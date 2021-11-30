@@ -6,6 +6,9 @@ body {
   background: linear-gradient(#CC9999, #eedddd) fixed;
   color: #000000;
 }
+body svg {
+  fill: #000000;
+}
 
 a {
   color: #000000;
@@ -172,5 +175,8 @@ button {
 
 .delfo th, .delfo td {
   border-color: #CC9999;
+}
+.delfo tr:nth-of-type(2n) td {
+  background-color: #ffaaaa;
 }
 /*# sourceMappingURL=mono.css.map */

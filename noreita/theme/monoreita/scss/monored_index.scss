@@ -33,6 +33,10 @@ body {
 	font-family: sans-serif;
 	word-wrap: break-word;
 	overflow-wrap: break-word;
+	svg {
+		width: auto;
+		height: 1em;
+	}
 }
 
 hr {

@@ -33,6 +33,9 @@ body {
 		background: $ushiro;
 	}
 	color: $moji;
+	svg {
+		fill: $moji;
+	}
 }
 a {
 	color: $moji;
@@ -166,5 +169,8 @@ button {
 .delfo {
 	th, td {
 		border-color: $ushiro;
+	}
+	tr:nth-of-type(2n) td {
+		background-color: $th_bg;
 	}
 }

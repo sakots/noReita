@@ -5,6 +5,9 @@ body {
   background: #FFFFEF;
   color: #79160A;
 }
+body svg {
+  fill: #79160A;
+}
 
 a {
   color: #79160A;
@@ -170,5 +173,8 @@ button {
 
 .delfo th, .delfo td {
   border-color: #FFFFEF;
+}
+.delfo tr:nth-of-type(2n) td {
+  background-color: #EEE0D7;
 }
 /*# sourceMappingURL=mono.css.map */

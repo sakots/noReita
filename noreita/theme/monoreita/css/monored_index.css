@@ -18,6 +18,10 @@ body {
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
+body svg {
+  width: auto;
+  height: 1em;
+}
 
 hr {
   border-style: dashed;

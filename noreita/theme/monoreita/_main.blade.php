@@ -99,6 +99,9 @@
 							<section>
 								<h4 id=oya>
 									<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
+									@if ($bbsline['admins'] == 1)
+										<svg viewBox="0 0 640 512"><use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge"></svg>
+									@endif
 									@if ($bbsline['modified'] == $bbsline['created'])
 										{{$bbsline['modified']}}
 									@else
@@ -145,7 +148,17 @@
 								<p class="comment oya">{!! $bbsline['com'] !!}</p>
 								@if ($bbsline['rflag'])
 								<div class="res">
-									<p class="limit">レス{{$bbsline['res_d_su']}}件省略。すべて見るには返信ボタンを押してください。</p>
+									<p class="limit">
+										レス{{$bbsline['res_d_su']}}件省略。すべて見るには
+										<a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}">
+										@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
+										返信
+										@else
+										すべて見る
+										@endif
+										</a>
+										を押してください。
+									</p>
 								</div>
 								@endif
 								@if (!empty($ko))
@@ -157,7 +170,11 @@
 													<section>
 														<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
 														<h4>
-															名前：<span class="resname">{{$res['a_name']}}</span>：
+															名前：<span class="resname">{{$res['a_name']}}
+																@if ($res['admins'] == 1)
+																<svg viewBox="0 0 640 512"><use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge"></svg>
+																@endif
+																</span>：
 															@if ($res['modified'] == $res['created'])
 																{{$res['modified']}}
 															@else
