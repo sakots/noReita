@@ -50,7 +50,7 @@ if (!is_file(DB_NAME.'.db')) {
             //LIMIT 1 で取り出す画像が1枚だけ決まる。
             //紆余曲折を経てこの文に行き着いた →
             //https://www.it-swarm-ja.com/ja/sql/SQLiteでランダムな行を選択します/970867568/
-            $sql = "SELECT picfile FROM tlog LIMIT 1 OFFSET abs(random() % '$thnum');";
+            $sql = "SELECT picfile FROM tlog LIMIT 1 OFFSET abs(random() % '$thnum')";
             $msgs = $db->prepare($sql);
             $msgs->execute();
             $msg = $msgs->fetch(); //取り出せた
