@@ -74,6 +74,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ## 履歴
 
+### [2021/12/01] noreita_rndimg
+
+- 文法ミス修正
+
 ### [2021/11/30] v1.1.0
 
 - 古いスレッドの省略レスが見れなかったの修正
