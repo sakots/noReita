@@ -1,0 +1,170 @@
+@charset "UTF-8";
+/*! =====このcssファイルはsassから生成されています。===== */
+
+@use "mono_conf" as *;
+
+// 押すボタンやinput:1, テキストエリア、書くinptutなど:-1
+@mixin txt_box($box){
+	@if $box == 1 {
+		border-color: $b_border $b_border_u $b_border_u $b_border;
+		color: $button_moji;
+		background-color: $button;
+	} @else if $box == -1 {
+		border-color: $b_border_u $b_border $b_border $b_border_u;
+		color: $form_txt;
+		background-color: $form_txt_bk;
+	} @else {
+		background-color: $button;
+		border-color: $b_border $b_border_u $b_border_u $b_border;
+		color: $button_moji;
+	}
+}
+
+//全体的指定
+body {
+	@if $dev == 1 {
+		background-attachment: fixed;
+		background: linear-gradient($ushiro, darken($ushiro,20%)) fixed;
+	} @else if $dev == -1 {
+		background-attachment: fixed;
+		background: linear-gradient($ushiro, lighten($ushiro,20%)) fixed;
+	} @else {
+		background-attachment: unset;
+		background: $ushiro;
+	}
+	color: $moji;
+}
+a {
+	color: $moji;
+	&:link {
+		color: $moji;
+	}
+	&:visited {
+		color: $link_visited;
+	}
+	&:active {
+		color: $link_active;
+	}
+	&:hover {
+		color: $link_hover;
+	}
+}
+
+hr {
+	border-style: dashed;
+	border-color: $border;
+}
+//----------
+header, .thread, footer {
+	background-color: $haikei;
+}
+header {
+	border-color: $border;
+}
+h1 {
+	a {
+		&:visited {
+			color: $link_visited;
+		}
+		&:hover {
+			color: $link_hover;
+		}
+	}
+}
+
+.thread {
+	border-color: $border;
+}
+footer {
+	@extend .thread;
+}
+input, textarea {
+	@include txt_box(-1);
+}
+select {
+	@include txt_box(-1);
+}
+input[type="submit"] {
+	@include txt_box(1);
+}
+input[name="upfile"] {
+	@include txt_box(1);
+}
+
+figure {
+	background-color: $haikei;
+}
+
+.oyaname {
+    border: solid 1px $button;
+}
+.oyaname:hover {
+    background-color: $ushiro;
+}
+
+.res {
+	border-color: $border;
+}
+.limit {
+	background-color: $limit;
+}
+.resma {
+	color: $resmoji;
+	background-color: $ushiro;
+}
+
+button {
+	@include txt_box(1);
+	background-color: $button;
+	color: $button_moji;
+}
+.button {
+	@include txt_box(1);
+	a {
+		color: $button_moji;
+		svg {
+			fill: $button_moji;
+		}
+	}
+}
+.oyat {
+	border-color: $border;
+	@if $dev == 1 {
+		background: linear-gradient(to right, $th_bg, lighten($th_bg,20%), adjust-hue(lighten($th_bg, 10%),-20deg)) fixed;
+	} @else if $dev == -1 {
+		background: linear-gradient(to right, $th_bg, darken($th_bg,15%), adjust-hue(darken($th_bg, 10%),20deg)) fixed;
+	} @else {
+		background: $th_bg;
+	}
+	color: $th_title;
+}
+
+#appstage {
+	.palette .palette_set {
+		@include txt_box(-1);
+	}
+}
+.NEO {
+	.color_bk { color: $bk; }
+	.color_bk2 { color: $bk2; }
+	.color_tool_icon { color: $tool_icon; }
+	.color_icon { color: $icon; }
+	.color_iconselect { color: $iconselect; }
+	.color_text { color: $text; }
+	.color_bar { color: $bar; }
+	.tool_color_button { color: $tool_button; }
+	.tool_color_button2 { color: $tool_button2; }
+	.tool_color_text { color: $tool_text; }
+	.tool_color_bar { color: $tool_bar; }
+	.tool_color_frame { color: $tool_frame; }
+}
+
+#cp {
+	scroll-behavior: smooth;
+}
+
+.delfo {
+	th, td {
+		border-color: $ushiro;
+	}
+}

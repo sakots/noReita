@@ -1,0 +1,176 @@
+@charset "UTF-8";
+/*! =====このcssファイルはsassから生成されています。===== */
+body {
+  background-attachment: fixed;
+  background: -webkit-gradient(linear, left top, left bottom, from(#CC9999), to(#eedddd)) fixed;
+  background: linear-gradient(#CC9999, #eedddd) fixed;
+  color: #000000;
+}
+
+a {
+  color: #000000;
+}
+a:link {
+  color: #000000;
+}
+a:visited {
+  color: #666666;
+}
+a:active {
+  color: #FF3322;
+}
+a:hover {
+  color: #FF3322;
+}
+
+hr {
+  border-style: dashed;
+  border-color: #FF3333;
+}
+
+header, .thread, footer {
+  background-color: #FEDEDE;
+}
+
+header {
+  border-color: #FF3333;
+}
+
+h1 a:visited {
+  color: #666666;
+}
+h1 a:hover {
+  color: #FF3322;
+}
+
+.thread, footer {
+  border-color: #FF3333;
+}
+
+input, textarea {
+  border-color: #336600 #99CC66 #99CC66 #336600;
+  color: #000;
+  background-color: #EEDDDD;
+}
+
+select {
+  border-color: #336600 #99CC66 #99CC66 #336600;
+  color: #000;
+  background-color: #EEDDDD;
+}
+
+input[type=submit] {
+  border-color: #99CC66 #336600 #336600 #99CC66;
+  color: #FFF;
+  background-color: #669933;
+}
+
+input[name=upfile] {
+  border-color: #99CC66 #336600 #336600 #99CC66;
+  color: #FFF;
+  background-color: #669933;
+}
+
+figure {
+  background-color: #FEDEDE;
+}
+
+.oyaname {
+  border: solid 1px #669933;
+}
+
+.oyaname:hover {
+  background-color: #CC9999;
+}
+
+.res {
+  border-color: #FF3333;
+}
+
+.limit {
+  background-color: #99BBAA;
+}
+
+.resma {
+  color: #114411;
+  background-color: #CC9999;
+}
+
+button {
+  border-color: #99CC66 #336600 #336600 #99CC66;
+  color: #FFF;
+  background-color: #669933;
+  background-color: #669933;
+  color: #FFF;
+}
+
+.button {
+  border-color: #99CC66 #336600 #336600 #99CC66;
+  color: #FFF;
+  background-color: #669933;
+}
+.button a {
+  color: #FFF;
+}
+.button a svg {
+  fill: #FFF;
+}
+
+.oyat {
+  border-color: #FF3333;
+  background: -webkit-gradient(linear, left top, right top, from(#ffaaaa), color-stop(#ff5e5e), to(#ffa477)) fixed;
+  background: linear-gradient(to right, #ffaaaa, #ff5e5e, #ffa477) fixed;
+  color: #130;
+}
+
+#appstage .palette .palette_set {
+  border-color: #336600 #99CC66 #99CC66 #336600;
+  color: #000;
+  background-color: #EEDDDD;
+}
+
+.NEO .color_bk {
+  color: #999;
+}
+.NEO .color_bk2 {
+  color: #766;
+}
+.NEO .color_tool_icon {
+  color: #444;
+}
+.NEO .color_icon {
+  color: #333;
+}
+.NEO .color_iconselect {
+  color: #333;
+}
+.NEO .color_text {
+  color: #FEE;
+}
+.NEO .color_bar {
+  color: #765;
+}
+.NEO .tool_color_button {
+  color: #877;
+}
+.NEO .tool_color_button2 {
+  color: #544;
+}
+.NEO .tool_color_text {
+  color: #FFF;
+}
+.NEO .tool_color_bar {
+  color: #A98;
+}
+.NEO .tool_color_frame {
+  color: #765;
+}
+
+#cp {
+  scroll-behavior: smooth;
+}
+
+.delfo th, .delfo td {
+  border-color: #CC9999;
+}
+/*# sourceMappingURL=mono.css.map */

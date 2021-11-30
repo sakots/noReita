@@ -1,0 +1,174 @@
+@charset "UTF-8";
+/*! =====このcssファイルはsassから生成されています。===== */
+body {
+  background-attachment: unset;
+  background: #111111;
+  color: #FEFEFE;
+}
+
+a {
+  color: #FEFEFE;
+}
+a:link {
+  color: #FEFEFE;
+}
+a:visited {
+  color: #999;
+}
+a:active {
+  color: #F33;
+}
+a:hover {
+  color: #F33;
+}
+
+hr {
+  border-style: dashed;
+  border-color: #99F;
+}
+
+header, .thread, footer {
+  background-color: #333333;
+}
+
+header {
+  border-color: #99F;
+}
+
+h1 a:visited {
+  color: #999;
+}
+h1 a:hover {
+  color: #F33;
+}
+
+.thread, footer {
+  border-color: #99F;
+}
+
+input, textarea {
+  border-color: #003 #66F #66F #003;
+  color: #000;
+  background-color: #EEEEEE;
+}
+
+select {
+  border-color: #003 #66F #66F #003;
+  color: #000;
+  background-color: #EEEEEE;
+}
+
+input[type=submit] {
+  border-color: #66F #003 #003 #66F;
+  color: #FFF;
+  background-color: #69F;
+}
+
+input[name=upfile] {
+  border-color: #66F #003 #003 #66F;
+  color: #FFF;
+  background-color: #69F;
+}
+
+figure {
+  background-color: #333333;
+}
+
+.oyaname {
+  border: solid 1px #69F;
+}
+
+.oyaname:hover {
+  background-color: #111111;
+}
+
+.res {
+  border-color: #99F;
+}
+
+.limit {
+  background-color: #112244;
+}
+
+.resma {
+  color: #44DD44;
+  background-color: #111111;
+}
+
+button {
+  border-color: #66F #003 #003 #66F;
+  color: #FFF;
+  background-color: #69F;
+  background-color: #69F;
+  color: #FFF;
+}
+
+.button {
+  border-color: #66F #003 #003 #66F;
+  color: #FFF;
+  background-color: #69F;
+}
+.button a {
+  color: #FFF;
+}
+.button a svg {
+  fill: #FFF;
+}
+
+.oyat {
+  border-color: #99F;
+  background: #036;
+  color: #EEC;
+}
+
+#appstage .palette .palette_set {
+  border-color: #003 #66F #66F #003;
+  color: #000;
+  background-color: #EEEEEE;
+}
+
+.NEO .color_bk {
+  color: #999;
+}
+.NEO .color_bk2 {
+  color: #567;
+}
+.NEO .color_tool_icon {
+  color: #444;
+}
+.NEO .color_icon {
+  color: #333;
+}
+.NEO .color_iconselect {
+  color: #333;
+}
+.NEO .color_text {
+  color: #FFF;
+}
+.NEO .color_bar {
+  color: #666;
+}
+.NEO .tool_color_button {
+  color: #778;
+}
+.NEO .tool_color_button2 {
+  color: #445;
+}
+.NEO .tool_color_text {
+  color: #FFF;
+}
+.NEO .tool_color_bar {
+  color: #89A;
+}
+.NEO .tool_color_frame {
+  color: #666;
+}
+
+#cp {
+  scroll-behavior: smooth;
+}
+
+.delfo th, .delfo td {
+  border-color: #111111;
+}
+/*# sourceMappingURL=mono.css.map */

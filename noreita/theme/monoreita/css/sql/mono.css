@@ -1,0 +1,174 @@
+@charset "UTF-8";
+/*! =====このcssファイルはsassから生成されています。===== */
+body {
+  background-attachment: unset;
+  background: #FFFFEF;
+  color: #79160A;
+}
+
+a {
+  color: #79160A;
+}
+a:link {
+  color: #79160A;
+}
+a:visited {
+  color: #79160A;
+}
+a:active {
+  color: #D12D1A;
+}
+a:hover {
+  color: #D12D1A;
+}
+
+hr {
+  border-style: dashed;
+  border-color: #79160A;
+}
+
+header, .thread, footer {
+  background-color: #FFFFEF;
+}
+
+header {
+  border-color: #79160A;
+}
+
+h1 a:visited {
+  color: #79160A;
+}
+h1 a:hover {
+  color: #D12D1A;
+}
+
+.thread, footer {
+  border-color: #79160A;
+}
+
+input, textarea {
+  border-color: #000000 #000000 #000000 #000000;
+  color: #000;
+  background-color: #FFFFFF;
+}
+
+select {
+  border-color: #000000 #000000 #000000 #000000;
+  color: #000;
+  background-color: #FFFFFF;
+}
+
+input[type=submit] {
+  border-color: #000000 #000000 #000000 #000000;
+  color: #000;
+  background-color: #E5E5E5;
+}
+
+input[name=upfile] {
+  border-color: #000000 #000000 #000000 #000000;
+  color: #000;
+  background-color: #E5E5E5;
+}
+
+figure {
+  background-color: #FFFFEF;
+}
+
+.oyaname {
+  border: solid 1px #E5E5E5;
+}
+
+.oyaname:hover {
+  background-color: #FFFFEF;
+}
+
+.res {
+  border-color: #79160A;
+}
+
+.limit {
+  background-color: #52745E;
+}
+
+.resma {
+  color: #52745E;
+  background-color: #FFFFEF;
+}
+
+button {
+  border-color: #000000 #000000 #000000 #000000;
+  color: #000;
+  background-color: #E5E5E5;
+  background-color: #E5E5E5;
+  color: #000;
+}
+
+.button {
+  border-color: #000000 #000000 #000000 #000000;
+  color: #000;
+  background-color: #E5E5E5;
+}
+.button a {
+  color: #000;
+}
+.button a svg {
+  fill: #000;
+}
+
+.oyat {
+  border-color: #79160A;
+  background: #EEE0D7;
+  color: #2F7448;
+}
+
+#appstage .palette .palette_set {
+  border-color: #000000 #000000 #000000 #000000;
+  color: #000;
+  background-color: #FFFFFF;
+}
+
+.NEO .color_bk {
+  color: #E9EFFE;
+}
+.NEO .color_bk2 {
+  color: #D5D9ED;
+}
+.NEO .color_tool_icon {
+  color: #A3B8D5;
+}
+.NEO .color_icon {
+  color: #A3B8D5;
+}
+.NEO .color_iconselect {
+  color: #738195;
+}
+.NEO .color_text {
+  color: #FFF;
+}
+.NEO .color_bar {
+  color: #6B6EA6;
+}
+.NEO .tool_color_button {
+  color: #D2D9FC;
+}
+.NEO .tool_color_button2 {
+  color: #9398B1;
+}
+.NEO .tool_color_text {
+  color: #59587E;
+}
+.NEO .tool_color_bar {
+  color: #D2D8EE;
+}
+.NEO .tool_color_frame {
+  color: #AEB3D2;
+}
+
+#cp {
+  scroll-behavior: smooth;
+}
+
+.delfo th, .delfo td {
+  border-color: #FFFFEF;
+}
+/*# sourceMappingURL=mono.css.map */
