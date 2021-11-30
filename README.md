@@ -11,7 +11,7 @@
 
 ## 概要
 
-Reactでお絵描き掲示板を作ろうとしたけど、あれ、jsxの中身に配列を送ってコンパイルして…って無理じゃね？
+[Reactでお絵描き掲示板を作ろうとした](https://github.com/sakots/Reita)けど、あれ、jsxの中身に配列を送ってコンパイルして…って無理じゃね？
 ってなったので諦めて、[ROIS](https://github.com/sakots/ROIS) から改良したものがこちらになります。
 
 Reactで絵板を作れなかったので、noReita。
