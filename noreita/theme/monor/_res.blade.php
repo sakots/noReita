@@ -53,6 +53,9 @@
 							<section>
 								<h4 id=oya>
 									<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
+									@if ($bbsline['admins'] == 1)
+										<svg viewBox="0 0 640 512"><use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge"></svg>
+									@endif
 									@if ($bbsline['modified'] == $bbsline['created'])
 										{{$bbsline['modified']}}
 									@else
@@ -105,7 +108,11 @@
 													{{$res['sub']}}
 												</h3>
 												<h4>
-													名前：<span class="resname">{{$res['a_name']}}</span>：
+													名前：<span class="resname">{{$res['a_name']}}
+														@if ($res['admins'] == 1)
+														<svg viewBox="0 0 640 512"><use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge"></svg>
+														@endif
+														</span>：
 													@if ($res['modified'] == $res['created'])
 														{{$res['modified']}}
 													@else
