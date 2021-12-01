@@ -1,6 +1,6 @@
 <?php
 //--------------------------------------------------
-//  noReita v1.1.1～
+//  noReita v1.1.2～
 //  by sakots >> https://oekakibbs.moe/
 //  Reitaの設定ファイルです。
 //--------------------------------------------------
@@ -25,7 +25,7 @@ define('THEMEDIR', 'monoreita');
 
 //設置URL phpのあるディレクトリの'/'まで
 //シェアボタンなどで使用
-define('BASE', 'https://localhost/dev/noreita/');
+define('BASE', 'https://dummy.example.com/noreita/');
 
 //掲示板のタイトル（<title>とTOP）
 define('TITLE', 'お絵かき掲示板');
@@ -64,6 +64,10 @@ define('ID_SEED', 'IDの種');
 
 //ID変更周期 なし(IDはずっと同じ):0 1日:1 1週間:2 1か月:3 1年:4
 define('ID_CYCLE', 2);
+
+//偽管理者用キャップ
+//管理者名で投稿し、管理パス以外だと名前の後にこれがつきます。
+define('ADMIN_CAP', '(ではない)');
 
 /* ---------- スパム対策 ---------- */
 

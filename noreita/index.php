@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.1.1'); //lot.211201.0
+define('REITA_VER','v1.1.2'); //lot.211201.1
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -96,12 +96,11 @@ $dat['use_hashtag'] = USE_HASHTAG;
 
 if (!isset($admin_name)) { $admin_name = '管理人'; }
 
-defined('A_NAME_SAN') or define('A_NAME_SAN','さん');
-defined('SODANE') or define('SODANE','そうだね');
+defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
+
 $dat['sodane'] = SODANE;
 
 //ペイント画面の$pwdの暗号化
-defined('CRYPT_PASS') or define('CRYPT_PASS','qRyFf1V6nyU4gSi');
 define('CRYPT_METHOD','aes-128-cbc');
 define('CRYPT_IV','T3pkYxNyjN7Wz3pu');//半角英数16文字
 
@@ -484,6 +483,14 @@ function regist() {
 			//id生成
 			$id = gen_id($host, $utime);
 
+			//管理者名は管理パスじゃないと使えない
+			if ($name === $admin_name && $pwd !== $admin_pass) {
+				$name = $name.ADMIN_CAP;
+			}
+
+			//管理者名の投稿でパスワードが管理パスなら管理者バッジつける
+			$admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0 ;
+
 			// 'のエスケープ(入りうるところがありそうなとこだけにしといた)
 			$name = str_replace("'","''",$name);
 			$sub = str_replace("'","''",$sub);
@@ -492,9 +499,6 @@ function regist() {
 			$url = str_replace("'","''",$url);
 			$host = str_replace("'","''",$host);
 			$id = str_replace("'","''",$id);
-
-			//管理者名の投稿でパスワードが管理パスなら管理者バッジつける
-			$admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0 ;
 
 			//age値取得
 			$sqlage = "SELECT MAX(age) FROM tlog";
@@ -637,6 +641,13 @@ function reply() {
 			//id生成
 			$id = gen_id($host, time());
 
+			//管理者名は管理パスじゃないと使えない
+			if ($name === $admin_name && $pwd !== $admin_pass) {
+				$name = $name.ADMIN_CAP;
+			}
+			//管理者名の投稿でパスワードが管理パスなら管理者バッジつける
+			$admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0 ;
+
 			// 'のエスケープ(入りうるところがありそうなとこだけにしといた)
 			$name = str_replace("'","''",$name);
 			$sub = str_replace("'","''",$sub);
@@ -645,9 +656,6 @@ function reply() {
 			$url = str_replace("'","''",$url);
 			$host = str_replace("'","''",$host);
 			$id = str_replace("'","''",$id);
-
-			//管理者名の投稿でパスワードが管理パスなら管理者バッジつける
-			$admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0 ;
 
 			//レスの位置
 			$tree = time() - $parent - (int)$msgwc["tid"];
