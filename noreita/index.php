@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.1.0'); //lot.211130.1
+define('REITA_VER','v1.1.1'); //lot.211201.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -93,6 +93,8 @@ $dat['dptime'] = DSP_PAINTTIME;
 $dat['share_button'] = SHARE_BUTTON;
 
 $dat['use_hashtag'] = USE_HASHTAG;
+
+if (!isset($admin_name)) { $admin_name = '管理人'; }
 
 defined('A_NAME_SAN') or define('A_NAME_SAN','さん');
 defined('SODANE') or define('SODANE','そうだね');
@@ -334,7 +336,7 @@ function init(){
 //投稿があればデータベースへ保存する
 /* 記事書き込み スレ立て */
 function regist() {
-	global $badip, $admin_pass;
+	global $badip, $admin_pass, $admin_name;
 	global $req_method;
 	global $dat;
 
@@ -491,8 +493,8 @@ function regist() {
 			$host = str_replace("'","''",$host);
 			$id = str_replace("'","''",$id);
 
-			//パスワードが管理パスなら管理者バッジつける
-			$admins = $pwd === $admin_pass ? 1 : 0 ;
+			//管理者名の投稿でパスワードが管理パスなら管理者バッジつける
+			$admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0 ;
 
 			//age値取得
 			$sqlage = "SELECT MAX(age) FROM tlog";
@@ -549,7 +551,7 @@ function regist() {
 
 //記事書き込み - リプライ
 function reply() {
-	global $badip, $admin_pass;
+	global $badip, $admin_pass, $admin_name;
 	global $req_method;
 	global $dat;
 
@@ -644,8 +646,8 @@ function reply() {
 			$host = str_replace("'","''",$host);
 			$id = str_replace("'","''",$id);
 
-			//パスワードが管理パスなら管理者バッジつける
-			$admins = $pwd === $admin_pass ? 1 : 0 ;
+			//管理者名の投稿でパスワードが管理パスなら管理者バッジつける
+			$admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0 ;
 
 			//レスの位置
 			$tree = time() - $parent - (int)$msgwc["tid"];
