@@ -42,21 +42,18 @@ if (!is_file(DB_NAME.'.db')) {
     try {
         //db接続
         $db = new PDO(DB_PDO);
-        //まずスレッドがあるか
-        $sql = "SELECT SUM(thread) FROM tlog";
-        $thnum = $db->exec($sql);
-        //あれば実行
-        if ($thnum > 0) {
-            //LIMIT 1 で取り出す画像が1枚だけ決まる。
-            //紆余曲折を経てこの文に行き着いた →
-            //https://www.it-swarm-ja.com/ja/sql/SQLiteでランダムな行を選択します/970867568/
-            $sql = "SELECT picfile FROM tlog LIMIT 1 OFFSET abs(random() % '$thnum')";
-            $msgs = $db->prepare($sql);
-            $msgs->execute();
-            $msg = $msgs->fetch(); //取り出せた
-            $filename = IMG_DIR.$msg["picfile"];
-        } else {
+        //LIMIT 1 で取り出す画像が1枚だけ決まる。
+        //紆余曲折を経てこの文に行き着いた →
+        //https://www.it-swarm-ja.com/ja/sql/SQLiteでランダムな行を選択します/970867568/
+        $sql = "SELECT picfile FROM tlog WHERE thread = 1 LIMIT 1 OFFSET abs(random() % (SELECT SUM(thread) FROM tlog))";
+        $msgs = $db->prepare($sql);
+        $msgs->execute();
+        $msg = $msgs->fetch(); //取り出せた
+        //配列がカラならデフォ画像
+        if (empty($msg)) {
             $filename = $default;
+        } else {
+            $filename = IMG_DIR.$msg["picfile"];
         }
         $db = null;// db切断
     } catch (PDOException $e) {

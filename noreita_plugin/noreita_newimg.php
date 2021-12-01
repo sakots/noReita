@@ -49,7 +49,7 @@ if (!is_file(DB_NAME.'.db')) {
         $msgs->execute();
         $msg = $msgs->fetch(); //取り出せた
         //配列$msg内のpicfileに格納されている
-        //$msgがからっぽ=ログに画像がない場合はデフォルト画像
+        //配列がカラならデフォ画像
         if (empty($msg)) {
             $filename = $default;
         } else {
