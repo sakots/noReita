@@ -310,6 +310,9 @@ button {
 }
 #catalog img {
   width: 150px;
+  height: 150px;
+  -o-object-fit: cover;
+     object-fit: cover;
 }
 
 .delfo {
