@@ -170,23 +170,23 @@
 											<table>
 												<tr>
 													<td>name @if ($use_name) * @endif</td>
-													<td><input type="text" name="name" size="18" value="" autocomplete="name"></td>
+													<td><input type="text" name="name" size="18" value="" autocomplete="name" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
 												</tr>
 												<tr>
 													<td>mail</td>
-													<td><input type="text" name="mail" size="18" value="" autocomplete="email"></td>
+													<td><input type="text" name="mail" size="18" value="" autocomplete="email" maxlength="{{$max_email}}"></td>
 												</tr>
 												<tr>
 													<td>URL</td>
-													<td><input type="text" name="url" size="18" value="" autocomplete="url"></td>
+													<td><input type="text" name="url" size="18" value="" autocomplete="url" maxlength="{{$max_url}}"></td>
 												</tr>
 												<tr>
 													<td>subject @if ($use_sub) * @endif</td>
 													<td>
 														@if ($use_resub)
-															<input type="text" name="sub" size="18" value="Re:{{$bbsline['sub']}}" autocomplete="section-sub">
+															<input type="text" name="sub" size="18" value="Re:{{$bbsline['sub']}}" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
 														@else
-															<input type="text" name="sub" size="18" value="" autocomplete="section-sub">
+															<input type="text" name="sub" size="18" value="" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
 														@endif
 														<input type="hidden" name="picfile" value="">
 														<input type="hidden" name="parent" value="{{$resno}}">
@@ -204,9 +204,9 @@
 													</td>
 												</tr>
 												<tr>
-													<td>comment @if ($use_com) * @endif</td>
+													<td>comment * </td>
 													<td>
-														<textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea>
+														<textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
 													</td>
 												</tr>
 												<tr>

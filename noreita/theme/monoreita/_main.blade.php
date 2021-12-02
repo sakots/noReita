@@ -31,8 +31,8 @@
 				<section class="epost">
 					<form action="{{$self}}" method="post" enctype="multipart/form-data">
 						<p>
-							<label>幅：<input class="form" type="number" min="{{$pdefw}}" name="picw" value="{{$pdefw}}"></label>
-							<label>高さ：<input class="form" type="number" min="{{$pdefh}}" name="pich" value="{{$pdefh}}"></label>
+							<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
+							<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
 							<input type="hidden" name="mode" value="paint">
 							<label for="tools">ツール</label>
 							<select name="tools" id="tools">
@@ -258,7 +258,7 @@
 					</form>
 					<form class="delf" action="{{$self}}" method="post">
 						<p>
-							No <input class="form" type="number" min="1" name="delno" value="" autocomplete="off">
+							No <input class="form" type="number" min="1" name="delno" value="" autocomplete="off" required>
 							Pass <input class="form" type="password" name="pwd" value="" autocomplete="current-password">
 							<select class="form" name="mode">
 								<option value="edit">編集</option>
