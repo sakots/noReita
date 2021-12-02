@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.1.2'); //lot.211201.1
+define('REITA_VER','v1.1.3'); //lot.211202.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -63,6 +63,13 @@ $dat['pdefw'] = PDEF_W;
 $dat['pdefh'] = PDEF_H;
 $dat['pmaxw'] = PMAX_W;
 $dat['pmaxh'] = PMAX_H;
+
+$dat['max_name'] = MAX_NAME;
+$dat['max_email'] = MAX_EMAIL;
+$dat['max_sub'] = MAX_SUB;
+$dat['max_url'] = MAX_URL;
+$dat['max_com'] = MAX_COM;
+
 $dat['themedir'] = THEMEDIR;
 $dat['tname'] = THEME_NAME;
 $dat['tver'] = THEME_VER;
