@@ -1,6 +1,6 @@
 <?php
 //--------------------------------------------------
-// 「noReita」v1.0.0～用テーマ「monor」設定ファイル
+// 「noReita」v1.1.3～用テーマ「monor」設定ファイル
 //  by sakots https://oekakibbs.moe/
 //--------------------------------------------------
 
@@ -8,7 +8,7 @@
 define('THEME_NAME', "monor");
 
 //テーマのバージョン
-define('THEME_VER', "v1.0.2 lot.211201.0");
+define('THEME_VER', "v1.1.0 lot.211202.0");
 
 /* -------------------- */
 
@@ -24,7 +24,7 @@ define('SODANE', 'そうだね');
 
 /* -------------------- */
 
-//テーマがXHTMLか 1:XTHML 0:HTML
+//テーマがXHTMLか 1:XHTML 0:HTML
 define('TH_XHTML', 0);
 
 /* テンプレートファイル名に".blade.php"は不要 */

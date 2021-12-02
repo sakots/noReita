@@ -49,25 +49,25 @@
 						<table>
 							<tr>
 								<td>name @if ($use_name) * @endif</td>
-								<td><input type="text" name="name" size="28" autocomplete="username"></td>
+								<td><input type="text" name="name" size="28" autocomplete="username" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
 							</tr>
 							<tr>
 								<td>mail</td>
-								<td><input type="text" name="mail" size="28" value="" autocomplete="email"></td>
+								<td><input type="text" name="mail" size="28" value="" autocomplete="email" maxlength="{{$max_email}}"></td>
 							</tr>
 							<tr>
 								<td>URL</td>
-								<td><input type="text" name="url" size="28" value="" autocomplete="url"></td>
+								<td><input type="text" name="url" size="28" value="" autocomplete="url" maxlength="{{$max_url}}"></td>
 							</tr>
 							<tr>
 								<td>subject @if ($use_sub) * @endif</td>
 								<td>
-									<input type="text" name="sub" size="35" autocomplete="section-sub">
+									<input type="text" name="sub" size="35" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
 								</td>
 							</tr>
 							<tr>
 								<td>comment @if ($use_com) * @endif </td>
-								<td><textarea name="com" cols="48" rows="5" wrap="soft" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea></td>
+								<td><textarea name="com" cols="48" rows="5" wrap="soft" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};" @if ($use_com) required @endif maxlength="{{$max_com}}"></textarea></td>
 							</tr>
 							@if (isset($temp))
 							<tr>
