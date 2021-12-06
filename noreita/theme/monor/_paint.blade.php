@@ -8,6 +8,7 @@
 		@if ($tool == 'neo')
 		<link rel="stylesheet" href="neo.css?{{$stime}}" type="text/css">
 		<script src="neo.js?{{$stime}}" charset="utf-8"></script>
+		<script src="theme/{{$themedir}}/fix_neo/fix.js?{{$stime}}" charset="utf-8"></script>
 		<!-- アプレットフィット -->
 		<script>
 			function appfit(f) {
@@ -39,9 +40,9 @@
 		@endif
 		@if ($tool == 'chicken')
 		<script src="chickenpaint/js/chickenpaint.min.js?{{$stime}}"></script>
-		<script src="templates/{{$themedir}}/fix_chiken/fix.js?{{$stime}}" charset="utf-8"></script>
+		<script src="theme/{{$themedir}}/fix_chiken/fix.js?{{$stime}}" charset="utf-8"></script>
 		<link rel="stylesheet" type="text/css" href="chickenpaint/css/chickenpaint.css?{{$stime}}">
-		<link rel="stylesheet" href="templates/{{$themedir}}/fix_chiken/fix.css?{{$stime}}" type="text/css">
+		<link rel="stylesheet" href="theme/{{$themedir}}/fix_chiken/fix.css?{{$stime}}" type="text/css">
 		@endif
 	</head>
 	<body id="paintmode">

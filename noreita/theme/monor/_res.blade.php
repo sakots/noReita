@@ -204,7 +204,7 @@
 													</td>
 												</tr>
 												<tr>
-													<td>comment *</td>
+													<td>comment * </td>
 													<td>
 														<textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
 													</td>
