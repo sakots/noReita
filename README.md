@@ -3,6 +3,7 @@
 ![php](https://img.shields.io/badge/php->5.6-green.svg)
 ![php](https://img.shields.io/badge/php-7.x-green.svg)
 ![php](https://img.shields.io/badge/php-8.0-green.svg)
+![php](https://img.shields.io/badge/php-8.1-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
 ![version](https://img.shields.io/github/v/release/sakots/noReita)
@@ -73,6 +74,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 リリース以外からのダウンロードの場合は、これらは自力でダウンロードをお願いします。
 
 ## 履歴
+
+### [2021/12/20]
+
+- php8.1での動作を確認
 
 ### [2021/12/06] v1.1.4
 
