@@ -76,7 +76,7 @@ main {
 	margin-top: 12px;
 	margin-bottom: 12px;
 	section figure img {
-		max-width: 400px;
+		max-width: min(100%, 400px);
 		height: auto;
 	}
 }

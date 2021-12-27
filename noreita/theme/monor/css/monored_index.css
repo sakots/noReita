@@ -63,7 +63,7 @@ main {
   margin-bottom: 12px;
 }
 .thread section figure img, footer section figure img {
-  max-width: 400px;
+  max-width: min(100%, 400px);
   height: auto;
 }
 
