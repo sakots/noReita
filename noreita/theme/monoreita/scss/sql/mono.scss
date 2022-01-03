@@ -94,10 +94,6 @@ input[name="upfile"] {
 	@include txt_box(1);
 }
 
-figure {
-	background-color: $haikei;
-}
-
 .oyaname {
     border: solid 1px $button;
 }
@@ -107,6 +103,9 @@ figure {
 
 .res {
 	border-color: $border;
+	section {
+		border-color: $border;
+	}
 }
 .limit {
 	background-color: $limit;

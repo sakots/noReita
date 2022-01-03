@@ -73,10 +73,6 @@ input[name=upfile] {
   background-color: #E5E5E5;
 }
 
-figure {
-  background-color: #FFFFEF;
-}
-
 .oyaname {
   border: solid 1px #E5E5E5;
 }
@@ -86,6 +82,9 @@ figure {
 }
 
 .res {
+  border-color: #79160A;
+}
+.res section {
   border-color: #79160A;
 }
 

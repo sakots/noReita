@@ -8,6 +8,8 @@ body {
 }
 body svg {
   fill: #000000;
+  height: 1em;
+  width: auto;
 }
 
 a {
@@ -87,6 +89,9 @@ figure {
 }
 
 .res {
+  border-color: #FF3333;
+}
+.res section {
   border-color: #FF3333;
 }
 

@@ -32,12 +32,14 @@
 						@if (isset($temp))
 						<div>
 							@foreach ($temp as $tmp)
+								<div class="imgs">
 								@if (isset($tmp['src']) && isset($tmp['srcname']))
 									<figure>
 										<img src="{{$tmp['src']}}">
 										<figcaption>{{$tmp['srcname']}}[{{$tmp['date']}}] 描画時間{{$tmp['utime']}}</figcaption>
 									</figure>
 								@endif
+								</div>
 							@endforeach
 						</div>
 						@else

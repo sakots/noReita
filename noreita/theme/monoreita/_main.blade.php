@@ -97,7 +97,7 @@
 						<section class="thread">
 							<h3 class="oyat">[{{$bbsline['tid']}}] {{$bbsline['sub']}}</h3>
 							<section>
-								<h4 id=oya>
+								<h4 class="oya">
 									<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
 									@if ($bbsline['admins'] == 1)
 										<svg viewBox="0 0 640 512"><use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge"></svg>
@@ -133,17 +133,15 @@
 											@endif
 										</h5>
 									@endif
-									<figure>
-										<figcaption><a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
-										@if ($bbsline['pchfile'])
-											<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
-										@endif
-										@if ($use_continue)
-											<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
-										@endif
-										</figcaption>
-										<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy"></a>
-									</figure>
+									<h5><a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
+									@if ($bbsline['pchfile'])
+										<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
+									@endif
+									@if ($use_continue)
+										<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
+									@endif
+									</h5>
+									<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></a>
 								@endif
 								<p class="comment oya">{!! $bbsline['com'] !!}</p>
 								@if ($bbsline['rflag'])

@@ -109,6 +109,9 @@ figure {
 
 .res {
 	border-color: $border;
+	section {
+		border-color: $border;
+	}
 }
 .limit {
 	background-color: $limit;
