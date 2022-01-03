@@ -75,6 +75,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ## 履歴
 
+### [2022/01/03] v1.1.6
+
+- テーマを大幅に編集
+  - figureタグ廃止など
+
 ### [2021/12/27] v1.1.5
 
 - theme
