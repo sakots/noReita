@@ -183,11 +183,11 @@ h4.oya {
 
 .res {
   margin-top: 1em;
+  border-top: dashed 1px;
 }
 .res section {
   margin-top: 1em;
   padding-top: 1em;
-  border-top: dashed 1px;
   display: table-cell;
   max-width: 100%;
 }
@@ -215,6 +215,7 @@ h5 {
 .thfoot {
   clear: left;
   text-align: right;
+  margin-top: 1em;
 }
 
 button {
