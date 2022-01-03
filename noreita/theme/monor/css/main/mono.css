@@ -88,6 +88,9 @@ figure {
 .res {
   border-color: #036;
 }
+.res section {
+  border-color: #036;
+}
 
 .limit {
   background-color: #FCC;

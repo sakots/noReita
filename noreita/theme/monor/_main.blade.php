@@ -133,17 +133,15 @@
 											@endif
 										</h5>
 									@endif
-									<figure>
-										<figcaption><a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
-										@if ($bbsline['pchfile'])
-											<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
-										@endif
-										@if ($use_continue)
-											<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
-										@endif
-										</figcaption>
-										<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy"></a>
-									</figure>
+									<h5><a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
+									@if ($bbsline['pchfile'])
+										<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
+									@endif
+									@if ($use_continue)
+										<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
+									@endif
+									</h5>
+									<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy"></a>
 								@endif
 								<p class="comment oya">{!! $bbsline['com'] !!}</p>
 								@if ($bbsline['rflag'])

@@ -85,18 +85,16 @@
 												描画時間：{{$bbsline['utime']}}
 											@endif
 										</h5>
-										<figure>
-											<figcaption>
-												<a href="{{$path}}{{$bbsline['picfile']}}" target="_blank">{{$bbsline['picfile']}}</a>
-												@if ($bbsline['pchfile'] != null)
-													<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}">●動画</a>
-												@endif
-												@if ($use_continue)
-													<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
-												@endif
-											</figcaption>
-											<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy"></a>
-										</figure>
+										<h5>
+											<a href="{{$path}}{{$bbsline['picfile']}}" target="_blank">{{$bbsline['picfile']}}</a>
+											@if ($bbsline['pchfile'] != null)
+												<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}">●動画</a>
+											@endif
+											@if ($use_continue)
+												<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
+											@endif
+										</h5>
+										<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy"></a>
 									@endif
 								<p class="comment oya">{!! $bbsline['com'] !!}</p>
 								@if (!empty($ko))
