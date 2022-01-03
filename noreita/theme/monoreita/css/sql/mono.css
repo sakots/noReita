@@ -48,6 +48,9 @@ h1 a:hover {
 .thread, footer {
   border-color: #79160A;
 }
+.thread img.image, footer img.image {
+  background-color: #FFFFEF;
+}
 
 input, textarea {
   border-color: #000000 #000000 #000000 #000000;
@@ -71,6 +74,10 @@ input[name=upfile] {
   border-color: #000000 #000000 #000000 #000000;
   color: #000;
   background-color: #E5E5E5;
+}
+
+figure {
+  background-color: #FFFFEF;
 }
 
 .oyaname {

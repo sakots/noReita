@@ -35,8 +35,6 @@ body {
 	color: $moji;
 	svg {
 		fill: $moji;
-		height: 1em;
-		width: auto;
 	}
 }
 a {
@@ -79,6 +77,9 @@ h1 {
 
 .thread {
 	border-color: $border;
+	img.image {
+		background-color: $haikei;
+	}
 }
 footer {
 	@extend .thread;

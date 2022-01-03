@@ -48,6 +48,9 @@ h1 a:hover {
 .thread, footer {
   border-color: #000;
 }
+.thread img.image, footer img.image {
+  background-color: #FEFEFE;
+}
 
 input, textarea {
   border-color: #300 #F66 #F66 #300;
