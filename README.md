@@ -75,6 +75,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ## 履歴
 
+### [2022/01/05] v1.1.7
+
+- PHP8.1環境で起こりうるエラーを減らした
+
 ### [2022/01/03] v1.1.6a
 
 - theme
