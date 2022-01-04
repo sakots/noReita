@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.1.6'); //lot.220103.0
+define('REITA_VER','v1.1.7'); //lot.220105.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -211,7 +211,7 @@ if(filter_input(INPUT_GET, 'mode')==="pictmp"){
 }
 if(filter_input(INPUT_GET, 'mode')==="picrep"){
 	$no = filter_input(INPUT_GET, 'no');
-	$pwd = filter_input(INPUT_GET, 'pwd');
+	$pwd = trim((string)filter_input(INPUT_GET, 'pwd'));
 	$repcode = filter_input(INPUT_GET, 'repcode');
 	$stime = filter_input(INPUT_GET, 'stime',FILTER_VALIDATE_INT);
 	$mode = "picrep";
@@ -351,16 +351,16 @@ function regist() {
 		check_csrf_token();
 	}
 
-	$sub = filter_input(INPUT_POST, 'sub');
-	$name = filter_input(INPUT_POST, 'name');
-	$mail = filter_input(INPUT_POST, 'mail');
-	$url = filter_input(INPUT_POST, 'url');
-	$com = filter_input(INPUT_POST, 'com');
+	$sub = (string)filter_input(INPUT_POST, 'sub');
+	$name = (string)filter_input(INPUT_POST, 'name');
+	$mail = (string)filter_input(INPUT_POST, 'mail');
+	$url = (string)filter_input(INPUT_POST, 'url');
+	$com = (string)filter_input(INPUT_POST, 'com');
 	$picfile = filter_input(INPUT_POST, 'picfile');
 	$invz = trim(filter_input(INPUT_POST, 'invz'));
 	$img_w = trim(filter_input(INPUT_POST, 'img_w',FILTER_VALIDATE_INT));
 	$img_h = trim(filter_input(INPUT_POST, 'img_h',FILTER_VALIDATE_INT));
-	$pwd = filter_input(INPUT_POST, 'pwd');
+	$pwd = trim((string)filter_input(INPUT_GET, 'pwd'));
 	$pwdh = password_hash($pwd,PASSWORD_DEFAULT);
 	$exid = trim(filter_input(INPUT_POST, 'exid',FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
@@ -571,14 +571,14 @@ function reply() {
 		check_csrf_token();
 	}
 
-	$sub = filter_input(INPUT_POST, 'sub');
-	$name = filter_input(INPUT_POST, 'name');
-	$mail = filter_input(INPUT_POST, 'mail');
-	$url = filter_input(INPUT_POST, 'url');
-	$com = filter_input(INPUT_POST, 'com');
+	$sub = (string)filter_input(INPUT_POST, 'sub');
+	$name = (string)filter_input(INPUT_POST, 'name');
+	$mail = (string)filter_input(INPUT_POST, 'mail');
+	$url = (string)filter_input(INPUT_POST, 'url');
+	$com = (string)filter_input(INPUT_POST, 'com');
 	$parent = trim(filter_input(INPUT_POST, 'parent',FILTER_VALIDATE_INT));
 	$invz = trim(filter_input(INPUT_POST, 'invz',FILTER_VALIDATE_INT));
-	$pwd = filter_input(INPUT_POST, 'pwd');
+	$pwd = trim((string)filter_input(INPUT_GET, 'pwd'));
 	$pwdh = password_hash($pwd,PASSWORD_DEFAULT);
 	$exid = trim(filter_input(INPUT_POST, 'exid',FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
@@ -1852,13 +1852,13 @@ function editexec(){
 
 	if($req_method !== "POST") {error(MSG006);}
 
-	$sub = filter_input(INPUT_POST, 'sub');
-	$name = filter_input(INPUT_POST, 'name');
-	$mail = filter_input(INPUT_POST, 'mail');
-	$url = filter_input(INPUT_POST, 'url');
-	$com = filter_input(INPUT_POST, 'com');
+	$sub = (string)filter_input(INPUT_POST, 'sub');
+	$name = (string)filter_input(INPUT_POST, 'name');
+	$mail = (string)filter_input(INPUT_POST, 'mail');
+	$url = (string)filter_input(INPUT_POST, 'url');
+	$com = (string)filter_input(INPUT_POST, 'com');
 	$picfile = trim(filter_input(INPUT_POST, 'picfile'));
-	$pwd = trim(filter_input(INPUT_POST, 'pwd'));
+	$pwd = (string)trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd,PASSWORD_DEFAULT);
 	$exid = trim(filter_input(INPUT_POST, 'exid',FILTER_VALIDATE_INT));
 
