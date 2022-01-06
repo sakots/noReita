@@ -2,13 +2,12 @@
 
 ![php](https://img.shields.io/badge/php->5.6-green.svg)
 ![php](https://img.shields.io/badge/php-7.x-green.svg)
-![php](https://img.shields.io/badge/php-8.0-green.svg)
-![php](https://img.shields.io/badge/php-8.1-green.svg)
+![php](https://img.shields.io/badge/php-8.x-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
 ![version](https://img.shields.io/github/v/release/sakots/noReita)
 ![Downloads](https://img.shields.io/github/downloads/sakots/noReita/total)
-![Licence](https://img.shields.io/github/license/sakots/noReita)
+![License](https://img.shields.io/github/license/sakots/noReita)
 
 ## 概要
 
@@ -74,6 +73,13 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 リリース以外からのダウンロードの場合は、これらは自力でダウンロードをお願いします。
 
 ## 履歴
+
+### [2022/01/07] v1.2.0
+
+- 2ページ目以降が表示されないとんでもないバグ修正
+- 同梱のBladeOneをv4.2にバージョンアップ
+- theme
+  - ツイートボタンで名前のエラーが出るのを修正
 
 ### [2022/01/05] v1.1.7
 
