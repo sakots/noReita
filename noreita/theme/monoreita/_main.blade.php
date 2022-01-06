@@ -204,7 +204,7 @@
 								@endif
 								<div class="thfoot">
 									@if ($share_button)
-									<span class="button"><a href="https://twitter.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank"><svg viewBox="0 0 512 512"><use href="./theme/{{$themedir}}/icons/twitter.svg#twitter"></svg> tweet</a></span>
+									<span class="button"><a href="https://twitter.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank"><svg viewBox="0 0 512 512"><use href="./theme/{{$themedir}}/icons/twitter.svg#twitter"></svg> tweet</a></span>
 									<span class="button"><a href="http://www.facebook.com/share.php?u={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" class="fb btn" target="_blank"><svg viewBox="0 0 512 512"><use href="./theme/{{$themedir}}/icons/facebook.svg#facebook"></svg> share</a></span>
 									@endif
 									@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
