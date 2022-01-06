@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.1.7'); //lot.220105.0
+define('REITA_VER','v1.2.0'); //lot.220107.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -28,7 +28,7 @@ if ($admin_pass === 'kanripass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
-//BladeOne v4.1
+//BladeOne v4.2
 include (__DIR__.'/BladeOne/lib/BladeOne.php');
 use eftec\bladeone\BladeOne;
 
@@ -543,8 +543,10 @@ function regist() {
 	//スレ数カウント
 	try {
 		$db = new PDO(DB_PDO);
-		$sqlth = "SELECT SUM(thread) FROM tlog";
-		$th_cnt = $db->exec("$sqlth");
+		$sqlth = "SELECT SUM(thread) as cnt FROM tlog";
+		$th_cnt_sql = $db->query("$sqlth");
+		$th_cnt_sql = $th_cnt_sql->fetch();
+		$th_cnt = $th_cnt_sql["cnt"];
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" .$e->getMessage();
 	}
@@ -718,8 +720,10 @@ function def() {
 	//スレ数カウント
 	try {
 		$db = new PDO(DB_PDO);
-		$sqlth = "SELECT SUM(thread) FROM tlog";
-		$th_cnt = $db->exec("$sqlth");
+		$sqlth = "SELECT SUM(thread) as cnt FROM tlog";
+		$th_cnt_sql = $db->query("$sqlth");
+		$th_cnt_sql = $th_cnt_sql->fetch();
+		$th_cnt = $th_cnt_sql["cnt"];
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" .$e->getMessage();
 	}
@@ -737,8 +741,10 @@ function def() {
 	//ページング
 	try {
 		$db = new PDO(DB_PDO);
-		$sqlcnt = "SELECT SUM(thread) FROM tlog WHERE invz=0";
-		$count = $db->exec("$sqlcnt");
+		$sqlcnt = "SELECT SUM(thread) as cnt FROM tlog WHERE invz=0";
+		$th_cnt_sql = $db->query("$sqlcnt");
+		$th_cnt_sql = $th_cnt_sql->fetch();
+		$count = $th_cnt_sql["cnt"];
 		if (isset($_GET['page']) && is_numeric($_GET['page'])) {
 			$page = $_GET['page'];
 			$page = max($page,1);
@@ -900,8 +906,10 @@ function catalog() {
 		$start = $page_def * ($page - 1);
 
 		//最大何ページあるのか
-		$sqlth = "SELECT SUM(thread) FROM tlog WHERE invz=0";
-		$th_cnt = $db->exec("$sqlth");
+		$sqlth = "SELECT SUM(thread) as cnt FROM tlog WHERE invz=0";
+		$th_cnt_sql = $db->query("$sqlth");
+		$th_cnt_sql = $th_cnt_sql->fetch();
+		$th_cnt = $th_cnt_sql["cnt"];
 		$max_page = floor($th_cnt / $page_def) + 1;
 		//最後にスレ数0のページができたら表示しない処理
 		if(($th_cnt % $page_def) == 0){
