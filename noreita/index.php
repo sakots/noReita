@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.2.0'); //lot.220107.0
+define('REITA_VER','v1.2.1'); //lot.220119.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -211,7 +211,7 @@ if(filter_input(INPUT_GET, 'mode')==="pictmp"){
 }
 if(filter_input(INPUT_GET, 'mode')==="picrep"){
 	$no = filter_input(INPUT_GET, 'no');
-	$pwd = trim((string)filter_input(INPUT_GET, 'pwd'));
+	$pwd = (string)trim(filter_input(INPUT_GET, 'pwd'));
 	$repcode = filter_input(INPUT_GET, 'repcode');
 	$stime = filter_input(INPUT_GET, 'stime',FILTER_VALIDATE_INT);
 	$mode = "picrep";
@@ -360,7 +360,7 @@ function regist() {
 	$invz = trim(filter_input(INPUT_POST, 'invz'));
 	$img_w = trim(filter_input(INPUT_POST, 'img_w',FILTER_VALIDATE_INT));
 	$img_h = trim(filter_input(INPUT_POST, 'img_h',FILTER_VALIDATE_INT));
-	$pwd = trim((string)filter_input(INPUT_GET, 'pwd'));
+	$pwd = (string)trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd,PASSWORD_DEFAULT);
 	$exid = trim(filter_input(INPUT_POST, 'exid',FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
@@ -580,7 +580,7 @@ function reply() {
 	$com = (string)filter_input(INPUT_POST, 'com');
 	$parent = trim(filter_input(INPUT_POST, 'parent',FILTER_VALIDATE_INT));
 	$invz = trim(filter_input(INPUT_POST, 'invz',FILTER_VALIDATE_INT));
-	$pwd = trim((string)filter_input(INPUT_GET, 'pwd'));
+	$pwd = trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd,PASSWORD_DEFAULT);
 	$exid = trim(filter_input(INPUT_POST, 'exid',FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
