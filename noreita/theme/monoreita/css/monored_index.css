@@ -133,6 +133,10 @@ input[type=color] {
   height: 1em;
 }
 
+textarea[name=com] {
+  padding: 0.1em;
+}
+
 input[type=number] {
   -moz-appearance: textfield;
 }
@@ -279,15 +283,9 @@ button {
 }
 
 #catalog {
-  display: -webkit-box;
-  display: -ms-flexbox;
   display: flex;
-  -webkit-box-orient: horizontal;
-  -webkit-box-direction: normal;
-      -ms-flex-direction: row;
-          flex-direction: row;
-  -ms-flex-wrap: wrap;
-      flex-wrap: wrap;
+  flex-direction: row;
+  flex-wrap: wrap;
 }
 #catalog div {
   width: 166px;
@@ -316,16 +314,10 @@ button {
 }
 
 .tmpimg div.imgs {
-  display: -webkit-box;
-  display: -ms-flexbox;
   display: flex;
-  -ms-flex-wrap: wrap;
-      flex-wrap: wrap;
-  -webkit-box-align: start;
-      -ms-flex-align: start;
-          align-items: flex-start;
-  -ms-flex-line-pack: start;
-      align-content: flex-start;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
 }
 
 @media screen and (max-width: 1024px) {

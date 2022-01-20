@@ -121,6 +121,9 @@ input[type="color"] {
 	@include txt_box;
 	height: 1em;
 }
+textarea[name="com"] {
+	padding: 0.1em;
+}
 //スポンボタン（上下の矢印ボタン）を非表示にする
 input[type="number"] {
 	-moz-appearance: textfield;
