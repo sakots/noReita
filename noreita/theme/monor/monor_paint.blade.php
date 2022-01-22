@@ -4,10 +4,10 @@
 		<meta charset="utf-8">
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		@include('headcss')
+		@include('monor_headcss')
 		@if ($tool == 'neo')
-		<link rel="stylesheet" href="neo.css?{{$stime}}" type="text/css">
-		<script src="neo.js?{{$stime}}" charset="utf-8"></script>
+		<link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$stime}}" type="text/css">
+		<script src="{{$neo_dir}}neo.js?{{$stime}}" charset="utf-8"></script>
 		<script src="theme/{{$themedir}}/fix_neo/fix.js?{{$stime}}" charset="utf-8"></script>
 		<!-- アプレットフィット -->
 		<script>
@@ -39,9 +39,9 @@
 		</script>
 		@endif
 		@if ($tool == 'chicken')
-		<script src="chickenpaint/js/chickenpaint.min.js?{{$stime}}"></script>
+		<script src="{{$chicken_dir}}js/chickenpaint.min.js?{{$stime}}"></script>
 		<script src="theme/{{$themedir}}/fix_chiken/fix.js?{{$stime}}" charset="utf-8"></script>
-		<link rel="stylesheet" type="text/css" href="chickenpaint/css/chickenpaint.css?{{$stime}}">
+		<link rel="stylesheet" type="text/css" href="{{$chicken_dir}}css/chickenpaint.css?{{$stime}}">
 		<link rel="stylesheet" href="theme/{{$themedir}}/fix_chiken/fix.css?{{$stime}}" type="text/css">
 		@endif
 	</head>
@@ -663,7 +663,7 @@
 						exitUrl: "{{$self}}",
 
 							allowDownload: true,
-							resourcesRoot: "chickenpaint/",
+							resourcesRoot: "{{$chicken_dir}}",
 							disableBootstrapAPI: true,
 							fullScreenMode: "auto"
 
@@ -674,7 +674,7 @@
 			@endif
 		</main>
 		<footer id="footer">
-			@include('footercopy')
+			@include('monor_footercopy')
 		</footer>
 	</body>
 </html>

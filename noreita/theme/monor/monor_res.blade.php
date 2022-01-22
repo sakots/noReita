@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		@include('headcss')
+		@include('monor_headcss')
 		@if ( !empty($oya) )
 		@foreach ($oya as $bbsline)
 		<meta name="twitter:card" content="summary">
@@ -255,7 +255,7 @@
 			</script>
 		</main>
 		<footer id="footer">
-			@include('footercopy')
+			@include('monor_footercopy')
 		</footer>
 	</body>
 </html>

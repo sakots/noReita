@@ -300,6 +300,18 @@ button {
 	}
 }
 
+.nsfw {
+	display: block;
+	overflow: hidden;
+	float: left;
+	position: relative;
+	img {
+		position: relative;
+		filter: blur(6px);
+		transition: .1s;
+	}
+}
+
 //以下レスポンシブ対応
 @media screen and (max-width: 1024px) {
 	.res {

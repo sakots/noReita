@@ -4,10 +4,10 @@
 		<meta charset="utf-8">
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		@include('headcss')
+		@include('monor_headcss')
 		@if ($tool == 'neo')
-		<link rel="stylesheet" href="neo.css?{{$a_stime}}" type="text/css">
-		<script src="neo.js?{{$a_stime}}" charset="utf-8"></script>
+		<link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
+		<script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
 		@endif
 		<script src="loadcookie.js"></script>
 	</head>
@@ -53,7 +53,7 @@
 			</section>
 		</main>
 		<footer id="footer">
-			@include('footercopy')
+			@include('monor_footercopy')
 		</footer>
 	</body>
 </html>
