@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.2.1'); //lot.220119.0
+define('REITA_VER','v1.3.0'); //lot.220122.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -15,11 +15,11 @@ require(__DIR__.'/theme/'.THEMEDIR.'/theme_conf.php');
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
 //phpのバージョンが古い場合動かさせない
-if (($phpver = phpversion()) < "5.6.0") {
-	die("PHP version 5.6.0 or higher is required for this program to work. <br>\n(Current PHP version:{$phpver})");
+if (($phpver = phpversion()) < "7.3.0") {
+	die("PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$phpver})");
 }
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 99999 || !defined('CONF_VER')) {
+if (CONF_VER < 220121 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
 
@@ -52,6 +52,9 @@ $message = "";
 $self = PHP_SELF;
 
 $dat['path'] = IMG_DIR;
+
+$dat['neo_dir'] = NEO_DIR;
+$dat['chicken_dir'] = CHICKEN_DIR;
 
 $dat['ver'] = REITA_VER;
 $dat['base'] = BASE;
@@ -116,6 +119,10 @@ defined('TH_XHTML') or define('TH_XHTML', 0);
 
 //日付フォーマット
 defined('DATE_FORMAT') or define('DATE_FORMAT', 'Y/m/d H:i:s');
+
+//NSFW画像機能を使う
+defined('USE_NSFW') or define('USE_NSFW', 1);
+$dat['use_nsfw'] = USE_NSFW;
 
 //データベース接続PDO
 define('DB_PDO', 'sqlite:'.DB_NAME.'.db');
@@ -309,10 +316,10 @@ function init(){
 			// id, 書いた日時, 修正日時, スレ親orレス, 親スレ, コメントid, スレ構造ID,
 			// 名前, メール, タイトル, 本文, url, ホスト,
 			// そうだね, 投稿者ID, パスワード, 絵の時間(内部), 絵の時間, 絵のurl, pchのurl, 絵の幅, 絵の高さ,
-			// age/sage記憶, 表示/非表示, 絵のツール, 認証マーク, そろそろ消える, 予備1, 予備2, 予備3, 予備4
+			// age/sage記憶, 表示/非表示, 絵のツール, 認証マーク, そろそろ消える, nsfw, 予備2, 予備3, 予備4
 			$db = new PDO(DB_PDO);
 			$db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
-			$sql = "CREATE TABLE tlog (tid integer primary key autoincrement, created TIMESTAMP, modified TIMESTAMP, thread VARCHAR(1), parent INT, comid BIGINT, tree BIGINT, a_name TEXT, mail TEXT, sub TEXT, com TEXT, a_url TEXT, host TEXT, exid TEXT, id TEXT, pwd TEXT, psec INT, utime TEXT, picfile TEXT, pchfile TEXT, img_w INT, img_h INT, age INT, invz VARCHAR(1), tool TEXT, admins VARCHAR(1),  shd VARCHAR(1), ext01 TEXT, ext02 TEXT, ext03 TEXT, ext04 TEXT)";
+			$sql = "CREATE TABLE tlog (tid integer primary key autoincrement, created TIMESTAMP, modified TIMESTAMP, thread VARCHAR(1), parent INT, comid BIGINT, tree BIGINT, a_name TEXT, mail TEXT, sub TEXT, com TEXT, a_url TEXT, host TEXT, exid TEXT, id TEXT, pwd TEXT, psec INT, utime TEXT, picfile TEXT, pchfile TEXT, img_w INT, img_h INT, age INT, invz VARCHAR(1), tool TEXT, admins VARCHAR(1), shd VARCHAR(1), ext01 TEXT, ext02 TEXT, ext03 TEXT, ext04 TEXT)";
 			$db = $db->query($sql);
 			$db = null; //db切断
 		}
@@ -364,6 +371,7 @@ function regist() {
 	$pwdh = password_hash($pwd,PASSWORD_DEFAULT);
 	$exid = trim(filter_input(INPUT_POST, 'exid',FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
+	$nsfw_flag = (string)filter_input(INPUT_POST, 'nsfw',FILTER_VALIDATE_INT);
 
 	if($req_method !== "POST") {error(MSG006);}
 
@@ -474,6 +482,13 @@ function regist() {
 				}
 				chmod( TEMP_DIR.$picdat, PERMISSION_FOR_DEST );
 				unlink( TEMP_DIR.$picdat );
+
+				//nsfw
+				if (USE_NSFW == 1 && $nsfw_flag == 1 ) {
+					$nsfw = true;
+				} else {
+					$nsfw = '';
+				}
 			} else {
 				$img_w = 0;
 				$img_h = 0;
@@ -517,7 +532,7 @@ function regist() {
 			$shd = 0;
 			$age = 0;
 			$parent = NULL;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), '$thread', '$parent', '$tree', '$tree', '$name', '$sub', '$com', '$mail', '$url', '$picfile', '$pchfile', '$img_w', '$img_h', '$psec', '$utime', '$pwdh', '$id', '$exid', '$age', '$invz', '$host', '$used_tool', '$admins', '$shd')";
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), '$thread', '$parent', '$tree', '$tree', '$name', '$sub', '$com', '$mail', '$url', '$picfile', '$pchfile', '$img_w', '$img_h', '$psec', '$utime', '$pwdh', '$id', '$exid', '$age', '$invz', '$host', '$used_tool', '$admins', '$shd', '$nsfw')";
 			$db->exec($sql);
 
 			$c_pass = $pwd;
@@ -1653,6 +1668,7 @@ function picreplace(){
 	$pwdf = filter_input(INPUT_GET, 'pwd');
 	$pwdf = hex2bin($pwdf);//バイナリに
 	$pwdf = openssl_decrypt($pwdf,CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV);//復号化
+	$nsfw_flag = filter_input(INPUT_POST, 'nsfw');
 
 	//ホスト取得
 	$host = gethostbyaddr(get_uip());
@@ -1757,8 +1773,15 @@ function picreplace(){
 			// 念のため'のエスケープ
 			$host = str_replace("'","''",$host);
 
+			//nsfw
+			if (USE_NSFW == 1 && $nsfw_flag == 1 ) {
+				$nsfw = true;
+			} else {
+				$nsfw = '';
+			}
+
 			//db上書き
-			$sqlrep = "UPDATE tlog set modified = datetime('now', 'localtime'), host = '$host', picfile = '$new_picfile', pchfile = '$new_pchfile', id = '$id', psec = '$psec', utime = '$utime' WHERE tid = '$no'";
+			$sqlrep = "UPDATE tlog set modified = datetime('now', 'localtime'), host = '$host', picfile = '$new_picfile', pchfile = '$new_pchfile', id = '$id', psec = '$psec', utime = '$utime' WHERE tid = '$no', ext01 = '$nsfw'";
 			$db = $db->exec($sqlrep);
 		} else {
 			error(MSG028);

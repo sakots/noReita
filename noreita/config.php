@@ -1,8 +1,8 @@
 <?php
 //--------------------------------------------------
-//  noReita v1.1.2～
+//  noReita v1.3.0～
 //  by sakots >> https://oekakibbs.moe/
-//  Reitaの設定ファイルです。
+//  noReitaの設定ファイルです。
 //--------------------------------------------------
 
 /* ---------- 最初に設定する項目 ---------- */
@@ -25,7 +25,7 @@ define('THEMEDIR', 'monoreita');
 
 //設置URL phpのあるディレクトリの'/'まで
 //シェアボタンなどで使用
-define('BASE', 'https://dummy.example.com/noreita/');
+define('BASE', 'https://example.com/noreita/');
 
 //掲示板のタイトル（<title>とTOP）
 define('TITLE', 'お絵かき掲示板');
@@ -52,6 +52,12 @@ define('DB_NAME', 'reita');
 //シェアボタンを表示する する:1 しない:0
 //設置場所のURL BASE で設定したurlをもとにリンクを作成
 define('SHARE_BUTTON', 0);
+
+/* ---------- NSFW画像 ---------- */
+
+//NSFW画像機能を使う 使う:1 使わない:0
+//自分の書いた画像に、表示するまでぼかしを掛けることができます
+define('USE_NSFW', 1);
 
 /* ---------- 個人識別 ---------- */
 
@@ -149,6 +155,16 @@ define('DEFAULT_TIMEZONE','Asia/Tokyo');
 //※treeのみを消して後に残ったlogは管理者のみ削除可能
 define('USER_DEL', 1);
 
+/* ---------- お絵かきディレクトリ設定 ---------- */
+
+//複数のお絵描き掲示板を管理する際に便利です。
+
+//neoのディレクトリ。index.phpから見て
+define('NEO_DIR', 'neo/');
+
+//chickenPaintのディレクトリ。index.phpから見て
+define('CHICKEN_DIR', 'chickenpaint/');
+
 /* ---------- お絵かきアプレット設定(neo) ---------- */
 
 //アンドゥの回数
@@ -230,7 +246,7 @@ define('AUTOLINK', 1);
 define('USE_NAME', 0);
 define('DEF_NAME', '名無しさん');	//未入力時の名前
 
-//本文を必須にする する:1 しない:0
+//絵を描いた時は本文を必須にする する:1 しない:0
 //(レス及び編集モードのときは必須)
 define('USE_COM', 0);
 define('DEF_COM', '本文無し');	//未入力時の本文
@@ -320,4 +336,4 @@ define('PHP_SELF', 'index.php');
 
 /* ------------- コンフィグ互換性管理 ------------- */
 
-define('CONF_VER', 100000);
+define('CONF_VER', 220122);
