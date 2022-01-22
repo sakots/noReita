@@ -1,6 +1,6 @@
 <?php
 //--------------------------------------------------
-// 「noReita」v1.1.3～用テーマ「nee-ex」設定ファイル
+// 「noReita」v1.3.0～用テーマ「nee-ex」設定ファイル
 //  by sakots https://oekakibbs.moe/
 //--------------------------------------------------
 
@@ -8,7 +8,7 @@
 define('THEME_NAME', "nee-ex");
 
 //テーマのバージョン
-define('THEME_VER', "v1.0.1 lot.220122.0");
+define('THEME_VER', "v1.3.0 lot.220122.0");
 
 /* -------------------- */
 
@@ -30,28 +30,28 @@ define('TH_XHTML', 0);
 /* テンプレートファイル名に".blade.php"は不要 */
 
 //メインのテンプレートファイル
-define('MAINFILE', "_main");
+define('MAINFILE', "nee-ex_main");
 
 //レスのテンプレートファイル
-define('RESFILE', "_res");
+define('RESFILE', "nee-ex_res");
 
 //お絵かきのテンプレートファイル
-define('PAINTFILE', "_paint");
+define('PAINTFILE', "nee-ex_paint");
 
 //動画再生のテンプレートファイル
-define('ANIMEFILE', "_anime");
+define('ANIMEFILE', "nee-ex_anime");
 
 //投稿時のテンプレートファイル
-define('PICFILE', "_picpost");
+define('PICFILE', "nee-ex_picpost");
 
 //カタログ、検索モードのテンプレートファイル
-define('CATALOGFILE', "_catalog");
+define('CATALOGFILE', "nee-ex_catalog");
 
 //管理モードのテンプレートファイル
-define('ADMINFILE', "_admin");
+define('ADMINFILE', "nee-ex_admin");
 
 //その他のテンプレートファイル
-define('OTHERFILE', "_other");
+define('OTHERFILE', "nee-ex_other");
 
 //描画時間の書式
 //※日本語だと、"1日1時間1分1秒"

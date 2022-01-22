@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		@include('headcss')
+		@include('nee-ex_headcss')
 		{{-- ok画面専用ヘッダ --}}
 		@if ($othermode == 'ok')
 		<meta http-equiv="refresh" content="1; URL={{$self}}">
@@ -225,7 +225,7 @@
 			</script>
 		</main>
 		<footer id="footer">
-			@include('footercopy')
+			@include('nee-ex_footercopy')
 		</footer>
 	</body>
 </html>

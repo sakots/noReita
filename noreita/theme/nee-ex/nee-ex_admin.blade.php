@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		@include('headcss')
+		@include('nee-ex_headcss')
 	</head>
 	<body>
 		<header id="header">
@@ -125,7 +125,7 @@
 			</div>
 		</main>
 		<footer id="footer">
-			@include('footercopy')
+			@include('nee-ex_footercopy')
 		</footer>
 	</body>
 </html>

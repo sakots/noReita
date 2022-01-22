@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		@include('headcss')
+		@include('nee-ex_headcss')
 	</head>
 	<body>
 		<header id="header">
@@ -176,6 +176,9 @@
 											@if ($bbsline['psec'] != null)
 												描画時間：{{$bbsline['utime']}}
 											@endif
+											@if ($bbsline['ext01'] == 1)
+												★NSFW
+											@endif
 										</h5>
 									@endif
 									<h5><a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
@@ -186,7 +189,11 @@
 										<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
 									@endif
 									</h5>
+									@if ($bbsline['ext01'] == 1)
+									<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></span></a>
+									@else
 									<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></a>
+									@endif
 								@endif
 								<p class="comment oya">{!! $bbsline['com'] !!}</p>
 								@if ($bbsline['rflag'])
@@ -277,7 +284,7 @@
 			</script>
 		</main>
 		<footer id="footer">
-			@include('footercopy')
+			@include('nee-ex_footercopy')
 		</footer>
 	</body>
 </html>

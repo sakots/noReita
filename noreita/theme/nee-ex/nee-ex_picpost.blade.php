@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		@include('headcss')
+		@include('nee-ex_headcss')
 	</head>
 	<body>
 		<header>
@@ -91,6 +91,17 @@
 									(記事の編集削除用。英数字で)
 								</td>
 							</tr>
+							@if ($use_nsfw === 1)
+							<tr>
+								<td>NSFW</td>
+								<td>
+									<input type="checkbox" name="nsfw" value="1" id="nsfw_button">
+									<label for="nsfw_button">(画像をNSFWとして投稿できます。)</label>
+								</td>
+							</tr>
+							@else
+							<input type="hidden" name="nsfw" value="0">
+							@endif
 							<tr>
 								<td>
 									<input type="submit" id="submit" name="send" value="書き込む">
@@ -120,7 +131,7 @@
 			</script>
 		</main>
 		<footer id="footer">
-			@include('footercopy')
+			@include('nee-ex_footercopy')
 		</footer>
 	</body>
 </html>

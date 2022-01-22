@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		@include('headcss')
+		@include('nee-ex_headcss')
 	</head>
 	<body>
 		<header id="header">
@@ -156,7 +156,11 @@
 						<div>
 							@if ($bbsline['picfile'] == true)
 							<p>
+								@if ($bbsline['ext01'] == 1)
+								<a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}" title="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})"><span class="nsfw"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})" loading="lazy"></span></a>
+								@else
 								<a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}" title="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})" loading="lazy"></a>
+								@endif
 							</p>
 							@else
 							<p>
@@ -217,7 +221,7 @@
 			</div>
 		</main>
 		<footer id="footer">
-			@include('footercopy')
+			@include('nee-ex_footercopy')
 		</footer>
 	</body>
 </html>
