@@ -320,6 +320,18 @@ button {
   align-content: flex-start;
 }
 
+.nsfw {
+  display: block;
+  overflow: hidden;
+  float: left;
+  position: relative;
+}
+.nsfw img {
+  position: relative;
+  filter: blur(6px);
+  transition: 0.1s;
+}
+
 @media screen and (max-width: 1024px) {
   .res {
     clear: left;
