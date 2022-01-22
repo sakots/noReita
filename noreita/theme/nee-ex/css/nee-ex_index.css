@@ -160,6 +160,10 @@ input[type=number]::-webkit-inner-spin-button {
   margin: 0;
 }
 
+.search_box {
+  font-size: smaller;
+}
+
 em.thispage {
   font-style: normal;
   font-weight: bold;

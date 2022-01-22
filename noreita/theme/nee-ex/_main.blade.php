@@ -26,12 +26,13 @@
 									<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
 									<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
 									<input type="hidden" name="mode" value="paint">
+									<input class="button" type="submit" value="お絵かき"><br>
 									<label for="tools">ツール</label>
 									<select name="tools" id="tools">
 										<option value="neo">PaintBBS NEO</option>
-										@if ($use_shi_p)<option value="shi">しぃペインター</option> @endif
 										@if ($use_chicken)<option value="chicken">ChickenPaint</option> @endif
 									</select>
+									<br>
 									<label for="palettes">パレット</label>
 									@if ($select_palettes)
 									<select name="palettes" id="palettes">
@@ -44,10 +45,10 @@
 										<option value="neo" id="0">標準</option>
 									</select>
 									@endif
+									<br>
 									@if ($useanime)
 									<label><input type="checkbox" value="true" name="anime" title="動画記録"@if ($defanime) checked @endif>アニメーション記録</label>
 									@endif
-									<input class="button" type="submit" value="お絵かき">
 								</p>
 							</form>
 							<ul>
@@ -106,6 +107,7 @@
 							<option value="del">削除</option>
 						</select>
 						<input class="button" type="submit" value=" OK ">
+						<hr>
 						<label for="mystyle">Color</label>
 						<span class="stylechanger">
 							<select class="form" name="select" id="mystyle" onchange="SetCss(this);">
