@@ -74,6 +74,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ## 履歴
 
+### [2022/01/23] theme nee-ex
+
+- ボタン微調整
+
 ### [2022/01/22] v1.3.0
 
 **configに大きな変更があります。再設定をお願いします。**
