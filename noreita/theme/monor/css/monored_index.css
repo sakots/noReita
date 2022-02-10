@@ -330,6 +330,10 @@ button {
   position: relative;
   filter: blur(6px);
   transition: 0.1s;
+  top: -6px;
+  bottom: -6px;
+  left: -6px;
+  right: -6px;
 }
 
 @media screen and (max-width: 1024px) {
