@@ -1,6 +1,5 @@
 # noReita
 
-![php](https://img.shields.io/badge/php->5.6-green.svg)
 ![php](https://img.shields.io/badge/php-7.x-green.svg)
 ![php](https://img.shields.io/badge/php-8.x-green.svg)
 
@@ -73,6 +72,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 リリース以外からのダウンロードの場合は、これらは自力でダウンロードをお願いします。
 
 ## 履歴
+
+### [2022/02/10] v1.3.1
+
+- 続きから書くと動画データ及び画像が喪失するバグ修正
+- テーマ微修正
 
 ### [2022/01/23] theme nee-ex
 
