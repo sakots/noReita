@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.3.0'); //lot.220122.0
+define('REITA_VER','v1.3.1'); //lot.220210.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -1781,7 +1781,7 @@ function picreplace(){
 			}
 
 			//db上書き
-			$sqlrep = "UPDATE tlog set modified = datetime('now', 'localtime'), host = '$host', picfile = '$new_picfile', pchfile = '$new_pchfile', id = '$id', psec = '$psec', utime = '$utime' WHERE tid = '$no', ext01 = '$nsfw'";
+			$sqlrep = "UPDATE tlog set modified = datetime('now', 'localtime'), host = '$host', picfile = '$new_picfile', pchfile = '$new_pchfile', id = '$id', psec = '$psec', utime = '$utime', ext01 = '$nsfw' WHERE tid = '$no'";
 			$db = $db->exec($sqlrep);
 		} else {
 			error(MSG028);
