@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.3.1'); //lot.220210.0
+define('REITA_VER','v1.3.2'); //lot.220321.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -28,7 +28,7 @@ if ($admin_pass === 'kanripass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
-//BladeOne v4.2
+//BladeOne v4.5
 include (__DIR__.'/BladeOne/lib/BladeOne.php');
 use eftec\bladeone\BladeOne;
 
