@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.3.2'); //lot.220321.0
+define('REITA_VER','v1.4.0'); //lot.220410.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -48,6 +48,9 @@ $temppath = realpath("./").'/'.TEMP_DIR;
 define('IMG_PATH', $path);
 define('TMP_PATH', $temppath);
 
+//偽しぃぺ
+defined('USE_NISE_SHIPE_NEO') or define('USE_NISE_SHIPE_NEO', 1);
+
 $message = "";
 $self = PHP_SELF;
 
@@ -79,6 +82,7 @@ $dat['tver'] = THEME_VER;
 
 $dat['use_shi_p'] = '0';
 $dat['use_chicken'] = USE_CHICKENPAINT;
+$dat['use_nise_shipe_neo'] = USE_NISE_SHIPE_NEO;
 
 $dat['select_palettes'] = USE_SELECT_PALETTES;
 $dat['pallets_dat'] = $pallets_dat;
@@ -449,6 +453,8 @@ function regist() {
 				//ツール
 				if( $tool === 'neo') {
 					$used_tool = 'PaintBBS NEO';
+				} elseif ( $tool === 'sneo') {
+					$used_tool = 'NISE shipe';
 				} elseif ( $tool === 'shi') {
 					$used_tool = 'Shi Painter';
 				} elseif ( $tool === 'chicken' ) {
@@ -1234,10 +1240,8 @@ function paintform($rep){
 		$dat['pwd'] = $pwdf;
 		$dat['ctype'] = $ctype;
 		if(is_file(IMG_DIR.$pch.'.pch')){
-			$useneo = true;
 			$dat['useneo'] = true;
 		}elseif(is_file(IMG_DIR.$pch.'.spch')){
-			$useneo = false;
 			$dat['useneo'] = false;
 		}
 		if((C_SECURITY_CLICK || C_SECURITY_TIMER) && SECURITY_URL){
@@ -1257,6 +1261,7 @@ function paintform($rep){
 
 	//パレット設定
 	//初期パレット
+	$lines = array();
 	$initial_palette = 'Palettes[0] = "#000000\n#FFFFFF\n#B47575\n#888888\n#FA9696\n#C096C0\n#FFB6FF\n#8080FF\n#25C7C9\n#E7E58D\n#E7962D\n#99CB7B\n#FCECE2\n#F9DDCF";';
 	foreach($pallets_dat as $p_value){
 		if($p_value[1] == filter_input(INPUT_POST, 'palettes')){ // キーと入力された値が同じなら

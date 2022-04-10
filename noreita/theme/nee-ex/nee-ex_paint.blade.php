@@ -8,6 +8,12 @@
 		@if ($tool == 'neo')
 		<link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$stime}}" type="text/css">
 		<script src="{{$neo_dir}}neo.js?{{$stime}}" charset="utf-8"></script>
+		@endif
+		@if ($tool == 'sneo')
+		<link rel="stylesheet" href="{{$neo_dir}}sneo.css?{{$stime}}" type="text/css">
+		<script src="{{$neo_dir}}sneo.js?{{$stime}}" charset="utf-8"></script>
+		@endif
+		@if ($tool == 'neo' || 'sneo')
 		<script src="theme/{{$themedir}}/fix_neo/fix.js?{{$stime}}" charset="utf-8"></script>
 		<!-- アプレットフィット -->
 		<script>

@@ -8,7 +8,7 @@
 define('THEME_NAME', "monoreita");
 
 //テーマのバージョン
-define('THEME_VER', "v1.3.1 lot.220321.0");
+define('THEME_VER', "v1.4.0 lot.220410.0");
 
 /* -------------------- */
 
