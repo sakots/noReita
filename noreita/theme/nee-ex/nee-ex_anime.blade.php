@@ -5,7 +5,7 @@
 		<title>{{$btitle}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		@include('nee-ex_headcss')
-		@if ($tool == 'neo')
+		@if ($tool == ('neo' || 'sneo'))
 		<link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
 		<script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
 		@endif

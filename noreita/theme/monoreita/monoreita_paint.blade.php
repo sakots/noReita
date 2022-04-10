@@ -13,7 +13,7 @@
 		<link rel="stylesheet" href="{{$neo_dir}}sneo.css?{{$stime}}" type="text/css">
 		<script src="{{$neo_dir}}sneo.js?{{$stime}}" charset="utf-8"></script>
 		@endif
-		@if ($tool == 'neo' || 'sneo')
+		@if ($tool == ('neo' || 'sneo'))
 		<script src="theme/{{$themedir}}/fix_neo/fix.js?{{$stime}}" charset="utf-8"></script>
 		<!-- アプレットフィット -->
 		<script>
