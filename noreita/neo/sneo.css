@@ -510,6 +510,7 @@
     font-family: 'Arial';
     letter-spacing: 0;
     vertical-align: baseline;
+    pointer-events: none;
 }
 
 .NEO .layerControl .label2 {
@@ -521,6 +522,7 @@
     font-family: 'Arial';
     letter-spacing: 0;
     vertical-align: baseline;
+    pointer-events: none;
 }
 
 .NEO .layerControl .label1 {
@@ -532,6 +534,7 @@
     font-family: 'Arial';
     letter-spacing: 0;
     vertical-align: baseline;
+    pointer-events: none;
 }
 
 .NEO .layerControl .label0 {
@@ -543,7 +546,55 @@
     font-family: 'Arial';
     letter-spacing: 0;
     vertical-align: baseline;
+    pointer-events: none;
 }
+
+.NEO .layerControl .opacity3 {
+    position: absolute;
+    width: 48px;
+    height: 9px;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+
+    top: 0px;
+    background-color: #aaaaaa;
+}
+.NEO .layerControl .opacity2 {
+    position: absolute;
+    width: 48px;
+    height: 9px;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+
+    top: 10px;
+    background-color: #aaaaaa;
+}
+.NEO .layerControl .opacity1 {
+    position: absolute;
+    width: 48px;
+    height: 9px;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+
+    top: 20px;
+    background-color: #aaaaaa;
+}
+.NEO .layerControl .opacity0 {
+    position: absolute;
+    width: 48px;
+    height: 9px;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+
+    top: 30px;
+    background-color: #aaaaaa;
+}
+
+
 
 /*
 -----------------------
