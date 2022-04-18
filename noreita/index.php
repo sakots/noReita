@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER','v1.4.0'); //lot.220410.0
+define('REITA_VER','v1.4.1'); //lot.220418.0
 
 //設定の読み込み
 require(__DIR__.'/config.php');
@@ -164,6 +164,7 @@ function get_uip(){
 //csrfトークンを作成
 function get_csrf_token(){
 	if(!isset($_SESSION)){
+		session_save_path(__DIR__.'/session/');
 		session_start();
 	}
 	header('Expires:');
@@ -173,6 +174,7 @@ function get_csrf_token(){
 }
 //csrfトークンをチェック
 function check_csrf_token(){
+	session_save_path(__DIR__.'/session/');
 	session_start();
 	$token=filter_input(INPUT_POST,'token');
 	$session_token=isset($_SESSION['token']) ? $_SESSION['token'] : '';
@@ -342,6 +344,9 @@ function init(){
 
 	if(!is_dir(TEMP_DIR)){
 		mkdir(TEMP_DIR,PERMISSION_FOR_DIR);chmod(TEMP_DIR,PERMISSION_FOR_DIR);
+	}
+	if(!is_dir(__DIR__.'/session/')){
+		mkdir(__DIR__.'/session/',PERMISSION_FOR_DIR);chmod(__DIR__.'/session/',PERMISSION_FOR_DIR);
 	}
 	if(!is_dir(TEMP_DIR))$err.=TEMP_DIR."がありません<br>";
 	if(!is_writable(TEMP_DIR))$err.=TEMP_DIR."を書けません<br>";
