@@ -75,6 +75,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ## 履歴
 
+### [2022/06/20] v1.4.2
+
+- bladeOneをバージョンアップ
+
 ### [2022/04/10] v1.4.1
 
 - funigeさんが偽しぃペインターNEOを動くようにしてくれた
