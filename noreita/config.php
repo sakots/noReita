@@ -8,7 +8,7 @@
 /* ---------- 最初に設定する項目 ---------- */
 //管理者パスワード
 //必ず変更してください ! kanripass のままではプログラムは動作しません !
-$admin_pass = 'pass';
+$admin_pass = 'kanripass';
 
 //管理者名
 //投稿の際に名前がこれでパスワードが管理パスのときに、名前のあとに管理者マークが付きます
@@ -80,10 +80,10 @@ define('ADMIN_CAP', '(ではない)');
 /* ---------- スパム対策 ---------- */
 
 //拒絶する文字列
-$badstring = array("irc.s16.xrea.com","著作権の侵害","未承諾広告");
+$badstring = array("irc.s16.xrea.com", "著作権の侵害", "未承諾広告");
 
 //使用できない名前
-$badname = array("ブランド","通販","販売","口コミ");
+$badname = array("ブランド", "通販", "販売", "口コミ");
 
 //全角半角スペース改行を考慮する必要はありません
 //スペースと改行を除去した文字列をチェックします
@@ -100,8 +100,8 @@ $badname = array("ブランド","通販","販売","口コミ");
 //拒絶する文字列で
 
 //AとBが両方あったら拒絶。
-$badstr_A = array("激安","低価","コピー","品質を?重視","大量入荷");
-$badstr_B = array("シャネル","シュプリーム","バレンシアガ","ブランド");
+$badstr_A = array("激安", "低価", "コピー", "品質を?重視", "大量入荷");
+$badstr_B = array("シャネル", "シュプリーム", "バレンシアガ", "ブランド");
 
 //正規表現を使うことができます。
 //全角半角スペース改行を考慮する必要はありません
@@ -136,22 +136,22 @@ define('ELAPSED_DAYS', 365);
 
 //拒絶するファイルのmd5
 //…使う？？
-$badfile = array("dummy","dummy2");
+$badfile = array("dummy", "dummy2");
 
 //拒絶するホスト
-$badip = array("dummy.example.com","198.51.100.0");
+$badip = array("dummy.example.com", "198.51.100.0");
 
 //ペイント画面の暗号化キー
 //phpの内部で処理するので覚えておく必要はありません。
 //管理パスとは別なものです。無作為な英数字を入れてください。
 //あまり頻繁に変えないように
-define('CRYPT_PASS','0qYzf1x6nyN4gS1');
+define('CRYPT_PASS', '0qYzf1x6nyN4gS1');
 
 // 言語設定
 define('LANG', 'Japanese');
 
 // タイムゾーン
-define('DEFAULT_TIMEZONE','Asia/Tokyo');
+define('DEFAULT_TIMEZONE', 'Asia/Tokyo');
 
 //ユーザー削除権限 (0:不可 1:許可)
 //※treeのみを消して後に残ったlogは管理者のみ削除可能
@@ -199,8 +199,8 @@ define('IMG_DIR', 'src/');
 define('MAX_KB', 2000);
 
 //投稿サイズ（これ以上はサイズを縮小
-define('MAX_W', 800);	//幅 px
-define('MAX_H', 800);	//高さ px
+define('MAX_W', 800);  //幅 px
+define('MAX_H', 800);  //高さ px
 
 //名前の制限文字数。半角で
 define('MAX_NAME', 100);
@@ -246,16 +246,16 @@ define('AUTOLINK', 1);
 
 //名前を必須にする する:1 しない:0
 define('USE_NAME', 0);
-define('DEF_NAME', '名無しさん');	//未入力時の名前
+define('DEF_NAME', '名無しさん');  //未入力時の名前
 
 //絵を描いた時は本文を必須にする する:1 しない:0
 //(レス及び編集モードのときは必須)
 define('USE_COM', 0);
-define('DEF_COM', '本文無し');	//未入力時の本文
+define('DEF_COM', '本文無し');  //未入力時の本文
 
 //題名を必須にする する:1 しない:0
 define('USE_SUB', 0);
-define('DEF_SUB', '無題');	//未入力時の題名
+define('DEF_SUB', '無題');  //未入力時の題名
 
 //レス時にスレ題名を引用する する:1 しない:0
 define('USE_RESUB', 1);
@@ -266,7 +266,7 @@ define('USE_HASHTAG', 1);
 //フォーム下の追加お知らせ <li></li>で囲まれます。
 //(例) $addinfo = array('まだまだ開発中…','バグがあったら教えてね');
 //設定しないなら $addinfo = array(''); で
-$addinfo = array('<a href="https://github.com/sakots/noReita">ソースはこちら</a>','まだまだ開発中…バグがあったら教えてね。');
+$addinfo = array('<a href="https://github.com/sakots/noReita">ソースはこちら</a>', 'まだまだ開発中…バグがあったら教えてね。');
 
 /* ---------- お絵かき設定 ---------- */
 
@@ -280,12 +280,12 @@ define('TEMP_LIMIT', 14);
 
 //お絵描き最大サイズ（これ以上は強制でこの値
 //最小値は幅、高さともに 300 固定です
-define('PMAX_W', 800);	//幅
-define('PMAX_H', 800);	//高さ
+define('PMAX_W', 800);  //幅
+define('PMAX_H', 800);  //高さ
 
 //お絵描きデフォルトサイズ
-define('PDEF_W', 400);	//幅
-define('PDEF_H', 400);	//高さ
+define('PDEF_W', 400);  //幅
+define('PDEF_H', 400);  //高さ
 
 //描画時間の表示 する:1 しない:0
 define('DSP_PAINTTIME', 1);
@@ -298,7 +298,7 @@ define('PALETTEFILE', 'palette.txt');
 define('USE_SELECT_PALETTES', 1);
 
 //パレットデータファイル切り替え機能を使用する する:1 の時のパレットデーターファイル名
-$pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マンセルHV/C','p_munsellHVC.txt']);
+$pallets_dat = array(['標準', 'palette.txt'], ['PCCS_HSL', 'p_PCCS.txt'], ['マンセルHV/C', 'p_munsellHVC.txt']);
 
 //動画機能を使用する する:1 しない:0
 define('USE_ANIME', 1);
@@ -322,11 +322,11 @@ define('CONTINUE_PASS', 0);
 //問題なく動作している時は変更しない。
 
 //画像やHTMLファイルのパーミッション。
-define('PERMISSION_FOR_DEST', 0606);//初期値 0606
+define('PERMISSION_FOR_DEST', 0606); //初期値 0606
 //ブラウザから直接呼び出さないログファイルのパーミッション(たぶん使ってない)
-define('PERMISSION_FOR_LOG', 0600);//初期値 0600
+define('PERMISSION_FOR_LOG', 0600); //初期値 0600
 //画像や動画ファイルを保存するディレクトリのパーミッション
-define('PERMISSION_FOR_DIR', 0707);//初期値 0707
+define('PERMISSION_FOR_DIR', 0707); //初期値 0707
 
 //csrfトークンを使って不正な投稿を拒絶する する:1 しない:0
 //する:1 にすると外部サイトからの不正な投稿を拒絶することができます
