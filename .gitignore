@@ -3,6 +3,6 @@
 /session
 *.db
 
-/BladeOne
-/chickenpaint
-/neo
+*/BladeOne
+*/chickenpaint
+*/neo
