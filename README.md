@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ## 履歴
 
+### [2022/09/01]
+
+- gitにいろいろ同梱はやめた
+
 ### [2022/07/26] v1.4.3
 
 - bladeOneをバージョンアップ
