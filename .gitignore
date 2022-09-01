@@ -2,3 +2,7 @@
 /src
 /session
 *.db
+
+/BladeOne
+/chickenpaint
+/neo
