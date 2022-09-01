@@ -1,6 +1,6 @@
 # noReita
 
-![php](https://img.shields.io/badge/php-7.4<=-green.svg)
+![php](https://img.shields.io/badge/php-7.4-green.svg)
 ![php](https://img.shields.io/badge/php-8.x-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
