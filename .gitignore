@@ -1,8 +1,9 @@
-/cache
-/src
-/session
 *.db
 
 */BladeOne
 */chickenpaint
 */neo
+*/cache
+*/session
+*/src
+*/tmp
