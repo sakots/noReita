@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.4.3'); //lot.220726.0
+define('REITA_VER', 'v1.4.4'); //lot.220908.0
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -28,7 +28,7 @@ if ($admin_pass === 'kanripass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
-//BladeOne v4.5.5
+//BladeOne v4.6
 include(__DIR__ . '/BladeOne/lib/BladeOne.php');
 
 use eftec\bladeone\BladeOne;
@@ -530,7 +530,7 @@ function regist()
 				if (USE_NSFW == 1 && $nsfw_flag == 1) {
 					$nsfw = true;
 				} else {
-					$nsfw = '';
+					$nsfw = false;
 				}
 			} else {
 				$img_w = 0;
@@ -1859,7 +1859,7 @@ function picreplace()
 			if (USE_NSFW == 1 && $nsfw_flag == 1) {
 				$nsfw = true;
 			} else {
-				$nsfw = '';
+				$nsfw = false;
 			}
 
 			//db上書き
