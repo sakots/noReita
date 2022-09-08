@@ -91,7 +91,7 @@
 					@if ($pp['p'] == $nowpage)
 					<em class="thispage">[{{$pp['p']}}]</em>
 					@else
-					<a href="{{$self}}?page={{$pp['p']}}">[{{$pp['p']}}]</a>
+					<a href="{{$self}}?mode=catalog&amp;page={{$pp['p']}}">[{{$pp['p']}}]</a>
 					@endif
 					@endforeach
 					@if ($next == ($max_page + 1))
