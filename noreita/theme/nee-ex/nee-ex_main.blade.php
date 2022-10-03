@@ -187,7 +187,7 @@
 					</h5>
 					@endif
 					<h5><a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
-						@if ($bbsline['pchfile'])
+						@if ($bbsline['pchfile'] && $bbsline['tool'] !== "Chicken Paint")
 						<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
 						@endif
 						@if ($use_continue)
