@@ -1,0 +1,42 @@
+@charset "UTF-8";
+
+//スタイル設定ファイル
+
+//devフラグ
+$dev: 0;
+
+//色指定とか
+$ushiro: #FFFFEF;		//一番後ろ
+$haikei: #FFFFEF;		//スレ背景
+$moji: #79160A;			//文字
+$link: #0000FF;			//リンクの文字
+$link_visited: #79160A;	//訪問済みリンク
+$link_active: #D12D1A;	//アクティブなリンク
+$link_hover: #D12D1A;	//マウスカーソルが上に載ってる時のリンク
+$resmoji: #52745E;			//レスの文字
+$border: #79160A;          //ボーダーとスレタイトルの左
+$b_border: #000000;        //ボタンのボーダー
+$b_border_u: #000000;       //ボタンのボーダーその2
+$button: #E5E5E5;			//返信とかのボタン
+$button_moji: #000;		//ボタンの文字色
+$form_txt: #000;		//テキスト入力欄の文字色
+$form_txt_bk: #FFFFFF;	//テキスト入力欄の背景色
+$th_bg: #EEE0D7;        //スレタイトルの背景と削除画面のテーブルの奇数行
+$th_title: #2F7448;		//スレタイトルの文字色
+
+$limit: #52745E;           //もうすぐ消える&省略の背景色
+
+//NEO色指定
+$bk: #E9EFFE;				//アプレット背景
+$bk2: #D5D9ED;				//アプレット背景の網状のあれ
+$tool_icon: #A3B8D5;		//「窓」とか
+$icon: #A3B8D5;			//
+$iconselect: #738195;		//選択してるアイコン
+$text: #FFF;			//文字
+$bar: #6B6EA6;				//バー
+$tool_button: #D2D9FC;		//ツールボタン「鉛筆」とか
+$tool_button2: #9398B1;	//選択中ツールボタン
+$tool_text: #59587E;		//ツールボタンの文字
+$tool_bar: #D2D8EE;		//ツールバーの色
+$tool_frame: #AEB3D2;		//フレームの色
+//--------

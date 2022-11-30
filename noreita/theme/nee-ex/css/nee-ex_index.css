@@ -348,13 +348,9 @@ button {
 }
 
 .nsfw {
-  display: block;
   overflow: hidden;
-  float: left;
-  position: relative;
 }
 .nsfw img {
-  position: relative;
   filter: blur(6px);
   transition: 0.1s;
   top: -6px;
@@ -385,16 +381,13 @@ button {
     position: relative;
     margin: 20px;
   }
-
   main {
     display: block;
   }
-
   .thread {
     display: block;
     margin: 20px;
   }
-
   #paintmode main {
     display: block;
   }
@@ -406,17 +399,14 @@ button {
     position: relative;
     margin: 20px;
   }
-
   #appstage {
     display: block;
   }
-
   #cp {
     margin-top: 1.5em;
     scroll-behavior: smooth;
     margin-bottom: 1.5em;
   }
-
   footer {
     width: auto;
     position: relative;

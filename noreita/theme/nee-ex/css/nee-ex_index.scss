@@ -1,0 +1,405 @@
+@charset "UTF-8";
+/*! =====このcssファイルはsassから生成されています。===== */
+
+//--------
+$cat_img_size: 150px;	//カタログモードのイメージサイズ
+
+//リセット
+* {
+	margin: 0px;
+	padding: 0px;
+}
+
+//iOS対策
+
+label {
+	cursor: pointer;
+}
+
+// 押すボタンやinput:1, テキストエリア、書くinputなど:-1
+@mixin txt_box(){
+	border-style: solid;
+	border-width: 0;
+	padding: 2px;
+}
+
+//スレッドとかフッダーとかボックス
+@mixin mainbox(){
+	border-radius: 16px;
+	margin-left: 360px;
+	margin-right: 20px;
+	padding: 1em;
+}
+
+
+//スムーズスクロール
+html {
+	scroll-behavior: smooth;
+}
+
+//全体的指定
+body {
+	font-family: sans-serif;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+	svg {
+		width: auto;
+		height: 1em;
+	}
+}
+
+hr {
+	border-style: dashed;
+	border-width: 1px 0 0 0;
+	margin: 1ex auto;
+	clear: left;
+}
+//----------
+header > .titlebox {
+	position: fixed;
+	width: 300px;
+	padding: 10px;
+	border-radius: 16px;
+	top: 10px;
+	left: 20px;
+	ul {
+		font-size: smaller;
+		margin-left: 12px;
+	}
+}
+div.th_head {
+	@include mainbox();
+	text-align: right;
+	margin-top: 10px;
+}
+
+h1 {
+	a {
+		text-decoration: none;
+	}
+}
+main {
+	display: block;
+}
+.thread {
+	@include mainbox();
+	margin-top: 1.5em;
+	margin-bottom: 1.5em;
+	.thfoot {
+		text-align: right;
+	}
+	img.image {
+		max-width: min(100%, 400px);
+		height: auto;
+		float: left;
+		padding-right: 8px;
+		margin-bottom: 1ex;
+	}
+}
+
+footer {
+	@include mainbox();
+	text-align: right;
+	margin-bottom: 20px;
+	margin-top: 20px;
+}
+
+select {
+	@include txt_box;
+	vertical-align: middle;
+}
+input[type="text"] {
+	@include txt_box;
+}
+input[name="picw"], input[name="pich"], input[name="delno"] {
+	@include txt_box;
+	width: 3em;
+}
+input[name="pwd"] {
+	@include txt_box;
+	width: 6em;
+}
+input[name="search"] {
+	@include txt_box;
+}
+input[type="submit"] {
+	@include txt_box;
+	padding-left: 4px;
+	padding-right: 4px;
+}
+input[name="upfile"] {
+	@include txt_box;
+	width: 10em;
+}
+input[type="color"] {
+	@include txt_box;
+	height: 1em;
+}
+textarea[name="com"] {
+	padding: 0.1em;
+}
+
+//スポンボタン（上下の矢印ボタン）を非表示にする
+input[type="number"] {
+	-moz-appearance: textfield;
+	&::-webkit-outer-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+	&::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+}
+
+.search_box {
+	font-size: smaller;
+}
+
+em.thispage {
+	font-style: normal;
+	font-weight: bold;
+}
+
+ul {
+	font-size: smaller;
+	margin-left: 1.5em;
+}
+p.oya {
+	margin-top: 0;
+}
+.sodane a {
+	font-weight: normal;
+	text-decoration: none;
+}
+
+.oyaname {
+	line-height: 1em;
+    border: solid 1px;
+    border-radius: 5px;
+	display: inline-block;
+    a {
+		text-decoration: none;
+        display: block;
+		padding: 5px;
+		color: inherit;
+    }
+}
+
+h4.oya {
+	margin-top: 1ex;
+}
+
+.res {
+	margin-top: 1em;
+	border-top: dashed 1px;
+	section {
+		margin-top: 1em;
+		padding-top: 1em;
+		display: table-cell;
+		max-width: 100%;
+	}
+	h3 {
+		font-size: 100%;
+		margin-bottom: 0ex;
+	}
+	h4 {
+		font-size: 100%;
+		margin-bottom: 1ex;
+	}
+}
+.limit {
+	margin-top: 1em;
+}
+
+h5 {
+	font-weight: normal;
+}
+
+.resma {
+	display: block;
+}
+.thfoot {
+	clear: left;
+	text-align: right;
+	margin-top: 1em;
+}
+button {
+	@include txt_box;
+	padding-left: 4px;
+	padding-right: 4px;
+}
+.button {
+	@include txt_box;
+	padding: 2px 6px;
+	display: inline-block;
+	a {
+		text-decoration: none;
+		svg {
+			width: 12px;
+			height: 12px;
+		}
+	}
+}
+
+.oyat {
+	border-left: solid 1ex;
+	padding: 0.2em;
+}
+//----------
+.oekaki {
+	font-size: smaller;
+}
+
+#appstage {
+	@include mainbox();
+	margin-top: 1.5em;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	.palette .palette_set {
+		@include txt_box();
+	}
+}
+
+.palette {
+	width: 180px;
+	fieldset {
+		text-align: center;
+	}
+}
+.c {
+	text-align: center;
+}
+
+.siihelp{
+	h2 {
+		@extend .oyat
+	}
+	dt {
+		font-weight: bold;
+	}
+	ul {
+		margin-left: 20px;
+	}
+}
+
+#cp {
+	margin-top: 160px;
+	scroll-behavior: smooth;
+	margin-bottom: 1.5em;
+}
+//----------
+
+#catalog {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	div {
+		width: $cat_img_size + 16px;
+		text-align: center;
+		overflow: hidden;
+	}
+	p {
+		margin: 0.5ex auto;
+	}
+	img {
+		width: $cat_img_size;
+		height: $cat_img_size;
+		object-fit: cover;
+	}
+}
+
+.delfo {
+	font-size: smaller;
+	th, td {
+		border: 1px solid;
+	}
+}
+.ppost {
+	clear: left;
+}
+
+.tmpimg {
+	div.imgs {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		align-content: flex-start;
+	}
+}
+
+.nsfw {
+	//display: block;
+	overflow: hidden;
+	//float: left;
+	//position: relative;
+	img {
+		//position: relative;
+		filter: blur(6px);
+		transition: .1s;
+		top: -6px;
+		bottom: -6px;
+		left: -6px;
+		right: -6px;
+	}
+}
+
+//以下レスポンシブ対応
+@media screen and (max-width: 1024px) {
+	.res {
+		clear: left;
+	}
+}
+@media screen and (max-width: 768px) {
+	header {
+		width: auto;
+		position: relative;
+		.titlebox {
+			width: auto;
+			margin: 20px;
+			position: relative;
+			top: unset;
+			left: unset;
+			+ div {
+				width: auto;
+				position: relative;
+				margin: 20px;
+			}
+		}
+	}
+	main {
+		display: block;
+	}
+	.thread {
+		display: block;
+		margin: 20px;
+	}
+	#paintmode {
+		main {
+			display: block;
+		}
+		footer {
+			text-align: right;
+		}
+		header {
+			width: auto;
+			position: relative;
+			margin: 20px;
+		}
+	}
+	#appstage {
+		display: block;
+	}
+	#cp {
+		margin-top: 1.5em;
+		scroll-behavior: smooth;
+		margin-bottom: 1.5em;
+	}
+	footer {
+		width: auto;
+		position: relative;
+		text-align: right;
+		margin: 20px;
+	}
+}
