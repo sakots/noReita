@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ## 履歴
 
+### [2022/12/01] v1.4.6
+
+- 大きなnsfw画像のときに文字の位置がずれる問題を修正
+
 ### [2022/10/04] v1.4.5
 
 - Chicken Paintで描いた画像にNEOで続きから描いた場合のバグを修正
