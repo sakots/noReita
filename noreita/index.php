@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.4.6'); //lot.221201.0
+define('REITA_VER', 'v1.4.7'); //lot.230102.0
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -1244,8 +1244,12 @@ function paintform($rep)
 	global $blade, $dat;
 	global $pallets_dat;
 
-	$pwd = trim(filter_input(INPUT_POST, 'pwd'));
+	$pwd = filter_input(INPUT_POST, 'pwd');
 	$imgfile = filter_input(INPUT_POST, 'img');
+
+	if (!$pwd) {
+		$pwd = "";
+	}
 
 	//ツール
 	if (isset($_POST["tools"])) {
