@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.4.7'); //lot.230102.0
+define('REITA_VER', 'v1.4.8'); //lot.230107.0
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -35,6 +35,12 @@ use eftec\bladeone\BladeOne;
 
 $views = __DIR__ . '/theme/' . THEMEDIR; // テンプレートフォルダ
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
+
+//キャッシュフォルダがなかったら作成
+if (!file_exists($cache)) {
+	mkdir($cache, PERMISSION_FOR_DIR);
+}
+
 $blade = new BladeOne($views, $cache, BladeOne::MODE_AUTO); // MODE_DEBUGだと開発モード MODE_AUTOが速い。
 $blade->pipeEnable = true; // パイプのフィルターを使えるようにする
 
