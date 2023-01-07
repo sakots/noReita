@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.4.9'); //lot.230107.1
+define('REITA_VER', 'v1.4.9'); //lot.230107.2
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -708,7 +708,7 @@ function reply()
 			$sqlw = "SELECT * FROM tlog WHERE thread=0 ORDER BY tid DESC LIMIT 1";
 			$msgw = $db->prepare($sqlw);
 			$msgw->execute();
-			$msgwc = $msgw->fetch();
+			$msgwc = $msgw->fetch() ?: [];
 			if (!empty($msgwc)) {
 				$msgwsub = $msgwc["sub"]; //最新タイトル
 				$msgwcom = $msgwc["com"]; //最新コメント取得できた
@@ -721,8 +721,7 @@ function reply()
 				}
 			} else {
 				//最初のレスのage処理対策
-				$msgwc["tid"] == false ? 0 : 0; //PHP8.2のエラー回避
-				//$msgwc["tid"] = 0;
+				$msgwc["tid"] = 0;
 				$msgwc["age"] = 0;
 				$msgwc["tree"] = 0;
 			}
