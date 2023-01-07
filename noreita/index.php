@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.4.8'); //lot.230107.0
+define('REITA_VER', 'v1.4.9'); //lot.230107.1
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -721,7 +721,8 @@ function reply()
 				}
 			} else {
 				//最初のレスのage処理対策
-				$msgwc["tid"] = 0;
+				$msgwc["tid"] == false ? 0 : 0; //PHP8.2のエラー回避
+				//$msgwc["tid"] = 0;
 				$msgwc["age"] = 0;
 				$msgwc["tree"] = 0;
 			}
