@@ -73,7 +73,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ### [2023/01/07] v1.4.9
 
-- 最初のスレッドへの最初のリプライのときにでるごく軽い警告をなくした(issue #6)
+- 最初のスレッドへの最初のリプライのときにでるごく軽い警告をなくした([issue #5](https://github.com/sakots/noReita/issues/5))
   - あまりに軽微なためリリースはありません。
 
 ### [2023/01/07] v1.4.8
