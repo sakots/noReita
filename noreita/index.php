@@ -810,7 +810,7 @@ function reply()
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = [["namec",$name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass] ,[ "palettec" . $pal]];
+			$cookies = [["namec",$name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass]];
 			foreach ($cookies as $cookie) {
 				list($c_name, $c_cookie) = $cookie;
 				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
