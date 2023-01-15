@@ -1284,12 +1284,8 @@ function paintform($rep)
 	global $blade, $dat;
 	global $pallets_dat;
 
-	$pwd = filter_input(INPUT_POST, 'pwd');
+	$pwd = (string)filter_input(INPUT_POST, 'pwd');
 	$imgfile = filter_input(INPUT_POST, 'img');
-
-	if (!$pwd) {
-		$pwd = "";
-	}
 
 	//ツール
 	if (isset($_POST["tools"])) {
