@@ -1153,7 +1153,7 @@ function search()
 //そうだね
 function sodane()
 {
-	$resto = filter_input(INPUT_GET, 'resto');
+	$resto = filter_input(INPUT_GET, 'resto',FILTER_VALIDATE_INT);
 	try {
 		$db = new PDO(DB_PDO);
 		$sql = "UPDATE tlog set exid = exid+1 where tid = '$resto'";
@@ -1171,7 +1171,7 @@ function sodane()
 function res()
 {
 	global $blade, $dat;
-	$resno = filter_input(INPUT_GET, 'res');
+	$resno = filter_input(INPUT_GET, 'res',FILTER_VALIDATE_INT);
 	$dat['resno'] = $resno;
 
 	//csrfトークンをセット
@@ -1665,7 +1665,7 @@ function delmode()
 {
 	global $admin_pass;
 	global $dat;
-	$delno = filter_input(INPUT_POST, 'delno');
+	$delno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 
 	$ppwd = filter_input(INPUT_POST, 'pwd');
 
@@ -1904,6 +1904,20 @@ function picreplace()
 
 			//db上書き
 			$sqlrep = "UPDATE tlog set modified = datetime('now', 'localtime'), host = '$host', picfile = '$new_picfile', pchfile = '$new_pchfile', id = '$id', psec = '$psec', utime = '$utime', ext01 = '$nsfw' WHERE tid = '$no'";
+				// プレースホルダ
+				try
+				{
+				$stmt = $db->prepare($sqlrep);
+				$stmt->execute(
+					[
+						':host'=>$host, ':new_picfile'=>$new_picfile, ':new_pchfile'=>$new_pchfile, ':id'=>$id,':psec'=>$psec,':utime'=>$utime,':nsfw'=>$nsfw,':no'=>$no,
+					]
+				);
+				}
+				catch(PDOException $e)
+				{
+					echo "DB接続エラー:" . $e->getMessage();
+				}
 			$db = $db->exec($sqlrep);
 		} else {
 			error(MSG028);
@@ -1933,7 +1947,7 @@ function editform()
 	//入力されたパスワード
 	$postpwd = filter_input(INPUT_POST, 'pwd');
 
-	$editno = filter_input(INPUT_POST, 'delno');
+	$editno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 	if ($editno == "") {
 		error('記事番号を入力してください');
 	}
@@ -2066,7 +2080,23 @@ function editexec()
 
 	try {
 		$db = new PDO(DB_PDO);
-		$sql = "UPDATE tlog set modified = datetime('now', 'localtime'), a_name = '$name', mail = '$mail', sub = '$sub', com = '$com', a_url = '$url', host = '$host', exid = '$exid', pwd = '$pwdh' where tid = '$e_no'";
+		$sql = "UPDATE tlog set modified = datetime('now', 'localtime'), a_name = :name, mail = :mail, sub = :sub, com = :com, a_url = :url, host = :host, exid = :exid, pwd = :pwdh where tid = :e_no";
+
+				// プレースホルダ
+				try
+				{
+				$stmt = $db->prepare($sql);
+				$stmt->execute(
+					[
+						':name'=>$name, ':mail'=>$mail, ':sub'=>$sub, ':com'=>$com,':url'=>$url,':host'=>$host,':exid'=> $exid,':pwdh'=> $pwdh, ':e_no'=>$e_no,
+						]
+				);
+				}
+				catch(PDOException $e)
+				{
+					echo "DB接続エラー:" . $e->getMessage();
+				}
+
 		$db = $db->exec($sql);
 		$db = null;
 		$dat['message'] = '編集完了しました。';
