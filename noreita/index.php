@@ -1389,6 +1389,7 @@ function paintform($rep)
 	$pal = array();
 	$DynP = array();
 	$p_cnt = 0;
+	$arr_pal=[];
 	foreach ($lines as $i => $line) {
 		$line = charconvert(str_replace(["\r", "\n", "\t"], "", $line));
 		list($pid, $pname, $pal[0], $pal[2], $pal[4], $pal[6], $pal[8], $pal[10], $pal[1], $pal[3], $pal[5], $pal[7], $pal[9], $pal[11], $pal[12], $pal[13]) = explode(",", $line);
@@ -1410,7 +1411,7 @@ function paintform($rep)
 	//パスワード暗号化
 	$pwdf = openssl_encrypt($pwd, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //暗号化
 	$pwdf = bin2hex($pwdf); //16進数に
-
+	$arr_dynp=[];
 	foreach ($DynP as $p) {
 		$arr_dynp[] = '<option>' . $p . '</option>';
 	}
