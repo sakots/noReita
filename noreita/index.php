@@ -604,7 +604,7 @@ function regist()
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = ["namec\t" . $name, "emailc\t" . $mail, "urlc\t" . $url, "pwdc\t" . $c_pass . "palettec\t" . $pal];
+			$cookies = ["namec\t" . $name, "emailc\t" . $mail, "urlc\t" . $url, "pwdc\t" . $c_pass , "palettec\t" . $pal];
 
 			foreach ($cookies as $cookie) {
 				list($c_name, $c_cookie) = explode("\t", $cookie);
