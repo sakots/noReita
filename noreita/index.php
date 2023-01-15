@@ -604,10 +604,10 @@ function regist()
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = ["namec\t" . $name, "emailc\t" . $mail, "urlc\t" . $url, "pwdc\t" . $c_pass , "palettec\t" . $pal];
+			$cookies = [["namec",$name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass] ,[ "palettec" . $pal]];
 
 			foreach ($cookies as $cookie) {
-				list($c_name, $c_cookie) = explode("\t", $cookie);
+				list($c_name, $c_cookie) = $cookie;
 				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
 			}
 
@@ -810,10 +810,9 @@ function reply()
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = ["namec\t" . $name, "emailc\t" . $mail, "urlc\t" . $url, "pwdc\t" . $c_pass . "palettec\t" . $pal];
-
+			$cookies = [["namec",$name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass] ,[ "palettec" . $pal]];
 			foreach ($cookies as $cookie) {
-				list($c_name, $c_cookie) = explode("\t", $cookie);
+				list($c_name, $c_cookie) = $cookie;
 				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
 			}
 
