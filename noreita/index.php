@@ -581,16 +581,33 @@ function regist()
 			$shd = 0;
 			$age = 0;
 			$parent = NULL;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), '$thread', '$parent', '$tree', '$tree', '$name', '$sub', '$com', '$mail', '$url', '$picfile', '$pchfile', '$img_w', '$img_h', '$psec', '$utime', '$pwdh', '$id', '$exid', '$age', '$invz', '$host', '$used_tool', '$admins', '$shd', '$nsfw')";
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :tree, :tree, :name, :sub, :com, :mail, :url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw)";
+
+				// プレースホルダ
+				try
+				{
+				$stmt = $db->prepare($sql);
+
+				$stmt->execute(
+					[
+						'thread'=>$thread, 'parent'=>$parent, 'tree'=>$tree, 'name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,
+					]
+				);
+				}
+				catch(PDOException $e)
+				{
+					echo "DB接続エラー:" . $e->getMessage();
+				}
+
 			$db->exec($sql);
 
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = ["namec\t" . $name, "emailc\t" . $mail, "urlc\t" . $url, "pwdc\t" . $c_pass . "palettec\t" . $pal];
+			$cookies = [["namec",$name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass] ,[ "palettec" , $pal]];
 
 			foreach ($cookies as $cookie) {
-				list($c_name, $c_cookie) = explode("\t", $cookie);
+				list($c_name, $c_cookie) = $cookie;
 				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
 			}
 
@@ -770,16 +787,32 @@ function reply()
 
 			//リプ処理
 			$thread = 0;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, pwd, id, exid, age, invz, host, admins) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), '$thread', '$parent', '$comid', '$tree', '$name', '$sub', '$com', '$mail', '$url', '$pwdh', '$id', '$exid', '$age', '$invz', '$host', '$admins')";
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, pwd, id, exid, age, invz, host, admins) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :name, :sub, :com, :mail, :url, :pwdh, :id, :exid, :age, :invz, :host, :admins)";
+			
+				// プレースホルダ
+				try
+				{
+				$stmt = $db->prepare($sql);
+	
+				$stmt->execute(
+					[
+						'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'url'=>$url,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'admins'=> $admins,
+					]
+				);
+				}
+				catch(PDOException $e)
+				{
+					echo "DB接続エラー:" . $e->getMessage();
+				}
+			
 			$db->exec($sql);
 
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = ["namec\t" . $name, "emailc\t" . $mail, "urlc\t" . $url, "pwdc\t" . $c_pass . "palettec\t" . $pal];
-
+			$cookies = [["namec",$name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass]];
 			foreach ($cookies as $cookie) {
-				list($c_name, $c_cookie) = explode("\t", $cookie);
+				list($c_name, $c_cookie) = $cookie;
 				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
 			}
 
@@ -1250,12 +1283,8 @@ function paintform($rep)
 	global $blade, $dat;
 	global $pallets_dat;
 
-	$pwd = filter_input(INPUT_POST, 'pwd');
+	$pwd = (string)filter_input(INPUT_POST, 'pwd');
 	$imgfile = filter_input(INPUT_POST, 'img');
-
-	if (!$pwd) {
-		$pwd = "";
-	}
 
 	//ツール
 	if (isset($_POST["tools"])) {
@@ -1359,6 +1388,7 @@ function paintform($rep)
 	$pal = array();
 	$DynP = array();
 	$p_cnt = 0;
+	$arr_pal=[];
 	foreach ($lines as $i => $line) {
 		$line = charconvert(str_replace(["\r", "\n", "\t"], "", $line));
 		list($pid, $pname, $pal[0], $pal[2], $pal[4], $pal[6], $pal[8], $pal[10], $pal[1], $pal[3], $pal[5], $pal[7], $pal[9], $pal[11], $pal[12], $pal[13]) = explode(",", $line);
@@ -1380,7 +1410,7 @@ function paintform($rep)
 	//パスワード暗号化
 	$pwdf = openssl_encrypt($pwd, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //暗号化
 	$pwdf = bin2hex($pwdf); //16進数に
-
+	$arr_dynp=[];
 	foreach ($DynP as $p) {
 		$arr_dynp[] = '<option>' . $p . '</option>';
 	}
