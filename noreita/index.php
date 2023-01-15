@@ -581,7 +581,24 @@ function regist()
 			$shd = 0;
 			$age = 0;
 			$parent = NULL;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), '$thread', '$parent', '$tree', '$tree', '$name', '$sub', '$com', '$mail', '$url', '$picfile', '$pchfile', '$img_w', '$img_h', '$psec', '$utime', '$pwdh', '$id', '$exid', '$age', '$invz', '$host', '$used_tool', '$admins', '$shd', '$nsfw')";
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :tree, :tree, :name, :sub, :com, :mail, :url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw)";
+
+				// プレースホルダ
+				try
+				{
+				$stmt = $db->prepare($sql);
+
+				$stmt->execute(
+					[
+						'thread'=>$thread, 'parent'=>$parent, 'tree'=>$tree, 'name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,
+					]
+				);
+				}
+				catch(PDOException $e)
+				{
+					echo "DB接続エラー:" . $e->getMessage();
+				}
+
 			$db->exec($sql);
 
 			$c_pass = $pwd;
@@ -770,7 +787,24 @@ function reply()
 
 			//リプ処理
 			$thread = 0;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, pwd, id, exid, age, invz, host, admins) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), '$thread', '$parent', '$comid', '$tree', '$name', '$sub', '$com', '$mail', '$url', '$pwdh', '$id', '$exid', '$age', '$invz', '$host', '$admins')";
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, pwd, id, exid, age, invz, host, admins) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :name, :sub, :com, :mail, :url, :pwdh, :id, :exid, :age, :invz, :host, :admins)";
+			
+				// プレースホルダ
+				try
+				{
+				$stmt = $db->prepare($sql);
+	
+				$stmt->execute(
+					[
+						'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'url'=>$url,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'admins'=> $admins,
+					]
+				);
+				}
+				catch(PDOException $e)
+				{
+					echo "DB接続エラー:" . $e->getMessage();
+				}
+			
 			$db->exec($sql);
 
 			$c_pass = $pwd;
