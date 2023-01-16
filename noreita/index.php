@@ -1894,7 +1894,7 @@ function picreplace()
 			}
 
 			//db上書き
-			$sqlrep = "UPDATE tlog set modified = datetime('now', 'localtime'), host = '$host', picfile = '$new_picfile', pchfile = '$new_pchfile', id = '$id', psec = '$psec', utime = '$utime', ext01 = '$nsfw' WHERE tid = '$no'";
+			$sqlrep = "UPDATE tlog set modified = datetime('now', 'localtime'), host = :host, picfile = :new_picfile, pchfile = :new_pchfile, id = :id, psec = :psec, utime = :utime, ext01 = :nsfw WHERE tid = :no";
 			// プレースホルダ
 			try {
 				$stmt = $db->prepare($sqlrep);
