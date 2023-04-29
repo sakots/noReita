@@ -2017,8 +2017,8 @@ function editexec()
 		check_csrf_token();
 	}
 
-	$resedit = trim(filter_input(INPUT_POST, 'resedit'));
-	$e_no = trim(filter_input(INPUT_POST, 'e_no'));
+	$resedit = trim((string)filter_input(INPUT_POST, 'resedit'));
+	$e_no = trim((string)filter_input(INPUT_POST, 'e_no'));
 
 	if ($req_method !== "POST") {
 		error(MSG006);
@@ -2029,10 +2029,10 @@ function editexec()
 	$mail = (string)filter_input(INPUT_POST, 'mail');
 	$url = (string)filter_input(INPUT_POST, 'url');
 	$com = (string)filter_input(INPUT_POST, 'com');
-	$picfile = trim(filter_input(INPUT_POST, 'picfile'));
+	$picfile = trim((string)filter_input(INPUT_POST, 'picfile'));
 	$pwd = (string)trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd, PASSWORD_DEFAULT);
-	$exid = trim(filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
+	$exid = trim((string)filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
 
 	//NGワードがあれば拒絶
 	Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
