@@ -1155,6 +1155,7 @@ function search()
 	}
 }
 
+//そうだね
 function sodane()
 {
 	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
@@ -1734,7 +1735,8 @@ function delmode()
 			$sql = "DELETE FROM tlog WHERE tid = ?";
 			$stmt = $db->prepare($sql);
 			$stmt->execute([$delno]);
-			$dat['message'] = '削除しました。';		} elseif ($admin_pass == $ppwd && $admindelmode == 1) {
+			$dat['message'] = '削除しました。';
+		} elseif ($admin_pass == $ppwd && $admindelmode == 1) {
 			//画像とかファイル削除
 			if (is_file(IMG_DIR . $msgpic)) {
 				$msgdat = str_replace(strrchr($msgpic, "."), "", $msgpic); //拡張子除去
