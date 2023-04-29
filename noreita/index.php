@@ -901,8 +901,11 @@ function def()
 	try {
 		$db = new PDO(DB_PDO);
 		//1ページの全スレッド取得
-		$sql = "SELECT * FROM tlog WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT $start,$page_def";
-		$posts = $db->query($sql);
+		$sql = "SELECT * FROM tlog WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?";
+		$posts = $db->prepare($sql);
+		$posts->bindValue(1, $start, PDO::PARAM_INT);
+		$posts->bindValue(2, $page_def, PDO::PARAM_INT);
+		$posts->execute();
 
 		$ko = array();
 		$oya = array();
@@ -1061,8 +1064,12 @@ function catalog()
 	try {
 		$db = new PDO(DB_PDO);
 		//1ページの全スレッド取得
-		$sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, exid, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime FROM tlog WHERE thread=1 AND invz=0 ORDER BY age DESC, tree DESC LIMIT $start,$page_def";
-		$posts = $db->query($sql);
+		$sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, exid, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime FROM tlog WHERE thread=1 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
+		$posts = $db->prepare($sql);
+		$posts->bindValue(':start', $start, PDO::PARAM_INT);
+		$posts->bindValue(':page_def', $page_def, PDO::PARAM_INT);
+		$posts->execute();
+
 
 		$oya = array();
 
@@ -1107,22 +1114,26 @@ function search()
 		//全スレッド取得
 		//まずtagがあれば全文検索
 		if ($tag == 'tag') {
-			$sql = "SELECT * FROM tlog WHERE com LIKE '%$search%' AND invz=0 ORDER BY age DESC, tree DESC";
+			$sql = "SELECT * FROM tlog WHERE com LIKE ? AND invz=0 ORDER BY age DESC, tree DESC";
+			$posts = $db->prepare($sql);
+			$posts->execute(["%$search%"]);
 			$dat['catalogmode'] = 'hashsearch';
 			$dat['tag'] = $searchf;
 		} else {
 			//tagがなければ作者名検索(スレッドのみ)
 			if ($bubun == "bubun") {
-				$sql = "SELECT * FROM tlog WHERE a_name LIKE '%$search%' AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
+				$sql = "SELECT * FROM tlog WHERE a_name LIKE ? AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
+				$posts = $db->prepare($sql);
+				$posts->execute(["%$search%"]);
 			} else {
 				//完全一致
-				$sql = "SELECT * FROM tlog WHERE a_name LIKE '$search' AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
+				$sql = "SELECT * FROM tlog WHERE a_name LIKE ? AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
+				$posts = $db->prepare($sql);
+				$posts->execute([$search]);
 			}
 			$dat['catalogmode'] = 'search';
 			$dat['author'] = $searchf;
 		}
-
-		$posts = $db->query($sql);
 
 		$oya = array();
 
@@ -1147,11 +1158,11 @@ function search()
 //そうだね
 function sodane()
 {
-	$resto = filter_input(INPUT_GET, 'resto',FILTER_VALIDATE_INT);
+	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
 	try {
 		$db = new PDO(DB_PDO);
-		$sql = "UPDATE tlog set exid = exid+1 where tid = '$resto'";
-		$db = $db->exec($sql);
+		$stmt = $db->prepare("UPDATE tlog SET exid = exid + 1 WHERE tid = ?");
+		$stmt->execute([$resto]);
 		$db = null;
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
@@ -1159,7 +1170,6 @@ function sodane()
 	header('Location:' . PHP_SELF);
 	def();
 }
-
 //レス画面
 
 function res()
@@ -1185,8 +1195,9 @@ function res()
 
 	try {
 		$db = new PDO(DB_PDO);
-		$sql = "SELECT * FROM tlog WHERE tid = $resno ORDER BY tree DESC";
-		$posts = $db->query($sql);
+		$sql = "SELECT * FROM tlog WHERE tid = ? ORDER BY tree DESC";
+		$posts = $db->prepare($sql);
+		$posts->execute([$resno]);
 
 		$oya = array();
 		$ko = array();
@@ -1614,9 +1625,9 @@ function incontinue($no)
 
 	try {
 		$db = new PDO(DB_PDO);
-		$sql = "SELECT * FROM tlog WHERE picfile='$no' ORDER BY tree DESC";
-		$posts = $db->query($sql);
-
+		$sql = "SELECT * FROM tlog WHERE picfile=? ORDER BY tree DESC";
+		$posts = $db->prepare($sql);
+		$posts->execute([$no]);
 		$oya = array();
 		while ($bbsline = $posts->fetch()) {
 			$bbsline['com'] = nl2br(htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
@@ -1668,20 +1679,21 @@ function delmode()
 		$db = new PDO(DB_PDO);
 
 		//パスワードを取り出す
-		$sql = "SELECT pwd FROM tlog WHERE tid = '$delno'";
+		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
 		$msgs = $db->prepare($sql);
 		if ($msgs == false) {
 			error('そんな記事ない気がします。');
 		}
-		$msgs->execute();
+		$msgs->execute([$delno]);
 		$msg = $msgs->fetch();
 		if (empty($msg)) {
 			error('そんな記事ない気がします。');
 		}
 
 		//削除記事の画像を取り出す
-		$sqlp = "SELECT picfile FROM tlog WHERE tid = '$delno'";
+		$sqlp = "SELECT picfile FROM tlog WHERE tid = ?";
 		$msgsp = $db->prepare($sqlp);
+		$msgsp->execute([$delno]);
 		$msgsp->execute();
 		$msgp = $msgsp->fetch();
 		if (empty($msgp)) {
@@ -1720,8 +1732,9 @@ function delmode()
 			}
 			//↑画像とか削除処理完了
 			//データベースから削除
-			$sql = "DELETE FROM tlog WHERE tid=$delno";
-			$db = $db->exec($sql);
+			$sql = "DELETE FROM tlog WHERE tid = ?";
+			$stmt = $db->prepare($sql);
+			$stmt->execute([$delno]);
 			$dat['message'] = '削除しました。';
 		} elseif ($admin_pass == $ppwd && $admindelmode == 1) {
 			//画像とかファイル削除
@@ -1748,16 +1761,16 @@ function delmode()
 			}
 			//↑画像とか削除処理完了
 			//データベースから削除
-			$sql = "DELETE FROM tlog WHERE tid = '$delno'";
-			$db->exec($sql);
-			$sql = "DELETE FROM tlog WHERE parent = '$delno'";
-			$db = $db->exec($sql);
+			$sql = "DELETE FROM tlog WHERE tid = ? OR parent = ?";
+			$stmt = $db->prepare($sql);
+			$stmt->execute([$delno, $delno]);
 			$dat['message'] = '削除しました。';
 		} elseif ($admin_pass == $ppwd && $admindelmode != 1) {
 			//管理モード以外での管理者削除は
 			//データベースから削除はせずに非表示
-			$sql = "UPDATE tlog SET invz=1 WHERE tid = '$delno'";
-			$db = $db->exec($sql);
+			$sql = "UPDATE tlog SET invz=1 WHERE tid = ?";
+			$stmt = $db->prepare($sql);
+			$stmt->execute([$delno]);
 			$dat['message'] = '非表示にしました。';
 		} else {
 			error('パスワードまたは記事番号が違います。');
@@ -1819,11 +1832,10 @@ function picreplace()
 	try {
 		$db = new PDO(DB_PDO);
 		//記事を取り出す
-		$sql = "SELECT * FROM tlog WHERE tid = $no";
+		$sql = "SELECT * FROM tlog WHERE tid = ?";
 		$msgs = $db->prepare($sql);
-		$msgs->execute();
+		$msgs->execute([$no]);
 		$msg_d = $msgs->fetch();
-
 		//パスワード照合
 		// $flag = false;
 		if (password_verify($pwdf, $msg_d["pwd"])) {
@@ -1948,10 +1960,10 @@ function editform()
 		$db = new PDO(DB_PDO);
 
 		//パスワードを取り出す
-		$sql = "SELECT pwd FROM tlog WHERE tid = $editno";
-		$msgs = $db->prepare($sql);
-		$msgs->execute();
-		$msg = $msgs->fetch();
+		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
+		$stmt = $db->prepare($sql);
+		$stmt->execute([$editno]);
+		$msg = $stmt->fetch();
 		if (empty($msg)) {
 			error('そんな記事ないです。');
 		}
@@ -2007,8 +2019,8 @@ function editexec()
 		check_csrf_token();
 	}
 
-	$resedit = trim(filter_input(INPUT_POST, 'resedit'));
-	$e_no = trim(filter_input(INPUT_POST, 'e_no'));
+	$resedit = trim((string)filter_input(INPUT_POST, 'resedit'));
+	$e_no = trim((string)filter_input(INPUT_POST, 'e_no'));
 
 	if ($req_method !== "POST") {
 		error(MSG006);
@@ -2019,10 +2031,10 @@ function editexec()
 	$mail = (string)filter_input(INPUT_POST, 'mail');
 	$url = (string)filter_input(INPUT_POST, 'url');
 	$com = (string)filter_input(INPUT_POST, 'com');
-	$picfile = trim(filter_input(INPUT_POST, 'picfile'));
+	$picfile = trim((string)filter_input(INPUT_POST, 'picfile'));
 	$pwd = (string)trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd, PASSWORD_DEFAULT);
-	$exid = trim(filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
+	$exid = trim((string)filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
 
 	//NGワードがあれば拒絶
 	Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
@@ -2122,7 +2134,8 @@ function admin()
 		if ($adminpass === $admin_pass) {
 			$sql = "SELECT * FROM tlog WHERE thread=1 ORDER BY age DESC,tree DESC";
 			$oya = array();
-			$posts = $db->query($sql);
+			$posts = $db->prepare($sql);
+			$posts->execute();
 			while ($bbsline = $posts->fetch()) {
 				if (empty($bbsline)) {
 					break;
@@ -2162,9 +2175,9 @@ function usrchk()
 	try {
 		$db = new PDO(DB_PDO);
 		//パスワードを取り出す
-		$sql = "SELECT pwd FROM tlog WHERE tid = $no";
+		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
 		$msgs = $db->prepare($sql);
-		$msgs->execute();
+		$msgs->execute([$no]);
 		$msg = $msgs->fetch();
 		if (password_verify($pwdf, $msg['pwd'])) {
 			$flag = true;
