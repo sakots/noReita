@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.4.12'); //lot.230430.0
+define('REITA_VER', 'v1.4.13'); //lot.230518.0
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -28,7 +28,7 @@ if ($admin_pass === 'kanripass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
-//BladeOne v4.7.1
+//BladeOne v4.9
 include(__DIR__ . '/BladeOne/lib/BladeOne.php');
 
 use eftec\bladeone\BladeOne;
@@ -2199,6 +2199,11 @@ function ok($mes)
 	global $blade, $dat;
 	$dat['okmes'] = $mes;
 	$dat['othermode'] = 'ok';
+	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
+	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
+	if($http_x_requested_with || $async_flag){
+		return die("OK!\n$mes");
+	}
 	echo $blade->run(OTHERFILE, $dat);
 }
 
@@ -2210,6 +2215,11 @@ function error($mes)
 	$db = null; //db切断
 	$dat['errmes'] = $mes;
 	$dat['othermode'] = 'err';
+	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
+	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
+	if($http_x_requested_with || $async_flag){
+		return die("error\n$mes");
+	}
 	echo $blade->run(OTHERFILE, $dat);
 	exit;
 }
@@ -2219,10 +2229,27 @@ function error2()
 {
 	global $db;
 	global $blade, $dat;
+	global $self;
 	$db = null; //db切断
 	$dat['othermode'] = 'err2';
+	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
+	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
+	if($http_x_requested_with || $async_flag){
+		return die("error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
+	}
 	echo $blade->run(OTHERFILE, $dat);
 	exit;
+}
+
+//Asyncリクエストの時は処理を中断
+function check_AsyncRequest($picfile='') {
+	//ヘッダーが確認できなかった時の保険
+	$asyncflag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
+	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
+	if($http_x_requested_with || $asyncflag){
+		safe_unlink($picfile);
+		exit;
+	}
 }
 
 /* テンポラリ内のゴミ除去 */
