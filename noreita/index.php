@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.4.13'); //lot.230518.0
+define('REITA_VER', 'v1.4.13'); //lot.230526.0
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -896,8 +896,8 @@ function def()
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
-	//読み込み
 
+	//読み込み
 	try {
 		$db = new PDO(DB_PDO);
 		//1ページの全スレッド取得
@@ -917,8 +917,8 @@ function def()
 			if (empty($bbsline)) {
 				break;
 			} //スレがなくなったら抜ける
-			$oid = $bbsline["tid"]; //スレのtid(親番号)を取得
-			$sqli = "SELECT * FROM tlog WHERE parent = $oid AND invz=0 AND thread=0 ORDER BY comid ASC";
+			$oya_id = $bbsline["tid"]; //スレのtid(親番号)を取得
+			$sqli = "SELECT * FROM tlog WHERE parent = $oya_id AND invz=0 AND thread=0 ORDER BY comid ASC";
 			//レス取得
 			$postsi = $db->query($sqli);
 			$j = 0;
@@ -2140,7 +2140,7 @@ function admin()
 				if (empty($bbsline)) {
 					break;
 				} //スレがなくなったら抜ける
-				//$oid = $bbsline["tid"]; //スレのtid(親番号)を取得
+				//$oya_id = $bbsline["tid"]; //スレのtid(親番号)を取得
 				$bbsline['com'] = htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5);
 				$oya[] = $bbsline;
 			}
@@ -2400,7 +2400,7 @@ function logdel()
 		$msgs->execute();
 		$msg = $msgs->fetch();
 
-		$dtid = (int)$msg["tid"]; //消す行のスレ番号
+		$del_tid = (int)$msg["tid"]; //消す行のスレ番号
 		$msgpic = $msg["picfile"]; //画像の名前取得できた
 		//画像とかの削除処理
 		if (is_file(IMG_DIR . $msgpic)) {
@@ -2427,23 +2427,23 @@ function logdel()
 
 		//レスあれば削除
 		//カウント
-		$sqlc = "SELECT COUNT(*) as cnti FROM tlog WHERE parent = $dtid";
+		$sqlc = "SELECT COUNT(*) as cnti FROM tlog WHERE parent = $del_tid";
 		$countres = $db->query("$sqlc");
 		$countres = $countres->fetch();
 		$logcount = $countres["cnti"];
 		//削除
 		if ($logcount !== 0) {
-			$delres = "DELETE FROM tlog WHERE parent = $dtid";
+			$delres = "DELETE FROM tlog WHERE parent = $del_tid";
 			$db->exec($delres);
 		}
 		//スレ削除
-		$delths = "DELETE FROM tlog WHERE tid = $dtid";
+		$delths = "DELETE FROM tlog WHERE tid = $del_tid";
 		$db->exec($delths);
 
 		$sqlimg = null;
 		$delths = null;
 		$msg = null;
-		$dtid = null;
+		$del_tid = null;
 		$db = null; //db切断
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
