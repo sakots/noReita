@@ -382,7 +382,11 @@
 					<param name="image_height" value="{{$pich}}">
 					<param name="undo" value="{{$undo}}">
 					<param name="undo_in_mg" value="{{$undo_in_mg}}">
+					@if ($tool == 'neo')
+					<param name="url_save" value="saveneo.php">
+					@else
 					<param name="url_save" value="picpost.php">
+					@endif
 					<param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}">
 					@if (isset($imgfile))<param name="image_canvas" value="{{$imgfile}}">@endif
 					@if (isset($pchfile))<param name="pch_file" value="{{$pchfile}}">@endif
@@ -401,6 +405,7 @@
 					@endif
 					<param name="neo_confirm_unload" value="true">
 					<param name="neo_show_right_button" value="true">
+					<param name="neo_send_with_formdata" value="true">
 					</applet-dummy>
 				</div>
 				<div class="palette" id="dyntools">
