@@ -35,8 +35,8 @@ defined('PERMISSION_FOR_LOG') or define('PERMISSION_FOR_LOG', 0600); //config.ph
 defined('PERMISSION_FOR_DEST') or define('PERMISSION_FOR_DEST', 0606); //config.phpで未定義なら0606
 
 $time = time();
-$imgfile = $time.substr(microtime(),2,3);	//画像ファイル名
-$imgfile = is_file(TEMP_DIR.$imgfile.'.png') ? ((time()+1).substr(microtime(),2,3)) : $imgfile;
+$imgfile = $time.substr(microtime(),2,6);	//画像ファイル名
+$imgfile = is_file(TEMP_DIR.$imgfile.'.png') ? ((time()+1).substr(microtime(),2,6)) : $imgfile;
 
 header('Content-type: text/plain');
 //Sec-Fetch-SiteがSafariに実装されていないので、Orijinと、hostをそれぞれ取得して比較。

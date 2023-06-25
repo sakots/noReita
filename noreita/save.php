@@ -14,7 +14,7 @@ defined('DEFAULT_TIMEZONE') or define('DEFAULT_TIMEZONE','Asia/Tokyo');
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
 $time = time();
-$imgfile = $time.substr(microtime(),2,3);	//画像ファイル名
+$imgfile = $time.substr(microtime(),2,6);	//画像ファイル名
 
 
 function chibi_die($message) {

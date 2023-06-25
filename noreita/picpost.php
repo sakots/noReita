@@ -78,7 +78,7 @@ define('SIZE_CHECK', '1');
 define('PICPOST_MAX_KB', '5120');//5MBまで
 
 $time = time();
-$imgfile = $time.substr(microtime(),2,3);	//画像ファイル名
+$imgfile = $time.substr(microtime(),2,6);	//画像ファイル名
 
 /* エラー発生時にSystemLOGにエラーを記録 */
 function error($error){
