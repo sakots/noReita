@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.5.1'); //lot.230626.0
+define('REITA_VER', 'v1.5.2'); //lot.230719.0
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -589,7 +589,7 @@ function regist()
 					'thread'=>$thread, 'parent'=>$parent, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,
 				]
 			);
-			$db->exec($sql);
+			//$db->exec($sql);
 
 			$c_pass = $pwd;
 			//-- クッキー保存 --
@@ -787,7 +787,7 @@ function reply()
 					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'admins'=> $admins,
 				]
 			);
-			$db->exec($sql);
+			//$db->exec($sql);
 
 			$c_pass = $pwd;
 			//-- クッキー保存 --
