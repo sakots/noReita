@@ -71,6 +71,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2024/03/18] v1.6.0
+
+- 偽しぃぺいんたーNEO削除
+- ChickenPaintをBeバージョンに変更
+- BladeOneバージョンアップ(4.12)
+
 ### [2023/06/26] v1.5.2
 
 - 投稿番号が2つおきになる問題を修正
