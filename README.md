@@ -76,6 +76,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 - 偽しぃぺいんたーNEO削除
 - ChickenPaintをBeバージョンに変更
 - BladeOneバージョンアップ(4.12)
+- NEOバージョンアップ(1.6.3)
 
 ### [2023/06/26] v1.5.2
 
