@@ -19,8 +19,8 @@ Reactで絵板を作れなかったので、noReita。
 と
 [chickenpaint](https://github.com/thenickdude/chickenpaint)
 が使えます。
-あと[偽しぃペインターNEO](https://github.com/sakots/Shi-PainterNEO)
-も。
+~~あと[偽しぃペインターNEO](https://github.com/sakots/Shi-PainterNEO)
+も。~~
 
 データベースを使ってるので検索が強いです。ハッシュタグも使えます。
 
