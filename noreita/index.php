@@ -55,9 +55,6 @@ $temppath = realpath("./") . '/' . TEMP_DIR;
 define('IMG_PATH', $path);
 define('TMP_PATH', $temppath);
 
-//偽しぃぺ
-defined('USE_NISE_SHIPE_NEO') or define('USE_NISE_SHIPE_NEO', 1);
-
 $message = "";
 $self = PHP_SELF;
 
@@ -89,7 +86,6 @@ $dat['tver'] = THEME_VER;
 
 $dat['use_shi_p'] = '0';
 $dat['use_chicken'] = USE_CHICKENPAINT;
-$dat['use_nise_shipe_neo'] = USE_NISE_SHIPE_NEO;
 
 $dat['select_palettes'] = USE_SELECT_PALETTES;
 $dat['pallets_dat'] = $pallets_dat;
