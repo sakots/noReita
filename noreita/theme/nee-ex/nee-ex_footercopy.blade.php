@@ -8,7 +8,7 @@
 	<p>
 		OekakiApplet -
 		<a href="https://github.com/funige/neo/" target="_blank" rel="noopener noreferrer" title="by funige">PaintBBS NEO</a>
-		@if ($use_chicken) ,<a href="https://github.com/thenickdude/chickenpaint" target="_blank" rel="nofollow noopener noreferrer" title="by Nicholas Sherlock">ChickenPaint</a> @endif
+		@if ($use_chicken) ,<a href="https://github.com/satopian/ChickenPaint_Be" target="_blank" rel="nofollow noopener noreferrer" title="by Nicholas Sherlock">ChickenPaint Be</a> @endif
 	</p>
 	<p>
 		UseFunction -
