@@ -37,8 +37,6 @@ define('HOME', '../');
 
 // ChickenPaintを使う 使う:1 使わない:0
 define('USE_CHICKENPAINT', 1);
-// 偽しぃペインターNEOを使う:1 使わない:0
-define('USE_NISE_SHIPE_NEO', 1);
 // PaintBBS NEOはどの設定でも起動します。
 
 /*----------絶対に設定が必要な項目はここまでです。ここから下は必要に応じて。----------*/

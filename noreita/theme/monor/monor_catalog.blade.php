@@ -39,7 +39,6 @@
 						<label for="tools">ツール</label>
 						<select name="tools">
 							<option value="neo">PaintBBS NEO</option>
-							@if ($use_nise_shipe_neo)<option value="sneo">偽しぃペNEO</option> @endif
 							@if ($use_chicken)<option value="chicken">ChickenPaint</option> @endif
 						</select>
 						<label for="palettes">パレット</label>

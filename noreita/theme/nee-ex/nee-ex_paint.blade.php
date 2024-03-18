@@ -8,12 +8,6 @@
 		@if ($tool == 'neo')
 		<link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$stime}}" type="text/css">
 		<script src="{{$neo_dir}}neo.js?{{$stime}}" charset="utf-8"></script>
-		@endif
-		@if ($tool == 'sneo')
-		<link rel="stylesheet" href="{{$neo_dir}}sneo.css?{{$stime}}" type="text/css">
-		<script src="{{$neo_dir}}sneo.js?{{$stime}}" charset="utf-8"></script>
-		@endif
-		@if ($tool == 'neo' || $tool == 'sneo')
 		<script src="theme/{{$themedir}}/fix_neo/fix.js?{{$stime}}" charset="utf-8"></script>
 		<!-- アプレットフィット -->
 		<script>
@@ -384,11 +378,7 @@
 					<param name="image_height" value="{{$pich}}">
 					<param name="undo" value="{{$undo}}">
 					<param name="undo_in_mg" value="{{$undo_in_mg}}">
-					@if ($tool == 'neo')
 					<param name="url_save" value="saveneo.php">
-					@else
-					<param name="url_save" value="picpost.php">
-					@endif
 					<param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}">
 					@if (isset($imgfile))<param name="image_canvas" value="{{$imgfile}}">@endif
 					@if (isset($pchfile))<param name="pch_file" value="{{$pchfile}}">@endif
