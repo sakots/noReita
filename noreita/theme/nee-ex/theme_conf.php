@@ -38,6 +38,9 @@ define('RESFILE', "nee-ex_res");
 //お絵かきのテンプレートファイル
 define('PAINTFILE', "nee-ex_paint");
 
+//chickenPaintのテンプレートファイル
+define('PAINTFILE_BE', "nee-ex_be");
+
 //動画再生のテンプレートファイル
 define('ANIMEFILE', "nee-ex_anime");
 

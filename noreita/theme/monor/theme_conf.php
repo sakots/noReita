@@ -38,6 +38,9 @@ define('RESFILE', "monor_res");
 //お絵かきのテンプレートファイル
 define('PAINTFILE', "monor_paint");
 
+//chickenPaintのテンプレートファイル
+define('PAINTFILE_BE', "monor_be");
+
 //動画再生のテンプレートファイル
 define('ANIMEFILE', "monor_anime");
 

@@ -38,6 +38,9 @@ define('RESFILE', "monoreita_res");
 //お絵かきのテンプレートファイル
 define('PAINTFILE', "monoreita_paint");
 
+//chickenPaintのテンプレートファイル
+define('PAINTFILE_BE', "monoreita_be");
+
 //動画再生のテンプレートファイル
 define('ANIMEFILE', "monoreita_anime");
 

@@ -1441,7 +1441,11 @@ function paintform($rep)
 		$dat['mode'] = 'piccom';
 	}
 	//出力
-	echo $blade->run(PAINTFILE, $dat);
+	if ($tool === 'chicken') {
+		echo $blade->run(PAINTFILE_BE, $dat);
+	} else {
+		echo $blade->run(PAINTFILE, $dat);
+	}
 }
 
 //アニメ再生
