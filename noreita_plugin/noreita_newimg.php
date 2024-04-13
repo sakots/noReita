@@ -66,15 +66,19 @@ $img_type=mime_content_type($filename);
 
 switch ($img_type):
 	case 'image/png':
+        header('Cache-Control: no-cache');
 		header('Content-Type: image/png');
 		break;
 	case 'image/jpeg':
+        header('Cache-Control: no-cache');
 		header('Content-Type: image/jpeg');
 		break;
 	case 'image/gif':
+        header('Cache-Control: no-cache');
 		header('Content-Type: image/gif');
 		break;
 	default :
+        header('Cache-Control: no-cache');
 		header('Content-Type: image/png');
 	endswitch;
 

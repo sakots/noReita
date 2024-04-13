@@ -8,9 +8,9 @@
 //  The MIT License
 
 // 使い方
-//ROISのindex.phpと同じディレクトリにアップロードして
+//noReitaのindex.phpと同じディレクトリにアップロードして
 //HTMLファイルに画像を表示する時のように
-//rois_rndimg.php ←このファイルの名前をurlで指定します。
+//noReita_rndimg.php ←このファイルの名前をurlで指定します。
 
 //例）
 // <img src="https://exsample.com/bbs/rois_rndimg.php" alt="" width="300">
@@ -67,15 +67,19 @@ $img_type=mime_content_type($filename);
 
 switch ($img_type):
 	case 'image/png':
+        header('Cache-Control: no-cache');
 		header('Content-Type: image/png');
 		break;
 	case 'image/jpeg':
+        header('Cache-Control: no-cache');
 		header('Content-Type: image/jpeg');
 		break;
 	case 'image/gif':
+        header('Cache-Control: no-cache');
 		header('Content-Type: image/gif');
 		break;
 	default :
+        header('Cache-Control: no-cache');
 		header('Content-Type: image/png');
 	endswitch;
 readfile($filename);
