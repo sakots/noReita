@@ -71,6 +71,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2024/05/31] v1.6.1
+
+- BladeOneバージョンアップ(4.13)
+
 ### [2024/03/18] v1.6.0
 
 - 偽しぃぺいんたーNEO削除
