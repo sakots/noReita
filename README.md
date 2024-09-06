@@ -71,6 +71,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2027/09/07] v1.6.2
+
+- PHP8.3での動作を確認
+- ChickenPaint Beバージョンアップ
+
 ### [2024/05/31] v1.6.1
 
 - BladeOneバージョンアップ(4.13)
