@@ -71,6 +71,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2024/11/24] php8.4環境下での動作
+
+- 現状BladeOneで軽微なエラーが出ます。BladeOneのバージョンアップがあり次第解決するものと思われます。
+  - https://github.com/EFTEC/BladeOne/issues/201
+
 ### [2024/10/13] v1.6.3
 
 - ChickenPaint Beバージョンアップ
