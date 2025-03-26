@@ -17,10 +17,8 @@ Reactで絵板を作れなかったので、noReita。
 
 [PaintBBS NEO](https://github.com/funige/neo/)
 と
-[chickenpaint](https://github.com/thenickdude/chickenpaint)
+[chickenPaint Be](https://github.com/satopian/ChickenPaint_Be)
 が使えます。
-~~あと[偽しぃペインターNEO](https://github.com/sakots/Shi-PainterNEO)
-も。~~
 
 データベースを使ってるので検索が強いです。ハッシュタグも使えます。
 
@@ -28,7 +26,7 @@ Reactで絵板を作れなかったので、noReita。
 
 ないです。
 
-BladeOneとSQLtieは使っていますが、データベースの形式を変えました。
+BladeOneとSQLiteは使っていますが、データベースの形式を変えました。
 
 ## 設置
 
@@ -70,6 +68,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ## 履歴
 
 [すべての履歴はこちら](changelog.md)
+
+### [2025/03/27] v1.6.5
+
+- BladeOne バージョンアップ (4.18)
+- ChickenPaint_Be バージョンアップ
+- neo バージョンアップ (1.6.12)
 
 ### [2025/01/10] v1.6.4
 
