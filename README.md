@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [0225/04/13] License
+
+- sns_share Copyright (c)satopian 2023-2025 MIT License 追加
+
 ### [2025/04/13] v1.6.6
 
 - テーマ改良によりメモリの消費量を減らしスピードをアップ
