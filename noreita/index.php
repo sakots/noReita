@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.5'); //lot.250327.0
+define('REITA_VER', 'v1.6.6'); //lot.250413.0
 
 //設定の読み込み
 require(__DIR__ . '/config.php');
@@ -15,11 +15,11 @@ require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
 //phpのバージョンが古い場合動かさせない
-if (($phpver = phpversion()) < "7.3.0") {
-	die("PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$phpver})");
+if (($php_ver = phpversion()) < "7.3.0") {
+	die("PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})");
 }
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 220121 || !defined('CONF_VER')) {
+if (CONF_VER < 250413 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
 
@@ -50,10 +50,10 @@ $dat = array(); // bladeに格納する変数
 
 //絶対パス取得
 $path = realpath("./") . '/' . IMG_DIR;
-$temppath = realpath("./") . '/' . TEMP_DIR;
+$temp_path = realpath("./") . '/' . TEMP_DIR;
 
 define('IMG_PATH', $path);
-define('TMP_PATH', $temppath);
+define('TMP_PATH', $temp_path);
 
 $message = "";
 $self = PHP_SELF;
@@ -84,6 +84,8 @@ $dat['themedir'] = THEMEDIR;
 $dat['tname'] = THEME_NAME;
 $dat['tver'] = THEME_VER;
 
+$dat['switch_sns'] = SWITCH_SNS;
+
 $dat['use_shi_p'] = '0';
 $dat['use_chicken'] = USE_CHICKENPAINT;
 
@@ -111,10 +113,6 @@ $dat['share_button'] = SHARE_BUTTON;
 
 $dat['use_hashtag'] = USE_HASHTAG;
 
-if (!isset($admin_name)) {
-	$admin_name = '管理人';
-}
-
 defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
 
 $dat['sodane'] = SODANE;
@@ -135,6 +133,9 @@ $dat['use_nsfw'] = USE_NSFW;
 
 //データベース接続PDO
 define('DB_PDO', 'sqlite:' . DB_NAME . '.db');
+
+defined("SNS_WINDOW_WIDTH") or define("SNS_WINDOW_WIDTH","600");
+defined("SNS_WINDOW_HEIGHT") or define("SNS_WINDOW_HEIGHT","600");
 
 //初期設定(初期設定後は不要なので削除可)
 init();
@@ -172,7 +173,7 @@ function get_csrf_token()
 {
 	if (!isset($_SESSION)) {
 		session_save_path(__DIR__ . '/session/');
-		session_start();
+		session_sta();
 	}
 	header('Expires:');
 	header('Cache-Control:');
@@ -183,7 +184,7 @@ function get_csrf_token()
 function check_csrf_token()
 {
 	session_save_path(__DIR__ . '/session/');
-	session_start();
+	session_sta();
 	$token = filter_input(INPUT_POST, 'token');
 	$session_token = isset($_SESSION['token']) ? $_SESSION['token'] : '';
 	if (!$session_token || $token !== $session_token) {
@@ -269,6 +270,13 @@ if (filter_input(INPUT_GET, 'mode') === "catalog") {
 if (filter_input(INPUT_GET, 'mode') === "search") {
 	$mode = "search";
 }
+if (filter_input(INPUT_GET, 'mode') === "set_share_server") {
+	$mode = "set_share_server";
+}
+if (filter_input(INPUT_GET, 'mode') === "post_share_server") {
+	$mode = "post_share_server";
+}
+
 
 switch ($mode) {
 	case 'regist':
@@ -318,6 +326,10 @@ switch ($mode) {
 		return admin_in();
 	case 'admin':
 		return admin();
+	case 'set_share_server':
+		return set_share_server();
+	case 'post_share_server':
+		return post_share_server();
 	default:
 		return def();
 }
@@ -775,7 +787,7 @@ function reply()
 			//リプ処理
 			$thread = 0;
 			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, pwd, id, exid, age, invz, host, admins) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :pwdh, :id, :exid, :age, :invz, :host, :admins)";
-			
+
 			// プレースホルダ
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
@@ -950,7 +962,7 @@ function def()
 				//日付をUNIX時間に変換して設定どおりにフォーマット
 				$res['created'] = date(DATE_FORMAT, strtotime($res['created']));
 				$res['modified'] = date(DATE_FORMAT, strtotime($res['modified']));
-				$ko[] = $res;
+				$bbsline['res'][$j] = $res;
 				$j++;
 			}
 			// http、https以外のURLの場合表示しない
@@ -977,12 +989,14 @@ function def()
 			$bbsline['past'] = strtotime($bbsline['created']); // このスレは古いので用
 			$bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
 			$bbsline['modified'] = date(DATE_FORMAT, strtotime($bbsline['modified']));
-			$oya[] = $bbsline;
+
+			$bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.TITLE);
+			$bbsline['encoded_u'] = urlencode(BASE.'?resno='.$bbsline['tid']);
+
+			$dat['oya'][$i] = $bbsline;
 			$i++;
 		}
 
-		$dat['ko'] = $ko;
-		$dat['oya'] = $oya;
 		$dat['dsp_res'] = DSP_RES;
 		$dat['path'] = IMG_DIR;
 
@@ -1241,7 +1255,6 @@ function res()
 			$bbsline['past'] = strtotime($bbsline['created']); //古いので用
 			$bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
 			$bbsline['modified'] = date(DATE_FORMAT, strtotime($bbsline['modified']));
-			$oya[] = $bbsline;
 			if (!in_array($bbsline['a_name'], $rresname)) {
 				$rresname[] = $bbsline['a_name'];
 			}
@@ -1252,6 +1265,11 @@ function res()
 			//名前付きレス用
 			$resname = implode(A_NAME_SAN . ' ', $rresname);
 			$dat['resname'] = $resname;
+
+			$bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.TITLE);
+			$bbsline['encoded_u'] = urlencode(BASE.'?resno='.$bbsline['tid']);
+
+			$oya[] = $bbsline;
 
 			$dat['oya'] = $oya;
 			$dat['ko'] = $ko;
@@ -2086,7 +2104,7 @@ function editexec()
 			} catch(PDOException $e) {
 				echo "DB接続エラー:" . $e->getMessage();
 			}
-		
+
 		$db = $db->exec($sql);
 		$db = null;
 		$dat['message'] = '編集完了しました。';
@@ -2497,5 +2515,132 @@ function gen_id($userip, $time)
 		return substr(crypt(md5($userip . ID_SEED . date("Y", $time)), 'id'), -8);
 	} else {
 		return substr(crypt(md5($userip . ID_SEED), 'id'), -8);
+	}
+}
+
+//リダイレクト
+function redirect($url): void {
+	header("Location: {$url}");
+	exit();
+}
+
+//シェアするserverの選択画面
+function set_share_server(): void {
+	global $servers,$blade,$dat;
+
+	//ShareするServerの一覧
+	//｢"ラジオボタンに表示するServer名","snsのserverのurl"｣
+	$servers = $servers ??
+	[
+		["X","https://x.com"],
+		["Bluesky","https://bsky.app"],
+		["Threads","https://www.threads.net"],
+		["pawoo.net","https://pawoo.net"],
+		["fedibird.com","https://fedibird.com"],
+		["misskey.io","https://misskey.io"],
+		["xissmie.xfolio.jp","https://xissmie.xfolio.jp"],
+		["misskey.design","https://misskey.design"],
+		["nijimiss.moe","https://nijimiss.moe"],
+		["sushi.ski","https://sushi.ski"],
+	];
+	//設定項目ここまで
+	$servers[]=["直接入力","direct"];//直接入力の箇所はそのまま。
+	$dat['servers'] = $servers;
+
+	$dat['encoded_t'] = filter_input_data('GET',"encoded_t");
+	$dat['encoded_u'] = filter_input_data('GET',"encoded_u");
+	$dat['sns_server_radio_cookie'] = (string)filter_input_data('COOKIE',"sns_server_radio_cookie");
+	$dat['sns_server_direct_input_cookie'] = (string)filter_input_data('COOKIE',"sns_server_direct_input_cookie");
+
+	$dat['admin_pass'] = null;
+	//HTML出力
+	echo $blade->run(SET_SHARE_SERVER, $dat);
+}
+
+//SNSへ共有リンクを送信
+function post_share_server(): void {
+
+	$sns_server_radio=(string)filter_input_data('POST',"sns_server_radio",FILTER_VALIDATE_URL);
+	$sns_server_radio_for_cookie=(string)filter_input_data('POST',"sns_server_radio");//directを判定するためurlでバリデーションしていない
+	$sns_server_radio_for_cookie=($sns_server_radio_for_cookie === 'direct') ? 'direct' : $sns_server_radio;
+	$sns_server_direct_input=(string)filter_input_data('POST',"sns_server_direct_input",FILTER_VALIDATE_URL);
+	$encoded_t=(string)filter_input_data('POST',"encoded_t");
+	$encoded_t=urlencode($encoded_t);
+	$encoded_u=(string)filter_input_data('POST',"encoded_u");
+	$encoded_u=urlencode($encoded_u);
+	setcookie("sns_server_radio_cookie",$sns_server_radio_for_cookie, time()+(86400*30),"","",false,true);
+	setcookie("sns_server_direct_input_cookie",$sns_server_direct_input, time()+(86400*30),"","",false,true);
+	$share_url='';
+	if($sns_server_radio){
+		$share_url=$sns_server_radio."/share?text=";
+	} elseif($sns_server_direct_input){//直接入力時
+		$share_url=$sns_server_direct_input."/share?text=";
+		if($sns_server_direct_input==="https://bsky.app"){
+			$share_url="https://bsky.app/intent/compose?text=";
+		} elseif($sns_server_direct_input==="https://www.threads.net"){
+			$share_url="https://www.threads.net/intent/post?text=";
+		}
+	}
+	if(in_array($sns_server_radio,["https://x.com","https://twitter.com"])){
+		// $share_url="https://x.com/intent/post?text=";
+		$share_url="https://twitter.com/intent/tweet?text=";
+	} elseif($sns_server_radio === "https://bsky.app"){
+		$share_url="https://bsky.app/intent/compose?text=";
+	}	elseif($sns_server_radio === "https://www.threads.net"){
+		$share_url="https://www.threads.net/intent/post?text=";
+	}
+	$share_url.=$encoded_t.'%20'.$encoded_u;
+	$share_url = filter_var($share_url, FILTER_VALIDATE_URL) ? $share_url : '';
+	if(!$share_url){
+		error("SNSの共有先を選択してください。");
+	}
+	redirect($share_url);
+}
+
+//filter_input のラッパー関数
+function filter_input_data(string $input, string $key, int $filter=0) {
+	// $_GETまたは$_POSTからデータを取得
+	$value = null;
+	if ($input === 'GET') {
+			$value = $_GET[$key] ?? null;
+	} elseif ($input === 'POST') {
+			$value = $_POST[$key] ?? null;
+	} elseif ($input === 'COOKIE') {
+			$value = $_COOKIE[$key] ?? null;
+	}
+
+	// データが存在しない場合はnullを返す
+	if ($value === null) {
+			return null;
+	}
+
+	// フィルタリング処理
+	switch ($filter) {
+		case FILTER_VALIDATE_BOOLEAN:
+			return  filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+		case FILTER_VALIDATE_INT:
+			return filter_var($value, FILTER_VALIDATE_INT);
+		case FILTER_VALIDATE_URL:
+			return filter_var($value, FILTER_VALIDATE_URL);
+		default:
+			return $value;  // 他のフィルタはそのまま返す
+	}
+}
+
+//session開始
+function session_sta(): void {
+
+	$session_name = SESSION_NAME;
+
+	if(!isset($_SESSION)){
+		ini_set('session.use_strict_mode', 1);
+		session_set_cookie_params(
+			0,"","",false,true
+		);
+		session_name($session_name);
+		session_start();
+		header('Expires:');
+		header('Cache-Control:');
+		header('Pragma:');
 	}
 }
