@@ -151,12 +151,19 @@
 			</section>
 			@if ($share_button)
 			<div class="thfoot">
-				<span class="button"><a href="https://twitter.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank"><svg viewBox="0 0 512 512">
-							<use href="./theme/{{$themedir}}/icons/twitter.svg#twitter">
-						</svg> tweet</a></span>
-				<span class="button"><a href="http://www.facebook.com/share.php?u={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" class="fb btn" target="_blank"><svg viewBox="0 0 512 512">
-							<use href="./theme/{{$themedir}}/icons/facebook.svg#facebook">
-						</svg> share</a></span>
+				@if ($switch_sns)
+				<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
+					<svg viewBox="0 0 512 512">
+						<use href="./theme/{{$themedir}}/icons/share.svg#share">
+					</svg> SNSで共有する</a>
+				</span>
+				@else
+				<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
+					<svg viewBox="0 0 512 512">
+						<use href="./theme/{{$themedir}}/icons/twitter.svg#twitter">
+					</svg> tweet</a>
+				</span>
+				@endif
 			</div>
 			@endif
 			@endif
@@ -262,6 +269,35 @@
 			<script src="https://cdn.jsdelivr.net/npm/luminous-lightbox@2.3.2/dist/luminous.min.js"></script>
 			<script>
 				new Luminous(document.querySelector('.luminous'), {closeTrigger: "click", closeWithEscape: true});
+			</script>
+			<script>
+				//shareするSNSのserver一覧を開く
+				let snsWindow = null; // グローバル変数としてウィンドウオブジェクトを保存する
+
+				function open_sns_server_window(event, width = 600, height = 600) {
+					event.preventDefault(); // デフォルトのリンクの挙動を中断
+
+					// 幅と高さが数値であることを確認
+					// 幅と高さが正の値であることを確認
+					if (isNaN(width) || width <= 350 || isNaN(height) || height <= 400) {
+						width = 350; // デフォルト値
+						height = 400; // デフォルト値
+					}
+					let url = event.currentTarget.href;
+					let windowFeatures = "width=" + width + ",height=" + height; // ウィンドウのサイズを指定
+
+					if (snsWindow && !snsWindow.closed) {
+						snsWindow.focus(); // 既に開かれているウィンドウがあればフォーカスする
+					} else {
+						snsWindow = window.open(url, "_blank", windowFeatures); // 新しいウィンドウを開く
+					}
+					// ウィンドウがフォーカスを失った時の処理
+					snsWindow.addEventListener("blur", function () {
+						if (snsWindow.location.href === url) {
+							snsWindow.close(); // URLが変更されていない場合はウィンドウを閉じる
+						}
+					})
+				}
 			</script>
 		</main>
 		<footer id="footer">
