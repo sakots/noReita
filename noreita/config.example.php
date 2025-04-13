@@ -51,7 +51,59 @@ define('DB_NAME', 'reita');
 
 //シェアボタンを表示する する:1 しない:0
 //設置場所のURL BASE で設定したurlをもとにリンクを作成
-define('SHARE_BUTTON', 0);
+define('SHARE_BUTTON', 1);
+
+/* ---------- SNSシェア機能詳細設定 ---------- */
+//SNSシェア詳細を表示する する:1 しない:0
+define('SWITCH_SNS', 1);
+
+//SNS共有の時に一覧で表示するサーバ
+//例 	["表示名","https://example.com (SNSのサーバのurl)"],(最後にカンマが必要です)
+
+$servers =
+[
+	["X","https://x.com"],
+	["Bluesky","https://bsky.app"],
+	["Threads","https://www.threads.net"],
+	["pawoo.net","https://pawoo.net"],
+	["fedibird.com","https://fedibird.com"],
+	["misskey.io","https://misskey.io"],
+	["xissmie.xfolio.jp","https://xissmie.xfolio.jp"],
+	["misskey.design","https://misskey.design"],
+	["nijimiss.moe","https://nijimiss.moe"],
+	["sushi.ski","https://sushi.ski"],
+];
+
+//SNS共有の時に開くWindowsの幅と高さ
+//windowの幅 初期値 600
+define("SNS_WINDOW_WIDTH","600");
+
+//windowの高さ 初期値 600
+define("SNS_WINDOW_HEIGHT","600");
+
+//Misskey投稿機能設定
+
+//Misskeyへの投稿機能を有効にする
+//する: 1 しない: 0
+define('USE_MISSKEY_NOTE', 1);
+
+//Misskeyへの投稿時に一覧で表示するMisskeyサーバ
+$misskey_servers=
+[
+	["misskey.io","https://misskey.io"],
+	["xissmie.xfolio.jp","https://xissmie.xfolio.jp"],
+	["misskey.design","https://misskey.design"],
+	["nijimiss.moe","https://nijimiss.moe"],
+	["misskey.art","https://misskey.art"],
+	["oekakiskey.com","https://oekakiskey.com"],
+	["misskey.gamelore.fun","https://misskey.gamelore.fun"],
+	["novelskey.tarbin.net","https://novelskey.tarbin.net"],
+	["tyazzkey.work","https://tyazzkey.work"],
+	["sushi.ski","https://sushi.ski"],
+	["misskey.delmulin.com","https://misskey.delmulin.com"],
+	["side.misskey.productions","https://side.misskey.productions"],
+	["mk.shrimpia.network","https://mk.shrimpia.network"],
+];
 
 /* ---------- NSFW画像 ---------- */
 
@@ -154,6 +206,9 @@ define('DEFAULT_TIMEZONE', 'Asia/Tokyo');
 //ユーザー削除権限 (0:不可 1:許可)
 //※treeのみを消して後に残ったlogは管理者のみ削除可能
 define('USER_DEL', 1);
+
+//セッションの名前
+define('SESSION_NAME', 'noreita_session');
 
 /* ---------- お絵かきディレクトリ設定 ---------- */
 
@@ -336,4 +391,4 @@ define('PHP_SELF', 'index.php');
 
 /* ------------- コンフィグ互換性管理 ------------- */
 
-define('CONF_VER', 220122);
+define('CONF_VER', 250413);
