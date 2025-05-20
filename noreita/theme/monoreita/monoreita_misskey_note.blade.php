@@ -39,9 +39,7 @@
         @else
         <h3>この画像をMisskeyにノートします。</h3>
         @endif
-        @php
         <form action="./" method="POST" id="before_delete" onsubmit="return res_form_submit(event,'before_delete')">
-        @endphp
           @if (!($admin_post || $admin_del) || $verified !=='admin_post')
           <span class="non"><input type="text" value="" autocomplete="username"></span>
           <input type="password" name="pwd" value="{{$pwdc}}" autocomplete="current-password">
@@ -70,5 +68,13 @@
   <footer id="footer">
 		@include('monoreita_footercopy')
   </footer>
+  <script>
+    colorIdx = GetCookie('_monoreita_colorIdx');
+    document.getElementById("mystyle").selectedIndex = colorIdx;
+  </script>
+  <script src="loadcookie.js"></script>
+  <script>
+    l(); //LoadCookie
+  </script>
 </body>
 </html>
