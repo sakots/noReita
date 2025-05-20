@@ -60,6 +60,13 @@
     </div>
   </main>
   @endif
+  @if ($misskey_mode == 'note_edit_form')
+  <main>
+    <div>
+      
+    </div>
+  </main>
+  @endif
   <footer id="footer">
 		@include('monoreita_footercopy')
   </footer>
