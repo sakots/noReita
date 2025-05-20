@@ -5,13 +5,14 @@
 $misskey_note_ver = 20250326;
 
 // グローバル変数の宣言
-global $en, $home, $petit_ver, $petit_lot, $set_nsfw, $deny_all_posts;
+global $en, $home, $petit_ver, $petit_lot, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag, $date_format;
 
 //データベース接続PDO
 define('DB_PDO', 'sqlite:' . DB_NAME . '.db');
 
 // データベースから投稿を取得する関数
 function get_post_from_db($no, $id) {
+	global $en;
 	try {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -55,6 +56,7 @@ function get_post_from_db($no, $id) {
 
 // 投稿の存在確認
 function check_post_exists($no) {
+	global $en;
 	try {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -73,6 +75,7 @@ function check_post_exists($no) {
 
 // 投稿のパスワード検証
 function verify_post_password($no, $id, $pwd) {
+	global $en;
 	try {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -95,6 +98,7 @@ function verify_post_password($no, $id, $pwd) {
 
 // 投稿の編集権限チェック
 function check_edit_permission($no, $id, $pwd, $admin) {
+	global $en;
 	try {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
