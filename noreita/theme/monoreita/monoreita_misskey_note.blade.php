@@ -62,6 +62,6 @@
   @endif
   <footer id="footer">
 		@include('monoreita_footercopy')
-	</footer
+  </footer>
 </body>
 </html>
