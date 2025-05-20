@@ -1,17 +1,17 @@
 <?php
-$functions_ver=20250518;
+$functions_ver = 20250518;
 
 //ページのコンテキストをセッションに保存
-function set_page_context_to_session(){
+function set_page_context_to_session(): void {
 	session_sta();
 	// セッションに保存
 	$_SESSION['current_page_context'] = [
 		'page' => (int)filter_input_data('GET', 'page', FILTER_VALIDATE_INT),
 		'resno' => filter_input_data('GET', 'resno', FILTER_VALIDATE_INT),//未設定時はnull。intでキャストしない事。
-		'catalog' => (bool)(filter_input_data('GET', 'mode')==='catalog'),
+		'catalog' => (bool)(filter_input_data('GET', 'mode') === 'catalog'),
 		'res_catalog' => (bool)filter_input_data('GET', 'res_catalog', FILTER_VALIDATE_BOOLEAN),
 		'misskey_note' => (bool)filter_input_data('GET', 'misskey_note', FILTER_VALIDATE_BOOLEAN),
-		'search' => (bool)(filter_input_data('GET', 'mode')==='search'),
+		'search' => (bool)(filter_input_data('GET', 'mode') === 'search'),
 		'radio' => (int)filter_input_data('GET', 'radio', FILTER_VALIDATE_INT),
 		'imgsearch' => (bool)filter_input_data('GET', 'imgsearch', FILTER_VALIDATE_BOOLEAN),
 		'q' => (string)filter_input_data('GET', 'q'),
@@ -72,18 +72,18 @@ function Reject_if_NGword_exists_in_the_post($com, $name, $email, $url, $sub): v
 
 //念のため画像タイプチェック
 function getImgType($img_type, $dest): string {
-	switch ($img_type) {
-		case "image/gif":
-			return ".gif";
-		case "image/jpeg":
-			return ".jpg";
-		case "image/png":
-			return ".png";
-		case "image/webp":
-			return ".webp";
-		default:
-			return error(MSG004, $dest);
+	$map = [
+		"image/gif" => ".gif",
+		"image/jpeg" => ".jpg",
+		"image/png" => ".png",
+		"image/webp" => ".webp",
+	];
+
+	if (isset($map[$img_type])) {
+		return $map[$img_type];
 	}
+	error(MSG004, $dest);
+	return ''; // この行は実際には実行されないが、リンターを満足させるために必要
 }
 
 /**
@@ -232,45 +232,45 @@ function set_share_server(): void {
 //SNSへ共有リンクを送信
 function post_share_server(): void {
 
-	$sns_server_radio=(string)filter_input_data('POST',"sns_server_radio",FILTER_VALIDATE_URL);
-	$sns_server_radio_for_cookie=(string)filter_input_data('POST',"sns_server_radio");//directを判定するためurlでバリデーションしていない
-	$sns_server_radio_for_cookie=($sns_server_radio_for_cookie === 'direct') ? 'direct' : $sns_server_radio;
-	$sns_server_direct_input=(string)filter_input_data('POST',"sns_server_direct_input",FILTER_VALIDATE_URL);
-	$encoded_t=(string)filter_input_data('POST',"encoded_t");
-	$encoded_t=urlencode($encoded_t);
-	$encoded_u=(string)filter_input_data('POST',"encoded_u");
-	$encoded_u=urlencode($encoded_u);
-	setcookie("sns_server_radio_cookie",$sns_server_radio_for_cookie, time()+(86400*30),"","",false,true);
-	setcookie("sns_server_direct_input_cookie",$sns_server_direct_input, time()+(86400*30),"","",false,true);
+	$sns_server_radio = (string)filter_input_data('POST',"sns_server_radio",FILTER_VALIDATE_URL);
+	$sns_server_radio_for_cookie = (string)filter_input_data('POST',"sns_server_radio");//directを判定するためurlでバリデーションしていない
+	$sns_server_radio_for_cookie = ($sns_server_radio_for_cookie === 'direct') ? 'direct' : $sns_server_radio;
+	$sns_server_direct_input = (string)filter_input_data('POST',"sns_server_direct_input",FILTER_VALIDATE_URL);
+	$encoded_t = (string)filter_input_data('POST',"encoded_t");
+	$encoded_t = urlencode($encoded_t);
+	$encoded_u = (string)filter_input_data('POST',"encoded_u");
+	$encoded_u = urlencode($encoded_u);
+	setcookie("sns_server_radio_cookie",$sns_server_radio_for_cookie, time() + (86400*30),"","",false,true);
+	setcookie("sns_server_direct_input_cookie",$sns_server_direct_input, time() + (86400*30),"","",false,true);
 	$share_url='';
-	if($sns_server_radio){
-		$share_url=$sns_server_radio."/share?text=";
-	} elseif($sns_server_direct_input){//直接入力時
-		$share_url=$sns_server_direct_input."/share?text=";
-		if($sns_server_direct_input==="https://bsky.app"){
-			$share_url="https://bsky.app/intent/compose?text=";
-		} elseif($sns_server_direct_input==="https://www.threads.net"){
-			$share_url="https://www.threads.net/intent/post?text=";
+	if($sns_server_radio) {
+		$share_url = $sns_server_radio."/share?text=";
+	} elseif($sns_server_direct_input) { //直接入力時
+		$share_url = $sns_server_direct_input."/share?text=";
+		if($sns_server_direct_input === "https://bsky.app") {
+			$share_url = "https://bsky.app/intent/compose?text=";
+		} elseif($sns_server_direct_input === "https://www.threads.net") {
+			$share_url = "https://www.threads.net/intent/post?text=";
 		}
 	}
-	if(in_array($sns_server_radio,["https://x.com","https://twitter.com"])){
+	if(in_array($sns_server_radio,["https://x.com","https://twitter.com"])) {
 		// $share_url="https://x.com/intent/post?text=";
-		$share_url="https://twitter.com/intent/tweet?text=";
-	} elseif($sns_server_radio === "https://bsky.app"){
-		$share_url="https://bsky.app/intent/compose?text=";
-	}	elseif($sns_server_radio === "https://www.threads.net"){
-		$share_url="https://www.threads.net/intent/post?text=";
+		$share_url = "https://twitter.com/intent/tweet?text=";
+	} elseif($sns_server_radio === "https://bsky.app") {
+		$share_url = "https://bsky.app/intent/compose?text=";
+	}	elseif($sns_server_radio === "https://www.threads.net") {
+		$share_url = "https://www.threads.net/intent/post?text=";
 	}
-	$share_url.=$encoded_t.'%20'.$encoded_u;
+	$share_url .= $encoded_t.'%20'.$encoded_u;
 	$share_url = filter_var($share_url, FILTER_VALIDATE_URL) ? $share_url : '';
-	if(!$share_url){
+	if(!$share_url) {
 		error("SNSの共有先を選択してください。");
 	}
 	redirect($share_url);
 }
 
 //filter_input のラッパー関数
-function filter_input_data(string $input, string $key, int $filter=0) {
+function filter_input_data(string $input, string $key, int $filter=0): mixed {
 	// $_GETまたは$_POSTからデータを取得
 	$value = null;
 	if ($input === 'GET') {
@@ -318,7 +318,7 @@ function session_sta(): void {
 }
 
 //エスケープ
-function h($str) :string{
+function h($str): string {
 	if(zero_check($str)){
 		return '0';
 	}
@@ -419,14 +419,14 @@ function switch_tool($tool): string {
 function adminpost_valid(): bool {
 	global $second_pass;
 	session_sta();
-	return isset($_SESSION['adminpost'])&&($second_pass && $_SESSION['adminpost']===$second_pass);
+	return isset($_SESSION['adminpost']) && ($second_pass && $_SESSION['adminpost'] === $second_pass);
 }
 function admindel_valid(): bool {
 	global $second_pass;
 	session_sta();
-	return isset($_SESSION['admindel'])&&($second_pass && $_SESSION['admindel']===$second_pass);
+	return isset($_SESSION['admindel']) && ($second_pass && $_SESSION['admindel'] === $second_pass);
 }
 function userdel_valid(): bool {
 	session_sta();
-	return isset($_SESSION['userdel'])&&($_SESSION['userdel']==='userdel_mode');
+	return isset($_SESSION['userdel']) && ($_SESSION['userdel'] === 'userdel_mode');
 }
