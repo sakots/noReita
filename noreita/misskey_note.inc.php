@@ -123,6 +123,64 @@ function check_edit_permission($no, $id, $pwd, $admin) {
 	return false;
 }
 
+// 投稿データを整形して表示用の配列を作成
+function create_res($post) {
+	global $en, $autolink, $use_hashtag, $date_format;
+
+	try {
+		// 投稿データの整形
+		$res = [
+			'tid' => $post['tid'],
+			'sub' => $post['sub'],
+			'a_name' => $post['a_name'],
+			'admins' => $post['admins'],
+			'com' => $post['com'],
+			'mail' => $post['mail'],
+			'a_url' => $post['a_url'],
+			'id' => $post['id'],
+			'exid' => $post['exid'],
+			'picfile' => $post['picfile'],
+			'pchfile' => $post['pchfile'],
+			'img_w' => $post['img_w'],
+			'img_h' => $post['img_h'],
+			'tool' => $post['tool'],
+			'utime' => $post['utime'],
+			'created' => date($date_format, strtotime($post['created'])),
+			'modified' => date($date_format, strtotime($post['modified'])),
+			'past' => strtotime($post['created']),
+			'parent' => $post['parent']
+		];
+
+		// コメントの整形
+		if ($autolink) {
+			$res['com'] = auto_link($res['com']);
+		}
+		if ($use_hashtag) {
+			$res['com'] = hashtag_link($res['com']);
+		}
+		// 空行を縮める
+		$res['com'] = preg_replace('/(\n|\r|\r\n){3,}/us', "\n", $res['com']);
+		// <br>に変換
+		$res['com'] = tobr($res['com']);
+		// 引用の色付け
+		$res['com'] = quote($res['com']);
+
+		// URLの検証
+		if (!filter_var($res['a_url'], FILTER_VALIDATE_URL) || !preg_match('|^https?://.*$|', $res['a_url'])) {
+			$res['a_url'] = "";
+		}
+
+		// 共有用のエンコード
+		$res['encoded_t'] = urlencode('[' . $res['tid'] . ']' . $res['sub'] . ($res['a_name'] ? ' by ' . $res['a_name'] : '') . ' - ' . TITLE);
+		$res['encoded_u'] = urlencode(BASE . '?resno=' . $res['tid']);
+
+		return $res;
+	} catch (Exception $e) {
+		error($en ? "Error processing post data: " . $e->getMessage() : "投稿データの処理中にエラーが発生しました: " . $e->getMessage());
+	}
+	return null;
+}
+
 class misskey_note{
 
 	//投稿済みの記事をMisskeyにノートするための前処理
