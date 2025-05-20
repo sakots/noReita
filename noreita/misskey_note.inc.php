@@ -241,7 +241,8 @@ class misskey_note {
 	//投稿済みの画像をMisskeyにNoteするための投稿フォーム
 	public static function misskey_note_edit_form(): void {
 
-		global  $petit_ver,$petit_lot,$home,$boardname,$skindir,$set_nsfw,$en,$max_kb,$use_upload;
+		global $home,$set_nsfw,$en,$max_kb,$use_upload;
+		global $blade;
 
 		check_same_origin();
 
@@ -297,8 +298,8 @@ class misskey_note {
 
 		$admin_pass= null;
 		// HTML出力
-		$template='misskey_note_edit_form.html';
-		include __DIR__.'/'.$skindir.$template;
+		$dat['misskey_mode'] = 'note_edit_form';
+		echo $blade->run(MISSKEYFILE, $dat);
 		exit();
 	}
 
