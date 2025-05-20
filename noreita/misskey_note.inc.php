@@ -11,7 +11,7 @@ global $en, $home, $petit_ver, $petit_lot, $set_nsfw, $deny_all_posts, $autolink
 define('DB_PDO', 'sqlite:' . DB_NAME . '.db');
 
 // データベースから投稿を取得する関数
-function get_post_from_db($no, $id) {
+function get_post_from_db($no, $id): array|null {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
@@ -55,7 +55,7 @@ function get_post_from_db($no, $id) {
 }
 
 // 投稿の存在確認
-function check_post_exists($no) {
+function check_post_exists($no): bool {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
@@ -74,7 +74,7 @@ function check_post_exists($no) {
 }
 
 // 投稿のパスワード検証
-function verify_post_password($no, $id, $pwd) {
+function verify_post_password($no, $id, $pwd): bool {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
@@ -97,7 +97,7 @@ function verify_post_password($no, $id, $pwd) {
 }
 
 // 投稿の編集権限チェック
-function check_edit_permission($no, $id, $pwd, $admin) {
+function check_edit_permission($no, $id, $pwd, $admin): bool {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
@@ -128,7 +128,7 @@ function check_edit_permission($no, $id, $pwd, $admin) {
 }
 
 // 投稿データを整形して表示用の配列を作成
-function create_res($post) {
+function create_res($post): array {
 	global $en, $autolink, $use_hashtag, $date_format;
 
 	try {
@@ -182,7 +182,7 @@ function create_res($post) {
 	} catch (Exception $e) {
 		error($en ? "Error processing post data: " . $e->getMessage() : "投稿データの処理中にエラーが発生しました: " . $e->getMessage());
 	}
-	return null;
+	return [];
 }
 
 class misskey_note {
