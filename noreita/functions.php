@@ -416,17 +416,17 @@ function switch_tool($tool): string {
 }
 
 //sessionの確認
-function adminpost_valid(): bool {
+function admin_post_valid(): bool {
 	global $second_pass;
 	session_sta();
-	return isset($_SESSION['adminpost']) && ($second_pass && $_SESSION['adminpost'] === $second_pass);
+	return isset($_SESSION['admin_post']) && ($second_pass && $_SESSION['admin_post'] === $second_pass);
 }
-function admindel_valid(): bool {
+function admin_del_valid(): bool {
 	global $second_pass;
 	session_sta();
-	return isset($_SESSION['admindel']) && ($second_pass && $_SESSION['admindel'] === $second_pass);
+	return isset($_SESSION['admin_del']) && ($second_pass && $_SESSION['admin_del'] === $second_pass);
 }
-function userdel_valid(): bool {
+function user_del_valid(): bool {
 	session_sta();
-	return isset($_SESSION['userdel']) && ($_SESSION['userdel'] === 'userdel_mode');
+	return isset($_SESSION['user_del']) && ($_SESSION['user_del'] === 'user_del_mode');
 }

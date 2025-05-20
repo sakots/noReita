@@ -112,7 +112,7 @@ function check_edit_permission($no, $id, $pwd, $admin) {
 			return false;
 		}
 
-		if ($admin || $post['admins'] === 'adminpost') {
+		if ($admin || $post['admins'] === 'admin_post') {
 			return true;
 		}
 
@@ -185,23 +185,23 @@ function create_res($post) {
 	return null;
 }
 
-class misskey_note{
+class misskey_note {
 
 	//投稿済みの記事をMisskeyにノートするための前処理
 	public static function before_misskey_note (): void {
 
-		global $home,$set_nsfw,$en,$deny_all_posts;
+		global $home,$set_nsfw,$en,$deny_all_posts,$blade;
 		//管理者判定処理
 		session_sta();
-		$adminpost=adminpost_valid();
-		$admindel=admindel_valid();
+		$admin_post=admin_post_valid();
+		$admin_del=admin_del_valid();
 
 		$pwdc=(string)filter_input_data('COOKIE','pwdc');
 		$id = t(filter_input_data('POST','id'));//intの範囲外
 		$id = $id ? $id : t(filter_input_data('GET','id'));//intの範囲外
 		$no = t(filter_input_data('POST','no',FILTER_VALIDATE_INT));
 		$no = $no ? $no : t(filter_input_data('GET','no',FILTER_VALIDATE_INT));
-		$userdel=isset($_SESSION['userdel'])&&($_SESSION['userdel']==='userdel_mode');
+		$user_del=isset($_SESSION['user_del'])&&($_SESSION['user_del']==='user_del_mode');
 		$resmode = false;//使っていない
 		$page= $_SESSION['current_page_context']["page"] ?? 0;
 		$resno= $_SESSION['current_page_context']["resno"] ?? null;//下の行でnull判定
@@ -220,7 +220,7 @@ class misskey_note{
 			error($en ? 'The article was not found.' : '記事が見つかりません。');
 		}
 
-		$out[0][] = $post;
+		$dat[0][] = $post;
 		$token=get_csrf_token();
 
 		// nsfw
@@ -234,8 +234,8 @@ class misskey_note{
 
 		$admin_pass= null;
 
-		$templete='before_misskey_note.html';
-		include __DIR__.'/'.$skindir.$templete;
+		$dat['misskey_mode'] = 'before';
+		echo $blade->run(MISSKEYFILE, $dat);
 		exit();
 	}
 	//投稿済みの画像をMisskeyにNoteするための投稿フォーム
@@ -247,9 +247,9 @@ class misskey_note{
 
 		$token = get_csrf_token();
 
-		$admindel = admindel_valid();
-		$adminpost = adminpost_valid();
-		$admin = ($admindel||$adminpost);
+		$admin_del = admin_del_valid();
+		$admin_post = admin_post_valid();
+		$admin = ($admin_del||$admin_post);
 
 		$pwd=(string)filter_input_data('POST','pwd');
 		$pwdc=(string)filter_input_data('COOKIE','pwdc');
@@ -278,7 +278,7 @@ class misskey_note{
 			error($en ? 'The article was not found.' : '記事が見つかりません。');
 		}
 
-		$out[0][] = create_res($post);//$postから、情報を取り出す;
+		$dat[0][] = create_res($post);//$postから、情報を取り出す;
 
 
 		$nsfwc=(bool)filter_input_data('COOKIE','nsfwc',FILTER_VALIDATE_BOOLEAN);
@@ -288,8 +288,8 @@ class misskey_note{
 		$resno= $_SESSION['current_page_context']["resno"] ?? null;//下の行でnull判定
 		$resno ?? $no;
 
-		$userdel = false;
-		$admindel = false;
+		$user_del = false;
+		$admin_del = false;
 
 		$image_rep=false;
 
@@ -297,8 +297,8 @@ class misskey_note{
 
 		$admin_pass= null;
 		// HTML出力
-		$templete='misskey_note_edit_form.html';
-		include __DIR__.'/'.$skindir.$templete;
+		$template='misskey_note_edit_form.html';
+		include __DIR__.'/'.$skindir.$template;
 		exit();
 	}
 
