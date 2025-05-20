@@ -57,7 +57,7 @@ define('ADMINFILE', "monoreita_admin");
 define('SET_SHARE_SERVER', "monoreita_sns_share");
 
 //misskey関係のテンプレートファイル
-define('MISSKEYFILE', "monoreita_misskey");
+define('MISSKEYFILE', "monoreita_misskey_note");
 
 //その他のテンプレートファイル
 define('OTHERFILE', "monoreita_other");

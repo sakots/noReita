@@ -33,27 +33,20 @@
   <main>
     <div>
       <section class="thread">
-        @if ($dat[0]['check_elapsed_days'] || $admin_post || $admin_del)
-        @if (!($admin_post || $admin_del) || $verified !=='admin_post')
-        <h3>この画像をMisskeyにノートします。パスワードを入力してください。</h3>
-        @else
-        <h3>この画像をMisskeyにノートします。</h3>
-        @endif
-        <form action="./" method="POST" id="before_delete" onsubmit="return res_form_submit(event,'before_delete')">
-          @if (!($admin_post || $admin_del) || $verified !=='admin_post')
-          <span class="non"><input type="text" value="" autocomplete="username"></span>
-          <input type="password" name="pwd" value="{{$pwdc}}" autocomplete="current-password">
-          @endif
-          <input type="hidden" name="mode" value="misskey_note_edit_form">
-          <span class="button">
-            <svg viewBox="0 0 512 512">
-							<use xlink:href="./theme/{{$themedir}}/icons/misskey.svg#misskey">
-						</svg> <input type="submit" value="ノート">
-          </span>
-        </form>
-        @else
-        <h3>このスレッドは閉じられています。</h3>
-        @endif
+        <h3 class="oyat">この画像をMisskeyにノートします。パスワードを入力してください。</h3>
+        <hr>
+        <div class="thfoot">
+          <form action="./" method="POST" id="before_delete" onsubmit="return res_form_submit(event,'before_delete')">
+            <span class="non"><input type="text" value="" autocomplete="username"></span>
+            <input type="password" name="pwd" value="{{$pwdc}}" autocomplete="current-password">
+            <input type="hidden" name="mode" value="misskey_note_edit_form">
+            <button type="submit">
+              <svg viewBox="0 0 512 512">
+                <use href="./theme/{{$themedir}}/icons/misskey.svg#misskey">
+              </svg> ノート
+            </button>
+          </form>
+        </div>
       </section>
     </div>
   </main>

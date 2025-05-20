@@ -11,15 +11,15 @@ global $en, $home, $petit_ver, $petit_lot, $set_nsfw, $deny_all_posts, $autolink
 require_once __DIR__ . '/index.php';
 
 // データベースから投稿を取得する関数
-function get_post_from_db($no, $id): array|null {
+function get_post_from_db($no): ?array {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-		$sql = "SELECT * FROM tlog WHERE tid = :no AND id = :id";
+		$sql = "SELECT * FROM tlog WHERE tid = :no";
 		$stmt = $db->prepare($sql);
-		$stmt->execute([':no' => $no, ':id' => $id]);
+		$stmt->execute(['no' => $no]);
 		$post = $stmt->fetch(PDO::FETCH_ASSOC);
 
 		if (!$post) {
@@ -188,23 +188,23 @@ function create_res($post): array {
 class misskey_note {
 
 	//投稿済みの記事をMisskeyにノートするための前処理
-	public static function before_misskey_note (): void {
+	public static function before_misskey_note(): void {
 
-		global $home,$set_nsfw,$en,$deny_all_posts,$blade;
+		global $home,$set_nsfw,$en,$deny_all_posts,$blade,$dat;
 		//管理者判定処理
 		session_sta();
-		$admin_post=admin_post_valid();
-		$admin_del=admin_del_valid();
+		$admin_post = admin_post_valid();
+		$admin_del = admin_del_valid();
 
-		$pwdc=(string)filter_input_data('COOKIE','pwdc');
-		$id = t(filter_input_data('POST','id'));//intの範囲外
-		$id = $id ? $id : t(filter_input_data('GET','id'));//intの範囲外
+		$pwdc = (string)filter_input_data('COOKIE','pwdc');
+		//$id = t(filter_input_data('POST','id'));//intの範囲外
+		//$id = $id ? $id : t(filter_input_data('GET','id'));//intの範囲外
 		$no = t(filter_input_data('POST','no',FILTER_VALIDATE_INT));
 		$no = $no ? $no : t(filter_input_data('GET','no',FILTER_VALIDATE_INT));
-		$user_del=isset($_SESSION['user_del'])&&($_SESSION['user_del']==='user_del_mode');
+		$user_del = isset($_SESSION['user_del'])&&($_SESSION['user_del']==='user_del_mode');
 		$resmode = false;//使っていない
-		$page= $_SESSION['current_page_context']["page"] ?? 0;
-		$resno= $_SESSION['current_page_context']["resno"] ?? null;//下の行でnull判定
+		$page = $_SESSION['current_page_context']["page"] ?? 0;
+		$resno = $_SESSION['current_page_context']["resno"] ?? null;//下の行でnull判定
 		$resno ?? $no;
 
 		if (!$no) {
@@ -215,24 +215,24 @@ class misskey_note {
 			error($en ? 'The article does not exist.' : '記事がありません。');
 		}
 
-		$post = get_post_from_db($no, $id);
+		$post = get_post_from_db($no);
 		if (!$post) {
 			error($en ? 'The article was not found.' : '記事が見つかりません。');
 		}
 
 		$dat[0][] = $post;
-		$token=get_csrf_token();
+		$token = get_csrf_token();
 
 		// nsfw
-		$nsfwc=(bool)filter_input_data('COOKIE','nsfwc',FILTER_VALIDATE_BOOLEAN);
-		$set_nsfw_show_hide=(bool)filter_input_data('COOKIE','p_n_set_nsfw_show_hide',FILTER_VALIDATE_BOOLEAN);
+		$nsfwc = (bool)filter_input_data('COOKIE','nsfwc',FILTER_VALIDATE_BOOLEAN);
+		$set_nsfw_show_hide = (bool)filter_input_data('COOKIE','p_n_set_nsfw_show_hide',FILTER_VALIDATE_BOOLEAN);
 
 		$count_r_arr = count($post);
 		$edit_mode = 'editmode';
 
-		$_SESSION['current_id']	= $id;
+		//$_SESSION['current_id']	= $id;
 
-		$admin_pass= null;
+		$admin_pass = null;
 
 		$dat['misskey_mode'] = 'before';
 		echo $blade->run(MISSKEYFILE, $dat);
