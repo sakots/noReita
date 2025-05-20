@@ -208,6 +208,12 @@
 				@endif
 				<div class="thfoot">
 					@if ($share_button)
+					@if ($use_misskey_note)
+					<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}"><svg viewBox="0 0 512 512">
+						<use href="./theme/{{$themedir}}/icons/misskey.svg#misskey">
+						</svg> Misskeyにノート</a>
+					</span>
+					@endif
 					@if ($switch_sns)
 					<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
 						<svg viewBox="0 0 512 512">
@@ -222,14 +228,15 @@
 					</span>
 					@endif
 					@endif
-					@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) <span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><svg viewBox="0 0 512 512">
-								<use href="./theme/{{$themedir}}/icons/rep.svg#rep">
-							</svg> 返信</a></span>
-						@else
-						このスレは古いので返信できません…
-						@endif
-						<a href="#header">[↑]</a>
-						<hr>
+					@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
+					<span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><svg viewBox="0 0 512 512">
+						<use href="./theme/{{$themedir}}/icons/rep.svg#rep"></svg> 返信</a>
+					</span>
+					@else
+					このスレは古いので返信できません…
+					@endif
+					<a href="#header">[↑]</a>
+					<hr>
 				</div>
 			</section>
 			</section>
