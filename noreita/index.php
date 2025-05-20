@@ -2203,20 +2203,20 @@ function usrchk(): void {
 }
 
 //OK画面
-function ok($mes) {
+function ok($mes): void {
 	global $blade, $dat;
 	$dat['okmes'] = $mes;
 	$dat['othermode'] = 'ok';
 	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
 	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
 	if($http_x_requested_with || $async_flag){
-		return die("OK!\n$mes");
+		die("OK!\n$mes");
 	}
 	echo $blade->run(OTHERFILE, $dat);
 }
 
 //エラー画面
-function error($mes) {
+function error($mes): void {
 	global $db;
 	global $blade, $dat;
 	$db = null; //db切断
@@ -2225,14 +2225,14 @@ function error($mes) {
 	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
 	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
 	if($http_x_requested_with || $async_flag){
-		return die("error\n$mes");
+		die("error\n$mes");
 	}
 	echo $blade->run(OTHERFILE, $dat);
 	exit;
 }
 
 //画像差し替え失敗
-function error2() {
+function error2(): void {
 	global $db;
 	global $blade, $dat;
 	global $self;
@@ -2241,7 +2241,7 @@ function error2() {
 	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
 	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
 	if($http_x_requested_with || $async_flag){
-		return die("error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
+		die("error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
 	}
 	echo $blade->run(OTHERFILE, $dat);
 	exit;
