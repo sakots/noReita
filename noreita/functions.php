@@ -327,6 +327,26 @@ function h($str) :string{
 	}
 	return htmlspecialchars($str,ENT_QUOTES,"utf-8",false);
 }
+//タブ除去
+function t($str): string {
+	if(zero_check($str)){
+		return '0';
+	}
+	if(!$str){
+		return '';
+	}
+	return str_replace("\t","",(string)$str);
+}
+//タグ除去
+function s($str): string {
+	if(zero_check($str)){
+		return '0';
+	}
+	if(!$str){
+		return '';
+	}
+	return strip_tags((string)$str);
+}
 
 // 0 または "0" かどうか
 function zero_check($str): bool {
@@ -351,4 +371,62 @@ function initial_error_message(): array {
 	$msg['002']=$en ? ' is not readable.':'を読めません。';
 	$msg['003']=$en ? ' is not writable.':'を書けません。';
 return $msg;
+}
+
+function check_same_origin(): void {
+	global $en,$usercode;
+
+	session_sta();
+	$c_usercode = t(filter_input_data('COOKIE', 'usercode'));//user-codeを取得
+	$session_usercode = isset($_SESSION['usercode']) ? t($_SESSION['usercode']) : "";
+	if(!$c_usercode){
+		error($en?'Cookie check failed.':'Cookieが確認できません。');
+	}
+	if(!$usercode || ($usercode !== $c_usercode) && ($usercode !== $session_usercode)){
+		error($en?"User code mismatch.":"ユーザーコードが一致しません。");
+	}
+	if(!isset($_SERVER['HTTP_ORIGIN']) || !isset($_SERVER['HTTP_HOST'])){
+		error($en?'Your browser is not supported. ':'お使いのブラウザはサポートされていません。');
+	}
+	if(parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST) !== $_SERVER['HTTP_HOST']){
+		error($en?"The post has been rejected.":'拒絶されました。');
+	}
+}
+
+function switch_tool($tool): string {
+	global $en;
+	switch($tool){
+		case 'neo':
+			$tool='PaintBBS NEO';
+			break;
+		case 'PaintBBS':
+			$tool='PaintBBS';
+			break;
+		case 'shi-Painter':
+			$tool='Shi-Painter';
+			break;
+		case 'chi':
+			$tool='ChickenPaint';
+			break;
+		default:
+			$tool='';
+			break;
+	}
+	return $tool;
+}
+
+//sessionの確認
+function adminpost_valid(): bool {
+	global $second_pass;
+	session_sta();
+	return isset($_SESSION['adminpost'])&&($second_pass && $_SESSION['adminpost']===$second_pass);
+}
+function admindel_valid(): bool {
+	global $second_pass;
+	session_sta();
+	return isset($_SESSION['admindel'])&&($second_pass && $_SESSION['admindel']===$second_pass);
+}
+function userdel_valid(): bool {
+	session_sta();
+	return isset($_SESSION['userdel'])&&($_SESSION['userdel']==='userdel_mode');
 }
