@@ -22,6 +22,13 @@ if(!is_file(__DIR__.'/functions.php')){
 	die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
 
+//コンフィグ
+require(__DIR__ . '/config.php');
+//コンフィグのバージョンが古くて互換性がない場合動かさせない
+if (CONF_VER < 250413 || !defined('CONF_VER')) {
+	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
+}
+
 require_once(__DIR__.'/functions.php');
 if(!isset($functions_ver)||$functions_ver<20250416){
 	die($en?'Please update functions.php to the latest version.':'functions.phpを最新版に更新してください。');
@@ -33,18 +40,12 @@ if(!isset($misskey_note_ver)||$misskey_note_ver<20250326){
 	die($en?'Please update misskey_note.inc.php to the latest version.':'misskey_note.inc.phpを最新版に更新してください。');
 }
 
-//その他設定の読み込み
-require(__DIR__ . '/config.php');
+//テーマ
 require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
 
 //タイムゾーン設定
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
-
-//コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 250413 || !defined('CONF_VER')) {
-	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
-}
 
 //管理パスが初期値(kanripass)の場合は動作させない
 if ($admin_pass === 'kanripass') {
