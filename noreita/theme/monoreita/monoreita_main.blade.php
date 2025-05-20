@@ -209,8 +209,9 @@
 				<div class="thfoot">
 					@if ($share_button)
 					@if ($use_misskey_note)
-					<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}"><svg viewBox="0 0 512 512">
-						<use href="./theme/{{$themedir}}/icons/misskey.svg#misskey">
+					<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}">
+						<svg viewBox="0 0 512 512">
+							<use href="./theme/{{$themedir}}/icons/misskey.svg#misskey">
 						</svg> Misskeyにノート</a>
 					</span>
 					@endif
