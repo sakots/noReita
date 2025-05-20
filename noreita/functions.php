@@ -71,7 +71,8 @@ function Reject_if_NGword_exists_in_the_post($com, $name, $email, $url, $sub): v
 }
 
 //念のため画像タイプチェック
-function getImgType($img_type, $dest): string {
+function get_image_type($img_type, $dest = null): string {
+	$img_type = mime_content_type($img_type);
 	$map = [
 		"image/gif" => ".gif",
 		"image/jpeg" => ".jpg",

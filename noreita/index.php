@@ -1864,7 +1864,7 @@ function picreplace(): void {
 			unlink(IMG_DIR . $msg_d["picfile"]);
 
 			$img_type = mime_content_type($dest);
-			$imgext = getImgType($img_type, $dest);
+			$imgext = get_image_type($img_type, $dest);
 
 			//新しい画像の名前(DB保存用)
 			$new_picfile = $file_name . $imgext;
