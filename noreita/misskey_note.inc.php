@@ -1,14 +1,14 @@
 <?php
 //Petit Note 2021-2025 (c)satopian MIT LICENSE
 //https://paintbbs.sakura.ne.jp/
-//APIを使ってお絵かき掲示板からMisskeyにノート
-$misskey_note_ver = 20250326;
+//APIを使ってお絵かき掲示板からMisskeyにノート sqlite版
+$misskey_note_ver = 20250521;
 
-// グローバル変数の宣言
+//グローバル変数の宣言
 global $en, $home, $petit_ver, $petit_lot, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag, $date_format;
 
-//データベース接続PDO
-define('DB_PDO', 'sqlite:' . DB_NAME . '.db');
+//設定読み込み
+require_once __DIR__ . '/index.php';
 
 // データベースから投稿を取得する関数
 function get_post_from_db($no, $id): array|null {
