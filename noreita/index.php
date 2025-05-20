@@ -230,76 +230,8 @@ $dat['usercode'] = $usercode;
 
 /*-----------mode-------------*/
 
-$mode = filter_input(INPUT_POST, 'mode');
-
-if (filter_input(INPUT_GET, 'mode') === "anime") {
-	$pch = filter_input(INPUT_GET, 'pch');
-	$mode = "anime";
-}
-if (filter_input(INPUT_GET, 'mode') === "continue") {
-	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
-	$mode = "continue";
-}
-if (filter_input(INPUT_GET, 'mode') === "admin") {
-	$mode = "admin";
-}
-if (filter_input(INPUT_GET, 'mode') === "admin_in") {
-	$mode = "admin_in";
-}
-if (filter_input(INPUT_GET, 'mode') === "piccom") {
-	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
-	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
-	$mode = "piccom";
-}
-if (filter_input(INPUT_GET, 'mode') === "pictmp") {
-	$mode = "pictmp";
-}
-if (filter_input(INPUT_GET, 'mode') === "picrep") {
-	$no = filter_input(INPUT_GET, 'no');
-	$pwd = (string)trim(filter_input(INPUT_GET, 'pwd'));
-	$repcode = filter_input(INPUT_GET, 'repcode');
-	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
-	$mode = "picrep";
-}
-if (filter_input(INPUT_GET, 'mode') === "regist") {
-	$mode = "regist";
-}
-if (filter_input(INPUT_GET, 'mode') === "reply") {
-	$mode = "reply";
-}
-if (filter_input(INPUT_GET, 'mode') === "res") {
-	$mode = "res";
-}
-if (filter_input(INPUT_GET, 'mode') === "sodane") {
-	$mode = "sodane";
-	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
-}
-if (filter_input(INPUT_GET, 'mode') === "continue") {
-	$no = filter_input(INPUT_GET, 'no');
-	$mode = "continue";
-}
-if (filter_input(INPUT_GET, 'mode') === "del") {
-	$mode = "del";
-}
-if (filter_input(INPUT_GET, 'mode') === "edit") {
-	$mode = "edit";
-}
-if (filter_input(INPUT_GET, 'mode') === "editexec") {
-	$mode = "editexec";
-}
-if (filter_input(INPUT_GET, 'mode') === "catalog") {
-	$mode = "catalog";
-}
-if (filter_input(INPUT_GET, 'mode') === "search") {
-	$mode = "search";
-}
-if (filter_input(INPUT_GET, 'mode') === "set_share_server") {
-	$mode = "set_share_server";
-}
-if (filter_input(INPUT_GET, 'mode') === "post_share_server") {
-	$mode = "post_share_server";
-}
-
+$mode = (string)filter_input_data('POST','mode');
+$mode = $mode ? $mode :(string)filter_input_data('GET','mode');
 
 switch ($mode) {
 	case 'resist':
@@ -323,9 +255,9 @@ switch ($mode) {
 		if (!isset($sp)) {
 			$sp = "";
 		}
-		return openpch($pch, $sp);
+		return openpch($sp);
 	case 'continue':
-		return incontinue($no);
+		return in_continue();
 	case 'contpaint':
 		//パスワードが必要なのは差し換えの時だけ
 		$type = filter_input(INPUT_POST, 'type');
@@ -353,6 +285,16 @@ switch ($mode) {
 		return set_share_server();
 	case 'post_share_server':
 		return post_share_server();
+	case 'before_misskey_note':
+		return misskey_note::before_misskey_note();
+	case 'misskey_note_edit_form':
+		return misskey_note::misskey_note_edit_form();
+	case 'create_misskey_note_sessiondata':
+		return misskey_note::create_misskey_note_sessiondata();
+	case 'create_misskey_authrequesturl':
+		return misskey_note::create_misskey_authrequesturl();
+	case 'misskey_success':
+		return misskey_note::misskey_success();
 	default:
 		return def();
 }
@@ -1186,8 +1128,8 @@ function sodane(): void {
 	header('Location:' . PHP_SELF);
 	def();
 }
-//レス画面
 
+//レス画面
 function res(): void {
 	global $blade, $dat;
 	$resno = filter_input(INPUT_GET, 'res',FILTER_VALIDATE_INT);
@@ -1539,6 +1481,9 @@ function paintcom($tmpmode): void {
 	global $usercode, $ptime;
 	global $blade, $dat;
 
+	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
+	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
+
 	$dat['parent'] = $_SERVER['REQUEST_TIME'];
 	$dat['usercode'] = $usercode;
 
@@ -1625,8 +1570,10 @@ function paintcom($tmpmode): void {
 }
 
 //コンティニュー画面in
-function incontinue($no): void {
+function in_continue(): void {
 	global $blade, $dat;
+
+	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
 	$dat['othermode'] = 'incontinue';
 	$dat['continue_mode'] = true;
 
@@ -1809,6 +1756,7 @@ function delmode(): void {
 function picreplace(): void {
 	global $type;
 	global $path, $badip;
+
 	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
 	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
 	$repcode = filter_input(INPUT_GET, 'repcode');
@@ -1948,7 +1896,6 @@ function picreplace(): void {
 	}
 	ok('編集に成功しました。画面を切り替えます。');
 }
-
 
 //編集モードくん入口
 function editform(): void {
@@ -2337,6 +2284,21 @@ function logdel(): void {
 		$msg = null;
 		$del_tid = null;
 		$db = null; //db切断
+	} catch (PDOException $e) {
+		echo "DB接続エラー:" . $e->getMessage();
+	}
+}
+
+//misskeyにノート
+function misskey_note(): void {
+	global $blade, $dat;
+	//スレの画像取得
+	$no = filter_input(INPUT_GET, 'no',FILTER_VALIDATE_INT);
+	try {
+		$db = new PDO(DB_PDO);
+		$sql = "SELECT * FROM tlog WHERE id=? ORDER BY tree DESC";
+		$posts = $db->prepare($sql);
+		$posts->execute([$no]);
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
