@@ -131,7 +131,7 @@ button {
 	@include txt_box(1);
 	a {
 		color: $button_moji;
-		svg {
+		svg{
 			fill: $button_moji;
 		}
 	}
