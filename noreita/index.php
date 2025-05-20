@@ -236,7 +236,7 @@ $mode = $mode ?: (string)filter_input_data('GET','mode');
 
 // モード → 実行関数 のマップ
 $modeMap = [
-	'resist' => 'resist',
+	'regist' => 'regist',
 	'reply' => 'reply',
 	'res' => 'res',
 	'sodane' => 'sodane',
