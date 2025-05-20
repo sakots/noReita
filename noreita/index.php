@@ -327,7 +327,7 @@ function init(): void {
 
 //投稿があればデータベースへ保存する
 /* 記事書き込み スレ立て */
-function resist(): void {
+function regist(): void {
 	global $badip, $admin_pass, $admin_name;
 	global $req_method;
 	global $dat;
