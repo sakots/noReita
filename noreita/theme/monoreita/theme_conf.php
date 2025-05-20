@@ -56,6 +56,9 @@ define('ADMINFILE', "monoreita_admin");
 //SNSシェア選択のテンプレートファイル
 define('SET_SHARE_SERVER', "monoreita_sns_share");
 
+//misskey関係のテンプレートファイル
+define('MISSKEYFILE', "monoreita_misskey");
+
 //その他のテンプレートファイル
 define('OTHERFILE', "monoreita_other");
 
