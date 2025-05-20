@@ -160,10 +160,13 @@ define('DB_PDO', 'sqlite:' . DB_NAME . '.db');
 defined("SNS_WINDOW_WIDTH") or define("SNS_WINDOW_WIDTH","600");
 defined("SNS_WINDOW_HEIGHT") or define("SNS_WINDOW_HEIGHT","600");
 
+//misskey
+$dat['use_misskey_note'] = USE_MISSKEY_NOTE;
+
 //初期設定(初期設定後は不要なので削除可)
 init();
 
-deltemp();
+del_temp();
 
 $message = "";
 
@@ -2259,7 +2262,7 @@ function check_AsyncRequest($picfile=''): void {
 }
 
 /* テンポラリ内のゴミ除去 */
-function deltemp(): void {
+function del_temp(): void {
 	$handle = opendir(TEMP_DIR);
 	while ($file = readdir($handle)) {
 		if (!is_dir($file)) {
