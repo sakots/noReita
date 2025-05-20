@@ -232,73 +232,53 @@ $dat['usercode'] = $usercode;
 /*-----------mode-------------*/
 
 $mode = (string)filter_input_data('POST','mode');
-$mode = $mode ? $mode :(string)filter_input_data('GET','mode');
+$mode = $mode ?: (string)filter_input_data('GET','mode');
 
-switch ($mode) {
-	case 'resist':
-		return resist();
-	case 'reply':
-		return reply();
-	case 'res':
-		return res();
-	case 'sodane':
-		return sodane();
-	case 'paint':
-		$rep = "";
-		return paintform($rep);
-	case 'piccom':
-		$tmpmode = "";
-		return paintcom($tmpmode);
-	case 'pictmp':
-		$tmpmode = "tmp";
-		return paintcom($tmpmode);
-	case 'anime':
-		if (!isset($sp)) {
-			$sp = "";
-		}
-		return openpch($sp);
-	case 'continue':
-		return in_continue();
-	case 'contpaint':
-		//パスワードが必要なのは差し換えの時だけ
+// モード → 実行関数 のマップ
+$modeMap = [
+	'resist' => 'resist',
+	'reply' => 'reply',
+	'res' => 'res',
+	'sodane' => 'sodane',
+	'paint' => fn() => paintform(""),
+	'piccom' => fn() => paintcom(""),
+	'pictmp' => fn() => paintcom("tmp"),
+	'anime' => fn() => openpch($sp ?? ""),
+	'continue' => 'in_continue',
+	'contpaint' => function() {
 		$type = filter_input(INPUT_POST, 'type');
 		if (CONTINUE_PASS || $type === 'rep') usrchk();
-		// if(ADMIN_NEWPOST) $admin=$pwd;
-		$rep = $type;
-		return paintform($rep);
-	case 'picrep':
-		return picreplace();
-	case 'catalog':
-		return catalog();
-	case 'search':
-		return search();
-	case 'edit':
-		return editform();
-	case 'editexec':
-		return editexec();
-	case 'del':
-		return delmode();
-	case 'admin_in':
-		return admin_in();
-	case 'admin':
-		return admin();
-	case 'set_share_server':
-		return set_share_server();
-	case 'post_share_server':
-		return post_share_server();
-	case 'before_misskey_note':
-		return misskey_note::before_misskey_note();
-	case 'misskey_note_edit_form':
-		return misskey_note::misskey_note_edit_form();
-	case 'create_misskey_note_sessiondata':
-		return misskey_note::create_misskey_note_sessiondata();
-	case 'create_misskey_authrequesturl':
-		return misskey_note::create_misskey_authrequesturl();
-	case 'misskey_success':
-		return misskey_note::misskey_success();
-	default:
-		return def();
+		return paintform($type);
+	},
+	'picrep' => 'picreplace',
+	'catalog' => 'catalog',
+	'search' => 'search',
+	'edit' => 'editform',
+	'editexec' => 'editexec',
+	'del' => 'delmode',
+	'admin_in' => 'admin_in',
+	'admin' => 'admin',
+	'set_share_server' => 'set_share_server',
+	'post_share_server' => 'post_share_server',
+	'before_misskey_note' => [misskey_note::class, 'before_misskey_note'],
+	'misskey_note_edit_form' => [misskey_note::class, 'misskey_note_edit_form'],
+	'create_misskey_note_sessiondata' => [misskey_note::class, 'create_misskey_note_sessiondata'],
+	'create_misskey_authrequesturl' => [misskey_note::class, 'create_misskey_authrequesturl'],
+	'misskey_success' => [misskey_note::class, 'misskey_success'],
+];
+
+// 実行
+if (isset($modeMap[$mode])) {
+	$handler = $modeMap[$mode];
+	if (is_callable($handler)) {
+		return $handler();
+	} elseif (is_string($handler) && function_exists($handler)) {
+		return $handler();
+	}
 }
+
+// デフォルト
+return def();
 exit;
 
 /*-----------Main-------------*/
