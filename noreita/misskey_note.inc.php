@@ -5,12 +5,12 @@
 $misskey_note_ver = 20250521;
 
 //グローバル変数の宣言
-global $en, $home, $petit_ver, $petit_lot, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag, $date_format;
+global $en, $home, $petit_ver, $petit_lot, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
 
 //設定読み込み
 require_once __DIR__ . '/index.php';
 
-// データベースから投稿を取得する関数
+// データベースから投稿を取得する
 function get_post_from_db($no): ?array {
 	global $en;
 	try {
@@ -27,26 +27,25 @@ function get_post_from_db($no): ?array {
 		}
 
 		return [
-			'no' => $post['tid'],
-			'sub' => $post['sub'],
-			'name' => $post['a_name'],
-			'verified' => $post['admins'],
-			'com' => $post['com'],
-			'url' => $post['a_url'],
-			'imgfile' => $post['picfile'],
-			'w' => $post['img_w'],
-			'h' => $post['img_h'],
-			'thumbnail' => $post['picfile'],
-			'painttime' => $post['utime'],
-			'log_hash_img' => '',
-			'tool' => $post['tool'],
-			'pchext' => pathinfo($post['pchfile'], PATHINFO_EXTENSION),
-			'time' => $post['id'],
-			'first_posted_time' => $post['created'],
-			'host' => $post['host'],
-			'userid' => '',
-			'hash' => $post['pwd'],
-			'oya' => $post['parent']
+			'tid'      => $post['tid'],
+			'sub'      => $post['sub'],
+			'a_name'   => $post['a_name'],
+			'admins'   => $post['admins'],
+			'com'      => $post['com'],
+			'mail'     => $post['mail'],
+			'a_url'    => $post['a_url'],
+			'id'       => $post['id'],
+			'exid'     => $post['exid'],
+			'picfile'  => $post['picfile'],
+			'pchfile'  => $post['pchfile'],
+			'img_w'    => $post['img_w'],
+			'img_h'    => $post['img_h'],
+			'tool'     => $post['tool'],
+			'utime'    => $post['utime'],
+			'created'  => $post['created'],
+			'modified' => $post['modified'],
+			'parent'   => $post['parent'],
+			'pwd'      => $post['pwd'],
 		];
 	} catch (PDOException $e) {
 		error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage());
@@ -129,7 +128,7 @@ function check_edit_permission($no, $id, $pwd, $admin): bool {
 
 // 投稿データを整形して表示用の配列を作成
 function create_res($post): array {
-	global $en, $autolink, $use_hashtag, $date_format;
+	global $en, $autolink, $use_hashtag;
 
 	try {
 		// 投稿データの整形
@@ -149,10 +148,11 @@ function create_res($post): array {
 			'img_h' => $post['img_h'],
 			'tool' => $post['tool'],
 			'utime' => $post['utime'],
-			'created' => date($date_format, strtotime($post['created'])),
-			'modified' => date($date_format, strtotime($post['modified'])),
-			'past' => strtotime($post['created']),
-			'parent' => $post['parent']
+			'created' => (!empty($post['created']) && strtotime($post['created'])) ? date(DATE_FORMAT, strtotime($post['created'])) : '',
+			'modified' => (!empty($post['modified']) && strtotime($post['modified'])) ? date(DATE_FORMAT, strtotime($post['modified'])) : '',
+			'past' => (!empty($post['created']) && strtotime($post['created'])) ? strtotime($post['created']) : 0,
+			'parent' => $post['parent'],
+			'pwd' => $post['pwd'],
 		];
 
 		// コメントの整形
@@ -189,48 +189,40 @@ class misskey_note {
 
 	//投稿済みの記事をMisskeyにノートするための前処理
 	public static function before_misskey_note(): void {
-
-		global $home,$set_nsfw,$en,$deny_all_posts,$blade,$dat;
+		global $home, $set_nsfw, $en, $deny_all_posts;
+		global $blade, $dat;
 		//管理者判定処理
 		session_sta();
 		$admin_post = admin_post_valid();
 		$admin_del = admin_del_valid();
 
-		$pwdc = (string)filter_input_data('COOKIE','pwdc');
-		//$id = t(filter_input_data('POST','id'));//intの範囲外
-		//$id = $id ? $id : t(filter_input_data('GET','id'));//intの範囲外
-		$no = t(filter_input_data('POST','no',FILTER_VALIDATE_INT));
-		$no = $no ? $no : t(filter_input_data('GET','no',FILTER_VALIDATE_INT));
-		$user_del = isset($_SESSION['user_del'])&&($_SESSION['user_del']==='user_del_mode');
-		$resmode = false;//使っていない
-		$page = $_SESSION['current_page_context']["page"] ?? 0;
-		$resno = $_SESSION['current_page_context']["resno"] ?? null;//下の行でnull判定
-		$resno ?? $no;
+		$dat['pwdc'] = (string)filter_input_data('COOKIE', 'pwdc');
+		$dat['no'] = t(filter_input_data('POST', 'no', FILTER_VALIDATE_INT));
+		$dat['no'] = $dat['no'] ? $dat['no'] : t(filter_input_data('GET', 'no', FILTER_VALIDATE_INT));
 
-		if (!$no) {
+		if (!$dat['no']) {
 			error($en ? 'Invalid post number.' : '投稿番号が無効です。');
 		}
 
-		if (!check_post_exists($no)) {
+		if (!check_post_exists($dat['no'])) {
 			error($en ? 'The article does not exist.' : '記事がありません。');
 		}
 
-		$post = get_post_from_db($no);
-		if (!$post) {
-			error($en ? 'The article was not found.' : '記事が見つかりません。');
-		}
+		$post = get_post_from_db($dat['no']);
+    if (!$post) {
+        error($en ? 'The article was not found.' : '記事が見つかりません。');
+    }
+    $dat['post'] = $post;
 
-		$dat[0][] = $post;
-		$token = get_csrf_token();
+		$dat['path'] = IMG_DIR;
+		$dat['token'] = get_csrf_token();
 
 		// nsfw
-		$nsfwc = (bool)filter_input_data('COOKIE','nsfwc',FILTER_VALIDATE_BOOLEAN);
-		$set_nsfw_show_hide = (bool)filter_input_data('COOKIE','p_n_set_nsfw_show_hide',FILTER_VALIDATE_BOOLEAN);
+		$dat['nsfwc'] = (bool)filter_input_data('COOKIE', 'nsfwc', FILTER_VALIDATE_BOOLEAN);
+		$dat['set_nsfw_show_hide'] = (bool)filter_input_data('COOKIE', 'p_n_set_nsfw_show_hide', FILTER_VALIDATE_BOOLEAN);
 
-		$count_r_arr = count($post);
-		$edit_mode = 'editmode';
-
-		//$_SESSION['current_id']	= $id;
+		$dat['count_r_arr'] = count($dat['post']);
+		$dat['edit_mode'] = 'editmode';
 
 		$admin_pass = null;
 
@@ -238,11 +230,11 @@ class misskey_note {
 		echo $blade->run(MISSKEYFILE, $dat);
 		exit();
 	}
+
 	//投稿済みの画像をMisskeyにNoteするための投稿フォーム
 	public static function misskey_note_edit_form(): void {
-
-		global $home,$set_nsfw,$en,$max_kb,$use_upload;
-		global $blade;
+		global $home, $set_nsfw, $en, $max_kb, $use_upload, $misskey_servers;
+		global $blade, $dat;
 
 		check_same_origin();
 
@@ -250,15 +242,15 @@ class misskey_note {
 
 		$admin_del = admin_del_valid();
 		$admin_post = admin_post_valid();
-		$admin = ($admin_del||$admin_post);
+		$admin = ($admin_del || $admin_post);
 
-		$pwd=(string)filter_input_data('POST','pwd');
-		$pwdc=(string)filter_input_data('COOKIE','pwdc');
+		$pwd = (string)filter_input_data('POST', 'pwd');
+		$pwdc = (string)filter_input_data('COOKIE', 'pwdc');
 		$pwd = $pwd ? $pwd : $pwdc;
 
-		$id_and_no=(string)filter_input_data('POST','id_and_no');
+		$id_and_no = (string)filter_input_data('POST', 'id_and_no');
 
-		list($id,$no)=explode(",",trim($id_and_no));
+		list($id, $no) = explode(",", trim($id_and_no));
 
 		if (!$no) {
 			error($en ? 'Invalid post number.' : '投稿番号が無効です。');
@@ -278,25 +270,26 @@ class misskey_note {
 		if (!$post) {
 			error($en ? 'The article was not found.' : '記事が見つかりません。');
 		}
+		$dat['post'] = $post;
 
-		$dat[0][] = create_res($post);//$postから、情報を取り出す;
+		// Misskeyサーバーリストをセット
+		$dat['misskey_servers'] = $misskey_servers;
 
+		$dat['nsfwc'] = (bool)filter_input_data('COOKIE', 'nsfwc', FILTER_VALIDATE_BOOLEAN);
+		$dat['set_nsfw_show_hide'] = (bool)filter_input_data('COOKIE', 'p_n_set_nsfw_show_hide', FILTER_VALIDATE_BOOLEAN);
 
-		$nsfwc=(bool)filter_input_data('COOKIE','nsfwc',FILTER_VALIDATE_BOOLEAN);
-		$set_nsfw_show_hide=(bool)filter_input_data('COOKIE','p_n_set_nsfw_show_hide',FILTER_VALIDATE_BOOLEAN);
-
-		$page= $_SESSION['current_page_context']["page"] ?? 0;
-		$resno= $_SESSION['current_page_context']["resno"] ?? null;//下の行でnull判定
+		$page = $_SESSION['current_page_context']["page"] ?? 0;
+		$resno = $_SESSION['current_page_context']["resno"] ?? null; //下の行でnull判定
 		$resno ?? $no;
 
 		$user_del = false;
 		$admin_del = false;
 
-		$image_rep=false;
+		$image_rep = false;
 
-		$_SESSION['current_id']	= $id;
+		$_SESSION['current_id'] = $id;
 
-		$admin_pass= null;
+		$admin_pass = null;
 		// HTML出力
 		$dat['misskey_mode'] = 'note_edit_form';
 		echo $blade->run(MISSKEYFILE, $dat);
@@ -305,7 +298,7 @@ class misskey_note {
 
 	//Misskeyに投稿するSESSIONデータを作成
 	public static function create_misskey_note_sessiondata(): void {
-		global $en,$usercode,$root_url,$skindir,$petit_lot,$misskey_servers,$boardname;
+		global $en, $usercode, $root_url, $skindir, $petit_lot, $misskey_servers, $boardname;
 
 		check_csrf_token();
 
@@ -341,50 +334,28 @@ class misskey_note {
 		$src_image = basename($src_image);
 		$_SESSION['sns_api_val'] = [$com, $src_image, $tool, $painttime, $hide_thumbnail, $no, $article_url_link, $cw];
 
-		$misskey_servers = $misskey_servers ?? [
-			["misskey.io", "https://misskey.io"],
-			["xissmie.xfolio.jp", "https://xissmie.xfolio.jp"],
-			["misskey.design", "https://misskey.design"],
-			["nijimiss.moe", "https://nijimiss.moe"],
-			["misskey.art", "https://misskey.art"],
-			["oekakiskey.com", "https://oekakiskey.com"],
-			["misskey.gamelore.fun", "https://misskey.gamelore.fun"],
-			["novelskey.tarbin.net", "https://novelskey.tarbin.net"],
-			["tyazzkey.work", "https://tyazzkey.work"],
-			["sushi.ski", "https://sushi.ski"],
-			["misskey.delmulin.com", "https://misskey.delmulin.com"],
-			["side.misskey.productions", "https://side.misskey.productions"],
-			["mk.shrimpia.network", "https://mk.shrimpia.network"],
-		];
-		$misskey_servers[] = [($en ? "Direct input" : "直接入力"), "direct"];
-
-		$misskey_server_radio_cookie = (string)filter_input_data('COOKIE', "misskey_server_radio_cookie");
-		$misskey_server_direct_input_cookie = (string)filter_input_data('COOKIE', "misskey_server_direct_input_cookie");
-
-		$admin_pass = null;
-		$templete = 'misskey_server_selection.html';
-		include __DIR__ . '/' . $skindir . $templete;
-		exit();
+		redirect($root_url . 'connect_misskey_api.php');
 	}
 
+	// Misskeyサーバー認証URLを生成
 	public static function create_misskey_authrequesturl(): void {
 		global $root_url;
 		global $en;
 
 		check_same_origin();
 
-		$misskey_server_radio = (string)filter_input_data('POST',"misskey_server_radio",FILTER_VALIDATE_URL);
-		$misskey_server_radio_for_cookie = (string)filter_input_data('POST',"misskey_server_radio");//directを判定するためurlでバリデーションしていない
+		$misskey_server_radio = (string)filter_input_data('POST', "misskey_server_radio", FILTER_VALIDATE_URL);
+		$misskey_server_radio_for_cookie = (string)filter_input_data('POST', "misskey_server_radio"); //directを判定するためurlでバリデーションしていない
 		$misskey_server_radio_for_cookie = ($misskey_server_radio_for_cookie === 'direct') ? 'direct' : $misskey_server_radio;
-		$misskey_server_direct_input = (string)filter_input_data('POST',"misskey_server_direct_input",FILTER_VALIDATE_URL);
-		setcookie("misskey_server_radio_cookie",$misskey_server_radio_for_cookie, time()+(86400*30),"","",false,true);
-		setcookie("misskey_server_direct_input_cookie",$misskey_server_direct_input, time()+(86400*30),"","",false,true);
+		$misskey_server_direct_input = (string)filter_input_data('POST', "misskey_server_direct_input", FILTER_VALIDATE_URL);
+		setcookie("misskey_server_radio_cookie", $misskey_server_radio_for_cookie, time() + (86400 * 30), "", "", false, true);
+		setcookie("misskey_server_direct_input_cookie", $misskey_server_direct_input, time() + (86400 * 30), "", "", false, true);
 
-		if(!$misskey_server_radio && !$misskey_server_direct_input){
-			error($en ? "Please select an misskey server.":"Misskeyサーバを選択してください。");
+		if (!$misskey_server_radio && !$misskey_server_direct_input) {
+			error($en ? "Please select an misskey server." : "Misskeyサーバを選択してください。");
 		}
 
-		if(!$misskey_server_radio && $misskey_server_direct_input){
+		if (!$misskey_server_radio && $misskey_server_direct_input) {
 			$misskey_server_radio = $misskey_server_direct_input;
 		}
 
@@ -393,16 +364,16 @@ class misskey_note {
 		$sns_api_session_id = session_id() . random_bytes(16);
 
 		// SHA256ハッシュ化
-		$sns_api_session_id=hash('sha256', $sns_api_session_id);
+		$sns_api_session_id = hash('sha256', $sns_api_session_id);
 
 		$_SESSION['sns_api_session_id'] = $sns_api_session_id;
 
 		$encoded_root_url = urlencode($root_url);
 
 		//別のサーバを選択した時はトークンをクリア
-		if(!isset($_SESSION['misskey_server_radio']) ||
-		$_SESSION['misskey_server_radio'] !== $misskey_server_radio){
-			unset($_SESSION['accessToken']);//トークンをクリア
+		if (!isset($_SESSION['misskey_server_radio']) ||
+			$_SESSION['misskey_server_radio'] !== $misskey_server_radio) {
+			unset($_SESSION['accessToken']); //トークンをクリア
 		}
 		//投稿完了画面に表示するサーバのURl
 		$_SESSION['misskey_server_radio'] = $misskey_server_radio;
@@ -410,7 +381,7 @@ class misskey_note {
 		//アプリを認証するためのURL
 		$Location = "{$misskey_server_radio}/miauth/{$sns_api_session_id}?name=Petit%20Note&callback={$encoded_root_url}connect_misskey_api.php&permission=write:notes,write:drive";
 
-		if(isset($_SESSION['accessToken'])){//SESSIONのトークンが有効か確認
+		if (isset($_SESSION['accessToken'])) { //SESSIONのトークンが有効か確認
 
 			// ダミーの投稿を試みる（textフィールドを空にする）
 			$postUrl = "{$misskey_server_radio}/api/notes/create";
@@ -431,7 +402,7 @@ class misskey_note {
 
 			// HTTPステータスコードが403の時は、トークン不一致と判断しアプリを認証
 			if ($postStatusCode === 403) {
-				unset($_SESSION['accessToken']);//トークンをクリア
+				unset($_SESSION['accessToken']); //トークンをクリア
 			} else {
 				//アプリの認証をスキップするURL
 				$Location = "{$root_url}connect_misskey_api.php?skip_auth_check=on&s_id={$sns_api_session_id}";
@@ -439,22 +410,23 @@ class misskey_note {
 		}
 
 		redirect($Location);
-
 	}
+
 	// Misskeyへの投稿が成功した事を知らせる画面
 	public static function misskey_success(): void {
-		global $en,$skindir,$boardname,$petit_lot;
-		$no = (string)filter_input_data('GET', 'no',FILTER_VALIDATE_INT);
+		global $en, $petit_lot, $blade, $dat;
+		$dat = [];
+		$no = (string)filter_input_data('GET', 'no', FILTER_VALIDATE_INT);
 
 		session_sta();
 
 		$misskey_server_url = $_SESSION['misskey_server_radio'] ?? "";
-		if(!$misskey_server_url || !filter_var($misskey_server_url,FILTER_VALIDATE_URL) || !$no){
+		if (!$misskey_server_url || !filter_var($misskey_server_url, FILTER_VALIDATE_URL) || !$no) {
 			redirect('./');
 		}
-		$admin_pass= null;
-		$templete='misskey_success.html';
-		include __DIR__.'/'.$skindir.$templete;
+		$admin_pass = null;
+		$dat['misskey_mode'] = 'success';
+		echo $blade->run(MISSKEYFILE, $dat);
 		exit();
 	}
 }
