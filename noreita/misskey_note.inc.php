@@ -233,16 +233,16 @@ class misskey_note {
 
 	//投稿済みの画像をMisskeyにNoteするための投稿フォーム
 	public static function misskey_note_edit_form(): void {
-		global $home, $set_nsfw, $en, $max_kb, $use_upload, $misskey_servers;
+		global $home, $set_nsfw, $en, $max_kb, $use_upload, $admin, $misskey_servers;
 		global $blade, $dat;
 
 		check_same_origin();
 
-		$token = get_csrf_token();
+		$dat['token'] = get_csrf_token();
 
-		$admin_del = admin_del_valid();
-		$admin_post = admin_post_valid();
-		$admin = ($admin_del || $admin_post);
+		$dat['admin_del'] = admin_del_valid();
+		$dat['admin_post'] = admin_post_valid();
+		$dat['admin'] = ($dat['admin_del'] || $dat['admin_post']);
 
 		$pwd = (string)filter_input_data('POST', 'pwd');
 		$pwdc = (string)filter_input_data('COOKIE', 'pwdc');

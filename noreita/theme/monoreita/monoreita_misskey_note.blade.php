@@ -21,12 +21,6 @@
       border: 1px solid #ccc;
       border-radius: 4px;
     }
-    .server-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 0.5em;
-      margin: 1em 0;
-    }
     .server-option {
       display: flex;
       align-items: center;
@@ -38,7 +32,6 @@
     .cw-input {
       margin-top: 0.5em;
       padding: 0.5em;
-      background: #f5f5f5;
       border-radius: 4px;
     }
   </style>
@@ -50,19 +43,36 @@
       <section class="thread">
         <h3 class="oyat">Misskeyにノートする内容を設定してください。</h3>
         <hr>
+        {{-- 投稿情報の表示 --}}
+        <div class="post">
+          <h4>
+            <span class="oyaname">{{ $post['a_name'] }}</span>
+            {{ $post['created'] }}
+          </h4>
+          @if (!empty($post['picfile']))
+          <div class="image">
+            <a href="{{ $path }}{{ $post['picfile'] }}" target="_blank">
+              <img src="{{ $path }}{{ $post['picfile'] }}" alt="{{ $post['sub'] }}" width="{{ $post['img_w'] }}" height="{{ $post['img_h'] }}">
+            </a>
+          </div>
+          @endif
+          <p class="comment">{!! $post['com'] !!}</p>
+          <p class="painttime">描画時間 : {{ $post['utime'] }} tool : {{ $post['tool'] }}</p>
+        </div>
+        <hr>
         <div class="thfoot">
           <form action="./" method="POST" id="misskey_note_form" onsubmit="return res_form_submit(event,'misskey_note_form')">
             <input type="hidden" name="mode" value="create_misskey_note_sessiondata">
-            <input type="hidden" name="no" value="{{$dat['tid']}}">
-            <input type="hidden" name="src_image" value="{{$dat['picfile']}}">
-            <input type="hidden" name="id_and_no" value="{{$dat['id']}},{{$dat['tid']}}">
-            <input type="hidden" name="abbr_toolname" value="{{$dat['tool']}}">
-            <input type="hidden" name="paintsec" value="{{$dat['utime']}}">
+            <input type="hidden" name="no" value="{{$post['tid']}}">
+            <input type="hidden" name="src_image" value="{{$post['picfile']}}">
+            <input type="hidden" name="id_and_no" value="{{$post['id']}},{{$post['tid']}}">
+            <input type="hidden" name="abbr_toolname" value="{{$post['tool']}}">
+            <input type="hidden" name="paintsec" value="{{$post['utime']}}">
             <input type="hidden" name="token" value="{{$token}}">
 
             <div class="form-group">
               <label for="com">コメント</label>
-              <textarea name="com" id="com" rows="5" cols="48" wrap="soft">{{$dat['com']}}</textarea>
+              <textarea name="com" id="com" rows="5" cols="48" wrap="soft">{{$post['com']}}</textarea>
             </div>
 
             <div class="form-group">
@@ -82,7 +92,7 @@
             @if ($use_nsfw === 1)
             <div class="form-group">
               <label>
-                <input type="checkbox" name="hide_thumbnail" value="1" @if ($dat[0]['admins'] === 'admin_post') checked @endif>
+                <input type="checkbox" name="hide_thumbnail" value="1">
                 センシティブな画像として投稿
               </label>
               <div class="cw-input" style="display: none;">
@@ -127,12 +137,6 @@
     // センシティブ設定の表示/非表示
     document.querySelector('input[name="hide_thumbnail"]').addEventListener('change', function() {
       document.querySelector('.cw-input').style.display = this.checked ? 'block' : 'none';
-    });
-
-    // 直接入力の表示/非表示
-    document.querySelector('input[name="misskey_server_radio"]').addEventListener('change', function() {
-      const directInput = document.querySelector('input[name="misskey_server_direct_input"]');
-      directInput.style.display = this.value === 'direct' ? 'inline-block' : 'none';
     });
   </script>
   @endif
