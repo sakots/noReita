@@ -82,7 +82,7 @@
             @if ($use_nsfw === 1)
             <div class="form-group">
               <label>
-                <input type="checkbox" name="hide_thumbnail" value="1" @if ($dat[0][0]['admins'] === 'admin_post') checked @endif>
+                <input type="checkbox" name="hide_thumbnail" value="1" @if ($dat[0]['admins'] === 'admin_post') checked @endif>
                 センシティブな画像として投稿
               </label>
               <div class="cw-input" style="display: none;">
@@ -104,7 +104,7 @@
                 <div class="server-option">
                   <input type="radio" name="misskey_server_radio" value="direct" id="server_direct">
                   <label for="server_direct">直接入力</label>
-                  <input type="text" name="misskey_server_direct_input" placeholder="https://example.com" style="display: none;">
+                  <input type="text" name="misskey_server_direct_input" placeholder="https://example.com">
                 </div>
               </div>
             </div>
@@ -147,6 +147,9 @@
           <p>画像の投稿が完了しました。</p>
           <p>
             <a href="{{$self}}?resno={{$no}}">記事に戻る</a>
+          </p>
+          <p>
+            <a href="{{$self}}">掲示板に戻る</a>
           </p>
         </div>
       </section>
