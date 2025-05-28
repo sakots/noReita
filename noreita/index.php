@@ -5,23 +5,47 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.6'); //lot.250413.0
-
-//設定の読み込み
-require(__DIR__ . '/config.php');
-require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
-
-//タイムゾーン設定
-date_default_timezone_set(DEFAULT_TIMEZONE);
+define('REITA_VER', 'v1.6.7'); //lot.250528.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
 	die("PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})");
 }
+
+//言語判定
+$lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
+  ? explode( ',', $http_langs )[0] : '';
+$en= (stripos($lang,'ja')!== 0);
+
+//ファイルが足りない場合
+if(!is_file(__DIR__.'/functions.php')){
+	die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
+}
+
+//コンフィグ
+require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
 if (CONF_VER < 250413 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
+
+require_once(__DIR__.'/functions.php');
+if(!isset($functions_ver) || $functions_ver < 20250416) {
+	die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
+}
+
+check_file(__DIR__.'/misskey_note.inc.php');
+require_once(__DIR__.'/misskey_note.inc.php');
+if(!isset($misskey_note_ver) || $misskey_note_ver < 20250326){
+	die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
+}
+
+//テーマ
+require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
+
+//タイムゾーン設定
+date_default_timezone_set(DEFAULT_TIMEZONE);
+
 
 //管理パスが初期値(kanripass)の場合は動作させない
 if ($admin_pass === 'kanripass') {
@@ -137,10 +161,13 @@ define('DB_PDO', 'sqlite:' . DB_NAME . '.db');
 defined("SNS_WINDOW_WIDTH") or define("SNS_WINDOW_WIDTH","600");
 defined("SNS_WINDOW_HEIGHT") or define("SNS_WINDOW_HEIGHT","600");
 
+//misskey
+$dat['use_misskey_note'] = USE_MISSKEY_NOTE;
+
 //初期設定(初期設定後は不要なので削除可)
 init();
 
-deltemp();
+del_temp();
 
 $message = "";
 
@@ -156,8 +183,7 @@ $req_method = isset($_SERVER["REQUEST_METHOD"]) ? $_SERVER["REQUEST_METHOD"] : "
 //INPUT_SERVER が動作しないサーバがあるので$_SERVERを使う。
 
 //ユーザーip
-function get_uip()
-{
+function get_uip():	string {
 	if ($userip = getenv("HTTP_CLIENT_IP")) {
 		return $userip;
 	} elseif ($userip = getenv("HTTP_X_FORWARDED_FOR")) {
@@ -168,177 +194,80 @@ function get_uip()
 		return $userip;
 	}
 }
-//csrfトークンを作成
-function get_csrf_token()
-{
-	if (!isset($_SESSION)) {
-		session_save_path(__DIR__ . '/session/');
-		session_sta();
-	}
-	header('Expires:');
-	header('Cache-Control:');
-	header('Pragma:');
-	return hash('sha256', session_id(), false);
-}
-//csrfトークンをチェック
-function check_csrf_token()
-{
-	session_save_path(__DIR__ . '/session/');
-	session_sta();
-	$token = filter_input(INPUT_POST, 'token');
-	$session_token = isset($_SESSION['token']) ? $_SESSION['token'] : '';
-	if (!$session_token || $token !== $session_token) {
-		error(MSG006);
-	}
-}
 
+$https_only = (bool)($_SERVER['HTTPS'] ?? '');
 //user-codeの発行
-if (!$usercode) { //falseなら発行
-	$userip = get_uip();
-	$usercode = substr(crypt(md5($userip . ID_SEED . date("Ymd", time())), 'id'), -12);
-	//念の為にエスケープ文字があればアルファベットに変換
-	$usercode = strtr($usercode, "!\"#$%&'()+,/:;<=>?@[\\]^`/{|}~", "ABCDEFGHIJKLMNOabcdefghijklmn");
-}
-setcookie("usercode", $usercode, time() + (86400 * 365)); //1年間
+$usercode = t(filter_input_data('COOKIE', 'usercode')); //user-codeを取得
 
-$dat['usercode'] = $usercode;
+session_sta();
+$session_usercode = $_SESSION['usercode'] ?? "";
+$session_usercode = t($session_usercode);
+
+$usercode = $usercode ? $usercode : $session_usercode;
+if(!$usercode){ //user-codeがなければ発行
+	$userip = get_uip();
+	$usercode = hash('sha256', $userip.random_bytes(16));
+}
+setcookie("usercode", $usercode, time()+(86400*365),"","",$https_only,true); //1年間
+$_SESSION['usercode'] = $usercode;
 
 //var_dump($_GET);
 
 /*-----------mode-------------*/
 
-$mode = filter_input(INPUT_POST, 'mode');
+$mode = (string)filter_input_data('POST','mode');
+$mode = $mode ?: (string)filter_input_data('GET','mode');
 
-if (filter_input(INPUT_GET, 'mode') === "anime") {
-	$pch = filter_input(INPUT_GET, 'pch');
-	$mode = "anime";
-}
-if (filter_input(INPUT_GET, 'mode') === "continue") {
-	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
-	$mode = "continue";
-}
-if (filter_input(INPUT_GET, 'mode') === "admin") {
-	$mode = "admin";
-}
-if (filter_input(INPUT_GET, 'mode') === "admin_in") {
-	$mode = "admin_in";
-}
-if (filter_input(INPUT_GET, 'mode') === "piccom") {
-	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
-	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
-	$mode = "piccom";
-}
-if (filter_input(INPUT_GET, 'mode') === "pictmp") {
-	$mode = "pictmp";
-}
-if (filter_input(INPUT_GET, 'mode') === "picrep") {
-	$no = filter_input(INPUT_GET, 'no');
-	$pwd = (string)trim(filter_input(INPUT_GET, 'pwd'));
-	$repcode = filter_input(INPUT_GET, 'repcode');
-	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
-	$mode = "picrep";
-}
-if (filter_input(INPUT_GET, 'mode') === "regist") {
-	$mode = "regist";
-}
-if (filter_input(INPUT_GET, 'mode') === "reply") {
-	$mode = "reply";
-}
-if (filter_input(INPUT_GET, 'mode') === "res") {
-	$mode = "res";
-}
-if (filter_input(INPUT_GET, 'mode') === "sodane") {
-	$mode = "sodane";
-	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
-}
-if (filter_input(INPUT_GET, 'mode') === "continue") {
-	$no = filter_input(INPUT_GET, 'no');
-	$mode = "continue";
-}
-if (filter_input(INPUT_GET, 'mode') === "del") {
-	$mode = "del";
-}
-if (filter_input(INPUT_GET, 'mode') === "edit") {
-	$mode = "edit";
-}
-if (filter_input(INPUT_GET, 'mode') === "editexec") {
-	$mode = "editexec";
-}
-if (filter_input(INPUT_GET, 'mode') === "catalog") {
-	$mode = "catalog";
-}
-if (filter_input(INPUT_GET, 'mode') === "search") {
-	$mode = "search";
-}
-if (filter_input(INPUT_GET, 'mode') === "set_share_server") {
-	$mode = "set_share_server";
-}
-if (filter_input(INPUT_GET, 'mode') === "post_share_server") {
-	$mode = "post_share_server";
-}
-
-
-switch ($mode) {
-	case 'regist':
-		return regist();
-	case 'reply':
-		return reply();
-	case 'res':
-		return res();
-	case 'sodane':
-		return sodane();
-	case 'paint':
-		$rep = "";
-		return paintform($rep);
-	case 'piccom':
-		$tmpmode = "";
-		return paintcom($tmpmode);
-	case 'pictmp':
-		$tmpmode = "tmp";
-		return paintcom($tmpmode);
-	case 'anime':
-		if (!isset($sp)) {
-			$sp = "";
-		}
-		return openpch($pch, $sp);
-	case 'continue':
-		return incontinue($no);
-	case 'contpaint':
-		//パスワードが必要なのは差し換えの時だけ
+// モード → 実行関数 のマップ
+$modeMap = [
+	'regist' => 'regist',
+	'reply' => 'reply',
+	'res' => 'res',
+	'sodane' => 'sodane',
+	'paint' => fn() => paintform(""),
+	'piccom' => fn() => paintcom(""),
+	'pictmp' => fn() => paintcom("tmp"),
+	'anime' => fn() => openpch($sp ?? ""),
+	'continue' => 'in_continue',
+	'contpaint' => function() {
 		$type = filter_input(INPUT_POST, 'type');
 		if (CONTINUE_PASS || $type === 'rep') usrchk();
-		// if(ADMIN_NEWPOST) $admin=$pwd;
-		$rep = $type;
-		return paintform($rep);
-	case 'picrep':
-		return picreplace();
-	case 'catalog':
-		return catalog();
-	case 'search':
-		return search();
-	case 'edit':
-		return editform();
-	case 'editexec':
-		return editexec();
-	case 'del':
-		return delmode();
-	case 'admin_in':
-		return admin_in();
-	case 'admin':
-		return admin();
-	case 'set_share_server':
-		return set_share_server();
-	case 'post_share_server':
-		return post_share_server();
-	default:
-		return def();
+		return paintform($type);
+	},
+	'picrep' => 'picreplace',
+	'catalog' => 'catalog',
+	'search' => 'search',
+	'edit' => 'editform',
+	'editexec' => 'editexec',
+	'del' => 'delmode',
+	'admin_in' => 'admin_in',
+	'admin' => 'admin',
+	'set_share_server' => 'set_share_server',
+	'post_share_server' => 'post_share_server',
+	'before_misskey_note' => [misskey_note::class, 'before_misskey_note'],
+	'misskey_note_edit_form' => [misskey_note::class, 'misskey_note_edit_form'],
+	'create_misskey_note_sessiondata' => [misskey_note::class, 'create_misskey_note_sessiondata'],
+	'create_misskey_authrequesturl' => [misskey_note::class, 'create_misskey_authrequesturl'],
+	'misskey_success' => [misskey_note::class, 'misskey_success'],
+];
+
+// 実行
+if (isset($modeMap[$mode])) {
+	$handler = $modeMap[$mode];
+	if (is_callable($handler)) {
+		return $handler();
+	} elseif (is_string($handler) && function_exists($handler)) {
+		return $handler();
+	}
 }
+
+// デフォルト
+return def();
 exit;
 
 /*-----------Main-------------*/
 
-function init()
-{
+function init(): void {
 	try {
 		if (!is_file(DB_NAME . '.db')) {
 			// はじめての実行なら、テーブルを作成
@@ -382,8 +311,7 @@ function init()
 
 //投稿があればデータベースへ保存する
 /* 記事書き込み スレ立て */
-function regist()
-{
+function regist(): void {
 	global $badip, $admin_pass, $admin_name;
 	global $req_method;
 	global $dat;
@@ -643,8 +571,7 @@ function regist()
 }
 
 //記事書き込み - リプライ
-function reply()
-{
+function reply(): void {
 	global $badip, $admin_pass, $admin_name;
 	global $req_method;
 	global $dat;
@@ -821,8 +748,7 @@ function reply()
 }
 
 //通常表示モード
-function def()
-{
+function def(): void {
 	global $dat, $blade;
 	$dsp_res = DSP_RES;
 	$page_def = PAGE_DEF;
@@ -1008,8 +934,7 @@ function def()
 }
 
 //カタログモード
-function catalog()
-{
+function catalog(): void {
 	global $blade, $dat;
 	$page_def = CATALOG_N;
 
@@ -1097,8 +1022,7 @@ function catalog()
 }
 
 //検索モード 現在全件表示のみ対応
-function search()
-{
+function search(): void {
 	global $blade, $dat;
 
 	$searchf = filter_input(INPUT_GET, 'search');
@@ -1156,8 +1080,7 @@ function search()
 }
 
 //そうだね
-function sodane()
-{
+function sodane(): void {
 	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
 	try {
 		$db = new PDO(DB_PDO);
@@ -1170,10 +1093,9 @@ function sodane()
 	header('Location:' . PHP_SELF);
 	def();
 }
-//レス画面
 
-function res()
-{
+//レス画面
+function res(): void {
 	global $blade, $dat;
 	$resno = filter_input(INPUT_GET, 'res',FILTER_VALIDATE_INT);
 	$dat['resno'] = $resno;
@@ -1285,8 +1207,7 @@ function res()
 }
 
 //お絵描き画面
-function paintform($rep)
-{
+function paintform($rep): void {
 	global $message, $usercode, $quality, $qualitys, $no;
 	global $mode, $ctype, $pch, $type;
 	global $blade, $dat;
@@ -1353,6 +1274,8 @@ function paintform($rep)
 		$ctype = filter_input(INPUT_POST, 'ctype');
 		$type = $rep;
 		$pwdf = filter_input(INPUT_POST, 'pwd');
+
+		session_sta();
 
 		$dat['no'] = $no;
 		$dat['pwd'] = $pwdf;
@@ -1441,6 +1364,8 @@ function paintform($rep)
 	if ($type === 'rep') {
 		$no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
 		$userip = get_uip();
+
+		session_sta();
 		$time = time();
 		$repcode = substr(crypt(md5($no . $userip . $pwdf . date("Ymd", $time)), $time), -8);
 		//念の為にエスケープ文字があればアルファベットに変換
@@ -1468,8 +1393,7 @@ function paintform($rep)
 
 //アニメ再生
 
-function openpch($pch, $sp = "")
-{
+function openpch($pch, $sp = ""): void {
 	global $blade, $dat;
 	$message = "";
 
@@ -1522,10 +1446,12 @@ function openpch($pch, $sp = "")
 }
 
 //お絵かき投稿
-function paintcom($tmpmode)
-{
+function paintcom($tmpmode): void {
 	global $usercode, $ptime;
 	global $blade, $dat;
+
+	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
+	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
 
 	$dat['parent'] = $_SERVER['REQUEST_TIME'];
 	$dat['usercode'] = $usercode;
@@ -1613,9 +1539,10 @@ function paintcom($tmpmode)
 }
 
 //コンティニュー画面in
-function incontinue($no)
-{
+function in_continue(): void {
 	global $blade, $dat;
+
+	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
 	$dat['othermode'] = 'incontinue';
 	$dat['continue_mode'] = true;
 
@@ -1674,8 +1601,7 @@ function incontinue($no)
 
 //削除くん
 
-function delmode()
-{
+function delmode(): void {
 	global $admin_pass;
 	global $dat;
 	$delno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
@@ -1796,10 +1722,10 @@ function delmode()
 }
 
 //画像差し替え
-function picreplace()
-{
+function picreplace(): void {
 	global $type;
 	global $path, $badip;
+
 	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
 	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
 	$repcode = filter_input(INPUT_GET, 'repcode');
@@ -1858,7 +1784,7 @@ function picreplace()
 			unlink(IMG_DIR . $msg_d["picfile"]);
 
 			$img_type = mime_content_type($dest);
-			$imgext = getImgType($img_type, $dest);
+			$imgext = get_image_type($img_type, $dest);
 
 			//新しい画像の名前(DB保存用)
 			$new_picfile = $file_name . $imgext;
@@ -1940,10 +1866,8 @@ function picreplace()
 	ok('編集に成功しました。画面を切り替えます。');
 }
 
-
 //編集モードくん入口
-function editform()
-{
+function editform(): void {
 	global $admin_pass;
 	global $blade, $dat;
 
@@ -2016,8 +1940,7 @@ function editform()
 }
 
 //編集モードくん本体
-function editexec()
-{
+function editexec(): void {
 	global $badip;
 	global $req_method;
 	global $dat;
@@ -2117,8 +2040,7 @@ function editexec()
 }
 
 //管理モードin
-function admin_in()
-{
+function admin_in(): void {
 	global $blade, $dat;
 	$dat['othermode'] = 'admin_in';
 
@@ -2126,8 +2048,7 @@ function admin_in()
 }
 
 //管理モード
-function admin()
-{
+function admin(): void {
 	global $admin_pass;
 	global $blade, $dat;
 
@@ -2175,8 +2096,7 @@ function admin()
 }
 
 // コンティニュー認証 (画像)
-function usrchk()
-{
+function usrchk(): void {
 	$no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
 	$pwdf = filter_input(INPUT_POST, 'pwd');
 	$flag = FALSE;
@@ -2202,55 +2122,20 @@ function usrchk()
 }
 
 //OK画面
-function ok($mes)
-{
+function ok($mes): void {
 	global $blade, $dat;
 	$dat['okmes'] = $mes;
 	$dat['othermode'] = 'ok';
 	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
 	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
 	if($http_x_requested_with || $async_flag){
-		return die("OK!\n$mes");
+		die("OK!\n$mes");
 	}
 	echo $blade->run(OTHERFILE, $dat);
-}
-
-//エラー画面
-function error($mes)
-{
-	global $db;
-	global $blade, $dat;
-	$db = null; //db切断
-	$dat['errmes'] = $mes;
-	$dat['othermode'] = 'err';
-	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
-	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
-	if($http_x_requested_with || $async_flag){
-		return die("error\n$mes");
-	}
-	echo $blade->run(OTHERFILE, $dat);
-	exit;
-}
-
-//画像差し替え失敗
-function error2()
-{
-	global $db;
-	global $blade, $dat;
-	global $self;
-	$db = null; //db切断
-	$dat['othermode'] = 'err2';
-	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
-	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
-	if($http_x_requested_with || $async_flag){
-		return die("error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
-	}
-	echo $blade->run(OTHERFILE, $dat);
-	exit;
 }
 
 //Asyncリクエストの時は処理を中断
-function check_AsyncRequest($picfile='') {
+function check_AsyncRequest($picfile=''): void {
 	//ヘッダーが確認できなかった時の保険
 	$asyncflag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
 	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
@@ -2261,8 +2146,7 @@ function check_AsyncRequest($picfile='') {
 }
 
 /* テンポラリ内のゴミ除去 */
-function deltemp()
-{
+function del_temp(): void {
 	$handle = opendir(TEMP_DIR);
 	while ($file = readdir($handle)) {
 		if (!is_dir($file)) {
@@ -2282,124 +2166,8 @@ function deltemp()
 	closedir($handle);
 }
 
-// 文字コード変換
-function charconvert($str)
-{
-	mb_language(LANG);
-	return mb_convert_encoding($str, "UTF-8", "auto");
-}
-
-/* NGワードがあれば拒絶 */
-function Reject_if_NGword_exists_in_the_post($com, $name, $email, $url, $sub)
-{
-	global $badstring, $badname, $badstr_A, $badstr_B, $pwd, $admin_pass;
-	//チェックする項目から改行・スペース・タブを消す
-	$chk_com  = preg_replace("/\s/u", "", $com);
-	$chk_name = preg_replace("/\s/u", "", $name);
-	$chk_email = preg_replace("/\s/u", "", $email);
-	$chk_sub = preg_replace("/\s/u", "", $sub);
-
-	//本文に日本語がなければ拒絶
-	if (USE_JAPANESEFILTER) {
-		mb_regex_encoding("UTF-8");
-		if (strlen($com) > 0 && !preg_match("/[ぁ-んァ-ヶー一-龠]+/u", $chk_com)) error(MSG035);
-	}
-
-	//本文へのURLの書き込みを禁止
-	if (!($pwd === $admin_pass)) { //どちらも一致しなければ
-		if (DENY_COMMENTS_URL && preg_match('/:\/\/|\.co|\.ly|\.gl|\.net|\.org|\.cc|\.ru|\.su|\.ua|\.gd/i', $com)) error(MSG036);
-	}
-
-	// 使えない文字チェック
-	if (is_ngword($badstring, [$chk_com, $chk_sub, $chk_name, $chk_email])) {
-		error(MSG032);
-	}
-
-	// 使えない名前チェック
-	if (is_ngword($badname, $chk_name)) {
-		error(MSG037);
-	}
-
-	//指定文字列が2つあると拒絶
-	$bstr_A_find = is_ngword($badstr_A, [$chk_com, $chk_sub, $chk_name, $chk_email]);
-	$bstr_B_find = is_ngword($badstr_B, [$chk_com, $chk_sub, $chk_name, $chk_email]);
-	if ($bstr_A_find && $bstr_B_find) {
-		error(MSG032);
-	}
-}
-
-//念のため画像タイプチェック
-function getImgType($img_type, $dest)
-{
-	switch ($img_type) {
-		case "image/gif":
-			return ".gif";
-		case "image/jpeg":
-			return ".jpg";
-		case "image/png":
-			return ".png";
-		case "image/webp":
-			return ".webp";
-		default:
-			return error(MSG004, $dest);
-	}
-}
-
-/**
- * NGワードチェック
- * @param $ngwords
- * @param string|array $strs
- * @return bool
- */
-function is_ngword($ngwords, $strs)
-{
-	if (empty($ngwords)) {
-		return false;
-	}
-	if (!is_array($strs)) {
-		$strs = [$strs];
-	}
-	foreach ($strs as $str) {
-		foreach ($ngwords as $ngword) { //拒絶する文字列
-			if ($ngword !== '' && preg_match("/{$ngword}/ui", $str)) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-/**
- * 描画時間を計算
- * @param $starttime
- * @return string
- */
-function calcPtime($psec)
-{
-
-	$D = floor($psec / 86400);
-	$H = floor($psec % 86400 / 3600);
-	$M = floor($psec % 3600 / 60);
-	$S = $psec % 60;
-
-	return ($D ? $D . PTIME_D : '') . ($H ? $H . PTIME_H : '') . ($M ? $M . PTIME_M : '') . ($S ? $S . PTIME_S : '');
-}
-/**
- * ファイルがあれば削除
- * @param $path
- * @return bool
- */
-function safe_unlink($path)
-{
-	if ($path && is_file($path)) {
-		return unlink($path);
-	}
-	return false;
-}
-
 //ログの行数が最大値を超えていたら削除
-function logdel()
-{
+function logdel(): void {
 	//オーバーした行の画像とスレ番号を取得
 	try {
 		$db = new PDO(DB_PDO);
@@ -2458,189 +2226,49 @@ function logdel()
 	}
 }
 
-/* オートリンク */
-function auto_link($proto)
-{
-	if (!(stripos($proto, "script") !== false)) { //scriptがなければ続行
-		$pattern = "{(https?|ftp)(://[[:alnum:]\+\$\;\?\.%,!#~*/:@&=_-]+)}";
-		$replace = "<a href=\"\\1\\2\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">\\1\\2</a>";
-		$proto = preg_replace($pattern, $replace, $proto);
-		return $proto;
-	} else {
-		return $proto;
+//misskeyにノート
+function misskey_note(): void {
+	global $blade, $dat;
+	//スレの画像取得
+	$no = filter_input(INPUT_GET, 'no',FILTER_VALIDATE_INT);
+	try {
+		$db = new PDO(DB_PDO);
+		$sql = "SELECT * FROM tlog WHERE id=? ORDER BY tree DESC";
+		$posts = $db->prepare($sql);
+		$posts->execute([$no]);
+	} catch (PDOException $e) {
+		echo "DB接続エラー:" . $e->getMessage();
 	}
 }
 
-/* ハッシュタグリンク */
-function hashtag_link($hashtag)
-{
-	$self = PHP_SELF;
-	$pattern = "/(?:^|[^ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9&_\/]+)[#＃]([ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9_]*[ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z]+[ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9_]*)/u";
-	$replace = " <a href=\"{$self}?mode=search&amp;tag=tag&amp;search=\\1\">#\\1</a>";
-	$hashtag = preg_replace($pattern, $replace, $hashtag);
-	return $hashtag;
+//エラー画面
+function error($mes): void {
+	global $db;
+	global $blade, $dat;
+	$db = null; //db切断
+	$dat['errmes'] = $mes;
+	$dat['othermode'] = 'err';
+	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
+	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
+	if($http_x_requested_with || $async_flag){
+		die("error\n$mes");
+	}
+	echo $blade->run(OTHERFILE, $dat);
+	exit;
 }
 
-/* '>'色設定 */
-function quote($quote)
-{
-	$quote = preg_replace("/(^|>)((&gt;|＞)[^<]*)/i", "\\1" . RE_START . "\\2" . RE_END, $quote);
-	return $quote;
-}
-
-/* 改行を<br>に */
-function tobr($com)
-{
-	if (TH_XHTML !== 1) {
-		$com = nl2br($com, false);
-	} else {
-		$com = nl2br($com);
+//画像差し替え失敗
+function error2(): void {
+	global $db;
+	global $blade, $dat;
+	global $self;
+	$db = null; //db切断
+	$dat['othermode'] = 'err2';
+	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
+	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
+	if($http_x_requested_with || $async_flag){
+		die("error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
 	}
-	return $com;
-}
-
-/* ID生成 */
-function gen_id($userip, $time)
-{
-	if (ID_CYCLE === '0') {
-		return substr(crypt(md5($userip . ID_SEED), 'id'), -8);
-	} elseif (ID_CYCLE === '1') {
-		return substr(crypt(md5($userip . ID_SEED . date("Ymd", $time)), 'id'), -8);
-	} elseif (ID_CYCLE === '2') {
-		$week = ceil(date("d", $time) / 7);
-		return substr(crypt(md5($userip . ID_SEED . date("Ym", $time) . $week), 'id'), -8);
-	} elseif (ID_CYCLE === '3') {
-		return substr(crypt(md5($userip . ID_SEED . date("Ym", $time)), 'id'), -8);
-	} elseif (ID_CYCLE === '4') {
-		return substr(crypt(md5($userip . ID_SEED . date("Y", $time)), 'id'), -8);
-	} else {
-		return substr(crypt(md5($userip . ID_SEED), 'id'), -8);
-	}
-}
-
-//リダイレクト
-function redirect($url): void {
-	header("Location: {$url}");
-	exit();
-}
-
-//シェアするserverの選択画面
-function set_share_server(): void {
-	global $servers,$blade,$dat;
-
-	//ShareするServerの一覧
-	//｢"ラジオボタンに表示するServer名","snsのserverのurl"｣
-	$servers = $servers ??
-	[
-		["X","https://x.com"],
-		["Bluesky","https://bsky.app"],
-		["Threads","https://www.threads.net"],
-		["pawoo.net","https://pawoo.net"],
-		["fedibird.com","https://fedibird.com"],
-		["misskey.io","https://misskey.io"],
-		["xissmie.xfolio.jp","https://xissmie.xfolio.jp"],
-		["misskey.design","https://misskey.design"],
-		["nijimiss.moe","https://nijimiss.moe"],
-		["sushi.ski","https://sushi.ski"],
-	];
-	//設定項目ここまで
-	$servers[]=["直接入力","direct"];//直接入力の箇所はそのまま。
-	$dat['servers'] = $servers;
-
-	$dat['encoded_t'] = filter_input_data('GET',"encoded_t");
-	$dat['encoded_u'] = filter_input_data('GET',"encoded_u");
-	$dat['sns_server_radio_cookie'] = (string)filter_input_data('COOKIE',"sns_server_radio_cookie");
-	$dat['sns_server_direct_input_cookie'] = (string)filter_input_data('COOKIE',"sns_server_direct_input_cookie");
-
-	$dat['admin_pass'] = null;
-	//HTML出力
-	echo $blade->run(SET_SHARE_SERVER, $dat);
-}
-
-//SNSへ共有リンクを送信
-function post_share_server(): void {
-
-	$sns_server_radio=(string)filter_input_data('POST',"sns_server_radio",FILTER_VALIDATE_URL);
-	$sns_server_radio_for_cookie=(string)filter_input_data('POST',"sns_server_radio");//directを判定するためurlでバリデーションしていない
-	$sns_server_radio_for_cookie=($sns_server_radio_for_cookie === 'direct') ? 'direct' : $sns_server_radio;
-	$sns_server_direct_input=(string)filter_input_data('POST',"sns_server_direct_input",FILTER_VALIDATE_URL);
-	$encoded_t=(string)filter_input_data('POST',"encoded_t");
-	$encoded_t=urlencode($encoded_t);
-	$encoded_u=(string)filter_input_data('POST',"encoded_u");
-	$encoded_u=urlencode($encoded_u);
-	setcookie("sns_server_radio_cookie",$sns_server_radio_for_cookie, time()+(86400*30),"","",false,true);
-	setcookie("sns_server_direct_input_cookie",$sns_server_direct_input, time()+(86400*30),"","",false,true);
-	$share_url='';
-	if($sns_server_radio){
-		$share_url=$sns_server_radio."/share?text=";
-	} elseif($sns_server_direct_input){//直接入力時
-		$share_url=$sns_server_direct_input."/share?text=";
-		if($sns_server_direct_input==="https://bsky.app"){
-			$share_url="https://bsky.app/intent/compose?text=";
-		} elseif($sns_server_direct_input==="https://www.threads.net"){
-			$share_url="https://www.threads.net/intent/post?text=";
-		}
-	}
-	if(in_array($sns_server_radio,["https://x.com","https://twitter.com"])){
-		// $share_url="https://x.com/intent/post?text=";
-		$share_url="https://twitter.com/intent/tweet?text=";
-	} elseif($sns_server_radio === "https://bsky.app"){
-		$share_url="https://bsky.app/intent/compose?text=";
-	}	elseif($sns_server_radio === "https://www.threads.net"){
-		$share_url="https://www.threads.net/intent/post?text=";
-	}
-	$share_url.=$encoded_t.'%20'.$encoded_u;
-	$share_url = filter_var($share_url, FILTER_VALIDATE_URL) ? $share_url : '';
-	if(!$share_url){
-		error("SNSの共有先を選択してください。");
-	}
-	redirect($share_url);
-}
-
-//filter_input のラッパー関数
-function filter_input_data(string $input, string $key, int $filter=0) {
-	// $_GETまたは$_POSTからデータを取得
-	$value = null;
-	if ($input === 'GET') {
-			$value = $_GET[$key] ?? null;
-	} elseif ($input === 'POST') {
-			$value = $_POST[$key] ?? null;
-	} elseif ($input === 'COOKIE') {
-			$value = $_COOKIE[$key] ?? null;
-	}
-
-	// データが存在しない場合はnullを返す
-	if ($value === null) {
-			return null;
-	}
-
-	// フィルタリング処理
-	switch ($filter) {
-		case FILTER_VALIDATE_BOOLEAN:
-			return  filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-		case FILTER_VALIDATE_INT:
-			return filter_var($value, FILTER_VALIDATE_INT);
-		case FILTER_VALIDATE_URL:
-			return filter_var($value, FILTER_VALIDATE_URL);
-		default:
-			return $value;  // 他のフィルタはそのまま返す
-	}
-}
-
-//session開始
-function session_sta(): void {
-
-	$session_name = SESSION_NAME;
-
-	if(!isset($_SESSION)){
-		ini_set('session.use_strict_mode', 1);
-		session_set_cookie_params(
-			0,"","",false,true
-		);
-		session_name($session_name);
-		session_start();
-		header('Expires:');
-		header('Cache-Control:');
-		header('Pragma:');
-	}
+	echo $blade->run(OTHERFILE, $dat);
+	exit;
 }

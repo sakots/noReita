@@ -12,13 +12,13 @@
 		<!-- アプレットフィット -->
 		<script>
 			function appfit(f) {
-				var d = document;
-				var client = d.compatMode && d.compatMode != "BackCompat" ? d.documentElement : d.body;
-				var chei = client.clientHeight - 10;
-				var neo = d.getElementById("NEO");
-				var target = d.getElementById("pageView");
+				const d = document;
+				const client = d.compatMode && d.compatMode != "BackCompat" ? d.documentElement : d.body;
+				const chei = client.clientHeight - 10;
+				const neo = d.getElementById("NEO");
+				const target = d.getElementById("pageView");
 				if (f == 0) { //ひろげる
-					var cwid = d.getElementById("appstage").scrollWidth - 360;
+					const cwid = d.getElementById("appstage").scrollWidth - 360;
 					if (cwid > target.clientWidth) { target.style.width = cwid + "px"; }
 					if (chei > target.clientHeight) { target.style.height = chei + "px"; }
 					document.getElementById("fit_exp").style.display="none";

@@ -8,7 +8,7 @@
 define('THEME_NAME', "nee-ex");
 
 //テーマのバージョン
-define('THEME_VER', "1.7.0 lot.250413.0");
+define('THEME_VER', "1.8.0 lot.250528.0");
 
 /* -------------------- */
 
@@ -55,6 +55,9 @@ define('ADMINFILE', "nee-ex_admin");
 
 //SNSシェア選択のテンプレートファイル
 define('SET_SHARE_SERVER', "nee-ex_sns_share");
+
+//misskey関係のテンプレートファイル
+define('MISSKEYFILE', "nee-ex_misskey_note");
 
 //その他のテンプレートファイル
 define('OTHERFILE', "nee-ex_other");

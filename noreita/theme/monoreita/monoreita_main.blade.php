@@ -167,71 +167,78 @@
 					@endif
 					@if (!empty($bbsline['res']))
 					@foreach ($bbsline['res'] as $res)
-					@if ($res['resno'] <= $bbsline['res_d_su']) @else <section class="res">
-						<section>
-							<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
-							<h4>
-								名前：<span class="resname">{{$res['a_name']}}
-									@if ($res['admins'] == 1)
-									<svg viewBox="0 0 640 512">
-										<use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge">
-									</svg>
-									@endif
-								</span>：
-								@if ($res['modified'] == $res['created'])
-								{{$res['modified']}}
+					@if ($res['resno'] <= $bbsline['res_d_su']) @else 
+					<section class="res">
+						<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
+						<h4>
+							名前：<span class="resname">{{$res['a_name']}}
+								@if ($res['admins'] == 1)
+								<svg viewBox="0 0 640 512">
+									<use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge">
+								</svg>
+								@endif
+							</span>：
+							@if ($res['modified'] == $res['created'])
+							{{$res['modified']}}
+							@else
+							{{$res['created']}} {{$updatemark}} {{$res['modified']}}
+							@endif
+							@if ($res['mail'])
+							<span class="mail"><a href="mailto:{{$res['mail']}}">[mail]</a></span>
+							@endif
+							@if ($res['a_url'])
+							<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
+							@endif
+							@if ($dispid)
+							<span class="id">ID：{{$res['id']}}</span>
+							@endif
+							<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
+								@if ($res['exid'] != 0)
+								x{{$res['exid']}}
 								@else
-								{{$res['created']}} {{$updatemark}} {{$res['modified']}}
+								+
 								@endif
-								@if ($res['mail'])
-								<span class="mail"><a href="mailto:{{$res['mail']}}">[mail]</a></span>
-								@endif
-								@if ($res['a_url'])
-								<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
-								@endif
-								@if ($dispid)
-								<span class="id">ID：{{$res['id']}}</span>
-								@endif
-								<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
-										@if ($res['exid'] != 0)
-										x{{$res['exid']}}
-										@else
-										+
-										@endif
-									</a></span>
-							</h4>
-							<p class="comment">{!! $res['com'] !!}</p>
-						</section>
-				</section>
-				@endif
-				@endforeach
-				@endif
-				<div class="thfoot">
-					@if ($share_button)
-					@if ($switch_sns)
-					<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
-						<svg viewBox="0 0 512 512">
-							<use href="./theme/{{$themedir}}/icons/share.svg#share">
-						</svg> SNSで共有する</a>
-					</span>
-					@else
-					<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
-						<svg viewBox="0 0 512 512">
-							<use href="./theme/{{$themedir}}/icons/twitter.svg#twitter">
-						</svg> tweet</a>
-					</span>
+							</a></span>
+						</h4>
+						<p class="comment">{!! $res['com'] !!}</p>
+					</section>
 					@endif
+					@endforeach
 					@endif
-					@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) <span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><svg viewBox="0 0 512 512">
-								<use href="./theme/{{$themedir}}/icons/rep.svg#rep">
-							</svg> 返信</a></span>
+					<div class="thfoot">
+						@if ($share_button)
+						@if ($use_misskey_note)
+						<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}">
+							<svg>
+								<use href="./theme/{{$themedir}}/icons/misskey.svg#misskey"></use>
+							</svg> Misskeyにノート</a>
+						</span>
+						@endif
+						@if ($switch_sns)
+						<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
+							<svg viewBox="0 0 512 512">
+								<use href="./theme/{{$themedir}}/icons/share.svg#share">
+							</svg> SNSで共有する</a>
+						</span>
+						@else
+						<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
+							<svg viewBox="0 0 512 512">
+								<use href="./theme/{{$themedir}}/icons/twitter.svg#twitter">
+							</svg> tweet</a>
+						</span>
+						@endif
+						@endif
+						@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
+						<span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><svg viewBox="0 0 512 512">
+							<use href="./theme/{{$themedir}}/icons/rep.svg#rep"></svg> 返信</a>
+						</span>
 						@else
 						このスレは古いので返信できません…
 						@endif
 						<a href="#header">[↑]</a>
 						<hr>
-				</div>
-			</section>
+					</div>
+				</section>
 			</section>
 			@endforeach
 			@endif

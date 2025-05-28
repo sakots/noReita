@@ -8,7 +8,7 @@
 define('THEME_NAME', "monoreita");
 
 //テーマのバージョン
-define('THEME_VER', "1.7.0 lot.250413.0");
+define('THEME_VER', "1.8.0 lot.250528.0");
 
 /* -------------------- */
 
@@ -55,6 +55,9 @@ define('ADMINFILE', "monoreita_admin");
 
 //SNSシェア選択のテンプレートファイル
 define('SET_SHARE_SERVER', "monoreita_sns_share");
+
+//misskey関係のテンプレートファイル
+define('MISSKEYFILE', "monoreita_misskey_note");
 
 //その他のテンプレートファイル
 define('OTHERFILE', "monoreita_other");

@@ -3,7 +3,7 @@
 	<!-- 著作権表示 -->
 	<p>
 		<a href="https://dev.oekakibbs.net/" target="_blank">noReita {{$ver}}</a>
-		Web Style by <a href="https://oekakibbs.moe/" target="_blanc" title="monoreita {{$tver}} (by sakots,お絵かきBBSラボ)">monoreita</a>
+		Web Style by <a href="https://oekakibbs.moe/" target="_blanc" title="monor {{$tver}} (by sakots,お絵かきBBSラボ)">monor</a>
 	</p>
 	<p>
 		OekakiApplet -
