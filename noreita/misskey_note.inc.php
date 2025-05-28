@@ -5,7 +5,7 @@
 $misskey_note_ver = 20250521;
 
 //グローバル変数の宣言
-global $en, $home, $petit_ver, $petit_lot, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
+global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
 
 //設定読み込み
 require_once __DIR__ . '/index.php';
@@ -270,6 +270,7 @@ class misskey_note {
 		if (!$post) {
 			error($en ? 'The article was not found.' : '記事が見つかりません。');
 		}
+		$dat['path'] = IMG_DIR;
 		$dat['post'] = $post;
 
 		// Misskeyサーバーリストをセット
@@ -292,13 +293,14 @@ class misskey_note {
 		$admin_pass = null;
 		// HTML出力
 		$dat['misskey_mode'] = 'note_edit_form';
+
 		echo $blade->run(MISSKEYFILE, $dat);
 		exit();
 	}
 
 	//Misskeyに投稿するSESSIONデータを作成
 	public static function create_misskey_note_sessiondata(): void {
-		global $en, $usercode, $root_url, $skindir, $petit_lot, $misskey_servers, $boardname;
+		global $en, $usercode, $misskey_servers;
 
 		check_csrf_token();
 
@@ -315,7 +317,7 @@ class misskey_note {
 		$cw = t(filter_input_data('POST', 'cw'));
 
 		if ($hide_content && !$cw) {
-			error($en ? "Content warning field is empty." : "注釈がありません。");
+			die("Error: " . ($en ? "Content warning field is empty." : "注釈がありません。"));
 		}
 
 		check_AsyncRequest();
@@ -324,40 +326,84 @@ class misskey_note {
 		$tool = switch_tool($abbr_toolname);
 
 		$painttime = calcPtime($paintsec);
-		$painttime_en = $painttime ? $painttime['en'] : '';
-		$painttime_ja = $painttime ? $painttime['ja'] : '';
-		$painttime = $en ? $painttime_en : $painttime_ja;
-		$painttime = $show_painttime ? $painttime : '';
+		$painttime_str = '';
+		if (is_array($painttime)) {
+			$painttime_str = $en ? ($painttime['en'] ?? '') : ($painttime['ja'] ?? '');
+		} else {
+			$painttime_str = (string)$painttime;
+		}
+		$painttime_to_session = $show_painttime ? $painttime_str : '';
 
 		session_sta();
 
-		$src_image = basename($src_image);
-		$_SESSION['sns_api_val'] = [$com, $src_image, $tool, $painttime, $hide_thumbnail, $no, $article_url_link, $cw];
+		// 投稿データをセッションに保存
+		$_SESSION['misskey_note_data'] = [
+			'no' => $no,
+			'src_image' => $src_image,
+			'com' => $com,
+			'tool' => $tool,
+			'painttime' => $painttime_to_session,
+			'hide_thumbnail' => $hide_thumbnail,
+			'article_url_link' => $article_url_link,
+			'cw' => $cw
+		];
 
-		redirect($root_url . 'connect_misskey_api.php');
+		// sns_api_valを設定
+		$_SESSION['sns_api_val'] = [
+			$com,
+			$src_image,
+			$tool,
+			$painttime_to_session,
+			$hide_thumbnail,
+			$no,
+			$article_url_link,
+			$cw
+		];
+
+		// Misskeyサーバー認証URLを生成する処理を直接呼び出す
+		self::create_misskey_authrequesturl();
 	}
 
 	// Misskeyサーバー認証URLを生成
 	public static function create_misskey_authrequesturl(): void {
-		global $root_url;
 		global $en;
 
 		check_same_origin();
 
-		$misskey_server_radio = (string)filter_input_data('POST', "misskey_server_radio", FILTER_VALIDATE_URL);
-		$misskey_server_radio_for_cookie = (string)filter_input_data('POST', "misskey_server_radio"); //directを判定するためurlでバリデーションしていない
-		$misskey_server_radio_for_cookie = ($misskey_server_radio_for_cookie === 'direct') ? 'direct' : $misskey_server_radio;
-		$misskey_server_direct_input = (string)filter_input_data('POST', "misskey_server_direct_input", FILTER_VALIDATE_URL);
+		// ラジオボタンの値
+		$misskey_server_radio_value = filter_input_data('POST', "misskey_server_radio"); // フィルタリングしない生の値を取得
+
+		// 直接入力欄の値
+		$misskey_server_direct_input_value = filter_input_data('POST', "misskey_server_direct_input"); // フィルタリングしない生の値を取得
+
+		// セッションにセットする最終的なURLを決定
+		$baseUrl_to_set_in_session = null;
+
+		if ($misskey_server_radio_value && $misskey_server_radio_value !== 'direct') {
+			// ラジオボタンが選択されており、かつ"direct"でない場合
+			// この値が有効なURLか検証して使用
+			$validated_url = filter_var($misskey_server_radio_value, FILTER_VALIDATE_URL);
+			if ($validated_url) {
+				$baseUrl_to_set_in_session = $validated_url;
+			}
+		} elseif ($misskey_server_radio_value === 'direct' && $misskey_server_direct_input_value) {
+			// ラジオボタンが"direct"で、直接入力に値がある場合
+			// 直接入力の値を有効なURLか検証して使用
+			$validated_url = filter_var($misskey_server_direct_input_value, FILTER_VALIDATE_URL);
+			if ($validated_url) {
+				$baseUrl_to_set_in_session = $validated_url;
+			}
+		}
+
+		// どちらにも有効なURLがない場合エラー
+		if (!$baseUrl_to_set_in_session) {
+			die("Error: " . ($en ? "Please select a valid Misskey server or enter a valid URL." : "有効なMisskeyサーバーを選択するか、有効なURLを直接入力してください。"));
+		}
+
+		// Cookie セット (misskey_server_radio_cookie は "direct" または URLを保存)
+		$misskey_server_radio_for_cookie = ($misskey_server_radio_value === 'direct') ? 'direct' : $baseUrl_to_set_in_session;
 		setcookie("misskey_server_radio_cookie", $misskey_server_radio_for_cookie, time() + (86400 * 30), "", "", false, true);
-		setcookie("misskey_server_direct_input_cookie", $misskey_server_direct_input, time() + (86400 * 30), "", "", false, true);
-
-		if (!$misskey_server_radio && !$misskey_server_direct_input) {
-			error($en ? "Please select an misskey server." : "Misskeyサーバを選択してください。");
-		}
-
-		if (!$misskey_server_radio && $misskey_server_direct_input) {
-			$misskey_server_radio = $misskey_server_direct_input;
-		}
+		setcookie("misskey_server_direct_input_cookie", $misskey_server_direct_input_value, time() + (86400 * 30), "", "", false, true);
 
 		session_sta();
 		// セッションIDとユニークIDを結合
@@ -368,23 +414,22 @@ class misskey_note {
 
 		$_SESSION['sns_api_session_id'] = $sns_api_session_id;
 
-		$encoded_root_url = urlencode($root_url);
+		$encoded_root_url = urlencode(BASE);
 
 		//別のサーバを選択した時はトークンをクリア
 		if (!isset($_SESSION['misskey_server_radio']) ||
-			$_SESSION['misskey_server_radio'] !== $misskey_server_radio) {
+			$_SESSION['misskey_server_radio'] !== $baseUrl_to_set_in_session) {
 			unset($_SESSION['accessToken']); //トークンをクリア
 		}
-		//投稿完了画面に表示するサーバのURl
-		$_SESSION['misskey_server_radio'] = $misskey_server_radio;
+		// 投稿完了画面に表示するサーバのURl としてセッションにセット
+		$_SESSION['misskey_server_radio'] = $baseUrl_to_set_in_session;
 
 		//アプリを認証するためのURL
-		$Location = "{$misskey_server_radio}/miauth/{$sns_api_session_id}?name=Petit%20Note&callback={$encoded_root_url}connect_misskey_api.php&permission=write:notes,write:drive";
+		$Location = "{$baseUrl_to_set_in_session}/miauth/{$sns_api_session_id}?name=noReita&callback={$encoded_root_url}connect_misskey_api.php&permission=write:notes,write:drive";
 
 		if (isset($_SESSION['accessToken'])) { //SESSIONのトークンが有効か確認
-
 			// ダミーの投稿を試みる（textフィールドを空にする）
-			$postUrl = "{$misskey_server_radio}/api/notes/create";
+			$postUrl = "{$baseUrl_to_set_in_session}/api/notes/create";
 			$postData = array(
 				'i' => $_SESSION['accessToken'],
 				'text' => '', // 投稿を成功させないようにするためtextフィールドを空にする
@@ -397,7 +442,7 @@ class misskey_note {
 			curl_setopt($postCurl, CURLOPT_POSTFIELDS, json_encode($postData));
 			curl_setopt($postCurl, CURLOPT_RETURNTRANSFER, true);
 			$postResponse = curl_exec($postCurl);
-			$postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE); // HTTPステータスコードを取得
+			$postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE);
 			curl_close($postCurl);
 
 			// HTTPステータスコードが403の時は、トークン不一致と判断しアプリを認証
@@ -405,7 +450,7 @@ class misskey_note {
 				unset($_SESSION['accessToken']); //トークンをクリア
 			} else {
 				//アプリの認証をスキップするURL
-				$Location = "{$root_url}connect_misskey_api.php?skip_auth_check=on&s_id={$sns_api_session_id}";
+				$Location = BASE . "connect_misskey_api.php?skip_auth_check=on&s_id={$sns_api_session_id}";
 			}
 		}
 
@@ -414,8 +459,7 @@ class misskey_note {
 
 	// Misskeyへの投稿が成功した事を知らせる画面
 	public static function misskey_success(): void {
-		global $en, $petit_lot, $blade, $dat;
-		$dat = [];
+		global $en, $blade, $dat;
 		$no = (string)filter_input_data('GET', 'no', FILTER_VALIDATE_INT);
 
 		session_sta();
