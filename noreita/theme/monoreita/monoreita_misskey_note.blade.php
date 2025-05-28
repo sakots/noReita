@@ -37,6 +37,28 @@
   </style>
 </head>
 <body>
+  <header id="header">
+    <h1><a href="{{$self}}">{{$btitle}}</a></h1>
+    <div>
+      <a href="{{$home}}" target="_top">[ホーム]</a>
+      <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+    </div>
+    <hr>
+    <div>
+      <section>
+        <p class="top menu">
+          <a href="{{$self}}">[トップ]</a>
+          <a href="{{$self}}?mode=catalog">[カタログ]</a>
+          <a href="#footer">[↓]</a>
+        </p>
+      </section>
+      <section>
+        <p class="sysmsg">{{$message ?? ''}}</p>
+      </section>
+    </div>
+    <hr>
+  </header>
+
   @if ($misskey_mode == 'note_edit_form')
   <main>
     <div>
@@ -61,18 +83,18 @@
         </div>
         <hr>
         <div class="thfoot">
-          <form action="./" method="POST" id="misskey_note_form" onsubmit="return res_form_submit(event,'misskey_note_form')">
+          <form action="./" method="POST" id="misskey_note_form" enctype="multipart/form-data">
             <input type="hidden" name="mode" value="create_misskey_note_sessiondata">
-            <input type="hidden" name="no" value="{{$post['tid']}}">
-            <input type="hidden" name="src_image" value="{{$post['picfile']}}">
-            <input type="hidden" name="id_and_no" value="{{$post['id']}},{{$post['tid']}}">
-            <input type="hidden" name="abbr_toolname" value="{{$post['tool']}}">
-            <input type="hidden" name="paintsec" value="{{$post['utime']}}">
-            <input type="hidden" name="token" value="{{$token}}">
+            <input type="hidden" name="no" value="{{ $post['tid'] }}">
+            <input type="hidden" name="src_image" value="{{ $post['picfile'] }}">
+            <input type="hidden" name="id_and_no" value="{{ $post['id'] }},{{ $post['tid'] }}">
+            <input type="hidden" name="abbr_toolname" value="{{ $post['tool'] }}">
+            <input type="hidden" name="paintsec" value="{{ $post['utime'] }}">
+            <input type="hidden" name="token" value="{{ $token }}">
 
             <div class="form-group">
               <label for="com">コメント</label>
-              <textarea name="com" id="com" rows="5" cols="48" wrap="soft">{{$post['com']}}</textarea>
+              <textarea name="com" id="com" rows="5" cols="48" wrap="soft">{{ $post['com'] }}</textarea>
             </div>
 
             <div class="form-group">
@@ -103,7 +125,7 @@
             @endif
 
             <div class="form-group">
-              <label>Misskeyサーバーを選択</label>
+              <h3 class="oyat">Misskeyサーバーを選択</h3>
               <div class="server-list">
                 @foreach ($misskey_servers as $server)
                 <div class="server-option">
@@ -150,7 +172,7 @@
         <div class="thfoot">
           <p>画像の投稿が完了しました。</p>
           <p>
-            <a href="{{$self}}?resno={{$no}}">記事に戻る</a>
+            <a href="{{$self}}?mode=res&amp;res={{$dat['no']}}">記事に戻る</a>
           </p>
           <p>
             <a href="{{$self}}">掲示板に戻る</a>
@@ -188,7 +210,6 @@
             <input type="hidden" name="id_and_no" value="{{$post['id']}},{{$post['tid']}}">
             <input type="hidden" name="created" value="{{$post['created']}}">
             <input type="hidden" name="modified" value="{{$post['modified']}}">
-            <span class="non"><input type="text" value="" autocomplete="username"></span>
             <input type="password" name="pwd" value="{{$pwdc}}" autocomplete="current-password">
             <input type="hidden" name="mode" value="misskey_note_edit_form">
             <button type="submit">
@@ -202,5 +223,9 @@
     </div>
   </main>
   @endif
+
+  <footer id="footer">
+    @include('monoreita_footercopy')
+  </footer>
 </body>
 </html>
