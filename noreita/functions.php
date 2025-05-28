@@ -226,6 +226,7 @@ function set_share_server(): void {
 	$dat['sns_server_direct_input_cookie'] = (string)filter_input_data('COOKIE',"sns_server_direct_input_cookie");
 
 	$dat['admin_pass'] = null;
+	$dat['token'] = get_csrf_token();
 	//HTML出力
 	echo $blade->run(SET_SHARE_SERVER, $dat);
 }
@@ -300,17 +301,48 @@ function filter_input_data(string $input, string $key, int $filter=0): mixed {
 	}
 }
 
+//csrfトークンを作成
+function get_csrf_token(): string {
+	if (!isset($_SESSION)) {
+		session_sta();
+	}
+	header('Expires:');
+	header('Cache-Control:');
+	header('Pragma:');
+	if (!isset($_SESSION['token'])) {
+		$_SESSION['token'] = hash('sha256', session_id(), false);
+	}
+	return $_SESSION['token'];
+}
+//csrfトークンをチェック
+function check_csrf_token(): void {
+	global $en;
+	if(($_SERVER["REQUEST_METHOD"]) !== "POST"){
+		error($en ? "This operation has failed." : "この操作は失敗しました。");
+	}
+	check_same_origin();
+
+	session_sta();
+	$token = (string)filter_input_data('POST','token');
+	$session_token = isset($_SESSION['token']) ? (string)$_SESSION['token'] : '';
+	if(!$token || !$session_token || !hash_equals($session_token,$token)) {
+		error($en ? "CSRF token mismatch.\nPlease reload." : "CSRFトークンが一致しません。\nリロードしてください。");
+	}
+}
+
 //session開始
+
 function session_sta(): void {
-
-	$session_name = SESSION_NAME;
-
-	if(!isset($_SESSION)){
+	global $session_name;
+	if (session_status() === PHP_SESSION_NONE) {
+		$session_name = SESSION_NAME ?? 'noreita_session';
+		session_name($session_name);
+		session_save_path(__DIR__ . '/session/');
+		$https_only = (bool)($_SERVER['HTTPS'] ?? '');
 		ini_set('session.use_strict_mode', 1);
 		session_set_cookie_params(
-			0,"","",false,true
+			0,"","",$https_only,true
 		);
-		session_name($session_name);
 		session_start();
 		header('Expires:');
 		header('Cache-Control:');
@@ -356,7 +388,7 @@ function zero_check($str): bool {
 
 // ファイル存在チェック
 function check_file ($path): void {
-	$msg=initial_error_message();
+	$msg = initial_error_message();
 
 	if (!is_file($path)){
 		die(h($path) . $msg['001']);
@@ -368,9 +400,9 @@ function check_file ($path): void {
 
 function initial_error_message(): array {
 	global $en;
-	$msg['001']=$en ? ' does not exist.':'がありません。';
-	$msg['002']=$en ? ' is not readable.':'を読めません。';
-	$msg['003']=$en ? ' is not writable.':'を書けません。';
+	$msg['001'] = $en ? ' does not exist.':'がありません。';
+	$msg['002'] = $en ? ' is not readable.':'を読めません。';
+	$msg['003'] = $en ? ' is not writable.':'を書けません。';
 return $msg;
 }
 
@@ -381,17 +413,20 @@ function check_same_origin(): void {
 	$c_usercode = t(filter_input_data('COOKIE', 'usercode'));//user-codeを取得
 	$session_usercode = isset($_SESSION['usercode']) ? t($_SESSION['usercode']) : "";
 	if(!$c_usercode){
-		error($en?'Cookie check failed.':'Cookieが確認できません。');
+		error( $en ? 'Cookie check failed.':'Cookieが確認できません。');
 	}
 	if(!$usercode || ($usercode !== $c_usercode) && ($usercode !== $session_usercode)){
-		error($en?"User code mismatch.":"ユーザーコードが一致しません。");
+		error( $en ? "User code mismatch.":"ユーザーコードが一致しません。");
 	}
-	if(!isset($_SERVER['HTTP_ORIGIN']) || !isset($_SERVER['HTTP_HOST'])){
-		error($en?'Your browser is not supported. ':'お使いのブラウザはサポートされていません。');
-	}
-	if(parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST) !== $_SERVER['HTTP_HOST']){
-		error($en?"The post has been rejected.":'拒絶されました。');
-	}
+	// POSTリクエストの場合のみHTTP_ORIGINをチェックする
+	if(($_SERVER["REQUEST_METHOD"]) === "POST"){
+		if(!isset($_SERVER['HTTP_ORIGIN']) || !isset($_SERVER['HTTP_HOST'])){
+				error( $en ? 'Your browser is not supported. ':'お使いのブラウザはサポートされていません。');
+		}
+		if(parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST) !== $_SERVER['HTTP_HOST']){
+				error( $en ? "The post has been rejected.":'拒絶されました。');
+		}
+}
 }
 
 function switch_tool($tool): string {

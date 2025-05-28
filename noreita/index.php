@@ -30,14 +30,14 @@ if (CONF_VER < 250413 || !defined('CONF_VER')) {
 }
 
 require_once(__DIR__.'/functions.php');
-if(!isset($functions_ver)||$functions_ver<20250416){
-	die($en?'Please update functions.php to the latest version.':'functions.phpを最新版に更新してください。');
+if(!isset($functions_ver) || $functions_ver < 20250416) {
+	die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!isset($misskey_note_ver)||$misskey_note_ver<20250326){
-	die($en?'Please update misskey_note.inc.php to the latest version.':'misskey_note.inc.phpを最新版に更新してください。');
+if(!isset($misskey_note_ver) || $misskey_note_ver < 20250326){
+	die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 //テーマ
@@ -194,38 +194,22 @@ function get_uip():	string {
 		return $userip;
 	}
 }
-//csrfトークンを作成
-function get_csrf_token(): string {
-	if (!isset($_SESSION)) {
-		session_save_path(__DIR__ . '/session/');
-		session_sta();
-	}
-	header('Expires:');
-	header('Cache-Control:');
-	header('Pragma:');
-	return hash('sha256', session_id(), false);
-}
-//csrfトークンをチェック
-function check_csrf_token(): void {
-	session_save_path(__DIR__ . '/session/');
-	session_sta();
-	$token = filter_input(INPUT_POST, 'token');
-	$session_token = isset($_SESSION['token']) ? $_SESSION['token'] : '';
-	if (!$session_token || $token !== $session_token) {
-		error(MSG006);
-	}
-}
 
+$https_only = (bool)($_SERVER['HTTPS'] ?? '');
 //user-codeの発行
-if (!$usercode) { //falseなら発行
-	$userip = get_uip();
-	$usercode = substr(crypt(md5($userip . ID_SEED . date("Ymd", time())), 'id'), -12);
-	//念の為にエスケープ文字があればアルファベットに変換
-	$usercode = strtr($usercode, "!\"#$%&'()+,/:;<=>?@[\\]^`/{|}~", "ABCDEFGHIJKLMNOabcdefghijklmn");
-}
-setcookie("usercode", $usercode, time() + (86400 * 365)); //1年間
+$usercode = t(filter_input_data('COOKIE', 'usercode')); //user-codeを取得
 
-$dat['usercode'] = $usercode;
+session_sta();
+$session_usercode = $_SESSION['usercode'] ?? "";
+$session_usercode = t($session_usercode);
+
+$usercode = $usercode ? $usercode : $session_usercode;
+if(!$usercode){ //user-codeがなければ発行
+	$userip = get_uip();
+	$usercode = hash('sha256', $userip.random_bytes(16));
+}
+setcookie("usercode", $usercode, time()+(86400*365),"","",$https_only,true); //1年間
+$_SESSION['usercode'] = $usercode;
 
 //var_dump($_GET);
 
@@ -1291,6 +1275,8 @@ function paintform($rep): void {
 		$type = $rep;
 		$pwdf = filter_input(INPUT_POST, 'pwd');
 
+		session_sta();
+
 		$dat['no'] = $no;
 		$dat['pwd'] = $pwdf;
 		$dat['ctype'] = $ctype;
@@ -1378,6 +1364,8 @@ function paintform($rep): void {
 	if ($type === 'rep') {
 		$no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
 		$userip = get_uip();
+
+		session_sta();
 		$time = time();
 		$repcode = substr(crypt(md5($no . $userip . $pwdf . date("Ymd", $time)), $time), -8);
 		//念の為にエスケープ文字があればアルファベットに変換
@@ -2146,38 +2134,6 @@ function ok($mes): void {
 	echo $blade->run(OTHERFILE, $dat);
 }
 
-//エラー画面
-function error($mes): void {
-	global $db;
-	global $blade, $dat;
-	$db = null; //db切断
-	$dat['errmes'] = $mes;
-	$dat['othermode'] = 'err';
-	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
-	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
-	if($http_x_requested_with || $async_flag){
-		die("error\n$mes");
-	}
-	echo $blade->run(OTHERFILE, $dat);
-	exit;
-}
-
-//画像差し替え失敗
-function error2(): void {
-	global $db;
-	global $blade, $dat;
-	global $self;
-	$db = null; //db切断
-	$dat['othermode'] = 'err2';
-	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
-	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
-	if($http_x_requested_with || $async_flag){
-		die("error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
-	}
-	echo $blade->run(OTHERFILE, $dat);
-	exit;
-}
-
 //Asyncリクエストの時は処理を中断
 function check_AsyncRequest($picfile=''): void {
 	//ヘッダーが確認できなかった時の保険
@@ -2283,4 +2239,36 @@ function misskey_note(): void {
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
+}
+
+//エラー画面
+function error($mes): void {
+	global $db;
+	global $blade, $dat;
+	$db = null; //db切断
+	$dat['errmes'] = $mes;
+	$dat['othermode'] = 'err';
+	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
+	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
+	if($http_x_requested_with || $async_flag){
+		die("error\n$mes");
+	}
+	echo $blade->run(OTHERFILE, $dat);
+	exit;
+}
+
+//画像差し替え失敗
+function error2(): void {
+	global $db;
+	global $blade, $dat;
+	global $self;
+	$db = null; //db切断
+	$dat['othermode'] = 'err2';
+	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
+	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
+	if($http_x_requested_with || $async_flag){
+		die("error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
+	}
+	echo $blade->run(OTHERFILE, $dat);
+	exit;
 }
