@@ -2,6 +2,11 @@
 
 ## すべての履歴
 
+### [2025/05/28] v1.6.7
+
+- Misskey連携機能追加
+- コード可読性アップ
+
 ### [0225/04/13] License
 
 - sns_share Copyright (c)satopian 2023-2025 MIT License 追加
