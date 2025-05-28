@@ -25,6 +25,7 @@ define('THEMEDIR', 'monoreita');
 
 //設置URL phpのあるディレクトリの'/'まで
 //シェアボタンなどで使用
+//misskey連携では正しいURL必須
 define('BASE', 'https://example.com/noreita/');
 
 //掲示板のタイトル（<title>とTOP）
