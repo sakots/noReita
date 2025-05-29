@@ -69,6 +69,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/05/30] theme monor
+
+- ファイル名が間違っていたので修正
+  - リリースはなし
+
 ### [2025/05/28] v1.6.7
 
 - Misskey連携機能追加
