@@ -1,6 +1,7 @@
 <?php
 //Petit Note 2021-2025 (c)satopian MIT Licence
 //https://paintbbs.sakura.ne.jp/
+//https://oekakibbs.moe/
 
 //Misskey APIに接続
 

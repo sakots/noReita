@@ -1,7 +1,8 @@
 <?php
 //Petit Note 2021-2025 (c)satopian MIT LICENSE
 //https://paintbbs.sakura.ne.jp/
-//APIを使ってお絵かき掲示板からMisskeyにノート sqlite版
+//https://oekakibbs.moe/
+//APIを使ってお絵かき掲示板からMisskeyにノート noReita版
 $misskey_note_ver = 20250521;
 
 //グローバル変数の宣言
