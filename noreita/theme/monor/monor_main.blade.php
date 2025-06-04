@@ -5,6 +5,7 @@
 	<meta charset="utf-8">
 	<title>{{$btitle}}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="theme/{{$themedir}}/luminous/luminous-basic.min.css">
 	@include('monor_headcss')
 </head>
 
@@ -288,13 +289,9 @@
 			l(); //LoadCookie
 		</script>
 		<!-- Luminous -->
-		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luminous-lightbox@2.3.2/dist/luminous-basic.min.css">
-		<script src="https://cdn.jsdelivr.net/npm/luminous-lightbox@2.3.2/dist/luminous.min.js"></script>
+		<script src="theme/{{$themedir}}/luminous/luminous.min.js"></script>
 		<script>
-			new LuminousGallery(document.querySelectorAll('.luminous'), {
-				closeTrigger: "click",
-				closeWithEscape: true
-			});
+			new Luminous(document.querySelector('.luminous'));
 		</script>
 		<script>
       //shareするSNSのserver一覧を開く
