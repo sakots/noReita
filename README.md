@@ -71,6 +71,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ### [2025/06/04] v1.6.8
 
+- ChickenPaint_Be バージョンアップ
 - データベースファイルのパーミッションを明示的に設定
 - HTTPセキュリティヘッダーの追加
 - ファイル検証機能の追加
