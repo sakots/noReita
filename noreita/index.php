@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.7'); //lot.250528.0
+define('REITA_VER', 'v1.6.8'); //lot.250604.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -164,7 +164,7 @@ defined("SNS_WINDOW_HEIGHT") or define("SNS_WINDOW_HEIGHT","600");
 //misskey
 $dat['use_misskey_note'] = USE_MISSKEY_NOTE;
 
-//初期設定(初期設定後は不要なので削除可)
+//初期設定
 init();
 
 del_temp();
@@ -268,6 +268,13 @@ exit;
 /*-----------Main-------------*/
 
 function init(): void {
+	// セキュリティヘッダーの設定
+	header('X-Content-Type-Options: nosniff');
+	header('X-Frame-Options: DENY');
+	header('X-XSS-Protection: 1; mode=block');
+	header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: blob:; media-src \'self\' blob:;');
+	header('Referrer-Policy: strict-origin-when-cross-origin');
+	header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 	try {
 		if (!is_file(DB_NAME . '.db')) {
 			// はじめての実行なら、テーブルを作成
@@ -306,6 +313,10 @@ function init(): void {
 	if (!is_writable(TEMP_DIR)) $err .= TEMP_DIR . "を書けません<br>";
 	if (!is_readable(TEMP_DIR)) $err .= TEMP_DIR . "を読めません<br>";
 	if ($err) error($err);
+	if (is_file(DB_NAME . '.db')) {
+		// データベースファイルのパーミッションを明示的に設定
+		chmod(DB_NAME . '.db', 0600);
+	}
 }
 
 
@@ -419,17 +430,33 @@ function regist(): void {
 
 			//画像ファイルとか処理
 			if ($picfile) {
-				$path_filename = pathinfo($picfile, PATHINFO_FILENAME); //拡張子除去
+				$path_filename = pathinfo($picfile, PATHINFO_FILENAME);
+				$temp_file = TEMP_DIR . $picfile;
+
+				// アップロードファイルの検証を追加
+				if (!validate_upload_file($temp_file)) {
+					error('無効なファイルです。');
+				}
+
+				// ファイルの移動とパーミッション設定
+				if (!rename($temp_file, IMG_DIR . $picfile)) {
+					error('ファイルの保存に失敗しました。');
+				}
+				chmod(IMG_DIR . $picfile, PERMISSION_FOR_DEST);
+
+				// 既存の処理を保持
 				$fp = fopen(TEMP_DIR . $path_filename . ".dat", "r");
 				$userdata = fread($fp, 1024);
 				fclose($fp);
 				list($uip, $uhost,,, $ucode,, $starttime, $postedtime, $uresto, $tool) = explode("\t", rtrim($userdata) . "\t");
-				//描画時間を$userdataをもとに計算
+
+				// 描画時間の計算
 				if ($starttime && DSP_PAINTTIME) {
 					$psec = $postedtime - $starttime; //内部保存用
 					$utime = calcPtime($psec);
 				}
-				//ツール
+
+				// ツールの判定
 				if ($tool === 'neo') {
 					$used_tool = 'PaintBBS NEO';
 				} elseif ($tool === 'sneo') {
@@ -441,9 +468,9 @@ function regist(): void {
 				} else {
 					$used_tool = '???';
 				}
-				list($img_w, $img_h) = getimagesize(TEMP_DIR . $picfile);
-				rename(TEMP_DIR . $picfile, IMG_DIR . $picfile);
-				chmod(IMG_DIR . $picfile, PERMISSION_FOR_DEST);
+
+				// 画像サイズの取得
+				list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
 
 				$picdat = $path_filename . '.dat';
 
@@ -2271,4 +2298,39 @@ function error2(): void {
 	}
 	echo $blade->run(OTHERFILE, $dat);
 	exit;
+}
+
+// ファイルアップロードのセキュリティ検証関数
+function validate_upload_file($file_path, $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
+    // ファイルの存在確認
+    if (!file_exists($file_path)) {
+        return false;
+    }
+
+    // MIMEタイプの検証
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime_type = finfo_file($finfo, $file_path);
+    finfo_close($finfo);
+
+    if (!in_array($mime_type, $allowed_types)) {
+        return false;
+    }
+
+    // ファイルサイズの検証（デフォルト10MB）
+    if (filesize($file_path) > 10 * 1024 * 1024) {
+        return false;
+    }
+
+    // 画像の整合性チェック
+    $image_info = getimagesize($file_path);
+    if ($image_info === false) {
+        return false;
+    }
+
+    // 画像の幅と高さの検証
+    if ($image_info[0] > PMAX_W || $image_info[1] > PMAX_H) {
+        return false;
+    }
+
+    return true;
 }
