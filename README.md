@@ -69,9 +69,9 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
-### [2025/06/05] v1.6.9
+### [2025/06/05] v1.6.9.1
 
-- Luminousが動かなくなっていたので修正
+- Luminousが動かなくなっていたので修正（x2）
 
 ### [2025/06/04] v1.6.8
 
