@@ -290,7 +290,7 @@
 		<!-- Luminous -->
 		<script src="theme/{{$themedir}}/luminous/luminous.min.js"></script>
 		<script>
-			new Luminous(document.querySelector('.luminous'));
+			new LuminousGallery(document.querySelectorAll('.luminous'), {closeTrigger: "click", closeWithEscape: true});
 		</script>
 		<script>
       //shareするSNSのserver一覧を開く
