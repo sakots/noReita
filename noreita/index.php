@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.11'); //lot.250609.1
+define('REITA_VER', 'v1.6.12'); //lot.250610.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -1621,7 +1621,7 @@ function paintcom($tmpmode): void {
 function in_continue(): void {
 	global $blade, $dat;
 
-	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
+	$no = filter_input(INPUT_GET, 'no'); // 画像ファイル名なので文字列として取得
 	$dat['othermode'] = 'incontinue';
 	$dat['continue_mode'] = true;
 
