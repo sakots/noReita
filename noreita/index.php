@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.9.1'); //lot.250605.1
+define('REITA_VER', 'v1.6.10'); //lot.250609.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -587,11 +587,30 @@ function regist(): void {
 	if ($th_cnt > LOG_MAX_T) {
 		logdel();
 	}
-	//そろそろ消える用
-	//$thid = (int)round( LOG_MAX_T * LOG_LIMIT/100 ); //閾値 … 新しい方からこの件数以降がもうすぐ消える
-	//if ($th_cnt > $thid) {
-	//	loglimit();
-	//}
+
+	//そろそろ消えるスレッドのフラグを設定
+	$thid = (int)round(LOG_MAX_T * LOG_LIMIT / 100); //閾値 … 新しい方からこの件数以降がもうすぐ消える
+	if ($th_cnt > $thid) {
+		// そろそろ消えるスレッドにshdフラグを設定
+		try {
+			$db = new PDO(DB_PDO);
+			// 古いスレッドから順番にshdフラグを設定
+			$sql = "UPDATE tlog SET shd = '1' WHERE thread = 1 AND shd = '0' ORDER BY tid ASC LIMIT ?";
+			$stmt = $db->prepare($sql);
+			$stmt->bindValue(1, $th_cnt - $thid, PDO::PARAM_INT);
+			$stmt->execute();
+			$db = null; //db切断
+		} catch (PDOException $e) {
+			echo "DB接続エラー:" . $e->getMessage();
+		}
+	}
+
+	// そろそろ消えるスレッドの情報をテンプレートに渡す
+	$dat['log_limit'] = LOG_LIMIT;
+	$dat['log_max_t'] = LOG_MAX_T;
+	$dat['th_cnt'] = $th_cnt;
+	$dat['thid'] = $thid;
+	$dat['will_delete_count'] = max(0, $th_cnt - $thid);
 
 	ok('書き込みに成功しました。画面を切り替えます。');
 }
@@ -857,9 +876,6 @@ function def(): void {
 		$posts->bindValue(2, $page_def, PDO::PARAM_INT);
 		$posts->execute();
 
-		$ko = array();
-		$oya = array();
-
 		$i = 0;
 		$j = 0;
 		while ($i < PAGE_DEF) {
@@ -944,6 +960,9 @@ function def(): void {
 
 			$bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.TITLE);
 			$bbsline['encoded_u'] = urlencode(BASE.'?resno='.$bbsline['tid']);
+
+			// そろそろ消えるスレッドのフラグを設定
+			$bbsline['will_delete'] = ($bbsline['shd'] === '1');
 
 			$dat['oya'][$i] = $bbsline;
 			$i++;
@@ -1108,14 +1127,48 @@ function search(): void {
 //そうだね
 function sodane(): void {
 	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
+
+	// Ajaxリクエストかどうかをチェック
+	$is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+
 	try {
 		$db = new PDO(DB_PDO);
 		$stmt = $db->prepare("UPDATE tlog SET exid = exid + 1 WHERE tid = ?");
 		$stmt->execute([$resto]);
+
+		// 更新後のそうだね数を取得
+		$stmt = $db->prepare("SELECT exid FROM tlog WHERE tid = ?");
+		$stmt->execute([$resto]);
+		$result = $stmt->fetch();
+		$new_exid = $result['exid'] ?? 0;
+
 		$db = null;
+
+		if ($is_ajax) {
+			// Ajaxリクエストの場合はJSONレスポンス
+			header('Content-Type: application/json');
+			echo json_encode([
+				'success' => true,
+				'exid' => $new_exid,
+				'message' => 'そうだねしました'
+			]);
+			return;
+		}
+
 	} catch (PDOException $e) {
-		echo "DB接続エラー:" . $e->getMessage();
+		if ($is_ajax) {
+			header('Content-Type: application/json');
+			echo json_encode([
+				'success' => false,
+				'error' => 'DB接続エラー:' . $e->getMessage()
+			]);
+			return;
+		} else {
+			echo "DB接続エラー:" . $e->getMessage();
+		}
 	}
+
+	// 通常のリクエストの場合は従来通りリダイレクト
 	header('Location:' . PHP_SELF);
 	def();
 }
