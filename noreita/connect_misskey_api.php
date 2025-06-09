@@ -1,9 +1,10 @@
 <?php
-//Petit Note 2021-2025 (c)satopian MIT Licence
+//Petit Note 2021-2025 (c)satopian MIT License
 //https://paintbbs.sakura.ne.jp/
 //https://oekakibbs.moe/
 
 //Misskey APIに接続
+//noReita用に改造by sakots
 
 require_once(__DIR__.'/config.php');
 require_once(__DIR__.'/functions.php');
@@ -79,7 +80,7 @@ class connect_misskey_api{
 		$src_image=basename($src_image);
 
 		// 画像のアップロード
-		$imagePath = __DIR__.'/src/'.$src_image;
+		$imagePath = __DIR__.'/'.IMG_DIR.$src_image;
 
 		if(!is_file($imagePath)){
 			die("Error: " . ($en ? "Image does not exist." : "画像がありません。") . ": " . $imagePath);
@@ -164,7 +165,7 @@ class connect_misskey_api{
 
 		$src_image_filename = pathinfo($src_image, PATHINFO_FILENAME );//拡張子除去
 
-		$fixed_link = BASE.'?resno='.$no.'#'.$src_image_filename;
+		$fixed_link = BASE.'?mode=res&res='.$no.'#'.$src_image_filename;
 		$fixed_link = filter_var($fixed_link,FILTER_VALIDATE_URL) ? $fixed_link : '';
 		$article_url_link = $article_url_link ? $fixed_link : '';
 		$com=str_replace(["\r\n","\r"],"\n",$com);

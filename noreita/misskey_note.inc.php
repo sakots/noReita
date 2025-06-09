@@ -471,6 +471,7 @@ class misskey_note {
 		}
 		$admin_pass = null;
 		$dat['misskey_mode'] = 'success';
+		$dat['no'] = $no;
 		echo $blade->run(MISSKEYFILE, $dat);
 		exit();
 	}
