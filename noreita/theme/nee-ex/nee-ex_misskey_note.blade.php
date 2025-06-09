@@ -175,7 +175,7 @@
         <div class="thfoot">
           <p>画像の投稿が完了しました。</p>
           <p>
-            <a href="{{$self}}?mode=res&amp;res={{$dat['no']}}">記事に戻る</a>
+            <a href="{{$self}}?mode=res&amp;res={{$no}}">記事に戻る</a>
           </p>
           <p>
             <a href="{{$self}}">掲示板に戻る</a>

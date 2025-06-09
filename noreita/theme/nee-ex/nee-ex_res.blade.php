@@ -154,6 +154,13 @@
 			</section>
 			@if ($share_button)
 			<div class="thfoot">
+				@if ($use_misskey_note)
+				<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}">
+					<svg>
+						<use href="./theme/{{$themedir}}/icons/misskey.svg#misskey"></use>
+					</svg> Misskeyにノート</a>
+				</span>
+				@endif
 				@if ($switch_sns)
 				<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
 					<svg viewBox="0 0 512 512">

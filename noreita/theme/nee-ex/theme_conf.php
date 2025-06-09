@@ -8,7 +8,7 @@
 define('THEME_NAME', "nee-ex");
 
 //テーマのバージョン
-define('THEME_VER', "1.8.3 lot.250609.0");
+define('THEME_VER', "1.8.4 lot.250609.1");
 
 /* -------------------- */
 
