@@ -8,7 +8,7 @@
 define('THEME_NAME', "monor");
 
 //テーマのバージョン
-define('THEME_VER', "1.8.2 lot.250605.1");
+define('THEME_VER', "1.8.3 lot.250609.0");
 
 /* -------------------- */
 

@@ -7,6 +7,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="stylesheet" href="theme/{{$themedir}}/luminous/luminous-basic.min.css">
 	@include('monor_headcss')
+	<script src="theme/{{$themedir}}/js/sodane.js"></script>
 </head>
 
 <body>
@@ -95,11 +96,25 @@
 	</header>
 	<main>
 		<div>
+			@if (isset($will_delete_count) && $will_delete_count > 0)
+			<div class="thread">
+				<h3 class="oyat">⚠️ 注意</h3>
+				<p class="limit">
+					現在 {{$th_cnt}} スレッド中、{{$will_delete_count}} スレッドがそろそろ削除されます。<br>
+					({{$log_limit}}%を超えた古いスレッド)
+				</p>
+			</div>
+			@endif
 			@if (!empty($oya))
 			@foreach ($oya as $bbsline)
-			<section class="thread">
-				<h3 class="oyat">[{{$bbsline['tid']}}] {{$bbsline['sub']}}</h3>
-				<section>
+			<section class="thread @if ($bbsline['will_delete']) will-delete-thread @endif">
+				<h3 class="oyat">
+					[{{$bbsline['tid']}}] {{$bbsline['sub']}}
+					@if ($bbsline['will_delete'])
+					<span class="will-delete" title="このスレッドはそろそろ削除されます">⚠️ このスレッドはそろそろ削除されます</span>
+					@endif
+				</h3>
+				<section id="{{$bbsline['sodane_url']}}">
 					<h4 id=oya>
 						<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
 						@if ($bbsline['admins'] == 1)

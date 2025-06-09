@@ -265,6 +265,7 @@
 			<script>
 				l(); //LoadCookie
 			</script>
+			<script src="theme/{{$themedir}}/js/sodane.js"></script>
 			<!-- Luminous -->
 			<script src="theme/{{$themedir}}/luminous/luminous.min.js"></script>
 			<script>
