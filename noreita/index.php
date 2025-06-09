@@ -54,7 +54,6 @@ if ($admin_pass === 'kanripass') {
 
 //BladeOne v4.18
 include(__DIR__ . '/BladeOne/lib/BladeOne.php');
-
 use eftec\bladeone\BladeOne;
 
 $views = __DIR__ . '/theme/' . THEMEDIR; // テンプレートフォルダ
