@@ -429,26 +429,25 @@ function check_same_origin(): void {
 }
 }
 
-function switch_tool($tool): string {
+/**
+ * ツール名の定数定義
+ */
+const TOOL_NAMES = [
+	'neo' => 'PaintBBS NEO',
+	'PaintBBS' => 'PaintBBS',
+	'shi-Painter' => 'Shi-Painter',
+	'chi' => 'ChickenPaint'
+];
+
+/**
+ * ツール名を正規化された形式に変換する
+ *
+ * @param string $tool 変換するツール名
+ * @return string 正規化されたツール名
+ */
+function switch_tool(string $tool): string {
 	global $en;
-	switch($tool){
-		case 'neo':
-			$tool='PaintBBS NEO';
-			break;
-		case 'PaintBBS':
-			$tool='PaintBBS';
-			break;
-		case 'shi-Painter':
-			$tool='Shi-Painter';
-			break;
-		case 'chi':
-			$tool='ChickenPaint';
-			break;
-		default:
-			$tool='';
-			break;
-	}
-	return $tool;
+	return TOOL_NAMES[$tool] ?? ($en ? 'Unknown tool' : '不明なツール');
 }
 
 //sessionの確認
