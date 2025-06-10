@@ -11,32 +11,11 @@
 		<script src="theme/{{$themedir}}/fix_neo/fix.js?{{$stime}}" charset="utf-8"></script>
 		<!-- アプレットフィット -->
 		<script>
-			function appfit(f) {
-				var d = document;
-				var client = d.compatMode && d.compatMode != "BackCompat" ? d.documentElement : d.body;
-				var chei = client.clientHeight - 10;
-				var neo = d.getElementById("NEO");
-				var target = d.getElementById("pageView");
-				if (f == 0) { //ひろげる
-					var cwid = d.getElementById("appstage").scrollWidth - 360;
-					if (cwid > target.clientWidth) { target.style.width = cwid + "px"; }
-					if (chei > target.clientHeight) { target.style.height = chei + "px"; }
-					document.getElementById("fit_exp").style.display="none";
-					document.getElementById("fit_comp").style.display="block";
-				} else if (f == 1) { //もどす
-				target.style.width = {{$w}} + "px";
-				target.style.height = {{$h}} + "px";
-				document.getElementById("fit_exp").style.display="block";
-				document.getElementById("fit_comp").style.display="none";
-				}
-			//ツールの縦の位置をキャンバス中央に修正
-			d.getElementById("toolsWrapper").style.top = (target.clientHeight - d.getElementById("toolsWrapper").clientHeight)/2 + "px";
-			//ズームをリセット
-			Neo.painter.setZoom(1);
-			Neo.resizeCanvas();
-			Neo.painter.updateDestCanvas();
-			}
+			const originalWidth = {{$w}};
+			const originalHeight = {{$h}};
 		</script>
+		<script src="theme/{{$themedir}}/js/appFit.js" charset="utf-8"></script>
+		<!-- アプレットフィットここまで -->
 		@endif
 		@if ($tool == 'chicken')
 		<script src="{{$chicken_dir}}js/chickenpaint.min.js?{{$stime}}"></script>
