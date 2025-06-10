@@ -1,46 +1,57 @@
-var colorIdx = GetCookie("_monoreita_colorIdx");
-switch (Number(colorIdx)) {
-    case 1:
-        document.getElementById("css1").removeAttribute("disabled");
-        break;
-    case 2:
-        document.getElementById("css2").removeAttribute("disabled");
-        break;
-    case 3:
-        document.getElementById("css3").removeAttribute("disabled");
-        break;
-    case 4:
-        document.getElementById("css4").removeAttribute("disabled");
-        break;
-    case 5:
-        document.getElementById("css5").removeAttribute("disabled");
-        break;
-    case 6:
-        document.getElementById("css6").removeAttribute("disabled");
-        break;
-    case 7:
-        document.getElementById("css7").removeAttribute("disabled");
-        break;
-    case 8:
-        document.getElementById("css8").removeAttribute("disabled");
-        break;
-}
-function SetCss(obj){
-    var idx = obj.selectedIndex;
-    SetCookie("_monoreita_colorIdx",idx);
-    window.location.reload();
-}
-function GetCookie(key){
-    var tmp = document.cookie + ";";
-    var tmp1 = tmp.indexOf(key, 0);
-    if(tmp1 != -1){
-        tmp = tmp.substring(tmp1, tmp.length);
-        var start = tmp.indexOf("=", 0) + 1;
-        var end = tmp.indexOf(";", start);
-        return(decodeURIComponent(tmp.substring(start,end)));
+// モダンなCSS切り替え機能
+class CssSwitcher {
+    constructor() {
+        this.cookieName = "_monoreita_colorIdx";
+        this.init();
     }
-    return("");
+
+    init() {
+        const colorIdx = this.getCookie(this.cookieName);
+        if (colorIdx) {
+            this.enableCss(Number(colorIdx));
+        }
+    }
+
+    enableCss(index) {
+        const cssElement = document.getElementById(`css${index}`);
+        if (cssElement) {
+            cssElement.removeAttribute("disabled");
+        }
+    }
+
+    setCss(selectElement) {
+        const index = selectElement.selectedIndex;
+        this.setCookie(this.cookieName, index);
+        window.location.reload();
+    }
+
+    getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            return decodeURIComponent(parts.pop().split(';').shift());
+        }
+        return "";
+    }
+
+    setCookie(name, value) {
+        const maxAge = 365 * 24 * 60 * 60; // 1年
+        document.cookie = `${name}=${encodeURIComponent(value)};max-age=${maxAge};path=/`;
+    }
 }
-function SetCookie(key, val){
-    document.cookie = key + "=" + encodeURIComponent(val) + ";max-age=31536000;";
+
+// 初期化
+const cssSwitcher = new CssSwitcher();
+
+// グローバル関数として公開（既存のHTMLとの互換性のため）
+function SetCss(obj) {
+    cssSwitcher.setCss(obj);
+}
+
+function GetCookie(key) {
+    return cssSwitcher.getCookie(key);
+}
+
+function SetCookie(key, val) {
+    cssSwitcher.setCookie(key, val);
 }
