@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.15'); //lot.250610.3
+define('REITA_VER', 'v1.6.16'); //lot.250611.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -20,6 +20,9 @@ $en= (stripos($lang,'ja')!== 0);
 //ファイルが足りない場合
 if(!is_file(__DIR__.'/functions.php')){
 	die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
+}
+if(!is_file(__DIR__.'/config.php')){
+	die(__DIR__.'/config.php'.($en ? ' does not exist.':'がありません。'));
 }
 
 //コンフィグ
@@ -1358,6 +1361,9 @@ function paintform($rep): void {
 
 		session_sta();
 
+		// 続きから描く場合は一時画像を除外するフラグを設定
+		$dat['exclude_temp_images'] = true;
+
 		$dat['no'] = $no;
 		$dat['pwd'] = $pwdf;
 		$dat['ctype'] = $ctype;
@@ -1586,6 +1592,10 @@ function paintcom($tmpmode): void {
 		foreach ($tmplist as $tmpimg) {
 			list($ucode, $uip, $ufilename, $utime, $psec, $tool) = explode("\t", $tmpimg);
 			if ($ucode == $usercode || $uip == $userip) {
+				// 続きから描く場合は一時画像を除外
+				if (isset($dat['exclude_temp_images']) && $dat['exclude_temp_images']) {
+					continue;
+				}
 				$tmp[] = $ufilename;
 			}
 		}
