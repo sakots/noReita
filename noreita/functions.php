@@ -1,5 +1,5 @@
 <?php
-$functions_ver = 20250518;
+$functions_ver = 20250610;
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {
@@ -396,6 +396,42 @@ function check_file ($path): void {
 	if (!is_readable($path)){
 		die(h($path) . $msg['002']);
 	}
+}
+
+//PaintBBS NEOのpchかどうか調べる
+function is_neo($src): bool {
+	$fp = fopen("$src", "rb");
+	$is_neo=(fread($fp,3) === "NEO");
+	fclose($fp);
+	return $is_neo;
+}
+//pchデータから幅と高さを取得
+function get_pch_size($src): ?array {
+	if(!$src){
+		return null;
+	}
+	$fp = fopen("$src", "rb");
+	$is_neo=(fread($fp,3) === "NEO");//ファイルポインタが3byte移動
+	$pch_data=(string)bin2hex(fread($fp,5));
+	fclose($fp);
+	if(!$is_neo || !$pch_data){
+		return null;
+	}
+	$width = null;
+	$height = null;
+	$w0 = hexdec(substr($pch_data,2,2));
+	$w1 = hexdec(substr($pch_data,4,2));
+	$h0 = hexdec(substr($pch_data,6,2));
+	$h1 = hexdec(substr($pch_data,8,2));
+	if( !is_numeric($w0) || !is_numeric($w1) || !is_numeric($h0) || !is_numeric($h1)){
+		return null;
+	}
+	$width = (int)$w0 + ((int)$w1 * 256);
+	$height = (int)$h0 + ((int)$h1 * 256);
+	if( !$width || !$height) {
+		return null;
+	}
+	return[(int)$width,(int)$height];
 }
 
 function initial_error_message(): array {

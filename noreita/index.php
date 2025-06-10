@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.13'); //lot.250610.1
+define('REITA_VER', 'v1.6.14'); //lot.250610.2
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -30,7 +30,7 @@ if (CONF_VER < 250413 || !defined('CONF_VER')) {
 }
 
 require_once(__DIR__.'/functions.php');
-if(!isset($functions_ver) || $functions_ver < 20250416) {
+if(!isset($functions_ver) || $functions_ver < 20250610) {
 	die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
@@ -1308,9 +1308,11 @@ function paintform($rep): void {
 	$picw = filter_input(INPUT_POST, 'picw', FILTER_VALIDATE_INT);
 	$pich = filter_input(INPUT_POST, 'pich', FILTER_VALIDATE_INT);
 
-	if ($mode === "contpaint") {
+	if ($mode === "contpaint" && (!$picw || !$pich)) {
 		$imgfile = filter_input(INPUT_POST, 'img'); // 先にimgfileを取得
-		list($picw, $pich) = getimagesize(IMG_DIR . $imgfile); //キャンバスサイズ
+	  if ($imgfile && is_file(IMG_DIR . $imgfile)) {
+      list($picw, $pich) = getimagesize(IMG_DIR . $imgfile); //キャンバスサイズ
+    }
 	}
 
 	$anime = isset($_POST["anime"]) ? true : false;
