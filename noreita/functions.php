@@ -72,7 +72,14 @@ function Reject_if_NGword_exists_in_the_post($com, $name, $email, $url, $sub): v
 
 //念のため画像タイプチェック
 function get_image_type($img_type, $dest = null): string {
-	$img_type = mime_content_type($img_type);
+	// 既にMIMEタイプが渡されている場合はそのまま使用
+	if (strpos($img_type, 'image/') === 0) {
+		$mime_type = $img_type;
+	} else {
+		// ファイルパスが渡されている場合はMIMEタイプを取得
+		$mime_type = mime_content_type($img_type);
+	}
+	
 	$map = [
 		"image/gif" => ".gif",
 		"image/jpeg" => ".jpg",
@@ -80,8 +87,8 @@ function get_image_type($img_type, $dest = null): string {
 		"image/webp" => ".webp",
 	];
 
-	if (isset($map[$img_type])) {
-		return $map[$img_type];
+	if (isset($map[$mime_type])) {
+		return $map[$mime_type];
 	}
 	error(MSG004, $dest);
 	return ''; // この行は実際には実行されないが、リンターを満足させるために必要
@@ -131,7 +138,13 @@ function calcPtime($psec): string {
  */
 function safe_unlink($path): bool {
 	if ($path && is_file($path)) {
-		return unlink($path);
+		try {
+			return @unlink($path);
+		} catch (Exception $e) {
+			// エラーをログに記録するか、静かに失敗する
+			error_log("Failed to delete file: {$path} - " . $e->getMessage());
+			return false;
+		}
 	}
 	return false;
 }

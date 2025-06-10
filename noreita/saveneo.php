@@ -112,7 +112,9 @@ if(SIZE_CHECK && ($_FILES['picture']['size'] > (PICTURE_MAX_KB * 1024))){
 	die("error\n{$errormsg_5}");
 }
 
-if(mime_content_type($_FILES['picture']['tmp_name'])!=='image/png'){
+$mime_type = mime_content_type($_FILES['picture']['tmp_name']);
+$allowed_types = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+if(!in_array($mime_type, $allowed_types)){
 	die("error\n{$errormsg_1}");
 }
 
@@ -133,7 +135,9 @@ if(!$success||!is_file(TEMP_DIR.$imgfile.'.png')) {
 }
 chmod(TEMP_DIR.$imgfile.'.png',PERMISSION_FOR_DEST);
 if(isset($_FILES['pch']) && ($_FILES['pch']['error'] == UPLOAD_ERR_OK)){
-	if(mime_content_type($_FILES['pch']['tmp_name'])==="application/octet-stream"){
+	$pch_mime_type = mime_content_type($_FILES['pch']['tmp_name']);
+	$allowed_pch_types = ['application/octet-stream', 'application/x-binary', 'binary/octet-stream'];
+	if(in_array($pch_mime_type, $allowed_pch_types) || strpos($pch_mime_type, 'application/') === 0){
 		if(!SIZE_CHECK || ($_FILES['pch']['size'] < (PCH_MAX_KB * 1024))){
 			//PSDファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
 			move_uploaded_file($_FILES['pch']['tmp_name'], TEMP_DIR.$imgfile.'.pch');

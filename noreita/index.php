@@ -1726,24 +1726,12 @@ function delmode(): void {
 			//画像とかファイル削除
 			if (is_file(IMG_DIR . $msgpic)) {
 				$msgdat = str_replace(strrchr($msgpic, "."), "", $msgpic); //拡張子除去
-				if (is_file(IMG_DIR . $msgdat . '.png')) {
-					unlink(IMG_DIR . $msgdat . '.png');
-				}
-				if (is_file(IMG_DIR . $msgdat . '.jpg')) {
-					unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
-				}
-				if (is_file(IMG_DIR . $msgdat . '.pch')) {
-					unlink(IMG_DIR . $msgdat . '.pch');
-				}
-				if (is_file(IMG_DIR . $msgdat . '.spch')) {
-					unlink(IMG_DIR . $msgdat . '.spch');
-				}
-				if (is_file(IMG_DIR . $msgdat . '.dat')) {
-					unlink(IMG_DIR . $msgdat . '.dat');
-				}
-				if (is_file(IMG_DIR . $msgdat . '.chi')) {
-					unlink(IMG_DIR . $msgdat . '.chi');
-				}
+				safe_unlink(IMG_DIR . $msgdat . '.png');
+				safe_unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
+				safe_unlink(IMG_DIR . $msgdat . '.pch');
+				safe_unlink(IMG_DIR . $msgdat . '.spch');
+				safe_unlink(IMG_DIR . $msgdat . '.dat');
+				safe_unlink(IMG_DIR . $msgdat . '.chi');
 			}
 			//↑画像とか削除処理完了
 			//データベースから削除
@@ -1755,24 +1743,12 @@ function delmode(): void {
 			//画像とかファイル削除
 			if (is_file(IMG_DIR . $msgpic)) {
 				$msgdat = str_replace(strrchr($msgpic, "."), "", $msgpic); //拡張子除去
-				if (is_file(IMG_DIR . $msgdat . '.png')) {
-					unlink(IMG_DIR . $msgdat . '.png');
-				}
-				if (is_file(IMG_DIR . $msgdat . '.jpg')) {
-					unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
-				}
-				if (is_file(IMG_DIR . $msgdat . '.pch')) {
-					unlink(IMG_DIR . $msgdat . '.pch');
-				}
-				if (is_file(IMG_DIR . $msgdat . '.spch')) {
-					unlink(IMG_DIR . $msgdat . '.spch');
-				}
-				if (is_file(IMG_DIR . $msgdat . '.dat')) {
-					unlink(IMG_DIR . $msgdat . '.dat');
-				}
-				if (is_file(IMG_DIR . $msgdat . '.chi')) {
-					unlink(IMG_DIR . $msgdat . '.chi');
-				}
+				safe_unlink(IMG_DIR . $msgdat . '.png');
+				safe_unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
+				safe_unlink(IMG_DIR . $msgdat . '.pch');
+				safe_unlink(IMG_DIR . $msgdat . '.spch');
+				safe_unlink(IMG_DIR . $msgdat . '.dat');
+				safe_unlink(IMG_DIR . $msgdat . '.chi');
 			}
 			//↑画像とか削除処理完了
 			//データベースから削除
@@ -1862,7 +1838,7 @@ function picreplace(): void {
 			if (!is_file($dest)) error(MSG003);
 			chmod($dest, PERMISSION_FOR_DEST);
 			//元ファイル削除
-			unlink(IMG_DIR . $msg_d["picfile"]);
+			safe_unlink(IMG_DIR . $msg_d["picfile"]);
 
 			$img_type = mime_content_type($dest);
 			$imgext = get_image_type($img_type, $dest);
@@ -1874,8 +1850,8 @@ function picreplace(): void {
 			rename($dest, IMG_DIR . $new_picfile);
 
 			//ワークファイル削除
-			if (is_file($up_picfile)) unlink($up_picfile);
-			if (is_file(TEMP_DIR . $file_name . ".dat")) unlink(TEMP_DIR . $file_name . ".dat");
+			safe_unlink($up_picfile);
+			safe_unlink(TEMP_DIR . $file_name . ".dat");
 
 			//動画ファイルアップロード
 			//拡張子チェック
@@ -1899,7 +1875,7 @@ function picreplace(): void {
 				$dst = IMG_DIR . $new_pchfile;
 				if (copy($pchsrc, $dst)) {
 					chmod($dst, PERMISSION_FOR_DEST);
-					unlink($pchsrc);
+					safe_unlink($pchsrc);
 				}
 			}
 
@@ -2233,13 +2209,13 @@ function del_temp(): void {
 		if (!is_dir($file)) {
 			$lapse = time() - filemtime(TEMP_DIR . $file);
 			if ($lapse > (TEMP_LIMIT * 24 * 3600)) {
-				unlink(TEMP_DIR . $file);
+				safe_unlink(TEMP_DIR . $file);
 			}
 			//pchアップロードペイントファイル削除
 			if (preg_match("/\A(pchup-.*-tmp\.s?pch)\z/i", $file)) {
 				$lapse = time() - filemtime(TEMP_DIR . $file);
 				if ($lapse > (300)) { //5分
-					unlink(TEMP_DIR . $file);
+					safe_unlink(TEMP_DIR . $file);
 				}
 			}
 		}
@@ -2262,24 +2238,12 @@ function logdel(): void {
 		//画像とかの削除処理
 		if (is_file(IMG_DIR . $msgpic)) {
 			$msgdat = pathinfo($msgpic, PATHINFO_FILENAME); //拡張子除去
-			if (is_file(IMG_DIR . $msgdat . '.png')) {
-				unlink(IMG_DIR . $msgdat . '.png');
-			}
-			if (is_file(IMG_DIR . $msgdat . '.jpg')) {
-				unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
-			}
-			if (is_file(IMG_DIR . $msgdat . '.pch')) {
-				unlink(IMG_DIR . $msgdat . '.pch');
-			}
-			if (is_file(IMG_DIR . $msgdat . '.spch')) {
-				unlink(IMG_DIR . $msgdat . '.spch');
-			}
-			if (is_file(IMG_DIR . $msgdat . '.dat')) {
-				unlink(IMG_DIR . $msgdat . '.dat');
-			}
-			if (is_file(IMG_DIR . $msgdat . '.chi')) {
-				unlink(IMG_DIR . $msgdat . '.chi');
-			}
+			safe_unlink(IMG_DIR . $msgdat . '.png');
+			safe_unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
+			safe_unlink(IMG_DIR . $msgdat . '.pch');
+			safe_unlink(IMG_DIR . $msgdat . '.spch');
+			safe_unlink(IMG_DIR . $msgdat . '.dat');
+			safe_unlink(IMG_DIR . $msgdat . '.chi');
 		}
 
 		//レスあれば削除
