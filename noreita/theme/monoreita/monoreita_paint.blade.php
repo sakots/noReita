@@ -17,12 +17,6 @@
 		<script src="theme/{{$themedir}}/js/appFit.js" charset="utf-8"></script>
 		<!-- アプレットフィットここまで -->
 		@endif
-		@if ($tool == 'chicken')
-		<script src="{{$chicken_dir}}js/chickenpaint.min.js?{{$stime}}"></script>
-		<script src="theme/{{$themedir}}/fix_chiken/fix.js?{{$stime}}" charset="utf-8"></script>
-		<link rel="stylesheet" type="text/css" href="{{$chicken_dir}}css/chickenpaint.css?{{$stime}}">
-		<link rel="stylesheet" href="theme/{{$themedir}}/fix_chiken/fix.css?{{$stime}}" type="text/css">
-		@endif
 	</head>
 	<body id="paintmode">
 		<header>
@@ -40,315 +34,34 @@
 			<hr>
 			<h2 class="oekaki">OEKAKI MODE</h2>
 			<hr>
-			@if ($tool == 'chicken')
-			<p><a href="#cp">ChickenPaintへ</a></p>
-			@endif
 		</header>
 		<main>
-			@if ($tool != 'chicken')
+			@if ($tool == 'neo' || $tool == 'shi')
 			<!-- 動的パレットスクリプト -->
 			<script>
-				var DynamicColor = 1;	// パレットリストに色表示
+				// パレットデータの初期化
 				var Palettes = new Array();
 				@if ($palettes)
 					{!!$palettes!!}
 				@endif
-				
-				function setPalette(){
-					d = document
-					d.paintbbs.setColors(Palettes[d.Palette.select.selectedIndex])
-					if(! d.grad.view.checked){return}
-					GetPalette();
-				}
-				function PaletteSave(){
-					Palettes[0] = String(document.paintbbs.getColors())
-				}
-				var cutomP = 0;
-				function PaletteNew(){
-					d = document;
-					p = String(d.paintbbs.getColors());
-					s = d.Palette.select;
-					Palettes[s.length] = p;
-					cutomP++;
-					str = prompt("パレット名","パレット " + cutomP);
-					if(str == null || str == ""){cutomP--;return}
-					s.options[s.length] = new Option(str)
-					if(30 > s.length) s.size = s.length
-					PaletteListSetColor()
-				}
-				function PaletteRenew(){
-					d = document
-					Palettes[d.Palette.select.selectedIndex] = String(d.paintbbs.getColors())
-					PaletteListSetColor()
-				}
-				function PaletteDel(){
-					p = Palettes.length
-					s = document.Palette.select
-					i = s.selectedIndex
-					if(i == -1)return
-					flag = confirm("「"+s.options[i].text + "」を削除してよろしいですか？")
-					if(!flag) return
-					s.options[i] = null
-					while(p>i){
-						Palettes[i] = Palettes[i+1]
-						i++
-					}
-					if(30 > s.length) s.size = s.length
-				}
-				function P_Effect(v){
-					v=parseInt(v)
-					x = 1
-					if(v==255)x=-1
-					d = document.paintbbs
-					p=String(d.getColors()).split("\n")
-					l = p.length
-					var s = ""
-					for(n=0;l>n;n++){
-						R = v+(parseInt("0x" + p[n].substring(1,3))*x)
-						G = v+(parseInt("0x" + p[n].substring(3,5))*x)
-						B = v+(parseInt("0x" + p[n].substring(5,7))*x)
-						if(R > 255){ R = 255}
-						else if(0 > R){ R = 0}
-						if(G > 255){ G = 255}
-						else if(0 > G){ G = 0}
-						if(B > 255){ B = 255}
-						else if(0 > B){ B = 0}
-						s += "#"+Hex(R)+Hex(G)+Hex(B)+"\n"
-					}
-					d.setColors(s)
-					PaletteListSetColor()
-				}
-				function PaletteMatrixGet(){
-					d = document.Palette
-					p = Palettes.length
-					s = d.select
-					m = d.m_m.selectedIndex
-					t = d.setr
-					switch(m){
-					case 0:case 2:default:
-					t.value = ""
-						n=0;c=0
-						while(p>n){
-							if(s.options[n] != null){ t.value = t.value + "\n!"+ s.options[n].text +"\n" + Palettes[n];c++}
-							n++
-						}
-						alert ("パレット数："+c+"\nパレットマトリクスを取得しました");break
-					case 1:
-					t.value = "!Palette\n"+String(document.paintbbs.getColors())
-						alert("現在使用されているパレット情報を取得しました");break
-					}
-						t.value = t.value.trim() + "\n!Matrix"
-				}
-				function PalleteMatrixSet(){
-					m = document.Palette.m_m.selectedIndex;
-					str = "パレットマトリクスをセットします。";
-					switch(m){
-					case 0:default:
-						flag = confirm(str+"\n現在の全パレット情報は失われますがよろしいですか？");
-						break;
-					case 1:
-						flag = confirm(str+"\n現在使用しているパレットと置き換えますがよろしいですか？");
-						break;
-					case 2:
-						flag = confirm(str+"\n現在のパレット情報に追加しますがよろしいですか？");
-						break;
-					}
-						if (!flag) return;
-					PaletteSet()
-					if(s.length < 30){ s.size = s.length}else{s.size=30}
-					if(DynamicColor) PaletteListSetColor()
-				}
-				function PalleteMatrixHelp(){
-					alert("★PALETTE MATRIX\nパレットマトリクスとはパレット情報を列挙したテキストを用いる事により\n自由なパレット設定を使用する事が出来ます。\n\n□マトリクスの取得\n1)「取得」ボタンよりパレットマトリクスを取得します。\n2)取得された情報が下のテキストエリアに出ます、これを全てコピーします。\n3)このマトリクス情報をテキストとしてファイルに保存しておくなりしましょう。\n\n□マトリクスのセット\n1）コピーしたマトリクスを下のテキストエリアに貼り付け(ペースト)します。\n2)ファイルに保存してある場合は、それをコピーし貼り付けます。\n3)「セット」ボタンを押せば保存されたパレットが使用できます。\n\n余分な情報があるとパレットが正しくセットされませんのでご注意下さい。");
-				}
-				function PaletteSet(){
-					d = document.Palette
-					se = d.setr.value;
-					s = d.select;
-					m = d.m_m.selectedIndex;
-					l = se.length
-					if(l<1){
-						alert("マトリクス情報がありません。");return
-					}
-						n = 0;o = 0;e = 0
-					switch(m){
-					case 0:default:
-						n = s.length
-						while(n > 0){
-							n--
-							s.options[n] = null
-						}
-					case 2:
-						i=s.options.length
-						n = se.indexOf("!",0)+1
-						if(n == 0)return
-							Matrix1 = 1
-							Matrix2 = -1
-						while(n<l){
-							e = se.indexOf("\n#",n)
-							if(e == -1)return
-							
-							pn = se.substring(n,e+Matrix1)
-							o = se.indexOf("!",e)
-							if(o == -1)return
-							pa = se.substring(e+1,o+Matrix2)
-							if (pn != "Palette"){
-							if(i >= 0)s.options[i] = new Option(pn)
-							
-							Palettes[i] = pa
-							i++
-							}else{document.paintbbs.setColors(pa)}
-							
-							n=o+1
-						}
-						break
-					case 1:
-						n = se.indexOf("!",0)+1
-						if(n == 0)return
-						e = se.indexOf("\n#",n)
-						o = se.indexOf("!",e)
-							if(e >= 0){
-								pa = se.substring(e+1,o-1)
-							}
-						document.paintbbs.setColors(pa)
-					}
-					PaletteListSetColor()
-				}
-				function PaletteListSetColor(){
-					var s = document.Palette.select;
-					for(i = 1; s.options.length > i; i ++) {
-						var c = Palettes[i].split("\n");
-						s.options[i].style.background = c[4];
-						s.options[i].style.color = GetBright(c[4]);
-				}
-				}
-				function GetBright(c){
-					r=parseInt("0x"+c.substring(1,3)),
-					g=parseInt("0x"+c.substring(3,5)),
-					b=parseInt("0x"+c.substring(5,7));
-					c=(r>=g)?(r>=b)?r:b:(g>=b)?g:b;
-					return 128>c?"#FFFFFF":"#000000";
-				}
-				function Chenge_(){
-					var st = document.grad.pst.value
-					var ed = document.grad.ped.value
-					
-					if(isNaN(parseInt("0x" + st)))return
-					if(isNaN(parseInt("0x" + ed)))return
-					GradView("#"+st,"#"+ed);
-				}
-				function ChengeGrad(){
-					var d =document
-					var st = d.grad.pst.value
-					var ed = d.grad.ped.value
-					Chenge_()
-					var degi_R = parseInt("0x" + st.substring(0,2))
-					var degi_G = parseInt("0x" + st.substring(2,4))
-					var degi_B = parseInt("0x" + st.substring(4,6))
-					var R = parseInt((degi_R - parseInt("0x" + ed.substring(0,2)))/15)
-					var G = parseInt((degi_G - parseInt("0x" + ed.substring(2,4)))/15)
-					var B = parseInt((degi_B - parseInt("0x" + ed.substring(4,6)))/15)
-					if(isNaN(R)) R = 1
-					if(isNaN(G)) G = 1
-					if(isNaN(B)) B = 1
-					var p = new String()
-					for(cnt=0,m1=degi_R,m2=degi_G,m3=degi_B; 14>cnt; cnt++,m1-=R,m2-=G,m3-=B){
-						if((m1 > 255)||(0 > m1)){ R *= -1;m1-=R}
-						if((m2 > 255)||(0 > m2)){ G *= -1;m2-=G}
-						if((m3 > 255)||(0 > m3)){ B *= -1;m2-=B}
-						p += "#"+Hex(m1)+Hex(m2)+Hex(m3)+"\n"
-					}
-					d.paintbbs.setColors(p);
-				}
-				function Hex(n){
-					n = parseInt(n);if(0 > n) n *=-1;
-					var hex = new String()
-					var m
-					var k
-					while(n > 16){
-					m = n
-					if(n >16){
-						n = parseInt(n/16)
-						m -= (n * 16)
-					}
-						k = Hex_(m)
-						hex = k + hex
-					}
-						k = Hex_(n)
-						hex = k + hex
-					while(2 > hex.length){hex="0" + hex}
-					return hex
-				}
-				function Hex_(n){
-					if(! isNaN(n)){
-						if(n == 10){n="A"}
-						else if(n == 11){n="B"}
-						else if(n == 12){n="C"}
-						else if(n == 13){n="D"}
-						else if(n == 14){n="E"}
-						else if(n == 15){n="F"}
-					}else{n=""}
-					return n
-				}
-				function GetPalette(){
-					d = document;
-					p = String(d.paintbbs.getColors());
-					if(p == "null" || p == ""){return};
-					ps = p.split("\n");
-					st = d.grad.p_st.selectedIndex
-					ed = d.grad.p_ed.selectedIndex
-					d.grad.pst.value = ps[st].substring(1,7)
-					d.grad.ped.value = ps[ed].substring(1,7)
-					GradSelC()
-					GradView(ps[st],ps[ed])
-					PaletteListSetColor()
-				}
-				function GradSelC(){
-					if(! d.grad.view.checked)return
-					d = document.grad
-					l = ps.length
-					pe=""
-					for(n=0;l>n;n++){
-						R = 255+(parseInt("0x" + ps[n].substring(1,3))*-1)
-						G = 255+(parseInt("0x" + ps[n].substring(3,5))*-1)
-						B = 255+(parseInt("0x" + ps[n].substring(5,7))*-1)
-						if(R > 255){ R = 255}
-						else if(0 > R){ R = 0}
-						if(G > 255){ G = 255}
-						else if(0 > G){ G = 0}
-						if(B > 255){ B = 255}
-						else if(0 > B){ B = 0}
-						pe += "#"+Hex(R)+Hex(G)+Hex(B)+"\n"
-					}
-					pe = pe.split("\n");
-					for(n=0;l>n;n++){
-						d.p_st.options[n].style.background = ps[n];
-						d.p_st.options[n].style.color = pe[n];
-						d.p_ed.options[n].style.background = ps[n];
-						d.p_ed.options[n].style.color = pe[n];
-					}
-				}
-				function GradView(st,ed){
-					d = document
-					if(! d.grad.view.checked)return
-				}
-				function showHideLayer() { //v3.0
-					d = document
-					var l
-					if(d.layers) {
-						l = d.layers["psft"]
-					}else{
-						l = d.all("psft").style
-					}
-					if(! d.grad.view.checked){
-						l.visibility = "hidden"
-					}
-					if(d.grad.view.checked){
-						l.visibility = "visible";
-						GetPalette();
-					}
-				}
 			</script>
+			<script src="theme/{{$themedir}}/js/dynamicPalette.js?{{$stime}}" charset="utf-8"></script>
+			<script>
+				// パレットデータをマネージャーに設定
+				document.addEventListener('DOMContentLoaded', function() {
+					// 少し遅延させて確実にマネージャーが初期化されるのを待つ
+					setTimeout(function() {
+						if (window.dynamicPaletteManager && window.Palettes) {
+							window.dynamicPaletteManager.setPaletteData(window.Palettes);
+							// 初期化後にパレットリストの色を設定
+							if (window.dynamicPaletteManager.DynamicColor) {
+								window.dynamicPaletteManager.PaletteListSetColor();
+							}
+						}
+					}, 100);
+				});
+			</script>
+			<!-- 動的パレットスクリプトここまで -->
 			<section id="appstage">
 				<div class="app" id="apps">
 					<applet-dummy code="pbbs.PaintBBS.class" archive="./PaintBBS.jar" name="paintbbs" width="{{$w}}" height="{{$h}}" mayscript>
@@ -418,8 +131,8 @@
 								<option value="2">追加</option>
 							</select>
 							<input type="button" class="button" name="m_g" value="GET" onclick="PaletteMatrixGet()">
-							<input type="button" class="button" name="m_h" value="SET" onclick="PalleteMatrixSet()">
-							<input type="button" class="button" name="1" value=" ? " onclick="PalleteMatrixHelp()"><br>
+							<input type="button" class="button" name="m_h" value="SET" onclick="PaletteMatrixSet()">
+							<input type="button" class="button" name="1" value=" ? " onclick="PaletteMatrixHelp()"><br>
 							<textarea class="form" name="setr" rows="1" cols="13" onmouseover="this.select()"></textarea>
 							</form>
 						</fieldset>
@@ -427,7 +140,7 @@
 							<legend>GRADATION</legend>
 							<form name="grad">
 								<input type="checkbox" name="view" onclick="showHideLayer()">
-								<input type="button" class="button" value=" OK " onclick="ChengeGrad()">
+								<input type="button" class="button" value=" OK " onclick="ChangeGrad()">
 								<input type="color">
 								<br>
 								<select class="form" name="p_st" onchange="GetPalette()">
@@ -446,7 +159,7 @@
 									<option>13</option>
 									<option>14</option>
 								</select>
-								<input class="form "type="text" name="pst" size="8" onkeypress="Chenge_()" onchange="Chenge_()"><br>
+								<input class="form "type="text" name="pst" size="8" onkeypress="Change_()" onchange="Change_()"><br>
 								<select class="form" name="p_ed" onchange="GetPalette()">
 									<option>1</option>
 									<option>2</option>
@@ -463,7 +176,7 @@
 									<option>13</option>
 									<option>14</option>
 								</select>
-								<input class="form" type="text" name="ped" size="8" onkeypress="Chenge_()" onchange="Chenge_()"><div id="psft" style="position:absolute;width:100px;height:30px;z-index:1;left:5px;top:10px;"></div>
+								<input class="form" type="text" name="ped" size="8" onkeypress="Change_()" onchange="Change_()"><div id="psft" style="position:absolute;width:100px;height:30px;z-index:1;left:5px;top:10px;"></div>
 							</form>
 						</fieldset>
 						<p class="c">DynamicPalette &copy;NoraNeko</p>
@@ -506,7 +219,9 @@
 									timerID = setTimeout('SetTimeCount()',250);
 								}
 								SetTimeCount();
-								if (DynamicColor) PaletteListSetColor();
+								if (window.dynamicPaletteManager && window.dynamicPaletteManager.DynamicColor) {
+									window.dynamicPaletteManager.PaletteListSetColor();
+								}
 							</script>
 						</form>
 					<hr>
@@ -634,32 +349,6 @@
 						</section>
 					</section>
 				</div>
-			</section>
-			@else
-			<section id="cp">
-				<div id="chickenpaint-parent"></div>
-				<p></p>
-				<script>
-					document.addEventListener("DOMContentLoaded", function() {
-						new ChickenPaint({
-							uiElem: document.getElementById("chickenpaint-parent"),
-							canvasWidth: {{$picw}},
-							canvasHeight: {{$pich}},
-
-						@if (isset($imgfile)) loadImageUrl: "{{$imgfile}}", @endif
-						@if (isset($pchfile)) loadChibiFileUrl: "{{$pchfile}}", @endif
-						saveUrl: "save.php?usercode={!!$usercode!!}",
-						postUrl: "{{$self}}?mode={!!$mode!!}&stime={{$stime}}",
-						exitUrl: "{{$self}}",
-
-							allowDownload: true,
-							resourcesRoot: "{{$chicken_dir}}",
-							disableBootstrapAPI: true,
-							fullScreenMode: "auto"
-
-						});
-					})
-				</script>
 			</section>
 			@endif
 		</main>
