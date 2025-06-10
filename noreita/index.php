@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.12'); //lot.250610.0
+define('REITA_VER', 'v1.6.12.1'); //lot.250610.1
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -1309,8 +1309,8 @@ function paintform($rep): void {
 	$pich = filter_input(INPUT_POST, 'pich', FILTER_VALIDATE_INT);
 
 	if ($mode === "contpaint") {
+		$imgfile = filter_input(INPUT_POST, 'img'); // 先にimgfileを取得
 		list($picw, $pich) = getimagesize(IMG_DIR . $imgfile); //キャンバスサイズ
-
 	}
 
 	$anime = isset($_POST["anime"]) ? true : false;
