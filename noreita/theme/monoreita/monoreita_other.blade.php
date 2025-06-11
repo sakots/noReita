@@ -107,14 +107,16 @@
 					<input type="hidden" name="picw" value="{{$bbsline['img_w']}}">
 					<input type="hidden" name="pich" value="{{$bbsline['img_h']}}">
 					<input type="hidden" name="no" value="{{$bbsline['tid']}}">
+					@if ($ctype_pch)
 					<input type="hidden" name="pch" value="{{$bbsline['pchfile']}}">
+					@endif
 					<input type="hidden" name="img" value="{{$bbsline['picfile']}}">
 					<select class="form" name="ctype">
 						@if ($ctype_pch)
-						<option value="pch">動画から</option>
+						<option value="pch" selected>動画から</option>
 						@endif
 						@if ($ctype_img)
-						<option value="img">画像から</option>
+						<option value="img" @if (!$ctype_pch) selected @endif>画像から</option>
 						@endif
 					</select>
 					<select class="form" name="type">
@@ -126,6 +128,7 @@
 					<label for="tools">ツール</label>
 					<select name="tools">
 						<option value="neo">PaintBBS NEO</option>
+						@if ($use_shi_painter)<option value="shi">ShiPainter</option> @endif
 						@if ($use_chicken)<option value="chicken">ChickenPaint</option> @endif
 					</select>
 					@else
