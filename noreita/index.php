@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.17'); //lot.250611.0
+define('REITA_VER', 'v1.6.18'); //lot.250612.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -461,14 +461,62 @@ function regist(): void {
 				// ctypeを取得して画像から続きを描いたかどうかを判定
 				$ctype = filter_input(INPUT_POST, 'ctype');
 				
+				// usercodeからctypeを取得（POSTデータにない場合）
+				if ($ctype === null) {
+					$usercode = filter_input(INPUT_POST, 'usercode');
+					if ($usercode) {
+						parse_str($usercode, $usercode_params);
+						if (isset($usercode_params['ctype'])) {
+							$ctype = $usercode_params['ctype'];
+						}
+					}
+				}
+				
+				// send_headerパラメータからusercodeを取得（POSTデータにない場合）
+				if ($ctype === null) {
+					$send_header = filter_input(INPUT_POST, 'send_header');
+					if ($send_header) {
+						parse_str($send_header, $header_params);
+						if (isset($header_params['usercode'])) {
+							$usercode = $header_params['usercode'];
+							parse_str($usercode, $usercode_params);
+							if (isset($usercode_params['ctype'])) {
+								$ctype = $usercode_params['ctype'];
+							}
+						}
+					}
+				}
+				
+				// HTTPヘッダーからusercodeを取得（POSTデータにない場合）
+				if ($ctype === null) {
+					$http_usercode = filter_input(INPUT_SERVER, 'HTTP_X_USERCODE');
+					if ($http_usercode) {
+						parse_str($http_usercode, $usercode_params);
+						if (isset($usercode_params['ctype'])) {
+							$ctype = $usercode_params['ctype'];
+						}
+					}
+				}
+				
+				// セッション変数からusercodeを取得（POSTデータにない場合）
+				if ($ctype === null) {
+					if (session_status() !== PHP_SESSION_ACTIVE) {
+						session_start();
+					}
+					if (isset($_SESSION['usercode'])) {
+						$usercode = $_SESSION['usercode'];
+						parse_str($usercode, $usercode_params);
+						if (isset($usercode_params['ctype'])) {
+							$ctype = $usercode_params['ctype'];
+						}
+					}
+				}
+				
 				// ctypeがnullの場合は新規投稿として扱う（動画ファイルを処理する）
 				if ($ctype === null) {
 					$ctype = 'new';
 				}
 				
-				// デバッグ用：ctypeの値を確認
-				error_log("regist関数 - ctype: " . $ctype);
-
 				// 描画時間の計算
 				if ($starttime && DSP_PAINTTIME) {
 					$psec = $postedtime - $starttime; //内部保存用
@@ -503,20 +551,33 @@ function regist(): void {
 				} else {
 					// 新規投稿または動画から続きを描く場合は動画ファイルを処理
 					if (is_file(TEMP_DIR . $pchfile)) {
-						rename(TEMP_DIR . $pchfile, IMG_DIR . $pchfile);
-						chmod(IMG_DIR . $pchfile, PERMISSION_FOR_DEST);
+						$success = rename(TEMP_DIR . $pchfile, IMG_DIR . $pchfile);
+						if ($success) {
+							chmod(IMG_DIR . $pchfile, PERMISSION_FOR_DEST);
+						} else {
+							$pchfile = "";
+						}
 					} elseif (is_file(TEMP_DIR . $spchfile)) {
-						rename(TEMP_DIR . $spchfile, IMG_DIR . $spchfile);
-						chmod(IMG_DIR . $spchfile, PERMISSION_FOR_DEST);
-						$pchfile = $spchfile;
+						$success = rename(TEMP_DIR . $spchfile, IMG_DIR . $spchfile);
+						if ($success) {
+							chmod(IMG_DIR . $spchfile, PERMISSION_FOR_DEST);
+							$pchfile = $spchfile;
+						} else {
+							$pchfile = "";
+						}
 					} elseif (is_file(TEMP_DIR . $chifile)) {
-						rename(TEMP_DIR . $chifile, IMG_DIR . $chifile);
-						chmod(IMG_DIR . $chifile, PERMISSION_FOR_DEST);
-						$pchfile = $chifile;
+						$success = rename(TEMP_DIR . $chifile, IMG_DIR . $chifile);
+						if ($success) {
+							chmod(IMG_DIR . $chifile, PERMISSION_FOR_DEST);
+							$pchfile = $chifile;
+						} else {
+							$pchfile = "";
+						}
 					} else {
 						$pchfile = "";
 					}
 				}
+				error_log("regist関数 - 最終的なpchfile: " . $pchfile);
 				chmod(TEMP_DIR . $picdat, PERMISSION_FOR_DEST);
 				unlink(TEMP_DIR . $picdat);
 
@@ -569,12 +630,12 @@ function regist(): void {
 			$shd = 0;
 			$age = 0;
 			$parent = NULL;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :tree, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw)";
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01, ext02) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :tree, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype)";
 
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					'thread'=>$thread, 'parent'=>$parent, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,
+					'thread'=>$thread, 'parent'=>$parent, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype,
 				]
 			);
 			//$db->exec($sql);
@@ -663,6 +724,9 @@ function reply(): void {
 	$pwdh = password_hash($pwd, PASSWORD_DEFAULT);
 	$exid = trim(filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
+	$picfile = filter_input(INPUT_POST, 'picfile');
+	$img_w = trim(filter_input(INPUT_POST, 'img_w', FILTER_VALIDATE_INT));
+	$img_h = trim(filter_input(INPUT_POST, 'img_h', FILTER_VALIDATE_INT));
 
 	if ($req_method !== "POST") {
 		error(MSG006);
@@ -741,13 +805,166 @@ function reply(): void {
 			}
 			//↑ 二重投稿チェックおわり
 
+			//画像ファイルとか処理
+			if ($picfile) {
+				$path_filename = pathinfo($picfile, PATHINFO_FILENAME);
+				$temp_file = TEMP_DIR . $picfile;
+
+				// アップロードファイルの検証を追加
+				if (!validate_upload_file($temp_file)) {
+					error('無効なファイルです。');
+				}
+
+				// ファイルの移動とパーミッション設定
+				if (!rename($temp_file, IMG_DIR . $picfile)) {
+					error('ファイルの保存に失敗しました。');
+				}
+				chmod(IMG_DIR . $picfile, PERMISSION_FOR_DEST);
+
+				// 既存の処理を保持
+				$fp = fopen(TEMP_DIR . $path_filename . ".dat", "r");
+				$userdata = fread($fp, 1024);
+				fclose($fp);
+				list($uip, $uhost,,, $ucode,, $starttime, $postedtime, $uresto, $tool) = explode("\t", rtrim($userdata) . "\t");
+
+				// ctypeを取得して画像から続きを描いたかどうかを判定
+				$ctype = filter_input(INPUT_POST, 'ctype');
+				
+				// usercodeからctypeを取得（POSTデータにない場合）
+				if ($ctype === null) {
+					$usercode = filter_input(INPUT_POST, 'usercode');
+					if ($usercode) {
+						parse_str($usercode, $usercode_params);
+						if (isset($usercode_params['ctype'])) {
+							$ctype = $usercode_params['ctype'];
+						}
+					}
+				}
+				
+				// send_headerパラメータからusercodeを取得（POSTデータにない場合）
+				if ($ctype === null) {
+					$send_header = filter_input(INPUT_POST, 'send_header');
+					if ($send_header) {
+						parse_str($send_header, $header_params);
+						if (isset($header_params['usercode'])) {
+							$usercode = $header_params['usercode'];
+							parse_str($usercode, $usercode_params);
+							if (isset($usercode_params['ctype'])) {
+								$ctype = $usercode_params['ctype'];
+							}
+						}
+					}
+				}
+				
+				// HTTPヘッダーからusercodeを取得（POSTデータにない場合）
+				if ($ctype === null) {
+					$http_usercode = filter_input(INPUT_SERVER, 'HTTP_X_USERCODE');
+					if ($http_usercode) {
+						parse_str($http_usercode, $usercode_params);
+						if (isset($usercode_params['ctype'])) {
+							$ctype = $usercode_params['ctype'];
+						}
+					}
+				}
+				
+				// セッション変数からusercodeを取得（POSTデータにない場合）
+				if ($ctype === null) {
+					if (session_status() !== PHP_SESSION_ACTIVE) {
+						session_start();
+					}
+					if (isset($_SESSION['usercode'])) {
+						$usercode = $_SESSION['usercode'];
+						parse_str($usercode, $usercode_params);
+						if (isset($usercode_params['ctype'])) {
+							$ctype = $usercode_params['ctype'];
+						}
+					}
+				}
+				
+				// ctypeがnullの場合は新規投稿として扱う（動画ファイルを処理する）
+				if ($ctype === null) {
+					$ctype = 'new';
+				}
+				
+				// 描画時間の計算
+				if ($starttime && DSP_PAINTTIME) {
+					$psec = $postedtime - $starttime; //内部保存用
+					$utime = calcPtime($psec);
+				}
+
+				// ツールの判定
+				if ($tool === 'neo') {
+					$used_tool = 'PaintBBS NEO';
+				} elseif ($tool === 'sneo') {
+					$used_tool = 'NISE shipe';
+				} elseif ($tool === 'shi') {
+					$used_tool = 'Shi Painter';
+				} elseif ($tool === 'chicken') {
+					$used_tool = 'Chicken Paint';
+				} else {
+					$used_tool = '???';
+				}
+
+				// 画像サイズの取得
+				list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
+
+				$picdat = $path_filename . '.dat';
+
+				$chifile = $path_filename . '.chi';
+				$spchfile = $path_filename . '.spch';
+				$pchfile = $path_filename . '.pch';
+
+				// 画像から続きを描いた場合のみ動画ファイルを処理しない
+				if ($ctype === 'img') {
+					$pchfile = "";
+				} else {
+					// 新規投稿または動画から続きを描く場合は動画ファイルを処理
+					if (is_file(TEMP_DIR . $pchfile)) {
+						$success = rename(TEMP_DIR . $pchfile, IMG_DIR . $pchfile);
+						if ($success) {
+							chmod(IMG_DIR . $pchfile, PERMISSION_FOR_DEST);
+						} else {
+							$pchfile = "";
+						}
+					} elseif (is_file(TEMP_DIR . $spchfile)) {
+						$success = rename(TEMP_DIR . $spchfile, IMG_DIR . $spchfile);
+						if ($success) {
+							chmod(IMG_DIR . $spchfile, PERMISSION_FOR_DEST);
+							$pchfile = $spchfile;
+						} else {
+							$pchfile = "";
+						}
+					} elseif (is_file(TEMP_DIR . $chifile)) {
+						$success = rename(TEMP_DIR . $chifile, IMG_DIR . $chifile);
+						if ($success) {
+							chmod(IMG_DIR . $chifile, PERMISSION_FOR_DEST);
+							$pchfile = $chifile;
+						} else {
+							$pchfile = "";
+						}
+					} else {
+						$pchfile = "";
+					}
+				}
+				error_log("reply関数 - 最終的なpchfile: " . $pchfile);
+				chmod(TEMP_DIR . $picdat, PERMISSION_FOR_DEST);
+				unlink(TEMP_DIR . $picdat);
+			} else {
+				$img_w = 0;
+				$img_h = 0;
+				$pchfile = "";
+				$utime = "";
+				$used_tool = "";
+				$ctype = null;
+			}
+
 			// 値を追加する
 
 			//不要改行圧縮
 			$com = preg_replace("/(\n|\r|\r\n){3,}/us", "\n\n", $com);
 
 			//id生成
-			$id = gen_id($host, time());
+			$id = gen_id($host, $utime ?? time());
 
 			//管理者名は管理パスじゃないと使えない
 			if ($name === $admin_name && $pwd !== $admin_pass) {
@@ -784,13 +1001,13 @@ function reply(): void {
 
 			//リプ処理
 			$thread = 0;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, pwd, id, exid, age, invz, host, admins) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :pwdh, :id, :exid, :age, :invz, :host, :admins)";
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, ext02) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :ctype)";
 
 			// プレースホルダ
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'admins'=> $admins,
+					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'ctype'=> $ctype,
 				]
 			);
 			//$db->exec($sql);
@@ -919,6 +1136,10 @@ function def(): void {
 				$_pchext = pathinfo($bbsline['pchfile'], PATHINFO_EXTENSION);
 				if ($_pchext === 'chi') {
 					$bbsline['pchfile'] = ''; //ChickenPaintは動画リンクを出さない
+				}
+				// 拡張子がない場合やext02がimgの場合は動画リンクを出さない
+				if ($_pchext === '' || $bbsline['pchfile'] === '' || (isset($bbsline['ext02']) && $bbsline['ext02'] === 'img')) {
+					$bbsline['pchfile'] = '';
 				}
 				$res = $postsi->fetch();
 				if (empty($res)) { //レスがなくなったら
@@ -1382,6 +1603,25 @@ function paintform($rep): void {
 		$type = $rep;
 		$pwdf = filter_input(INPUT_POST, 'pwd');
 
+		// 動画ファイルの存在をチェックしてctypeを自動設定
+		if ($ctype === null || $ctype === '') {
+			$pch = filter_input(INPUT_POST, 'pch');
+			if ($pch) {
+				$pch_filename = pathinfo($pch, PATHINFO_FILENAME);
+				if (is_file(IMG_DIR . $pch_filename . '.pch') || is_file(IMG_DIR . $pch_filename . '.spch') || is_file(IMG_DIR . $pch_filename . '.chi')) {
+					$ctype = 'pch'; // 動画ファイルが存在する場合
+				} else {
+					$ctype = 'img'; // 動画ファイルが存在しない場合
+				}
+			} else {
+				$ctype = 'img'; // pchが指定されていない場合
+			}
+		}
+
+		// デバッグ用：ctypeの値を確認
+		error_log("paintform関数 - ctype: " . $ctype);
+		error_log("paintform関数 - rep: " . $rep);
+
 		session_sta();
 
 		// 続きから描く場合は一時画像を除外するフラグを設定
@@ -1462,8 +1702,7 @@ function paintform($rep): void {
 	if ($ctype == 'pch' || $ctype == 'spch') {
 		$pchfile = filter_input(INPUT_POST, 'pch');
 		$dat['pchfile'] = IMG_DIR . $pchfile;
-	}
-	if ($ctype == 'img') {
+	} elseif ($ctype == 'img') {
 		$dat['animeform'] = false;
 		$dat['anime'] = false;
 		$dat['useanime'] = false; // 動画機能を無効化
@@ -1471,8 +1710,16 @@ function paintform($rep): void {
 		$dat['imgfile'] = IMG_DIR . $imgfile;
 		// 画像から続きを描く場合はpchfileを設定しない
 		$dat['pchfile'] = null;
+	} else {
+		// 新規投稿の場合はpchfileを設定しない（動画ファイルは後で生成される）
+		$dat['pchfile'] = null;
 	}
 	$usercode .= '&tool=' . $tool . '&stime=' . time(); //拡張ヘッダにツールと描画開始時間をセット
+	
+	// ctypeが設定されている場合はusercodeに含める
+	if ($ctype !== null) {
+		$usercode .= '&ctype=' . $ctype;
+	}
 
 	//差し換え時の認識コード追加
 	if ($type === 'rep') {
@@ -1488,6 +1735,15 @@ function paintform($rep): void {
 		$usercode .= '&repcode=' . $repcode;
 	}
 	$dat['usercode'] = $usercode; //usercodeにいろいろくっついたものをまとめて出力
+
+	// デバッグ用：usercodeの内容を確認
+	error_log("paintform関数 - usercode: " . $usercode);
+	
+	// usercodeをセッション変数に保存
+	if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+	}
+	$_SESSION['usercode'] = $usercode;
 
 	//出口
 	if ($type === 'rep') {
@@ -1531,8 +1787,16 @@ function openpch($pch, $sp = ""): void {
 	} else {
 		$w = $h = $picw = $pich = $datasize = ""; //動画が無い時は処理しない
 		$dat['tool'] = 'neo';
+		$pchfile = null; // pchfileを明示的にnullに設定
 	}
-	$datasize = filesize($pchfile);
+	
+	// pchfileが定義されている場合のみfilesizeを実行
+	if ($pchfile !== null && is_file($pchfile)) {
+		$datasize = filesize($pchfile);
+	} else {
+		$datasize = 0;
+	}
+
 	$size = getimagesize($picfile);
 	if (!$sp) $sp = PCH_SPEED;
 	$picw = $size[0];
@@ -1680,7 +1944,7 @@ function in_continue(): void {
 
 	try {
 		$db = new PDO(DB_PDO);
-		$sql = "SELECT * FROM tlog WHERE picfile=? ORDER BY tree DESC";
+		$sql = "SELECT *, ext02 as ctype FROM tlog WHERE picfile=? ORDER BY tree DESC";
 		$posts = $db->prepare($sql);
 		$posts->execute([$no]);
 		$oya = array();
@@ -1691,30 +1955,46 @@ function in_continue(): void {
 		}
 		$hist_ope = pathinfo($no, PATHINFO_FILENAME); //拡張子除去
 		$histfilename = IMG_DIR . $hist_ope;
+		
+		// データベースからctypeを取得
+		$db_ctype = $oya[0]['ctype'] ?? null;
+		
 		if (is_file($histfilename . '.pch')) {
 			//$pchfile = IMG_DIR.$pch;
 			$dat['tool'] = 'neo'; //拡張子がpchのときはNEO
 			$dat['useshi'] = false;
 			$dat['useneo'] = true;
 			$dat['ctype_pch'] = true;
+			$dat['ctype_img'] = false;
 		} elseif (is_file($histfilename . '.spch')) {
 			$dat['tool'] = 'shi'; //拡張子がspchのときはしぃぺ
 			$dat['useshi'] = true;
 			$dat['useneo'] = false;
 			$dat['ctype_pch'] = true;
+			$dat['ctype_img'] = false;
 		} elseif (is_file($histfilename . '.chi')) {
 			$dat['tool'] = 'chicken'; //拡張子がchiのときはChickenPaint
 			$dat['useshi'] = false;
 			$dat['useneo'] = false;
 			$dat['ctype_pch'] = true;
+			$dat['ctype_img'] = false;
 		} else { // どれでもない＝動画が無い時
 			//$w=$h=$picw=$pich=$datasize="";
 			$dat['useneo'] = true;
 			$dat['useshi'] = true;
 			$dat['ctype_pch'] = false;
+			$dat['ctype_img'] = true;
 		}
 		// useshi, useneoは互換のためにいちおう残してある
-		$dat['ctype_img'] = true;
+		
+		// データベースのctypeを優先する
+		if ($db_ctype === 'img') {
+			$dat['ctype_img'] = true;
+			$dat['ctype_pch'] = false;
+		} elseif ($db_ctype === 'pch' || $db_ctype === 'spch') {
+			$dat['ctype_img'] = false;
+			$dat['ctype_pch'] = true;
+		}
 
 		$db = null; //db切断
 	} catch (PDOException $e) {
