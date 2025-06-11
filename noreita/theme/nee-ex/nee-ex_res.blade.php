@@ -95,7 +95,7 @@
 					</h5>
 					<h5>
 						<a href="{{$path}}{{$bbsline['picfile']}}" target="_blank">{{$bbsline['picfile']}}</a>
-						@if ($bbsline['pchfile'] != null)
+						@if ($bbsline['pchfile'] != null && $bbsline['pchfile'] !== '' && pathinfo($bbsline['pchfile'], PATHINFO_EXTENSION) !== '' && (!isset($bbsline['ext02']) || $bbsline['ext02'] !== 'img'))
 						<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}">●動画</a>
 						@endif
 						@if ($use_continue)

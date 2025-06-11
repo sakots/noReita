@@ -115,9 +115,7 @@
 						@if ($ctype_pch)
 						<option value="pch" selected>動画から</option>
 						@endif
-						@if ($ctype_img)
 						<option value="img" @if (!$ctype_pch) selected @endif>画像から</option>
-						@endif
 					</select>
 					<select class="form" name="type">
 						<option value="rep">差し替え</option>
