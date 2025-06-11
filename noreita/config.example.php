@@ -218,10 +218,13 @@ define('SESSION_NAME', 'noreita_session');
 //neoのディレクトリ。index.phpから見て
 define('NEO_DIR', 'neo/');
 
+//しぃペインターのディレクトリ。index.phpから見て
+define('SHI_PAINTER_DIR', 'shi_painter/');
+
 //chickenPaintのディレクトリ。index.phpから見て
 define('CHICKEN_DIR', 'chickenpaint/');
 
-/* ---------- お絵かきアプレット設定(neo) ---------- */
+/* ---------- お絵かきアプレット設定(neo/しぃペインター) ---------- */
 
 //アンドゥの回数
 define('UNDO', 90);
@@ -325,6 +328,9 @@ $addinfo = array('<a href="https://github.com/sakots/noReita">ソースはこち
 
 //お絵かき機能を使用する お絵かきのみ
 
+//しぃペインターを使用する する:1 しない:0
+define('USE_SHI_PAINTER', 1);
+
 //一時ファイルディレクトリ
 define('TEMP_DIR', 'tmp/');
 
@@ -391,4 +397,4 @@ define('PHP_SELF', 'index.php');
 
 /* ------------- コンフィグ互換性管理 ------------- */
 
-define('CONF_VER', 250413);
+define('CONF_VER', 20250611);

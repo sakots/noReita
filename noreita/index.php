@@ -28,7 +28,7 @@ if(!is_file(__DIR__.'/config.php')){
 //コンフィグ
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 250413 || !defined('CONF_VER')) {
+if (CONF_VER < 20250611 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
 
@@ -72,6 +72,19 @@ $blade->pipeEnable = true; // パイプのフィルターを使えるように�
 
 $dat = array(); // bladeに格納する変数
 
+//CheerpJ 4.1
+define('CHEERPJ_URL','https://cjrtnc.leaningtech.com/4.1/loader.js');
+define('CHEERPJ_HASH','sha384-uKhK9NUHrSpoCfjhgnQkV7vDjOB6IhQZY1esOxD+TF1yvLbbJS/DRhX7g6ATh/wX');
+define('CHEERPJ_PRELOAD','{preloadResources:
+{"/lt/fc/ttf/LiberationSans-Regular.ttf":[0,131072,262144,393216],"/lt/8/jre/lib/rt.jar":[0,131072,9699328,10878976,11272192,11534336,11665408,12189696,12320768,12451840,15204352,15335424,15466496,15597568,15990784,16384000,16777216,16908288,17039360,17563648,17694720,17825792,18087936,18612224,18743296,18874368,19005440,19136512,19529728,19660800,20185088,20316160,20840448,21757952,21889024,26869760],"/lt/fc/cache/e21edda6a7db77f35ca341e0c3cb2a22-le32d8.cache-7":[0,131072],"/lt/fc/fonts/fonts.conf":[0,131072],"/lt/etc/resolv.conf":[0,131072],"/lt/8/lib/security/java.policy":[0,131072],"/lt/8/lib/security/java.security":[0,131072],"/lt/8/jre/lib/meta-index":[0,131072],"/lt/8/jre/lib/javaws.jar":[0,131072,1441792,1703936],"/lt/8/jre/lib/resources.jar":[0,131072,917504,1179648],"/lt/8/jre/lib/charsets.jar":[0,131072,1703936,1835008],"/lt/etc/users":[0,131072],"/lt/8/jre/lib/jce.jar":[0,131072],"/lt/etc/localtime":[],"/lt/8/jre/lib/jsse.jar":[0,131072,786432,917504],"/lt/8/jre/lib/cheerpj-awt.jar":[0,131072],"/lt/8/lib/ext/meta-index":[0,131072],"/lt/8/lib/ext":[],"/lt/8/lib/ext/index.list":[],"/lt/8/lib/ext/localedata.jar":[],"/lt/8/lib/ext/sunec.jar":[],"/lt/8/lib/ext/sunjce_provider.jar":[],"/lt/8/lib/ext/zipfs.jar":[],"/lt/8/jre/lib":[],"/lt/8/lib/accessibility.properties":[],"/lt/8/lib/fonts/LucidaSansRegular.ttf":[],"/lt/8/lib/ext/*":[],"/lt/etc/hosts":[],"/lt/8/lib/fonts/badfonts.txt":[],"/lt/8/lib/fonts":[],"/lt/8/lib/fonts/fallback":[],"/lt/fc/ttf":[]}
+}');
+define('CHEERPJ_DEBUG','{ enableDebug: true }');
+define('CHEERPJ_DEBUG_MODE',0);
+
+$dat['cheerpj_url'] = CHEERPJ_URL;
+$dat['cheerpj_hash'] = CHEERPJ_HASH;
+$dat['cheerpj_preload'] = CHEERPJ_DEBUG_MODE ? CHEERPJ_DEBUG : CHEERPJ_PRELOAD;
+
 //var_dump($_POST);
 
 //絶対パス取得
@@ -112,7 +125,7 @@ $dat['tver'] = THEME_VER;
 
 $dat['switch_sns'] = SWITCH_SNS;
 
-$dat['use_shi_p'] = '0';
+$dat['use_shi_painter'] = USE_SHI_PAINTER;
 $dat['use_chicken'] = USE_CHICKENPAINT;
 
 $dat['select_palettes'] = USE_SELECT_PALETTES;
@@ -1371,6 +1384,7 @@ function paintform($rep): void {
 			$dat['useneo'] = true;
 		} elseif (is_file(IMG_DIR . $pch . '.spch')) {
 			$dat['useneo'] = false;
+			$dat['use_shi_painter'] = true;
 		}
 		if ((C_SECURITY_CLICK || C_SECURITY_TIMER) && SECURITY_URL) {
 			$dat['security'] = true;
@@ -1435,7 +1449,7 @@ function paintform($rep): void {
 	}
 	$dat['dynp'] = implode('', $arr_dynp);
 
-	if ($ctype == 'pch') {
+	if ($ctype == 'pch' || $ctype == 'spch') {
 		$pchfile = filter_input(INPUT_POST, 'pch');
 		$dat['pchfile'] = IMG_DIR . $pchfile;
 	}
@@ -1473,6 +1487,8 @@ function paintform($rep): void {
 	//出力
 	if ($tool === 'chicken') {
 		echo $blade->run(PAINTFILE_BE, $dat);
+	} elseif ($tool === 'shi' || $tool === 'neo') {
+		echo $blade->run(PAINTFILE, $dat);
 	} else {
 		echo $blade->run(PAINTFILE, $dat);
 	}
