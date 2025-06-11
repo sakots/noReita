@@ -17,11 +17,9 @@
 		<script src="theme/{{$themedir}}/js/appFit.js" charset="utf-8"></script>
 		<!-- アプレットフィットここまで -->
 		@endif
-		@if ($tool == 'chicken')
-		<script src="{{$chicken_dir}}js/chickenpaint.min.js?{{$stime}}"></script>
-		<script src="theme/{{$themedir}}/fix_chiken/fix.js?{{$stime}}" charset="utf-8"></script>
-		<link rel="stylesheet" type="text/css" href="{{$chicken_dir}}css/chickenpaint.css?{{$stime}}">
-		<link rel="stylesheet" href="theme/{{$themedir}}/fix_chiken/fix.css?{{$stime}}" type="text/css">
+		@if ($tool == 'shi')
+		<!-- CheerpJ -->
+		<script src="{{$cheerpj_url}}"></script>
 		@endif
 	</head>
 	<body id="paintmode">
@@ -75,12 +73,23 @@
 			<!-- 動的パレットスクリプトここまで -->
 			<section id="appstage">
 				<div class="app" id="apps">
+					@if ($tool == 'neo')
 					<applet-dummy code="pbbs.PaintBBS.class" archive="./PaintBBS.jar" name="paintbbs" width="{{$w}}" height="{{$h}}" mayscript>
+					@elseif ($tool == 'shi')
+					<applet code="c.ShiPainter.class" archive="./{{$shi_painter_dir}}spainter_all.jar" name="paintbbs" width="{{$w}}" height="{{$h}}" mayscript>
+					<param name=dir_resource value="./{{$shi_painter_dir}}">
+					<param name="tt.zip" value="tt_def.zip">
+					<param name="res.zip" value="res.zip">
+					@endif
 					<param name="image_width" value="{{$picw}}">
 					<param name="image_height" value="{{$pich}}">
 					<param name="undo" value="{{$undo}}">
 					<param name="undo_in_mg" value="{{$undo_in_mg}}">
+					@if ($tool == 'neo')
 					<param name="url_save" value="saveneo.php">
+					@elseif ($tool == 'shi')
+					<param name="url_save" value="picpost.php">
+					@endif
 					<param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}">
 					@if (isset($imgfile))<param name="image_canvas" value="{{$imgfile}}">@endif
 					@if (isset($pchfile))<param name="pch_file" value="{{$pchfile}}">@endif
@@ -97,13 +106,23 @@
 						<param name="security_url" value="{{$security_url}}">
 						<param name="security_post" value="false">
 					@endif
+					@if ($tool == 'neo')
 					<param name="neo_confirm_unload" value="true">
 					<param name="neo_show_right_button" value="true">
 					<param name="neo_send_with_formdata" value="true">
+					@endif
+					@if ($tool == 'shi')
+					</applet>
+					<script>
+      			cheerpjInit();
+    			</script>
+					@elseif ($tool == 'neo')
 					</applet-dummy>
+					@endif
 				</div>
 				<div class="palette" id="dyntools">
 					<form name="Palette">
+						@if ($tool == 'neo')
 						<fieldset id="fit_exp">
 							<legend>FIT!</legend>
 							<input class="button" type="button" value="← FIT →" onclick="appfit(0)">
@@ -117,6 +136,7 @@
 							<input class="button" type="button" value="左" onclick="Neo.setToolSide(true)">
 							<input class="button" type="button" value="右" onclick="Neo.setToolSide(false)">
 						</fieldset>
+						@endif
 						<fieldset>
 							<legend>PALETTE</legend>
 							<select class="form palette_set" name="select" size="13" onChange="setPalette()" id="palnames">
@@ -125,13 +145,13 @@
 									{!!$dynp!!}
 								@endif
 							</select><br>
-							<input class="button" type="button" value="一時保存" onclick="PaletteSave()"><br>
-							<input class="button" type="button" value="作成" onclick="PaletteNew()">
-							<input class="button" type="button" value="変更" onclick="PaletteRenew()">
-							<input class="button" type="button" value="削除" onclick="PaletteDel()"><br>
-							<input class="button" type="button" value="明＋" onclick="P_Effect(10)">
-							<input class="button" type="button" value="明－" onclick="P_Effect(-10)">
-							<input class="button" type="button" value="反転" onclick="P_Effect(255)">
+							<input class="button" type="button" value="一時保存" onClick="PaletteSave()"><br>
+							<input class="button" type="button" value="作成" onClick="PaletteNew()">
+							<input class="button" type="button" value="変更" onClick="PaletteRenew()">
+							<input class="button" type="button" value="削除" onClick="PaletteDel()"><br>
+							<input class="button" type="button" value="明＋" onClick="P_Effect(10)">
+							<input class="button" type="button" value="明－" onClick="P_Effect(-10)">
+							<input class="button" type="button" value="反転" onClick="P_Effect(255)">
 						</fieldset>
 						<fieldset>
 							<legend>MATRIX</legend>

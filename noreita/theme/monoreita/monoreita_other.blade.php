@@ -131,7 +131,7 @@
 					@else
 					<input type="hidden" name="tools" value="{{$tool}}">
 					@endif
-					@if ($tool == 'neo')
+					@if ($tool == 'neo' || $tool == 'shi')
 					<label for="palettes">パレット</label>
 					@if ($select_palettes)
 					<select name="palettes" id="palettes">

@@ -41,7 +41,7 @@
 						<label for="tools">ツール</label>
 						<select name="tools" id="tools">
 							<option value="neo">PaintBBS NEO</option>
-							@if ($use_shi_p)<option value="shi">しぃペインター</option> @endif
+							@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
 							@if ($use_chicken)<option value="chicken">ChickenPaint</option> @endif
 						</select>
 						<label for="palettes">パレット</label>
