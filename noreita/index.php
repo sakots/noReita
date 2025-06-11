@@ -74,16 +74,8 @@ $dat = array(); // bladeに格納する変数
 
 //CheerpJ 4.1
 define('CHEERPJ_URL','https://cjrtnc.leaningtech.com/4.1/loader.js');
-define('CHEERPJ_HASH','sha384-uKhK9NUHrSpoCfjhgnQkV7vDjOB6IhQZY1esOxD+TF1yvLbbJS/DRhX7g6ATh/wX');
-define('CHEERPJ_PRELOAD','{preloadResources:
-{"/lt/fc/ttf/LiberationSans-Regular.ttf":[0,131072,262144,393216],"/lt/8/jre/lib/rt.jar":[0,131072,9699328,10878976,11272192,11534336,11665408,12189696,12320768,12451840,15204352,15335424,15466496,15597568,15990784,16384000,16777216,16908288,17039360,17563648,17694720,17825792,18087936,18612224,18743296,18874368,19005440,19136512,19529728,19660800,20185088,20316160,20840448,21757952,21889024,26869760],"/lt/fc/cache/e21edda6a7db77f35ca341e0c3cb2a22-le32d8.cache-7":[0,131072],"/lt/fc/fonts/fonts.conf":[0,131072],"/lt/etc/resolv.conf":[0,131072],"/lt/8/lib/security/java.policy":[0,131072],"/lt/8/lib/security/java.security":[0,131072],"/lt/8/jre/lib/meta-index":[0,131072],"/lt/8/jre/lib/javaws.jar":[0,131072,1441792,1703936],"/lt/8/jre/lib/resources.jar":[0,131072,917504,1179648],"/lt/8/jre/lib/charsets.jar":[0,131072,1703936,1835008],"/lt/etc/users":[0,131072],"/lt/8/jre/lib/jce.jar":[0,131072],"/lt/etc/localtime":[],"/lt/8/jre/lib/jsse.jar":[0,131072,786432,917504],"/lt/8/jre/lib/cheerpj-awt.jar":[0,131072],"/lt/8/lib/ext/meta-index":[0,131072],"/lt/8/lib/ext":[],"/lt/8/lib/ext/index.list":[],"/lt/8/lib/ext/localedata.jar":[],"/lt/8/lib/ext/sunec.jar":[],"/lt/8/lib/ext/sunjce_provider.jar":[],"/lt/8/lib/ext/zipfs.jar":[],"/lt/8/jre/lib":[],"/lt/8/lib/accessibility.properties":[],"/lt/8/lib/fonts/LucidaSansRegular.ttf":[],"/lt/8/lib/ext/*":[],"/lt/etc/hosts":[],"/lt/8/lib/fonts/badfonts.txt":[],"/lt/8/lib/fonts":[],"/lt/8/lib/fonts/fallback":[],"/lt/fc/ttf":[]}
-}');
-define('CHEERPJ_DEBUG','{ enableDebug: true }');
-define('CHEERPJ_DEBUG_MODE',0);
 
 $dat['cheerpj_url'] = CHEERPJ_URL;
-$dat['cheerpj_hash'] = CHEERPJ_HASH;
-$dat['cheerpj_preload'] = CHEERPJ_DEBUG_MODE ? CHEERPJ_DEBUG : CHEERPJ_PRELOAD;
 
 //var_dump($_POST);
 
@@ -101,6 +93,7 @@ $dat['path'] = IMG_DIR;
 
 $dat['neo_dir'] = NEO_DIR;
 $dat['chicken_dir'] = CHICKEN_DIR;
+$dat['shi_painter_dir'] = SHI_PAINTER_DIR;
 
 $dat['ver'] = REITA_VER;
 $dat['base'] = BASE;
@@ -287,7 +280,7 @@ function init(): void {
 	header('X-Content-Type-Options: nosniff');
 	header('X-Frame-Options: DENY');
 	header('X-XSS-Protection: 1; mode=block');
-	header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: blob:; media-src \'self\' blob:;');
+	header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://cjrtnc.leaningtech.com; style-src \'self\' \'unsafe-inline\' https://cjrtnc.leaningtech.com; img-src \'self\' data: blob:; media-src \'self\' blob:; connect-src \'self\' https://cjrtnc.leaningtech.com; worker-src \'self\' blob: https://cjrtnc.leaningtech.com; frame-src \'self\' https://cjrtnc.leaningtech.com;');
 	header('Referrer-Policy: strict-origin-when-cross-origin');
 	header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 	try {
@@ -1683,6 +1676,11 @@ function in_continue(): void {
 			$dat['tool'] = 'neo'; //拡張子がpchのときはNEO
 			$dat['useshi'] = false;
 			$dat['useneo'] = true;
+			$dat['ctype_pch'] = true;
+		} elseif (is_file($histfilename . '.spch')) {
+			$dat['tool'] = 'shi'; //拡張子がspchのときはしぃぺ
+			$dat['useshi'] = true;
+			$dat['useneo'] = false;
 			$dat['ctype_pch'] = true;
 		} elseif (is_file($histfilename . '.chi')) {
 			$dat['tool'] = 'chicken'; //拡張子がchiのときはChickenPaint
