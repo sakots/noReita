@@ -38,6 +38,10 @@ define('HOME', '../');
 
 // ChickenPaintを使う 使う:1 使わない:0
 define('USE_CHICKENPAINT', 1);
+
+//しぃペインターを使用する する:1 しない:0
+define('USE_SHI_PAINTER', 1);
+
 // PaintBBS NEOはどの設定でも起動します。
 
 /*----------絶対に設定が必要な項目はここまでです。ここから下は必要に応じて。----------*/
@@ -327,9 +331,6 @@ $addinfo = array('<a href="https://github.com/sakots/noReita">ソースはこち
 /* ---------- お絵かき設定 ---------- */
 
 //お絵かき機能を使用する お絵かきのみ
-
-//しぃペインターを使用する する:1 しない:0
-define('USE_SHI_PAINTER', 1);
 
 //一時ファイルディレクトリ
 define('TEMP_DIR', 'tmp/');
