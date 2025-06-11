@@ -458,6 +458,17 @@ function regist(): void {
 				fclose($fp);
 				list($uip, $uhost,,, $ucode,, $starttime, $postedtime, $uresto, $tool) = explode("\t", rtrim($userdata) . "\t");
 
+				// ctypeを取得して画像から続きを描いたかどうかを判定
+				$ctype = filter_input(INPUT_POST, 'ctype');
+				
+				// ctypeがnullの場合は新規投稿として扱う（動画ファイルを処理する）
+				if ($ctype === null) {
+					$ctype = 'new';
+				}
+				
+				// デバッグ用：ctypeの値を確認
+				error_log("regist関数 - ctype: " . $ctype);
+
 				// 描画時間の計算
 				if ($starttime && DSP_PAINTTIME) {
 					$psec = $postedtime - $starttime; //内部保存用
@@ -486,19 +497,25 @@ function regist(): void {
 				$spchfile = $path_filename . '.spch';
 				$pchfile = $path_filename . '.pch';
 
-				if (is_file(TEMP_DIR . $pchfile)) {
-					rename(TEMP_DIR . $pchfile, IMG_DIR . $pchfile);
-					chmod(IMG_DIR . $pchfile, PERMISSION_FOR_DEST);
-				} elseif (is_file(TEMP_DIR . $spchfile)) {
-					rename(TEMP_DIR . $spchfile, IMG_DIR . $spchfile);
-					chmod(IMG_DIR . $spchfile, PERMISSION_FOR_DEST);
-					$pchfile = $spchfile;
-				} elseif (is_file(TEMP_DIR . $chifile)) {
-					rename(TEMP_DIR . $chifile, IMG_DIR . $chifile);
-					chmod(IMG_DIR . $chifile, PERMISSION_FOR_DEST);
-					$pchfile = $chifile;
-				} else {
+				// 画像から続きを描いた場合のみ動画ファイルを処理しない
+				if ($ctype === 'img') {
 					$pchfile = "";
+				} else {
+					// 新規投稿または動画から続きを描く場合は動画ファイルを処理
+					if (is_file(TEMP_DIR . $pchfile)) {
+						rename(TEMP_DIR . $pchfile, IMG_DIR . $pchfile);
+						chmod(IMG_DIR . $pchfile, PERMISSION_FOR_DEST);
+					} elseif (is_file(TEMP_DIR . $spchfile)) {
+						rename(TEMP_DIR . $spchfile, IMG_DIR . $spchfile);
+						chmod(IMG_DIR . $spchfile, PERMISSION_FOR_DEST);
+						$pchfile = $spchfile;
+					} elseif (is_file(TEMP_DIR . $chifile)) {
+						rename(TEMP_DIR . $chifile, IMG_DIR . $chifile);
+						chmod(IMG_DIR . $chifile, PERMISSION_FOR_DEST);
+						$pchfile = $chifile;
+					} else {
+						$pchfile = "";
+					}
 				}
 				chmod(TEMP_DIR . $picdat, PERMISSION_FOR_DEST);
 				unlink(TEMP_DIR . $picdat);
@@ -1449,8 +1466,11 @@ function paintform($rep): void {
 	if ($ctype == 'img') {
 		$dat['animeform'] = false;
 		$dat['anime'] = false;
+		$dat['useanime'] = false; // 動画機能を無効化
 		$imgfile = filter_input(INPUT_POST, 'img');
 		$dat['imgfile'] = IMG_DIR . $imgfile;
+		// 画像から続きを描く場合はpchfileを設定しない
+		$dat['pchfile'] = null;
 	}
 	$usercode .= '&tool=' . $tool . '&stime=' . time(); //拡張ヘッダにツールと描画開始時間をセット
 
