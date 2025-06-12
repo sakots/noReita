@@ -55,18 +55,18 @@ class DynamicPaletteManager {
 	}
 
 	// パレットを一時保存
-	PaletteSave() {
+	async PaletteSave() {
 		if (document.paintbbs) {
-			this.Palettes[0] = String(document.paintbbs.getColors());
+			this.Palettes[0] = String(await document.paintbbs.getColors());
 		}
 	}
 
 	// 新しいパレットを作成
-	PaletteNew() {
+	async PaletteNew() {
 		const d = document;
 		if (!d.paintbbs) return;
 		
-		const p = String(d.paintbbs.getColors());
+		const p = String(await d.paintbbs.getColors());
 		const s = d.Palette.select;
 		this.Palettes[s.length] = p;
 		this.customP++;
@@ -83,11 +83,11 @@ class DynamicPaletteManager {
 	}
 
 	// パレットを更新
-	PaletteRenew() {
+	async PaletteRenew() {
 		const d = document;
 		if (!d.paintbbs) return;
 		
-		this.Palettes[d.Palette.select.selectedIndex] = String(d.paintbbs.getColors());
+		this.Palettes[d.Palette.select.selectedIndex] = String(await d.paintbbs.getColors());
 		this.PaletteListSetColor();
 	}
 
@@ -113,14 +113,14 @@ class DynamicPaletteManager {
 	}
 
 	// パレット効果（明度調整・反転）
-	P_Effect(v) {
+	async P_Effect(v) {
 		v = parseInt(v);
 		const x = v === 255 ? -1 : 1;
 		const d = document.paintbbs;
 		
 		if (!d) return;
 		
-		const p = String(d.getColors()).split("\n");
+		const p = String(await d.getColors()).split("\n");
 		const l = p.length;
 		let s = "";
 		
@@ -144,7 +144,7 @@ class DynamicPaletteManager {
 	}
 
 	// パレットマトリクス取得
-	PaletteMatrixGet() {
+	async PaletteMatrixGet() {
 		const d = document.Palette;
 		const p = this.Palettes.length;
 		const s = d.select;
@@ -167,7 +167,7 @@ class DynamicPaletteManager {
 				alert("パレット数：" + c + "\nパレットマトリクスを取得しました");
 				break;
 			case 1:
-				t.value = "!Palette\n" + String(document.paintbbs.getColors());
+				t.value = "!Palette\n" + String(await document.paintbbs.getColors());
 				alert("現在使用されているパレット情報を取得しました");
 				break;
 		}
@@ -405,11 +405,11 @@ class DynamicPaletteManager {
 	}
 
 	// パレット取得
-	GetPalette() {
+	async GetPalette() {
 		const d = document;
 		if (!d.paintbbs) return;
 		
-		const p = String(d.paintbbs.getColors());
+		const p = String(await d.paintbbs.getColors());
 		if (p === "null" || p === "") return;
 		
 		const ps = p.split("\n");
