@@ -8,7 +8,7 @@
 define('THEME_NAME', "monoreita");
 
 //テーマのバージョン
-define('THEME_VER', "1.8.7 lot.250612.0");
+define('THEME_VER', "1.8.8 lot.250706.0");
 
 /* -------------------- */
 
@@ -35,10 +35,10 @@ define('MAINFILE', "monoreita_main");
 //レスのテンプレートファイル
 define('RESFILE', "monoreita_res");
 
-//お絵かきのテンプレートファイル
+//お絵かき(PaintBBS NEO/しぃペインター)のテンプレートファイル
 define('PAINTFILE', "monoreita_paint");
 
-//chickenPaintのテンプレートファイル
+//お絵かき(chickenPaint/Klecks/Tegaki/Axnos)のテンプレートファイル
 define('PAINTFILE_BE', "monoreita_be");
 
 //動画再生のテンプレートファイル

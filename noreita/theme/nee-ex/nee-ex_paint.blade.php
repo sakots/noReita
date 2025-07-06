@@ -86,7 +86,7 @@
 					<param name="undo" value="{{$undo}}">
 					<param name="undo_in_mg" value="{{$undo_in_mg}}">
 					@if ($tool == 'neo')
-					<param name="url_save" value="saveneo.php">
+					<param name="url_save" value="{{$self}}?mode=saveimage&amp;tool=neo">
 					@elseif ($tool == 'shi')
 					<param name="url_save" value="picpost.php">
 					@endif

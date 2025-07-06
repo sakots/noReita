@@ -8,7 +8,7 @@
 define('THEME_NAME', "nee-ex");
 
 //テーマのバージョン
-define('THEME_VER', "1.8.7 lot.250612.0");
+define('THEME_VER', "1.8.8 lot.250706.0");
 
 /* -------------------- */
 
@@ -35,10 +35,10 @@ define('MAINFILE', "nee-ex_main");
 //レスのテンプレートファイル
 define('RESFILE', "nee-ex_res");
 
-//お絵かきのテンプレートファイル
+//neo、しぃペインターのテンプレートファイル
 define('PAINTFILE', "nee-ex_paint");
 
-//chickenPaintのテンプレートファイル
+//chickenPaint、Klecks、Tegaki、Axnosのテンプレートファイル
 define('PAINTFILE_BE', "nee-ex_be");
 
 //動画再生のテンプレートファイル
