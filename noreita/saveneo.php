@@ -8,7 +8,7 @@ include(__DIR__.'/config.php');
 defined('SECURITY_TIMER') or define('SECURITY_TIMER', 0); //config.phpで未定義なら0
 $lang = ($http_langs = isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? $_SERVER['HTTP_ACCEPT_LANGUAGE'] : '')
   ? explode( ',', $http_langs )[0] : '';
-$en= (stripos($lang,'ja')!==0);
+$en = (stripos($lang,'ja') !== 0);
 
 if($en){//ブラウザの言語が日本語以外の時
 	$errormsg_1 = "Your picture upload failed! Please try again!";
