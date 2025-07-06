@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/07/06] v1.6.21
+
+- tegakiでアイコンが表示されないの修正
+
 ### [2025/07/06] v1.6.20
 
 - chickenpaint Be バージョンアップ

@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.20'); //lot.250706.0
+define('REITA_VER', 'v1.6.21'); //lot.250706.1
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -29,7 +29,7 @@ if(!isset($functions_ver) || $functions_ver < 20250610) {
 check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 20250611 || !defined('CONF_VER')) {
+if (CONF_VER < 20250706 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
 
@@ -289,7 +289,7 @@ function init(): void {
 	header('X-Content-Type-Options: nosniff');
 	header('X-Frame-Options: DENY');
 	header('X-XSS-Protection: 1; mode=block');
-	header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://cjrtnc.leaningtech.com; style-src \'self\' \'unsafe-inline\' https://cjrtnc.leaningtech.com; img-src \'self\' data: blob:; media-src \'self\' blob:; connect-src \'self\' https://cjrtnc.leaningtech.com; worker-src \'self\' blob: https://cjrtnc.leaningtech.com; frame-src \'self\' https://cjrtnc.leaningtech.com;');
+	header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://cjrtnc.leaningtech.com https://cdn.jsdelivr.net https://unpkg.com; style-src \'self\' \'unsafe-inline\' https://cjrtnc.leaningtech.com https://fonts.googleapis.com; font-src \'self\' data: https://fonts.gstatic.com; img-src \'self\' data: blob:; media-src \'self\' blob:; connect-src \'self\' https://cjrtnc.leaningtech.com; worker-src \'self\' blob: https://cjrtnc.leaningtech.com; frame-src \'self\' https://cjrtnc.leaningtech.com;');
 	header('Referrer-Policy: strict-origin-when-cross-origin');
 	header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 	try {
