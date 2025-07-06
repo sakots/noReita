@@ -69,6 +69,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/07/06] v1.6.20
+
+- chickenpaint Be バージョンアップ
+- お絵かきツールにklecks、axnos、tegaki追加
+
 ### [2025/06/13] v1.6.19
 
 - しぃぺいんたーでダイナミックパレットが動くように修正

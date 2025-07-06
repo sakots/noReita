@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.19'); //lot.250613.0
+define('REITA_VER', 'v1.6.20'); //lot.250706.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -17,30 +17,32 @@ $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
   ? explode( ',', $http_langs )[0] : '';
 $en= (stripos($lang,'ja')!== 0);
 
-//ファイルが足りない場合
-if(!is_file(__DIR__.'/functions.php')){
+if (!is_file(__DIR__.'/functions.php')) {
 	die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
-if(!is_file(__DIR__.'/config.php')){
-	die(__DIR__.'/config.php'.($en ? ' does not exist.':'がありません。'));
+require_once(__DIR__.'/functions.php');
+if(!isset($functions_ver) || $functions_ver < 20250610) {
+	die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
 //コンフィグ
+check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
 if (CONF_VER < 20250611 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
 
-require_once(__DIR__.'/functions.php');
-if(!isset($functions_ver) || $functions_ver < 20250610) {
-	die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
-}
-
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
 if(!isset($misskey_note_ver) || $misskey_note_ver < 20250326){
 	die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
+}
+
+check_file(__DIR__.'/save.inc.php');
+require_once(__DIR__.'/save.inc.php');
+if(!isset($save_inc_ver)||$save_inc_ver<20250706){
+	die($en?'Please update save.inc.php to the latest version.':'save.inc.phpを最新版に更新してください。');
 }
 
 //テーマ
@@ -94,6 +96,9 @@ $dat['path'] = IMG_DIR;
 $dat['neo_dir'] = NEO_DIR;
 $dat['chicken_dir'] = CHICKEN_DIR;
 $dat['shi_painter_dir'] = SHI_PAINTER_DIR;
+$dat['klecks_dir'] = KLECKS_DIR;
+$dat['tegaki_dir'] = TEGAKI_DIR;
+$dat['axnos_dir'] = AXNOS_DIR;
 
 $dat['ver'] = REITA_VER;
 $dat['base'] = BASE;
@@ -120,6 +125,9 @@ $dat['switch_sns'] = SWITCH_SNS;
 
 $dat['use_shi_painter'] = USE_SHI_PAINTER;
 $dat['use_chicken'] = USE_CHICKENPAINT;
+$dat['use_klecks'] = USE_KLECKS;
+$dat['use_tegaki'] = USE_TEGAKI;
+$dat['use_axnos'] = USE_AXNOS;
 
 $dat['select_palettes'] = USE_SELECT_PALETTES;
 $dat['pallets_dat'] = $pallets_dat;
@@ -232,15 +240,15 @@ $modeMap = [
 	'reply' => 'reply',
 	'res' => 'res',
 	'sodane' => 'sodane',
-	'paint' => fn() => paintform(""),
-	'piccom' => fn() => paintcom(""),
-	'pictmp' => fn() => paintcom("tmp"),
-	'anime' => fn() => openpch($sp ?? ""),
+	'paint' => fn() => paint_form(""),
+	'piccom' => fn() => paint_com(""),
+	'pictmp' => fn() => paint_com("tmp"),
+	'anime' => fn() => open_pch($sp ?? ""),
 	'continue' => 'in_continue',
 	'contpaint' => function() {
 		$type = filter_input(INPUT_POST, 'type');
 		if (CONTINUE_PASS || $type === 'rep') usrchk();
-		return paintform($type);
+		return paint_form($type);
 	},
 	'picrep' => 'picreplace',
 	'catalog' => 'catalog',
@@ -248,6 +256,7 @@ $modeMap = [
 	'edit' => 'editform',
 	'editexec' => 'editexec',
 	'del' => 'delmode',
+	'saveimage' => 'save_image',
 	'admin_in' => 'admin_in',
 	'admin' => 'admin',
 	'set_share_server' => 'set_share_server',
@@ -331,9 +340,11 @@ function init(): void {
 //投稿があればデータベースへ保存する
 /* 記事書き込み スレ立て */
 function regist(): void {
-	global $badip, $admin_pass, $admin_name;
+	global $badip, $admin_pass, $admin_name, $en;
 	global $req_method;
 	global $dat;
+
+	$dat['en'] = $en;
 
 	//CSRFトークンをチェック
 	if (CHECK_CSRF_TOKEN) {
@@ -354,6 +365,13 @@ function regist(): void {
 	$exid = trim(filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
 	$nsfw_flag = (string)filter_input(INPUT_POST, 'nsfw', FILTER_VALIDATE_INT);
+	$rep = (string)filter_input(INPUT_POST, 'rep');
+
+	$repcode = (string)filter_input(INPUT_POST, 'repcode');
+	$id = (string)filter_input(INPUT_POST, 'id');
+	$no = (string)filter_input(INPUT_POST, 'no');
+	$enc_pwd = (string)filter_input(INPUT_POST, 'enc_pwd');
+	$resto = (string)filter_input(INPUT_POST, 'resto');
 
 	if ($req_method !== "POST") {
 		error(MSG006);
@@ -532,6 +550,12 @@ function regist(): void {
 					$used_tool = 'Shi Painter';
 				} elseif ($tool === 'chicken') {
 					$used_tool = 'Chicken Paint';
+				} elseif ($tool === 'klecks') {
+					$used_tool = 'Klecks';
+				} elseif ($tool === 'tegaki') {
+					$used_tool = 'Tegaki';
+				} elseif ($tool === 'axnos') {
+					$used_tool = 'Axnos';
 				} else {
 					$used_tool = '???';
 				}
@@ -895,12 +919,16 @@ function reply(): void {
 				// ツールの判定
 				if ($tool === 'neo') {
 					$used_tool = 'PaintBBS NEO';
-				} elseif ($tool === 'sneo') {
-					$used_tool = 'NISE shipe';
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
 				} elseif ($tool === 'chicken') {
 					$used_tool = 'Chicken Paint';
+				} elseif ($tool === 'klecks') {
+					$used_tool = 'Klecks';
+				} elseif ($tool === 'tegaki') {
+					$used_tool = 'Tegaki';
+				} elseif ($tool === 'axnos') {
+					$used_tool = 'Axnos';
 				} else {
 					$used_tool = '???';
 				}
@@ -946,7 +974,7 @@ function reply(): void {
 						$pchfile = "";
 					}
 				}
-				error_log("reply関数 - 最終的なpchfile: " . $pchfile);
+				// rror_log("reply関数 - 最終的なpchfile: " . $pchfile);
 				chmod(TEMP_DIR . $picdat, PERMISSION_FOR_DEST);
 				unlink(TEMP_DIR . $picdat);
 			} else {
@@ -1533,7 +1561,7 @@ function res(): void {
 }
 
 //お絵描き画面
-function paintform($rep): void {
+function paint_form($rep): void {
 	global $message, $usercode, $quality, $qualitys, $no;
 	global $mode, $ctype, $pch, $type;
 	global $blade, $dat;
@@ -1737,7 +1765,7 @@ function paintform($rep): void {
 	$dat['usercode'] = $usercode; //usercodeにいろいろくっついたものをまとめて出力
 
 	// デバッグ用：usercodeの内容を確認
-	error_log("paintform関数 - usercode: " . $usercode);
+	// error_log("paintform関数 - usercode: " . $usercode);
 	
 	// usercodeをセッション変数に保存
 	if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -1754,7 +1782,7 @@ function paintform($rep): void {
 		$dat['mode'] = 'piccom';
 	}
 	//出力
-	if ($tool === 'chicken') {
+	if ($tool === 'chicken' || $tool === 'klecks' || $tool === 'tegaki' || $tool === 'axnos') {
 		echo $blade->run(PAINTFILE_BE, $dat);
 	} elseif ($tool === 'shi' || $tool === 'neo') {
 		echo $blade->run(PAINTFILE, $dat);
@@ -1765,7 +1793,7 @@ function paintform($rep): void {
 
 //アニメ再生
 
-function openpch($pch, $sp = ""): void {
+function open_pch($pch, $sp = ""): void {
 	global $blade, $dat;
 	$message = "";
 
@@ -1826,7 +1854,7 @@ function openpch($pch, $sp = ""): void {
 }
 
 //お絵かき投稿
-function paintcom($tmpmode): void {
+function paint_com($tmpmode): void {
 	global $usercode, $ptime;
 	global $blade, $dat;
 
@@ -2545,6 +2573,30 @@ function del_temp(): void {
 		}
 	}
 	closedir($handle);
+}
+
+//画像保存
+function save_image(): void {
+	$tool=filter_input(INPUT_GET,"tool");
+	$image_save = new image_save;
+	header('Content-type: text/plain');
+	switch($tool){
+		case "neo":
+			$image_save->save_neo();
+			break;
+		case "chi":
+			$image_save->save_chickenpaint();
+			break;
+		case "klecks":
+			$image_save->save_klecks();
+			break;
+		case "tegaki":
+			$image_save->save_klecks();
+			break;
+		case "axnos":
+			$image_save->save_klecks();
+			break;
+	}
 }
 
 //ログの行数が最大値を超えていたら削除

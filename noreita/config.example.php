@@ -42,6 +42,15 @@ define('USE_CHICKENPAINT', 1);
 //しぃペインターを使用する する:1 しない:0
 define('USE_SHI_PAINTER', 1);
 
+// Klecksを使う 使う:1 使わない:0
+define('USE_KLECKS', 1);
+
+// Tegakiを使う 使う:1 使わない:0
+define('USE_TEGAKI', 1);
+
+// Axnosを使う 使う:1 使わない:0
+define('USE_AXNOS', 1);
+
 // PaintBBS NEOはどの設定でも起動します。
 
 /*----------絶対に設定が必要な項目はここまでです。ここから下は必要に応じて。----------*/
@@ -228,6 +237,15 @@ define('SHI_PAINTER_DIR', 'shi_painter/');
 //chickenPaintのディレクトリ。index.phpから見て
 define('CHICKEN_DIR', 'chickenpaint/');
 
+//klecksのディレクトリ。index.phpから見て
+define('KLECKS_DIR', 'klecks/');
+
+//tegakiのディレクトリ。index.phpから見て
+define('TEGAKI_DIR', 'tegaki/');
+
+//axnosのディレクトリ。index.phpから見て
+define('AXNOS_DIR', 'axnos/');
+
 /* ---------- お絵かきアプレット設定(neo/しぃペインター) ---------- */
 
 //アンドゥの回数
@@ -398,4 +416,4 @@ define('PHP_SELF', 'index.php');
 
 /* ------------- コンフィグ互換性管理 ------------- */
 
-define('CONF_VER', 20250611);
+define('CONF_VER', 20250706);
