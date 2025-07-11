@@ -512,35 +512,42 @@
 		@endif
 		// (c)satopian MIT Licence ここまで
 
-		if (psdURL) {
+		@if (isset($imgfile))
+		// PSDファイルがある場合はPSDとして読み込み
+		if (psdURL && psdURL.trim() !== '') {
 			fetch(new Request(psdURL)).then(response => {
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+				}
 				return response.arrayBuffer();
 			}).then(buffer => {
 				return klecks.readPSD(buffer); // resolves to Klecks project
 			}).then(project => {
 				klecks.openProject(project);
 			}).catch(e => {
-				klecks.initError(
-          @if (isset($en))
-          'failed to read image'
-          @else
-          '画像の読み込みに失敗しました。'
-          @endif
-        );
+				console.error('PSD読み込みエラー:', e);
+				// PSD読み込みに失敗した場合は画像として読み込みを試行
+				loadImageAsBackground();
 			});
-
 		} else {
+			// 画像ファイルがある場合は背景画像として読み込み
+			loadImageAsBackground();
+		}
+		@else
+		// 新規作成
+		loadImageAsBackground();
+		@endif
+
+		function loadImageAsBackground() {
 			const loadImage = (src) => {
-				return new Promise((resolve) => {
+				return new Promise((resolve, reject) => {
 					const img = new Image();
+					img.crossOrigin = 'anonymous';
 					img.onload = () => resolve(img);
-					img.onerror = () => klecks.initError(
-          @if (isset($en))
-          'failed to read image'
-          @else
-          '画像の読み込みに失敗しました。'
-          @endif
-        );
+					img.onerror = (error) => {
+						console.error('画像読み込みエラー:', error);
+						reject(error);
+					};
 					img.src = src;
 				});
 			};
@@ -557,7 +564,12 @@
 							const img = await loadImage("{{$imgfile}}");
 							ctx.drawImage(img, 0, 0);
 						} catch (error) {
-							console.error(error);
+							console.error('画像読み込みエラー:', error);
+							// エラーが発生した場合は白い背景を作成
+							ctx.save();
+							ctx.fillStyle = '#fff';
+							ctx.fillRect(0, 0, canvas.width, canvas.height);
+							ctx.restore();
 						}
 					@else
 						ctx.save();
@@ -569,31 +581,42 @@
 					return canvas;
 				};
 
-				const backgroundCanvas = await createCanvasWithImage();
-				const emptyCanvas = document.createElement('canvas');
-				emptyCanvas.width = {{$picw}};
-				emptyCanvas.height = {{$pich}};
+				try {
+					const backgroundCanvas = await createCanvasWithImage();
+					const emptyCanvas = document.createElement('canvas');
+					emptyCanvas.width = {{$picw}};
+					emptyCanvas.height = {{$pich}};
 
-				klecks.openProject({
-					width: {{$picw}},
-					height: {{$pich}},
-					layers: [{
-						name:
-            @if (isset($en))
-            'Background'
-						@else
-						'背景'
-						@endif,
-					opacity: 1,
-					mixModeStr: 'source-over',
-					image: backgroundCanvas
-					}, {
-						name: '1',
+					klecks.openProject({
+						width: {{$picw}},
+						height: {{$pich}},
+						layers: [{
+							name:
+              @if (isset($en))
+              'Background'
+							@else
+							'背景'
+							@endif,
 						opacity: 1,
 						mixModeStr: 'source-over',
-						image: emptyCanvas
-					}]
-				});
+						image: backgroundCanvas
+						}, {
+							name: '1',
+							opacity: 1,
+							mixModeStr: 'source-over',
+							image: emptyCanvas
+						}]
+					});
+				} catch (error) {
+					console.error('klecks初期化エラー:', error);
+					klecks.initError(
+            @if (isset($en))
+            'failed to initialize klecks'
+            @else
+            'klecksの初期化に失敗しました。'
+            @endif
+          );
+				}
 			})();
 		}
 	</script>
