@@ -4,6 +4,256 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{$btitle}}</title>
+  
+  <!-- キャンバスズーム機能用の共通スタイル -->
+  <style>
+    .canvas-zoom-container {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+    }
+    
+    .canvas-zoom-content {
+      transform-origin: 0 0;
+      transition: transform 0.1s ease-out;
+    }
+    
+    .canvas-zoom-controls {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .canvas-zoom-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 16px;
+      cursor: pointer;
+      user-select: none;
+      min-width: 40px;
+    }
+    
+    .canvas-zoom-btn:hover {
+      background: rgba(255, 255, 255, 1);
+    }
+    
+    .canvas-zoom-btn:active {
+      background: rgba(200, 200, 200, 1);
+    }
+    
+    .canvas-zoom-info {
+      color: white;
+      font-size: 12px;
+      text-align: center;
+      padding: 4px;
+    }
+  </style>
+  
+  <!-- キャンバスズーム機能用の共通スクリプト -->
+  <script>
+    class CanvasZoomController {
+      constructor(canvasSelector) {
+        this.canvasSelector = canvasSelector;
+        this.canvas = null;
+        this.scale = 1;
+        this.minScale = 0.1;
+        this.maxScale = 5;
+        this.translateX = 0;
+        this.translateY = 0;
+        this.isDragging = false;
+        this.lastX = 0;
+        this.lastY = 0;
+        
+        this.init();
+      }
+      
+      init() {
+        this.waitForCanvas();
+        this.createControls();
+      }
+      
+      waitForCanvas() {
+        const checkCanvas = () => {
+          this.canvas = document.querySelector(this.canvasSelector);
+          if (this.canvas) {
+            this.setupCanvas();
+            this.bindEvents();
+            this.updateTransform();
+          } else {
+            setTimeout(checkCanvas, 100);
+          }
+        };
+        checkCanvas();
+      }
+      
+      setupCanvas() {
+        // キャンバスをラップするコンテナを作成
+        const container = document.createElement('div');
+        container.className = 'canvas-zoom-container';
+        container.style.display = 'inline-block';
+        
+        // キャンバスをラップ
+        this.canvas.parentNode.insertBefore(container, this.canvas);
+        container.appendChild(this.canvas);
+        
+        // キャンバスにズーム用のクラスを追加
+        this.canvas.className += ' canvas-zoom-content';
+        
+        this.container = container;
+      }
+      
+      createControls() {
+        const controls = document.createElement('div');
+        controls.className = 'canvas-zoom-controls';
+        controls.innerHTML = `
+          <button class="canvas-zoom-btn" id="canvas-zoom-in">+</button>
+          <button class="canvas-zoom-btn" id="canvas-zoom-out">-</button>
+          <button class="canvas-zoom-btn" id="canvas-zoom-reset">100%</button>
+          <div class="canvas-zoom-info" id="canvas-zoom-info">100%</div>
+        `;
+        document.body.appendChild(controls);
+        
+        document.getElementById('canvas-zoom-in').addEventListener('click', () => this.zoomIn());
+        document.getElementById('canvas-zoom-out').addEventListener('click', () => this.zoomOut());
+        document.getElementById('canvas-zoom-reset').addEventListener('click', () => this.resetZoom());
+      }
+      
+      bindEvents() {
+        // マウスホイール
+        this.container.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const delta = e.deltaY > 0 ? 0.9 : 1.1;
+          this.zoomAtPoint(delta, e.clientX, e.clientY);
+        });
+        
+        // マウスドラッグ
+        this.container.addEventListener('mousedown', (e) => {
+          if (e.button === 0) { // 左クリックのみ
+            this.isDragging = true;
+            this.lastX = e.clientX;
+            this.lastY = e.clientY;
+            this.container.style.cursor = 'grabbing';
+          }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+          if (this.isDragging) {
+            const deltaX = e.clientX - this.lastX;
+            const deltaY = e.clientY - this.lastY;
+            this.translateX += deltaX;
+            this.translateY += deltaY;
+            this.lastX = e.clientX;
+            this.lastY = e.clientY;
+            this.updateTransform();
+          }
+        });
+        
+        document.addEventListener('mouseup', () => {
+          this.isDragging = false;
+          this.container.style.cursor = 'grab';
+        });
+        
+        // タッチイベント（ピンチイン/アウト）
+        let touchStartDistance = 0;
+        let touchStartScale = 1;
+        
+        this.container.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 2) {
+            e.preventDefault();
+            touchStartDistance = this.getDistance(e.touches[0], e.touches[1]);
+            touchStartScale = this.scale;
+          } else if (e.touches.length === 1) {
+            this.isDragging = true;
+            this.lastX = e.touches[0].clientX;
+            this.lastY = e.touches[0].clientY;
+          }
+        });
+        
+        this.container.addEventListener('touchmove', (e) => {
+          if (e.touches.length === 2) {
+            e.preventDefault();
+            const currentDistance = this.getDistance(e.touches[0], e.touches[1]);
+            const scale = (currentDistance / touchStartDistance) * touchStartScale;
+            this.setScale(scale);
+          } else if (e.touches.length === 1 && this.isDragging) {
+            e.preventDefault();
+            const deltaX = e.touches[0].clientX - this.lastX;
+            const deltaY = e.touches[0].clientY - this.lastY;
+            this.translateX += deltaX;
+            this.translateY += deltaY;
+            this.lastX = e.touches[0].clientX;
+            this.lastY = e.touches[0].clientY;
+            this.updateTransform();
+          }
+        });
+        
+        this.container.addEventListener('touchend', () => {
+          this.isDragging = false;
+        });
+      }
+      
+      getDistance(touch1, touch2) {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+      
+      zoomIn() {
+        this.zoomAtPoint(1.2, this.container.clientWidth / 2, this.container.clientHeight / 2);
+      }
+      
+      zoomOut() {
+        this.zoomAtPoint(0.8, this.container.clientWidth / 2, this.container.clientHeight / 2);
+      }
+      
+      resetZoom() {
+        this.scale = 1;
+        this.translateX = 0;
+        this.translateY = 0;
+        this.updateTransform();
+      }
+      
+      zoomAtPoint(factor, x, y) {
+        const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.scale * factor));
+        if (newScale !== this.scale) {
+          const scaleChange = newScale / this.scale;
+          this.scale = newScale;
+          
+          // ズーム中心点を考慮した移動
+          const rect = this.container.getBoundingClientRect();
+          const centerX = x - rect.left;
+          const centerY = y - rect.top;
+          
+          this.translateX = centerX - (centerX - this.translateX) * scaleChange;
+          this.translateY = centerY - (centerY - this.translateY) * scaleChange;
+          
+          this.updateTransform();
+        }
+      }
+      
+      setScale(newScale) {
+        this.scale = Math.max(this.minScale, Math.min(this.maxScale, newScale));
+        this.updateTransform();
+      }
+      
+      updateTransform() {
+        this.canvas.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.scale})`;
+        document.getElementById('canvas-zoom-info').textContent = `${Math.round(this.scale * 100)}%`;
+      }
+    }
+    
+    // グローバル変数として保存
+    window.CanvasZoomController = CanvasZoomController;
+  </script>
   @if ($tool == 'chicken')
   <style>
     body { overscroll-behavior-x: none !important; }
@@ -316,6 +566,14 @@
           fullScreenMode: "force"
 
         });
+        
+        // ChickenPaintのキャンバスにズーム機能を追加
+        setTimeout(() => {
+          const canvas = document.querySelector('#chickenpaint-parent canvas');
+          if (canvas) {
+            new CanvasZoomController('#chickenpaint-parent canvas');
+          }
+        }, 1000);
       })
     </script>
   </section>
@@ -619,6 +877,16 @@
 				}
 			})();
 		}
+		
+		// Klecksのキャンバスにズーム機能を追加
+		document.addEventListener('DOMContentLoaded', function() {
+			setTimeout(() => {
+				const canvas = document.querySelector('canvas');
+				if (canvas) {
+					new CanvasZoomController('canvas');
+				}
+			}, 2000);
+		});
 	</script>
 	<!-- embed end -->
   @endif
@@ -800,10 +1068,31 @@
 			};
 			image.src = "{{$imgfile}}"; // image URL
 		@endif
+		
+		// Tegakiのキャンバスにズーム機能を追加
+		document.addEventListener('DOMContentLoaded', function() {
+			setTimeout(() => {
+				const canvas = document.querySelector('canvas');
+				if (canvas) {
+					new CanvasZoomController('canvas');
+				}
+			}, 1000);
+		});
 	</script>
   @endif
   @if ($tool == 'axnos')
   <div id="axnospaint_body"></div>
+  <script>
+    // AXNOS Paintのキャンバスにズーム機能を追加
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(() => {
+        const canvas = document.querySelector('#axnospaint_body canvas');
+        if (canvas) {
+          new CanvasZoomController('#axnospaint_body canvas');
+        }
+      }, 2000);
+    });
+  </script>
   @endif
 </body>
 </html>
