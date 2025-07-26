@@ -71,9 +71,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ### [2025/07/26] v1.6.23
 
-- chickenPaint、Klecks、Axonsでのスマホ時のピンチイン/アウト対応
+- chickenPaintBe、Klecks、Axonsでのスマホ時のピンチイン/アウト対応
   - Neo、しぃぺインターでは座標がずれてしまうため実装見送り
   - tegakiではキャンバスに不具合発生
+- chickenPaintBe バージョンアップ
+- neo バージョンアップ（1.6.18）
 
 ### [2025/07/11] v1.6.22
 
