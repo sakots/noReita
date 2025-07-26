@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/07/26] v1.6.23
+
+- chickenPaint、Klecks、Axonsでのスマホ時のピンチイン/アウト対応
+
 ### [2025/07/11] v1.6.22
 
 - 続きから描くときにv1.6.20で増やしたツールを選択できないのを修正
