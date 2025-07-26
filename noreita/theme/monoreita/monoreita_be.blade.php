@@ -291,66 +291,6 @@
 		// (c)satopian MIT Licence ここまで
 	</script>
   @endif
-
-  <!-- tegaki以外のピンチイン/アウト機能のスクリプト -->
-	@if ($tool !== 'tegaki')
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // ピンチイン/アウト機能の実装
-      let initialDistance = 0;
-      let initialScale = 1;
-      let currentScale = 1;
-      let isPinching = false;
-
-      // 2点間の距離を計算
-      function getDistance(touch1, touch2) {
-        const dx = touch1.clientX - touch2.clientX;
-        const dy = touch1.clientY - touch2.clientY;
-        return Math.sqrt(dx * dx + dy * dy);
-      }
-
-      // タッチ開始時の処理
-      function handleTouchStart(e) {
-        if (e.touches.length === 2) {
-          isPinching = true;
-          initialDistance = getDistance(e.touches[0], e.touches[1]);
-          initialScale = currentScale;
-          e.preventDefault();
-        }
-      }
-
-      // タッチ移動時の処理
-      function handleTouchMove(e) {
-        if (isPinching && e.touches.length === 2) {
-          const currentDistance = getDistance(e.touches[0], e.touches[1]);
-          const scale = currentDistance / initialDistance;
-          currentScale = Math.max(0.5, Math.min(3, initialScale * scale));
-          
-          // キャンバス要素を取得してスケールを適用
-          const canvas = document.querySelector('canvas');
-          if (canvas) {
-            canvas.style.transform = `scale(${currentScale})`;
-            canvas.style.transformOrigin = 'center center';
-          }
-          
-          e.preventDefault();
-        }
-      }
-
-      // タッチ終了時の処理
-      function handleTouchEnd(e) {
-        if (e.touches.length < 2) {
-          isPinching = false;
-        }
-      }
-
-      // イベントリスナーを追加
-      document.addEventListener('touchstart', handleTouchStart, { passive: false });
-      document.addEventListener('touchmove', handleTouchMove, { passive: false });
-      document.addEventListener('touchend', handleTouchEnd, { passive: false });
-    });
-  </script>
-  @endif
 </head>
 <body>
   @if ($tool == 'chicken')
