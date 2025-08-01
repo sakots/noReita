@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/08/02] v1.6.24
+
+- chickenPaintBe バージョンアップ
+
 ### [2025/07/26] v1.6.23
 
 - chickenPaintBe バージョンアップ
