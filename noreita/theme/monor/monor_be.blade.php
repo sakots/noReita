@@ -185,8 +185,8 @@
 
 					const BlobPng = toBlob(postObj.strEncodeImg)
 					// console.log(BlobPng);
-					//2022-2025 (c)satopian MIT Licence
-					//この箇所はさとぴあが作成したMIT Licenceのコードです。
+					//2022-2025 (c)satopian MIT License
+					//この箇所はさとぴあが作成したMIT Licenseのコードです。
 					const postData = (path, data) => {
 						fetch(path, {
 								method: 'post',
@@ -242,13 +242,13 @@
 				formData.append("stime", {{time()}});
 				formData.append("resto", "{{$resto}}");
 				postData("{{$self}}?mode=saveimage&tool=axnos", formData);
-				// (c)satopian MIT Licence ここまで
+				// (c)satopian MIT License ここまで
 				// location.reload();
 				})
 			}
 		});
-		//Petit Note 2021-2025 (c)satopian MIT Licence
-		//この箇所はさとぴあが作成したMIT Licenceのコードです。
+		//Petit Note 2021-2025 (c)satopian MIT License
+		//この箇所はさとぴあが作成したMIT Licenseのコードです。
 		@if (isset($rep))
 			const repData = () => {
 				// 画像差し換えに必要なフォームデータをセット
@@ -288,7 +288,7 @@
 					});
 			}
 		@endif
-		// (c)satopian MIT Licence ここまで
+		// (c)satopian MIT License ここまで
 	</script>
   @endif
 </head>
@@ -385,8 +385,8 @@
 
 				setTimeout(() => {
 					onSuccess();
-					//Petit Note 2021-2024 (c)satopian MIT Licence
-					//この箇所はさとぴあが作成したMIT Licenceのコードです。
+					//Petit Note 2021-2024 (c)satopian MIT License
+					//この箇所はさとぴあが作成したMIT Licenseのコードです。
 					const postData = (path, data) => {
 						fetch(path, {
 								method: 'post',
@@ -464,13 +464,13 @@
 					formData.append("resto", "{{$resto}}");
 					postData("./?mode=saveimage&tool=klecks", formData);
 					});
-					// (c)satopian MIT Licence ここまで
+					// (c)satopian MIT License ここまで
 					// location.reload();
 				}, 500);
 			}
 		});
-		//Petit Note 2021-2025 (c)satopian MIT Licence
-		//この箇所はさとぴあが作成したMIT Licenceのコードです。
+		//Petit Note 2021-2025 (c)satopian MIT License
+		//この箇所はさとぴあが作成したMIT Licenseのコードです。
 		@if (isset($rep))
 			const repData = () => {
 				// 画像差し換えに必要なフォームデータをセット
@@ -510,7 +510,7 @@
 					});
 			}
 		@endif
-		// (c)satopian MIT Licence ここまで
+		// (c)satopian MIT License ここまで
 
 		@if (isset($imgfile))
 		// PSDファイルがある場合はPSDとして読み込み
@@ -656,8 +656,8 @@
 			// when the user clicks on Finish
 			onDone: function() {
 
-				//Petit Note 2021-2025 (c)satopian MIT Licence
-				//この箇所はさとぴあが作成したMIT Licenceのコードです。
+				//Petit Note 2021-2025 (c)satopian MIT License
+				//この箇所はさとぴあが作成したMIT Licenseのコードです。
 
 				if (Tegaki.saveReplay) {
 					Tegaki.replayRecorder.stop();
