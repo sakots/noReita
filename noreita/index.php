@@ -33,12 +33,14 @@ if (CONF_VER < 20250706 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
 
+//misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
 if(!isset($misskey_note_ver) || $misskey_note_ver < 20250326){
 	die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
+//save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
 if(!isset($save_inc_ver)||$save_inc_ver<20250706){
