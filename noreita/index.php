@@ -59,7 +59,7 @@ if ($admin_pass === 'kanripass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
-//BladeOne v4.18
+//BladeOne v4.19.19
 include(__DIR__ . '/BladeOne/lib/BladeOne.php');
 use eftec\bladeone\BladeOne;
 
