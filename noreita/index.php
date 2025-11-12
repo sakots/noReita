@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.27'); //lot.251111.0
+define('REITA_VER', 'v2.0.0'); //lot.251112.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -29,7 +29,7 @@ if(!isset($functions_ver) || $functions_ver < 20250610) {
 check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 20250706 || !defined('CONF_VER')) {
+if (CONF_VER < 20251112 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
 
@@ -158,6 +158,8 @@ $dat['use_hashtag'] = USE_HASHTAG;
 defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
 
 $dat['sodane'] = SODANE;
+
+$dat['use_oekaki_reply'] = USE_OEKAKI_REPLY;
 
 //ペイント画面の$pwdの暗号化
 define('CRYPT_METHOD', 'aes-128-cbc');
