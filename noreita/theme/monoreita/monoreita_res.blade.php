@@ -179,7 +179,49 @@
 				@foreach ($oya as $bbsline)
 				@if (!empty($bbsline['com']))
 				<section>
-					@if ($bbsline['parent'] < 1) <h3 class="oekaki">このスレにレス</h3>
+					@if ($bbsline['parent'] < 1) <h3 class="oekaki">このスレにリプライ</h3>
+						@if ($use_oekaki_reply)
+						<hr>
+						<section class="epost">
+							<form action="{{$self}}" method="post" enctype="multipart/form-data">
+								<p>
+									<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
+									<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
+									<input type="hidden" name="mode" value="paint">
+									<label for="tools">ツール</label>
+									<select name="tools" id="tools">
+										<option value="neo">PaintBBS NEO</option>
+										@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
+										@if ($use_chicken)<option value="chicken">ChickenPaint</option> @endif
+										@if ($use_klecks)<option value="klecks">Klecks</option> @endif
+										@if ($use_tegaki)<option value="tegaki">Tegaki</option> @endif
+										@if ($use_axnos)<option value="axnos">Axnos</option> @endif
+									</select>
+									<label for="palettes">パレット</label>
+									@if ($select_palettes)
+									<select name="palettes" id="palettes">
+										@foreach ($pallets_dat as $palette)
+										<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
+										@endforeach
+									</select>
+									@else
+									<select name="palettes" id="palettes">
+										<option value="neo" id="0">標準</option>
+									</select>
+									@endif
+									@if ($useanime)
+									<label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
+									@endif
+									<input class="button" type="submit" value="お絵かき">
+									<input type="hidden" name="resto" value="{{$resno}}">
+								</p>
+							</form>
+							<ul>
+								<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
+							</ul>
+						</section>
+						<hr>
+						@endif
 						<script>
 							function add_to_com() {
 								document.getElementById("p_input_com").value += "{{$resname}}さん";

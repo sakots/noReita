@@ -1573,6 +1573,7 @@ function paint_form($rep): void {
 
 	$pwd = (string)filter_input(INPUT_POST, 'pwd');
 	$imgfile = filter_input(INPUT_POST, 'img');
+	$resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
 
 	//ツール
 	if (isset($_POST["tools"])) {

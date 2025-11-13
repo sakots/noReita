@@ -84,7 +84,11 @@
 					@elseif ($tool == 'shi')
 					<param name="url_save" value="picpost.php">
 					@endif
+					@if (isset($resto))
+					<param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}&amp;resto={{$resto}}">
+					@else
 					<param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}">
+					@endif
 					@if (isset($imgfile))<param name="image_canvas" value="{{$imgfile}}">@endif
 					@if (isset($pchfile))<param name="pch_file" value="{{$pchfile}}">@endif
 					<param name="poo" value="false">
