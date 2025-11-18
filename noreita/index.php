@@ -400,6 +400,7 @@ function regist(): void {
 	$no = (string)filter_input(INPUT_POST, 'no');
 	$enc_pwd = (string)filter_input(INPUT_POST, 'enc_pwd');
 	$resto = (string)filter_input(INPUT_POST, 'resto');
+	$modid = (string)filter_input(INPUT_POST, 'modid');
 
 	if ($req_method !== "POST") {
 		error(MSG006);
@@ -1598,6 +1599,7 @@ function paint_form($rep): void {
 	$pwd = (string)filter_input(INPUT_POST, 'pwd');
 	$imgfile = filter_input(INPUT_POST, 'img');
 	$resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
+	$modid = filter_input(INPUT_POST, 'modid', FILTER_VALIDATE_INT);
 
 	//ツール
 	if (isset($_POST["tools"])) {
