@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.0.0'); //lot.251112.0
+define('REITA_VER', 'v2.0.0'); //lot.251119.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -54,8 +54,8 @@ require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
 
-//管理パスが初期値(kanripass)の場合は動作させない
-if ($admin_pass === 'kanripass') {
+//管理パスが初期値(admin_pass)の場合は動作させない
+if ($admin_pass === 'admin_pass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
@@ -238,73 +238,49 @@ $_SESSION['usercode'] = $usercode;
 $mode = (string)filter_input_data('POST','mode');
 $mode = $mode ?: (string)filter_input_data('GET','mode');
 
-// モード
-switch ($mode) {
-	case 'regist':
-		return regist();
-	case 'reply':
-		return reply();
-	case 'res':
-		return res();
-	case 'sodane':
-		return sodane();
-	case 'paint':
-		$rep = "";
-		return paint_form($rep);
-	case 'piccom':
-		$tmpmode = "";
-		return paint_com($tmpmode);
-	case 'pictmp':
-		$tmpmode = "tmp";
-		return paint_com($tmpmode);
-	case 'anime':
-		if (!isset($sp)) {
-			$sp = "";
-		}
-		return open_pch($pch, $sp);
-	case 'continue':
-		return in_continue($no);
-	case 'contpaint':
-		//パスワードが必要なのは差し換えの時だけ
+// モード → 実行関数 のマップ
+$modeMap = [
+	'regist' => 'regist',
+	'reply' => 'reply',
+	'res' => 'res',
+	'sodane' => 'sodane',
+	'paint' => fn() => paint_form("", filter_input_data('POST','modid',FILTER_VALIDATE_INT)),
+	'piccom' => fn() => paint_com(""),
+	'pictmp' => fn() => paint_com("tmp"),
+	'anime' => fn() => open_pch($sp ?? ""),
+	'continue' => 'in_continue',
+	'contpaint' => function() {
 		$type = filter_input(INPUT_POST, 'type');
 		if (CONTINUE_PASS || $type === 'rep') usrchk();
-		// if(ADMIN_NEWPOST) $admin=$pwd;
-		$rep = $type;
-		return paint_form($rep);
-	case 'picrep':
-		return picreplace();
-	case 'catalog':
-		return catalog();
-	case 'search':
-		return search();
-	case 'edit':
-		return editform();
-	case 'editexec':
-		return editexec();
-	case 'del':
-		return delmode();
-	case 'admin_in':
-		return admin_in();
-	case 'admin':
-		return admin();
-	case 'set_share_server':
-		return set_share_server();
-	case 'post_share_server':
-		return post_share_server();
-	case 'before_misskey_note':
-		return misskey_note::before_misskey_note();
-	case 'misskey_note_edit_form':
-		return misskey_note::misskey_note_edit_form();
-	case 'create_misskey_note_sessiondata':
-		return misskey_note::create_misskey_note_sessiondata();
-	case 'create_misskey_authrequesturl':
-		return misskey_note::create_misskey_authrequesturl();
-	case 'misskey_success':
-		return misskey_note::misskey_success();
-	default:
-		return def();
+		return paint_form($type, filter_input_data('POST','modid',FILTER_VALIDATE_INT));
+	},
+	'picrep' => 'picreplace',
+	'catalog' => 'catalog',
+	'search' => 'search',
+	'edit' => 'editform',
+	'editexec' => 'editexec',
+	'del' => 'delmode',
+	'saveimage' => 'save_image',
+	'admin_in' => 'admin_in',
+	'admin' => 'admin',
+	'set_share_server' => 'set_share_server',
+	'post_share_server' => 'post_share_server',
+	'before_misskey_note' => [misskey_note::class, 'before_misskey_note'],
+	'misskey_note_edit_form' => [misskey_note::class, 'misskey_note_edit_form'],
+	'create_misskey_note_sessiondata' => [misskey_note::class, 'create_misskey_note_sessiondata'],
+	'create_misskey_authrequesturl' => [misskey_note::class, 'create_misskey_authrequesturl'],
+	'misskey_success' => [misskey_note::class, 'misskey_success'],
+];
+
+// 実行
+if (isset($modeMap[$mode])) {
+	$handler = $modeMap[$mode];
+	if (is_callable($handler)) {
+		return $handler();
+	} elseif (is_string($handler) && function_exists($handler)) {
+		return $handler();
+	}
 }
-exit;
 
 // デフォルト
 return def();
@@ -399,8 +375,9 @@ function regist(): void {
 	$id = (string)filter_input(INPUT_POST, 'id');
 	$no = (string)filter_input(INPUT_POST, 'no');
 	$enc_pwd = (string)filter_input(INPUT_POST, 'enc_pwd');
-	$resto = (string)filter_input(INPUT_POST, 'resto');
 	$modid = (string)filter_input(INPUT_POST, 'modid');
+
+	$resto = (string)filter_input(INPUT_POST, 'resto');
 
 	if ($req_method !== "POST") {
 		error(MSG006);
@@ -678,17 +655,41 @@ function regist(): void {
 			$age = $db->exec("$sqlage");
 			$tree = time() * 100000000;
 
-			//スレ建て
-			$thread = 1;
+			//スレ建てorお絵かきリプ
+			if (!isset($resto) || $resto === "") {
+				$thread = 1; //スレ建て
+				$parent = NULL;
+				$comid = NULL;
+				
+				$age = 0;
+			} else {
+				$thread = 0; //お絵かきリプ
+				$parent = $resto;
+				//レスの位置
+				$tree = time() - $parent - (int)$msgwc["tid"];
+				$comid = $tree + time();
+
+				//メール欄にsageが含まれるならageない
+				$age = (int)$msgwc["age"];
+				if (strpos($mail, 'sage') !== false) {
+					//sage
+					$age = $age;
+				} else {
+					//age
+					$age++;
+					$agetree = $age + (time() * 100000000);
+					$sql_age = "UPDATE tlog SET age = $age, tree = $agetree WHERE tid = $parent";
+					$db->exec($sql_age);
+				}
+			}
 			$shd = 0;
-			$age = 0;
-			$parent = NULL;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01, ext02) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :tree, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype)";
+			
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01, ext02) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype)";
 
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					'thread'=>$thread, 'parent'=>$parent, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype,
+					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype,
 				]
 			);
 			//$db->exec($sql);
@@ -1013,6 +1014,7 @@ function reply(): void {
 				$utime = "";
 				$used_tool = "";
 				$ctype = null;
+				$psec = 0;
 			}
 
 			// 値を追加する
@@ -1590,7 +1592,7 @@ function res(): void {
 }
 
 //お絵描き画面
-function paint_form($rep): void {
+function paint_form($rep, $reply_to): void {
 	global $message, $usercode, $quality, $qualitys, $no;
 	global $mode, $ctype, $pch, $type;
 	global $blade, $dat;
@@ -1598,8 +1600,8 @@ function paint_form($rep): void {
 
 	$pwd = (string)filter_input(INPUT_POST, 'pwd');
 	$imgfile = filter_input(INPUT_POST, 'img');
-	$resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
-	$modid = filter_input(INPUT_POST, 'modid', FILTER_VALIDATE_INT);
+
+	$dat['resto'] = $reply_to;
 
 	//ツール
 	if (isset($_POST["tools"])) {
@@ -1797,7 +1799,7 @@ function paint_form($rep): void {
 
 	// デバッグ用：usercodeの内容を確認
 	// error_log("paintform関数 - usercode: " . $usercode);
-	
+
 	// usercodeをセッション変数に保存
 	if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -1894,6 +1896,7 @@ function paint_com($tmpmode): void {
 
 	$dat['parent'] = $_SERVER['REQUEST_TIME'];
 	$dat['usercode'] = $usercode;
+	$dat['resto'] = $resto;
 
 	//----------
 
