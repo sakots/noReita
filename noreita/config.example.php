@@ -234,22 +234,22 @@ define('SESSION_NAME', 'noreita_session');
 //複数のお絵描き掲示板を管理する際に便利です。
 
 //neoのディレクトリ。index.phpから見て
-define('NEO_DIR', 'neo/');
+define('NEO_DIR', 'app/neo/');
 
 //しぃペインターのディレクトリ。index.phpから見て
-define('SHI_PAINTER_DIR', 'shi_painter/');
+define('SHI_PAINTER_DIR', 'app/shi_painter/');
 
 //chickenPaintのディレクトリ。index.phpから見て
-define('CHICKEN_DIR', 'chickenpaint/');
+define('CHICKEN_DIR', 'app/chickenpaint/');
 
 //klecksのディレクトリ。index.phpから見て
-define('KLECKS_DIR', 'klecks/');
+define('KLECKS_DIR', 'app/klecks/');
 
 //tegakiのディレクトリ。index.phpから見て
-define('TEGAKI_DIR', 'tegaki/');
+define('TEGAKI_DIR', 'app/tegaki/');
 
 //axnosのディレクトリ。index.phpから見て
-define('AXNOS_DIR', 'axnos/');
+define('AXNOS_DIR', 'app/axnos/');
 
 /* ---------- お絵かきアプレット設定(neo/しぃペインター) ---------- */
 
