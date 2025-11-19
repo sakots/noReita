@@ -219,6 +219,32 @@
 								@endif
 							</a></span>
 						</h4>
+						@if ($res['picfile'])
+						@if ($dptime)
+						<h5>
+							{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
+							@if ($res['psec'] != null)
+							描画時間：{{$res['utime']}}
+							@endif
+							@if ($res['ext01'] == 1)
+							★NSFW
+							@endif
+						</h5>
+						@endif
+						<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
+							@if ($res['pchfile'] && (!isset($res['ext02']) || $res['ext02'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
+							<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
+							@endif
+							@if ($use_continue)
+							<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
+							@endif
+						</h5>
+						@if ($res['ext01'] == 1)
+						<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
+						@else
+						<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
+						@endif
+						@endif
 						<p class="comment">{!! $res['com'] !!}</p>
 					</section>
 					@endif
