@@ -206,122 +206,124 @@
 				@if (!empty($bbsline['com']))
 				<section>
 					@if ($bbsline['parent'] < 1) <h3 class="oekaki">このスレにリプライ</h3>
-						@if ($use_oekaki_reply)
-						<hr>
-						<section class="epost">
-							<form action="{{$self}}" method="post" enctype="multipart/form-data">
-								<p>
-									<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
-									<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
-									<input type="hidden" name="mode" value="paint">
-									<label for="tools">ツール</label>
-									<select name="tools" id="tools">
-										<option value="neo">PaintBBS NEO</option>
-										@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
-										@if ($use_chicken)<option value="chicken">ChickenPaint</option> @endif
-										@if ($use_klecks)<option value="klecks">Klecks</option> @endif
-										@if ($use_tegaki)<option value="tegaki">Tegaki</option> @endif
-										@if ($use_axnos)<option value="axnos">Axnos</option> @endif
-									</select>
-									<label for="palettes">パレット</label>
-									@if ($select_palettes)
-									<select name="palettes" id="palettes">
-										@foreach ($pallets_dat as $palette)
-										<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
-										@endforeach
-									</select>
-									@else
-									<select name="palettes" id="palettes">
-										<option value="neo" id="0">標準</option>
-									</select>
-									@endif
-									@if ($useanime)
-									<label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
-									@endif
-									<input class="button" type="submit" value="お絵かき">
-									<input type="hidden" name="modid" value="{{$resno}}">
-								</p>
-							</form>
-							<ul>
-								<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
-							</ul>
-						</section>
-						<hr>
-						@endif
-						<script>
-							function add_to_com() {
-								document.getElementById("p_input_com").value += "{{$resname}}さん";
-							}
-						</script>
-						@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) <p>
-							<button class="copy_button" onclick="add_to_com()">投稿者名をコピー</button>
-							（投稿者名をコピぺできます）
-							</p>
-							<form action="{{$self}}?mode=reply" method="post" class="postform" enctype="multipart/form-data">
-								<table>
-									<tr>
-										<td>name @if ($use_name) * @endif</td>
-										<td><input type="text" name="name" size="18" value="" autocomplete="name" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
-									</tr>
-									<tr>
-										<td>mail</td>
-										<td><input type="text" name="mail" size="18" value="" autocomplete="email" maxlength="{{$max_email}}"></td>
-									</tr>
-									<tr>
-										<td>URL</td>
-										<td><input type="text" name="url" size="18" value="" autocomplete="url" maxlength="{{$max_url}}"></td>
-									</tr>
-									<tr>
-										<td>subject @if ($use_sub) * @endif</td>
-										<td>
-											@if ($use_resub)
-											<input type="text" name="sub" size="18" value="Re:{{$bbsline['sub']}}" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
-											@else
-											<input type="text" name="sub" size="18" value="" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
-											@endif
-											<input type="hidden" name="picfile" value="">
-											<input type="hidden" name="parent" value="{{$resno}}">
-											<input type="hidden" name="invz" value="0">
-											<input type="hidden" name="img_w" value="0">
-											<input type="hidden" name="img_h" value="0">
-											<input type="hidden" name="time" value="0">
-											<input type="hidden" name="exid" value="0">
-											<input type="hidden" name="modid" value="{{$resno}}">
-											@if ($token != null)
-											<input type="hidden" name="token" value="{{$token}}">
-											@else
-											<input type="hidden" name="token" value="">
-											@endif
-										</td>
-									</tr>
-									<tr>
-										<td>comment * </td>
-										<td>
-											<textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
-													</td>
-												</tr>
-												<tr>
-													<td>pass</td>
-													<td>
-														<input type="password" name="pwd" size="8" value="" autocomplete="current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
-														(記事の編集削除用。英数字で)
-													</td>
-												</tr>
-												<tr>
-													<td><input type="submit" id="submit" name="send" value="書き込む"></td>
-													<td>
-														(PCならCtrl + Enterでも書き込めます)
-													</td>
-												</tr>
-											</table>
-										</form>
-									@else
-										<p>このスレは古いので返信できません</p>
-									@endif
+					@if ($use_oekaki_reply)
+					<hr>
+					<section class="epost">
+						<form action="{{$self}}" method="post" enctype="multipart/form-data">
+							<p>
+								<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
+								<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
+								<input type="hidden" name="mode" value="paint">
+								<label for="tools">ツール</label>
+								<select name="tools" id="tools">
+									<option value="neo">PaintBBS NEO</option>
+									@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
+									<!--@if ($use_chicken)<option value="chicken">ChickenPaint</option> @endif
+									@if ($use_klecks)<option value="klecks">Klecks</option> @endif
+									@if ($use_tegaki)<option value="tegaki">Tegaki</option> @endif
+									@if ($use_axnos)<option value="axnos">Axnos</option> @endif -->
+								</select>
+								<label for="palettes">パレット</label>
+								@if ($select_palettes)
+								<select name="palettes" id="palettes">
+									@foreach ($pallets_dat as $palette)
+									<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
+									@endforeach
+								</select>
 								@else
-									<p><a href="{{$self}}?mode=res&amp;res={{$bbsline['parent']}}">このスレッドへ</a></p>
+								<select name="palettes" id="palettes">
+									<option value="neo" id="0">標準</option>
+								</select>
 								@endif
-							</section>
+								@if ($useanime)
+								<label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
+								@endif
+								<input class="button" type="submit" value="お絵かき">
+								<input type="hidden" name="modid" value="{{$resno}}">
+								<input type="hidden" name="resto" value="{{$resno}}">
+							</p>
+						</form>
+						<ul>
+							<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
+						</ul>
+					</section>
+					<hr>
+					@endif
+					<script>
+						function add_to_com() {
+							document.getElementById("p_input_com").value += "{{$resname}}さん";
+						}
+					</script>
+					@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) <p>
+					<button class="copy_button" onclick="add_to_com()">投稿者名をコピー</button>
+					（投稿者名をコピぺできます）
+					</p>
+					<form action="{{$self}}?mode=reply" method="post" class="postform" enctype="multipart/form-data">
+						<table>
+							<tr>
+								<td>name @if ($use_name) * @endif</td>
+								<td><input type="text" name="name" size="18" value="" autocomplete="name" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
+							</tr>
+							<tr>
+								<td>mail</td>
+								<td><input type="text" name="mail" size="18" value="" autocomplete="email" maxlength="{{$max_email}}"></td>
+							</tr>
+							<tr>
+								<td>URL</td>
+								<td><input type="text" name="url" size="18" value="" autocomplete="url" maxlength="{{$max_url}}"></td>
+							</tr>
+							<tr>
+								<td>subject @if ($use_sub) * @endif</td>
+								<td>
+									@if ($use_resub)
+									<input type="text" name="sub" size="18" value="Re:{{$bbsline['sub']}}" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
+									@else
+									<input type="text" name="sub" size="18" value="" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
+									@endif
+									<input type="hidden" name="picfile" value="">
+									<input type="hidden" name="parent" value="{{$resno}}">
+									<input type="hidden" name="invz" value="0">
+									<input type="hidden" name="img_w" value="0">
+									<input type="hidden" name="img_h" value="0">
+									<input type="hidden" name="time" value="0">
+									<input type="hidden" name="exid" value="0">
+									<input type="hidden" name="modid" value="{{$resno}}">
+									<input type="hidden" name="resto" value="{{$resno}}">
+									@if ($token != null)
+									<input type="hidden" name="token" value="{{$token}}">
+									@else
+									<input type="hidden" name="token" value="">
+									@endif
+								</td>
+							</tr>
+							<tr>
+								<td>comment * </td>
+								<td>
+									<textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
+											</td>
+										</tr>
+										<tr>
+											<td>pass</td>
+											<td>
+												<input type="password" name="pwd" size="8" value="" autocomplete="current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
+												(記事の編集削除用。英数字で)
+											</td>
+										</tr>
+										<tr>
+											<td><input type="submit" id="submit" name="send" value="書き込む"></td>
+											<td>
+												(PCならCtrl + Enterでも書き込めます)
+											</td>
+										</tr>
+									</table>
+								</form>
+							@else
+							<p>このスレは古いので返信できません</p>
+							@endif
+							@else
+							<p><a href="{{$self}}?mode=res&amp;res={{$bbsline['parent']}}">このスレッドへ</a></p>
+							@endif
+						</section>
 						@endif
 					@endforeach
 				</div>
@@ -330,10 +332,11 @@
 				</div>
 			@endforeach
 			@else
-				<section>
-					<h3 class="oyat">エラー</h3>
-					<h4>none</h4>
-					<p>そんなスレッドないです。</p>
+			<section>
+				<h3 class="oyat">エラー</h3>
+				<h4>none</h4>
+				<p>そんなスレッドないです。</p>
+			</section>
 			@endif
 			</div>
 			<script src="loadcookie.js"></script>

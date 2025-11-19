@@ -112,6 +112,9 @@
 								<input type="hidden" name="img_w" value="0">
 								<input type="hidden" name="img_h" value="0">
 								<input type="hidden" name="exid" value="0">
+								@if (isset($resto) && $resto != null)
+								<input type="hidden" name="resto" value="{{$resto}}">
+								@endif
 								@if ($token != null)
 								<input type="hidden" name="token" value="{{$token}}">
 								@else

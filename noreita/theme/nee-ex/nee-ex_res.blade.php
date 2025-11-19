@@ -143,6 +143,32 @@
 										@endif
 									</a></span>
 							</h4>
+							@if ($res['picfile'])
+							@if ($dptime)
+							<h5>
+								{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
+								@if ($res['psec'] != null)
+								描画時間：{{$res['utime']}}
+								@endif
+								@if ($res['ext01'] == 1)
+								★NSFW
+								@endif
+							</h5>
+							@endif
+							<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
+								@if ($res['pchfile'] && (!isset($res['ext02']) || $res['ext02'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
+								<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
+								@endif
+								@if ($use_continue)
+								<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
+								@endif
+							</h5>
+							@if ($res['ext01'] == 1)
+							<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
+							@else
+							<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
+							@endif
+							@endif
 							<p class="comment">{!! $res['com'] !!}</p>
 						</section>
 					</section>
@@ -181,7 +207,50 @@
 				@foreach ($oya as $bbsline)
 				@if (!empty($bbsline['com']))
 				<section>
-					@if ($bbsline['parent'] < 1) <h3 class="oekaki">このスレにレス</h3>
+				@if ($bbsline['parent'] < 1) <h3 class="oekaki">このスレにリプライ</h3>
+				@if ($use_oekaki_reply)
+				<hr>
+				<section class="epost">
+					<form action="{{$self}}" method="post" enctype="multipart/form-data">
+						<p>
+							<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
+							<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
+							<input type="hidden" name="mode" value="paint">
+							<label for="tools">ツール</label>
+							<select name="tools" id="tools">
+								<option value="neo">PaintBBS NEO</option>
+								@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
+								<!--@if ($use_chicken)<option value="chicken">ChickenPaint</option> @endif
+								@if ($use_klecks)<option value="klecks">Klecks</option> @endif
+								@if ($use_tegaki)<option value="tegaki">Tegaki</option> @endif
+								@if ($use_axnos)<option value="axnos">Axnos</option> @endif -->
+							</select>
+							<label for="palettes">パレット</label>
+							@if ($select_palettes)
+							<select name="palettes" id="palettes">
+								@foreach ($pallets_dat as $palette)
+								<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
+								@endforeach
+							</select>
+							@else
+							<select name="palettes" id="palettes">
+								<option value="neo" id="0">標準</option>
+							</select>
+							@endif
+							@if ($useanime)
+							<label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
+							@endif
+							<input class="button" type="submit" value="お絵かき">
+							<input type="hidden" name="modid" value="{{$resno}}">
+							<input type="hidden" name="resto" value="{{$resno}}">
+						</p>
+					</form>
+					<ul>
+						<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
+					</ul>
+				</section>
+				<hr>
+				@endif
 						<script>
 							function add_to_com() {
 								document.getElementById("p_input_com").value += "{{$resname}}さん";
@@ -221,6 +290,7 @@
 											<input type="hidden" name="time" value="0">
 											<input type="hidden" name="exid" value="0">
 											<input type="hidden" name="modid" value="{{$resno}}">
+											<input type="hidden" name="resto" value="{{$resno}}">
 											@if ($token != null)
 											<input type="hidden" name="token" value="{{$token}}">
 											@else
@@ -250,10 +320,10 @@
 											</table>
 										</form>
 									@else
-										<p>このスレは古いので返信できません</p>
+									<p>このスレは古いので返信できません</p>
 									@endif
 								@else
-									<p><a href="{{$self}}?mode=res&amp;res={{$bbsline['parent']}}">このスレッドへ</a></p>
+								<p><a href="{{$self}}?mode=res&amp;res={{$bbsline['parent']}}">このスレッドへ</a></p>
 								@endif
 							</section>
 						@endif
@@ -264,10 +334,11 @@
 				</div>
 			@endforeach
 			@else
-				<section>
-					<h3 class="oyat">エラー</h3>
-					<h4>none</h4>
-					<p>そんなスレッドないです。</p>
+			<section>
+				<h3 class="oyat">エラー</h3>
+				<h4>none</h4>
+				<p>そんなスレッドないです。</p>
+			</section>
 			@endif
 			</div>
 			<script src="loadcookie.js"></script>
