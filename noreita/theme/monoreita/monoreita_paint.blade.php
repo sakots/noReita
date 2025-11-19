@@ -84,7 +84,11 @@
 					@elseif ($tool == 'shi')
 					<param name="url_save" value="picpost.php">
 					@endif
+					@if (isset($resto))
+					<param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}&amp;resto={{$resto}}">
+					@else
 					<param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}">
+					@endif
 					@if (isset($imgfile))<param name="image_canvas" value="{{$imgfile}}">@endif
 					@if (isset($pchfile))<param name="pch_file" value="{{$pchfile}}">@endif
 					<param name="poo" value="false">
@@ -95,10 +99,10 @@
 					<param name="tool_advance" value="true">
 					@if ($anime)<param name="thumbnail_type" value="animation">@endif
 					@if (isset($security))
-						@if (isset($security_click))<param name="security_click" value="{{$security_click}}">@endif
-						@if (isset($security_timer))<param name="security_timer" value="{{$security_timer}}">@endif
-						<param name="security_url" value="{{$security_url}}">
-						<param name="security_post" value="false">
+					@if (isset($security_click))<param name="security_click" value="{{$security_click}}">@endif
+					@if (isset($security_timer))<param name="security_timer" value="{{$security_timer}}">@endif
+					<param name="security_url" value="{{$security_url}}">
+					<param name="security_post" value="false">
 					@endif
 					@if ($tool == 'neo')
 					<param name="neo_confirm_unload" value="true">

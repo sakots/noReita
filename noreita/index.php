@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v1.6.27'); //lot.251111.0
+define('REITA_VER', 'v2.0.0'); //lot.251119.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -29,7 +29,7 @@ if(!isset($functions_ver) || $functions_ver < 20250610) {
 check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 20250706 || !defined('CONF_VER')) {
+if (CONF_VER < 20251112 || !defined('CONF_VER')) {
 	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
 }
 
@@ -54,8 +54,8 @@ require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
 
-//管理パスが初期値(kanripass)の場合は動作させない
-if ($admin_pass === 'kanripass') {
+//管理パスが初期値(admin_pass)の場合は動作させない
+if ($admin_pass === 'admin_pass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
@@ -159,6 +159,8 @@ defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
 
 $dat['sodane'] = SODANE;
 
+$dat['use_oekaki_reply'] = USE_OEKAKI_REPLY;
+
 //ペイント画面の$pwdの暗号化
 define('CRYPT_METHOD', 'aes-128-cbc');
 define('CRYPT_IV', 'T3pkYxNyjN7Wz3pu'); //半角英数16文字
@@ -242,7 +244,7 @@ $modeMap = [
 	'reply' => 'reply',
 	'res' => 'res',
 	'sodane' => 'sodane',
-	'paint' => fn() => paint_form(""),
+	'paint' => fn() => paint_form("", filter_input_data('POST','modid',FILTER_VALIDATE_INT)),
 	'piccom' => fn() => paint_com(""),
 	'pictmp' => fn() => paint_com("tmp"),
 	'anime' => fn() => open_pch($sp ?? ""),
@@ -250,7 +252,7 @@ $modeMap = [
 	'contpaint' => function() {
 		$type = filter_input(INPUT_POST, 'type');
 		if (CONTINUE_PASS || $type === 'rep') usrchk();
-		return paint_form($type);
+		return paint_form($type, filter_input_data('POST','modid',FILTER_VALIDATE_INT));
 	},
 	'picrep' => 'picreplace',
 	'catalog' => 'catalog',
@@ -373,6 +375,8 @@ function regist(): void {
 	$id = (string)filter_input(INPUT_POST, 'id');
 	$no = (string)filter_input(INPUT_POST, 'no');
 	$enc_pwd = (string)filter_input(INPUT_POST, 'enc_pwd');
+	$modid = (string)filter_input(INPUT_POST, 'modid');
+
 	$resto = (string)filter_input(INPUT_POST, 'resto');
 
 	if ($req_method !== "POST") {
@@ -651,17 +655,41 @@ function regist(): void {
 			$age = $db->exec("$sqlage");
 			$tree = time() * 100000000;
 
-			//スレ建て
-			$thread = 1;
+			//スレ建てorお絵かきリプ
+			if (!isset($resto) || $resto === "") {
+				$thread = 1; //スレ建て
+				$parent = NULL;
+				$comid = NULL;
+				
+				$age = 0;
+			} else {
+				$thread = 0; //お絵かきリプ
+				$parent = $resto;
+				//レスの位置
+				$tree = time() - $parent - (int)$msgwc["tid"];
+				$comid = $tree + time();
+
+				//メール欄にsageが含まれるならageない
+				$age = (int)$msgwc["age"];
+				if (strpos($mail, 'sage') !== false) {
+					//sage
+					$age = $age;
+				} else {
+					//age
+					$age++;
+					$agetree = $age + (time() * 100000000);
+					$sql_age = "UPDATE tlog SET age = $age, tree = $agetree WHERE tid = $parent";
+					$db->exec($sql_age);
+				}
+			}
 			$shd = 0;
-			$age = 0;
-			$parent = NULL;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01, ext02) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :tree, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype)";
+			
+			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01, ext02) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype)";
 
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					'thread'=>$thread, 'parent'=>$parent, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype,
+					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype,
 				]
 			);
 			//$db->exec($sql);
@@ -986,6 +1014,7 @@ function reply(): void {
 				$utime = "";
 				$used_tool = "";
 				$ctype = null;
+				$psec = 0;
 			}
 
 			// 値を追加する
@@ -1563,7 +1592,7 @@ function res(): void {
 }
 
 //お絵描き画面
-function paint_form($rep): void {
+function paint_form($rep, $reply_to): void {
 	global $message, $usercode, $quality, $qualitys, $no;
 	global $mode, $ctype, $pch, $type;
 	global $blade, $dat;
@@ -1571,6 +1600,8 @@ function paint_form($rep): void {
 
 	$pwd = (string)filter_input(INPUT_POST, 'pwd');
 	$imgfile = filter_input(INPUT_POST, 'img');
+
+	$dat['resto'] = $reply_to;
 
 	//ツール
 	if (isset($_POST["tools"])) {
@@ -1768,7 +1799,7 @@ function paint_form($rep): void {
 
 	// デバッグ用：usercodeの内容を確認
 	// error_log("paintform関数 - usercode: " . $usercode);
-	
+
 	// usercodeをセッション変数に保存
 	if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -1865,6 +1896,7 @@ function paint_com($tmpmode): void {
 
 	$dat['parent'] = $_SERVER['REQUEST_TIME'];
 	$dat['usercode'] = $usercode;
+	$dat['resto'] = $resto;
 
 	//----------
 

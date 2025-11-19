@@ -1,6 +1,6 @@
 <?php
 //--------------------------------------------------
-// 「noReita」v1.3.0～用テーマ「monoreita」設定ファイル
+// 「noReita」v2.0.0～用テーマ「monoreita」設定ファイル
 //  by sakots https://oekakibbs.moe/
 //--------------------------------------------------
 
@@ -8,7 +8,7 @@
 define('THEME_NAME', "monoreita");
 
 //テーマのバージョン
-define('THEME_VER', "1.8.9 lot.250711.0");
+define('THEME_VER', "2.0.0 lot.251119.0");
 
 /* -------------------- */
 

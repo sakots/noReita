@@ -69,6 +69,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/11/19] v2.0.0
+
+- リプライでお絵かき（しいちゃん）をできるようにした
+- 管理パスの初期値をadmin_passに
+
 ### [2025/11/11] v1.6.27
 
 - klecksバージョンアップ
