@@ -69,6 +69,13 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/11/23] v2.1.0
+
+- ChickenPaintBeがlitaChitに改名したので対応
+- litaChitで続きから描くのに対応
+- axnosバージョンアップ
+- しぃちゃん以外ではお絵かき前のパレット選択を表示しないようにした
+
 ### [2025/11/19] v2.0.0
 
 - リプライでお絵かき（しいちゃん）をできるようにした
