@@ -36,7 +36,7 @@ define('TITLE', 'お絵かき掲示板');
 // 自分のサイトのURL（絶対パスも可）をどうぞ。
 define('HOME', '../');
 
-// ChickenPaintを使う 使う:1 使わない:0
+// litaChitを使う 使う:1 使わない:0
 define('USE_CHICKENPAINT', 1);
 
 //しぃペインターを使用する する:1 しない:0
@@ -239,7 +239,7 @@ define('NEO_DIR', 'app/neo/');
 //しぃペインターのディレクトリ。index.phpから見て
 define('SHI_PAINTER_DIR', 'app/shi_painter/');
 
-//chickenPaintのディレクトリ。index.phpから見て
+//litaChitのディレクトリ。index.phpから見て
 define('CHICKEN_DIR', 'app/chickenpaint/');
 
 //klecksのディレクトリ。index.phpから見て
