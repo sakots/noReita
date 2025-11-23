@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.0.0'); //lot.251119.0
+define('REITA_VER', 'v2.1.0'); //lot.251123.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -54,8 +54,8 @@ require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
 
-//管理パスが初期値(admin_pass)の場合は動作させない
-if ($admin_pass === 'admin_pass') {
+//管理パスが初期値(kanripass)の場合は動作させない
+if ($admin_pass === 'kanripass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
@@ -555,7 +555,7 @@ function regist(): void {
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
 				} elseif ($tool === 'chicken') {
-					$used_tool = 'Chicken Paint';
+					$used_tool = 'litaChit';
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
 				} elseif ($tool === 'tegaki') {
@@ -952,7 +952,7 @@ function reply(): void {
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
 				} elseif ($tool === 'chicken') {
-					$used_tool = 'Chicken Paint';
+					$used_tool = 'litaChit';
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
 				} elseif ($tool === 'tegaki') {
@@ -1194,7 +1194,7 @@ function def(): void {
 			while ($flag == true) {
 				$_pchext = pathinfo($bbsline['pchfile'], PATHINFO_EXTENSION);
 				if ($_pchext === 'chi') {
-					$bbsline['pchfile'] = ''; //ChickenPaintは動画リンクを出さない
+					$bbsline['pchfile'] = ''; //litaChitは動画リンクを出さない
 				}
 				// 拡張子がない場合やext02がimgの場合は動画リンクを出さない
 				if ($_pchext === '' || $bbsline['pchfile'] === '' || (isset($bbsline['ext02']) && $bbsline['ext02'] === 'img')) {
@@ -1601,8 +1601,6 @@ function paint_form($rep, $reply_to): void {
 	$pwd = (string)filter_input(INPUT_POST, 'pwd');
 	$imgfile = filter_input(INPUT_POST, 'img');
 
-	$dat['resto'] = $reply_to;
-
 	//ツール
 	if (isset($_POST["tools"])) {
 		$tool = filter_input(INPUT_POST, 'tools');
@@ -1729,6 +1727,9 @@ function paint_form($rep, $reply_to): void {
 		}
 	}
 
+	//お絵かきリプ
+	$dat['resto'] = $reply_to;
+
 	$pal = array();
 	$DynP = array();
 	$p_cnt = 0;
@@ -1844,7 +1845,7 @@ function open_pch($pch, $sp = ""): void {
 		$dat['tool'] = 'neo'; //拡張子がpchのときはNEO
 		//}elseif($extn=='chi'){
 		//	$pchfile = IMG_DIR.$pch;
-		//	$dat['tool'] = 'chicken'; //拡張子がchiのときはChickenPaint 対応してくれるといいな
+		//	$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChit 対応してくれるといいな
 	} else {
 		$w = $h = $picw = $pich = $datasize = ""; //動画が無い時は処理しない
 		$dat['tool'] = 'neo';
@@ -2035,7 +2036,7 @@ function in_continue(): void {
 			$dat['ctype_pch'] = true;
 			$dat['ctype_img'] = false;
 		} elseif (is_file($histfilename . '.chi')) {
-			$dat['tool'] = 'chicken'; //拡張子がchiのときはChickenPaint
+			$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChit
 			$dat['useshi'] = false;
 			$dat['useneo'] = false;
 			$dat['ctype_pch'] = true;
