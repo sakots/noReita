@@ -240,8 +240,10 @@
 					@endif
 				formData.append("tool", "axnos");
 				formData.append("stime", {{time()}});
+				@if (isset($resto) && $resto != null)
 				formData.append("resto", "{{$resto}}");
-				postData("{{$self}}?mode=saveimage&tool=axnos", formData);
+				@endif
+				postData("{{$self}}?mode=saveimage&tool=axnos&resto={{$resto}}", formData);
 				// (c)satopian MIT License ここまで
 				// location.reload();
 				})
@@ -306,8 +308,8 @@
 
           @if (isset($imgfile)) loadImageUrl: "{{$imgfile}}", @endif
           @if (isset($pchfile)) loadChibiFileUrl: "{{$pchfile}}", @endif
-          saveUrl: "save.php?usercode={!!$usercode!!}",
-          postUrl: "{{$self}}?mode={!!$mode!!}&stime={{$stime}}",
+          saveUrl: "save.php?usercode={!!$usercode!!}@if (isset($resto) && $resto != null)&resto={{$resto}}@endif",
+          postUrl: "{{$self}}?mode={!!$mode!!}&stime={{$stime}}@if (isset($resto) && $resto != null)&resto={{$resto}}@endif",
           exitUrl: "{{$self}}",
 
           allowDownload: true,
@@ -461,8 +463,10 @@
 						@endif
 					formData.append("tool", "klecks");
 					formData.append("stime", {{time()}});
+					@if (isset($resto) && $resto != null)
 					formData.append("resto", "{{$resto}}");
-					postData("./?mode=saveimage&tool=klecks", formData);
+					@endif
+					postData("./?mode=saveimage&tool=klecks&resto={{$resto}}", formData);
 					});
 					// (c)satopian MIT License ここまで
 					// location.reload();
@@ -773,7 +777,7 @@
 					formData.append("tool", "tegaki");
 					formData.append("stime", {{time()}});
 					formData.append("resto", "{{$resto}}");
-					postData("{{$self}}?mode=saveimage&tool=tegaki", formData);
+					postData("{{$self}}?mode=saveimage&tool=tegaki&resto={{$resto}}", formData);
 					},
 					'image/png'
 				);
