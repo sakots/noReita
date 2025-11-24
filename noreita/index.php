@@ -54,8 +54,8 @@ require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
 
-//管理パスが初期値(kanripass)の場合は動作させない
-if ($admin_pass === 'kanripass') {
+//管理パスが初期値(admin_pass)の場合は動作させない
+if ($admin_pass === 'admin_pass') {
 	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
 }
 
