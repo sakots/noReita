@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.1.0'); //lot.251123.0
+define('REITA_VER', 'v2.1.1'); //lot.251202.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -2739,7 +2739,7 @@ function validate_upload_file($file_path, $allowed_types = ['image/jpeg', 'image
     // MIMEタイプの検証
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
     $mime_type = finfo_file($finfo, $file_path);
-    finfo_close($finfo);
+		//finfo_close($finfo);
 
     if (!in_array($mime_type, $allowed_types)) {
         return false;

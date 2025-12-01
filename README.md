@@ -69,6 +69,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/12/02] v2.1.1
+
+- php8.5対応、動作確認
+- PaintBBS NEOバージョンアップ（v1.6.21）
+
 ### [2025/11/23] v2.1.0
 
 - ChickenPaintBeがlitaChitに改名したので対応
