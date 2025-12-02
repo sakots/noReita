@@ -72,7 +72,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ### [2025/12/02] v2.1.1
 
 - php8.5対応、動作確認
-- 管理パスのデフォルト値をpanri_passからadmin_passに変更できていなかったので修正
+- 管理パスのデフォルト値をkanri_passからadmin_passに変更できていなかったので修正
 - PaintBBS NEOバージョンアップ（v1.6.21）
 
 ### [2025/11/23] v2.1.0
