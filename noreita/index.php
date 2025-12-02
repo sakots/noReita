@@ -284,7 +284,6 @@ if (isset($modeMap[$mode])) {
 
 // デフォルト
 return def();
-exit;
 
 /*-----------Main-------------*/
 
@@ -1972,8 +1971,6 @@ function paint_com($tmpmode): void {
 			$src = TEMP_DIR . $tmpfile;
 			$srcname = $tmpfile;
 			$date = gmdate("Y/m/d H:i", filemtime($src) + 9 * 60 * 60);
-			$utime = $utime;
-			$psec = $psec;
 			$temp[] = compact('src', 'srcname', 'date', 'tool', 'utime', 'psec');
 		}
 		$dat['temp'] = $temp;
