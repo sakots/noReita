@@ -36,14 +36,14 @@ if (CONF_VER < 20251112 || !defined('CONF_VER')) {
 //misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!isset($misskey_note_ver) || $misskey_note_ver < 20250326){
+if(!isset($misskey_note_ver) || $misskey_note_ver < 20250326) {
 	die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 //save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
-if(!isset($save_inc_ver)||$save_inc_ver<20250706){
+if(!isset($save_inc_ver)||$save_inc_ver < 20250918) {
 	die($en?'Please update save.inc.php to the latest version.':'save.inc.phpを最新版に更新してください。');
 }
 
