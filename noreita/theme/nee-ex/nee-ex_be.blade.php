@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{$btitle}}</title>
+	<script>
+		let resto = "{{$resto}}";
+	</script>
   @if ($tool == 'chicken')
   <style>
     body { overscroll-behavior-x: none !important; }
@@ -240,8 +243,8 @@
 					@endif
 				formData.append("tool", "axnos");
 				formData.append("stime", {{time()}});
-				formData.append("resto", "{{$resto}}");
-				postData("{{$self}}?mode=saveimage&tool=axnos&resto={{$resto}}", formData);
+				formData.append("resto", resto);
+				postData("{{$self}}?mode=saveimage&tool=axnos", formData);
 				// (c)satopian MIT License ここまで
 				// location.reload();
 				})
@@ -308,7 +311,7 @@
           @if (isset($pchfile)) loadChibiFileUrl: "{{$pchfile}}", @endif
           saveUrl: "save.php?usercode={!!$usercode!!}@if (isset($resto) && $resto != null)&resto={{$resto}}@endif",
           postUrl: "{{$self}}?mode={!!$mode!!}&stime={{$stime}}@if (isset($resto) && $resto != null)&resto={{$resto}}@endif",
-          exitUrl: "{{$self}}",
+          exitUrl: "{{$self}}" + (resto ? "?resto=" + resto : ""),
 
           allowDownload: true,
           resourcesRoot: "{{$chicken_dir}}",
@@ -404,7 +407,7 @@
 											@if (isset($rep))
 											return repData();
 											@endif
-											return window.location.href = "{{$self}}?mode=piccom";
+											return window.location.href = "{{$self}}?mode=piccom" + (resto ? "&resto=" + resto : "");
 										}
 										return alert(text);
 									})
@@ -461,8 +464,8 @@
 						@endif
 					formData.append("tool", "klecks");
 					formData.append("stime", {{time()}});
-					formData.append("resto", "{{$resto}}");
-					postData("./?mode=saveimage&tool=klecks&resto={{$resto}}", formData);
+					formData.append("resto", resto);
+					postData("./?mode=saveimage&tool=klecks", formData);
 					});
 					// (c)satopian MIT License ここまで
 					// location.reload();
@@ -499,14 +502,14 @@
 							response.text().then((text) => {
 								if (text.startsWith("error\n")) {
 									console.log(text);
-									return window.location.href = "{{$self}}?mode=piccom";
+									return window.location.href = "{{$self}}?mode=piccom" + (resto ? "&resto=" + resto : "");
 								}
 							})
 						}
 					})
 					.catch(error => {
 						console.error('There was a problem with the fetch operation:', error);
-						return window.location.href = "{{$self}}?mode=piccom";
+						return window.location.href = "{{$self}}?mode=piccom" + (resto ? "&resto=" + resto : "");
 					});
 			}
 		@endif
@@ -772,8 +775,8 @@
 						@endif
 					formData.append("tool", "tegaki");
 					formData.append("stime", {{time()}});
-					formData.append("resto", "{{$resto}}");
-					postData("{{$self}}?mode=saveimage&tool=tegaki&resto={{$resto}}", formData);
+					formData.append("resto", resto);
+					postData("{{$self}}?mode=saveimage&tool=tegaki", formData);
 					},
 					'image/png'
 				);
