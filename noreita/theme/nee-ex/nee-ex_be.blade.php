@@ -208,7 +208,7 @@
 											@if (isset($rep))
 												return repData();
 											@endif
-											return window.location.href = "{{$self}}?mode=piccom";
+											return window.location.href = "{{$self}}?mode=piccom" + (resto ? "&resto=" + resto : "");
 										}
 										resolve(false);
 										return alert(text);
@@ -684,7 +684,7 @@
 											return repData();
 										@endif
 										Tegaki.hide(); //｢このサイトを離れますか?｣を解除
-										return window.location.href = "{{$self}}?mode=piccom";
+										return window.location.href = "{{$self}}?mode=piccom" + (resto ? "&resto=" + resto : "");
 									}
 									return showAlert(text);
 								})
