@@ -554,7 +554,7 @@ function regist(): void {
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
 				} elseif ($tool === 'chicken') {
-					$used_tool = 'litaChit';
+					$used_tool = 'litaChix';
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
 				} elseif ($tool === 'tegaki') {
@@ -951,7 +951,7 @@ function reply(): void {
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
 				} elseif ($tool === 'chicken') {
-					$used_tool = 'litaChit';
+					$used_tool = 'litaChix';
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
 				} elseif ($tool === 'tegaki') {
@@ -1193,7 +1193,7 @@ function def(): void {
 			while ($flag == true) {
 				$_pchext = pathinfo($bbsline['pchfile'], PATHINFO_EXTENSION);
 				if ($_pchext === 'chi') {
-					$bbsline['pchfile'] = ''; //litaChitは動画リンクを出さない
+					$bbsline['pchfile'] = ''; //litaChixは動画リンクを出さない
 				}
 				// 拡張子がない場合やext02がimgの場合は動画リンクを出さない
 				if ($_pchext === '' || $bbsline['pchfile'] === '' || (isset($bbsline['ext02']) && $bbsline['ext02'] === 'img')) {
@@ -1844,7 +1844,7 @@ function open_pch($pch, $sp = ""): void {
 		$dat['tool'] = 'neo'; //拡張子がpchのときはNEO
 		//}elseif($extn=='chi'){
 		//	$pchfile = IMG_DIR.$pch;
-		//	$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChit 対応してくれるといいな
+		//	$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChix 対応してくれるといいな
 	} else {
 		$w = $h = $picw = $pich = $datasize = ""; //動画が無い時は処理しない
 		$dat['tool'] = 'neo';
@@ -2033,7 +2033,7 @@ function in_continue(): void {
 			$dat['ctype_pch'] = true;
 			$dat['ctype_img'] = false;
 		} elseif (is_file($histfilename . '.chi')) {
-			$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChit
+			$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChix
 			$dat['useshi'] = false;
 			$dat['useneo'] = false;
 			$dat['ctype_pch'] = true;
