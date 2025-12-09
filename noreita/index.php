@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.2.0a'); //lot.251207.1
+define('REITA_VER', 'v2.2.1'); //lot.251209.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -424,6 +424,7 @@ function regist(): void {
 
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		if (isset($_POST["send"])) {
 
 			$strlen_com = strlen($com);
@@ -717,6 +718,7 @@ function regist(): void {
 	//スレ数カウント
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$sqlth = "SELECT SUM(thread) as cnt FROM tlog";
 		$th_cnt_sql = $db->query("$sqlth");
 		$th_cnt_sql = $th_cnt_sql->fetch();
@@ -734,6 +736,7 @@ function regist(): void {
 		// そろそろ消えるスレッドにshdフラグを設定
 		try {
 			$db = new PDO(DB_PDO);
+			$db->exec("PRAGMA journal_mode=WAL;");
 			// 古いスレッドから順番にshdフラグを設定
 			$sql = "UPDATE tlog SET shd = '1' WHERE thread = 1 AND shd = '0' ORDER BY tid ASC LIMIT ?";
 			$stmt = $db->prepare($sql);
@@ -826,6 +829,7 @@ function reply(): void {
 
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		if (isset($_POST["send"])) {
 
 			$strlen_com = strlen($com);
@@ -1103,6 +1107,7 @@ function def(): void {
 	//スレ数カウント
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$sqlth = "SELECT SUM(thread) as cnt FROM tlog";
 		$th_cnt_sql = $db->query("$sqlth");
 		$th_cnt_sql = $th_cnt_sql->fetch();
@@ -1124,6 +1129,7 @@ function def(): void {
 	//ページング
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$sqlcnt = "SELECT SUM(thread) as cnt FROM tlog WHERE invz=0";
 		$th_cnt_sql = $db->query("$sqlcnt");
 		$th_cnt_sql = $th_cnt_sql->fetch();
@@ -1170,6 +1176,7 @@ function def(): void {
 	//読み込み
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		//1ページの全スレッド取得
 		$sql = "SELECT * FROM tlog WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?";
 		$posts = $db->prepare($sql);
@@ -1291,6 +1298,7 @@ function catalog(): void {
 	//ページング
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		if (isset($_GET['page']) && is_numeric($_GET['page'])) {
 			$page = $_GET['page'];
 			$page = max($page, 1);
@@ -1338,6 +1346,7 @@ function catalog(): void {
 
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		//1ページの全スレッド取得
 		$sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, exid, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime FROM tlog WHERE thread=1 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
 		$posts = $db->prepare($sql);
@@ -1385,6 +1394,7 @@ function search(): void {
 	//読み込み
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		//全スレッド取得
 		//まずtagがあれば全文検索
 		if ($tag == 'tag') {
@@ -1438,6 +1448,7 @@ function sodane(): void {
 
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$stmt = $db->prepare("UPDATE tlog SET exid = exid + 1 WHERE tid = ?");
 		$stmt->execute([$resto]);
 
@@ -1501,6 +1512,7 @@ function res(): void {
 
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$sql = "SELECT * FROM tlog WHERE tid = ? ORDER BY tree DESC";
 		$posts = $db->prepare($sql);
 		$posts->execute([$resno]);
@@ -2004,6 +2016,7 @@ function in_continue(): void {
 
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$sql = "SELECT *, ext02 as ctype FROM tlog WHERE picfile=? ORDER BY tree DESC";
 		$posts = $db->prepare($sql);
 		$posts->execute([$no]);
@@ -2076,6 +2089,7 @@ function delmode(): void {
 	//記事呼び出し
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 
 		//パスワードを取り出す
 		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
@@ -2206,6 +2220,7 @@ function picreplace(): void {
 	// ログ読み込み
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		//記事を取り出す
 		$sql = "SELECT * FROM tlog WHERE tid = ?";
 		$msgs = $db->prepare($sql);
@@ -2331,6 +2346,7 @@ function editform(): void {
 	//記事呼び出し
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 
 		//パスワードを取り出す
 		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
@@ -2455,6 +2471,7 @@ function editexec(): void {
 
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$sql = "UPDATE tlog set modified = datetime('now', 'localtime'), a_name = :name, mail = :mail, sub = :sub, com = :com, a_url = :url, host = :host, exid = :exid, pwd = :pwdh where tid = :e_no";
 
 		// プレースホルダ
@@ -2499,6 +2516,7 @@ function admin(): void {
 	//記事呼び出しから
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		//読み込み
 		$adminpass = filter_input(INPUT_POST, 'adminpass');
 		if ($adminpass === $admin_pass) {
@@ -2543,6 +2561,7 @@ function usrchk(): void {
 	$flag = FALSE;
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		//パスワードを取り出す
 		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
 		$msgs = $db->prepare($sql);
@@ -2636,6 +2655,7 @@ function logdel(): void {
 	//オーバーした行の画像とスレ番号を取得
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$sqlimg = "SELECT * FROM tlog ORDER BY tid LIMIT 1";
 		$msgs = $db->prepare($sqlimg);
 		$msgs->execute();
@@ -2686,6 +2706,7 @@ function misskey_note(): void {
 	$no = filter_input(INPUT_GET, 'no',FILTER_VALIDATE_INT);
 	try {
 		$db = new PDO(DB_PDO);
+		$db->exec("PRAGMA journal_mode=WAL;");
 		$sql = "SELECT * FROM tlog WHERE id=? ORDER BY tree DESC";
 		$posts = $db->prepare($sql);
 		$posts->execute([$no]);
