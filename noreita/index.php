@@ -1904,7 +1904,10 @@ function paint_com($tmpmode): void {
 	global $blade, $dat;
 
 	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
-	$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
+	$resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
+	if (!isset($resto) || $resto === null) {
+		$resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
+	}
 
 	$dat['parent'] = $_SERVER['REQUEST_TIME'];
 	$dat['usercode'] = $usercode;
