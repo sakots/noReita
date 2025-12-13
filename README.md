@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2025/12/13] v2.2.2
+
+- LitaChix更新
+
 ### [2025/12/09] v2.2.1
 
 - WALモードを有効にした
