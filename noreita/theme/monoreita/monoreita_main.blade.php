@@ -123,9 +123,7 @@
 					<h4 class="oya">
 						<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
 						@if ($bbsline['admins'] == 1)
-						<svg viewBox="0 0 640 512">
-							<use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge">
-						</svg>
+						<span class="mingcute--user-star-fill"></span>
 						@endif
 						@if ($bbsline['modified'] == $bbsline['created'])
 						{{$bbsline['modified']}}
@@ -194,9 +192,7 @@
 						<h4>
 							名前：<span class="resname">{{$res['a_name']}}
 								@if ($res['admins'] == 1)
-								<svg viewBox="0 0 640 512">
-									<use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge">
-								</svg>
+								<span class="mingcute--user-star-fill"></span>
 								@endif
 							</span>：
 							@if ($res['modified'] == $res['created'])
@@ -256,28 +252,21 @@
 						@if ($share_button)
 						@if ($use_misskey_note)
 						<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}">
-							<svg>
-								<use href="./theme/{{$themedir}}/icons/misskey.svg#misskey"></use>
-							</svg> Misskeyにノート</a>
+							<span class="simple-icons--misskey"></span> Misskeyにノート</a>
 						</span>
 						@endif
 						@if ($switch_sns)
 						<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
-							<svg viewBox="0 0 512 512">
-								<use href="./theme/{{$themedir}}/icons/share.svg#share">
-							</svg> SNSで共有する</a>
+							<span class="eva--share-outline"></span> SNSで共有する</a>
 						</span>
 						@else
 						<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
-							<svg viewBox="0 0 512 512">
-								<use href="./theme/{{$themedir}}/icons/twitter.svg#twitter">
-							</svg> tweet</a>
+							<span class="ri--twitter-x-line"></span> tweet</a>
 						</span>
 						@endif
 						@endif
 						@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
-						<span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><svg viewBox="0 0 512 512">
-							<use href="./theme/{{$themedir}}/icons/rep.svg#rep"></svg> 返信</a>
+						<span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><span class="ic--baseline-reply"></span> 返信</a>
 						</span>
 						@else
 						このスレは古いので返信できません…
