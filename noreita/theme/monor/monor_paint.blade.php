@@ -99,10 +99,10 @@
 					<param name="tool_advance" value="true">
 					@if ($anime)<param name="thumbnail_type" value="animation">@endif
 					@if (isset($security))
-						@if (isset($security_click))<param name="security_click" value="{{$security_click}}">@endif
-						@if (isset($security_timer))<param name="security_timer" value="{{$security_timer}}">@endif
-						<param name="security_url" value="{{$security_url}}">
-						<param name="security_post" value="false">
+					@if (isset($security_click))<param name="security_click" value="{{$security_click}}">@endif
+					@if (isset($security_timer))<param name="security_timer" value="{{$security_timer}}">@endif
+					<param name="security_url" value="{{$security_url}}">
+					<param name="security_post" value="false">
 					@endif
 					@if ($tool == 'neo')
 					<param name="neo_confirm_unload" value="true">
@@ -112,8 +112,8 @@
 					@if ($tool == 'shi')
 					</applet>
 					<script>
-      			cheerpjInit();
-    			</script>
+						cheerpjInit();
+					</script>
 					@elseif ($tool == 'neo')
 					</applet-dummy>
 					@endif
@@ -245,10 +245,12 @@
 									}
 									document.watch.count.value = disp+s+"sec";
 									clearTimeout(timerID);
-									timerID = setTimeout(function() { SetTimeCount();},250);
+									timerID = setTimeout('SetTimeCount()',250);
 								}
 								SetTimeCount();
-								if (DynamicColor) PaletteListSetColor();
+								if (window.dynamicPaletteManager && window.dynamicPaletteManager.DynamicColor) {
+									window.dynamicPaletteManager.PaletteListSetColor();
+								}
 							</script>
 						</form>
 					<hr>

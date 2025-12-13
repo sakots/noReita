@@ -6,9 +6,11 @@
 	<title>{{$btitle}}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	@include('monor_headcss')
-	@if ($tool == ('neo' || 'sneo'))
+	@if ($tool == 'neo')
 	<link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
 	<script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
+	@elseif ($tool == 'shi')
+	<script src="{{$cheerpj_url}}"></script>
 	@endif
 	<script src="loadcookie.js"></script>
 </head>

@@ -58,9 +58,7 @@
 					<h4 id=oya>
 						<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
 						@if ($bbsline['admins'] == 1)
-						<svg viewBox="0 0 640 512">
-							<use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge">
-						</svg>
+						<span class="mingcute--user-star-fill"></span>
 						@endif
 						@if ($bbsline['modified'] == $bbsline['created'])
 						{{$bbsline['modified']}}
@@ -100,7 +98,7 @@
 						<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
 						@endif
 					</h5>
-					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy"></a>
+					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></a>
 					@endif
 					<p class="comment oya">{!! $bbsline['com'] !!}</p>
 					@if (!empty($ko))
@@ -114,9 +112,7 @@
 							<h4>
 								名前：<span class="resname">{{$res['a_name']}}
 									@if ($res['admins'] == 1)
-									<svg viewBox="0 0 640 512">
-										<use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge">
-									</svg>
+									<span class="mingcute--user-star-fill"></span>
 									@endif
 								</span>：
 								@if ($res['modified'] == $res['created'])
@@ -180,22 +176,16 @@
 			<div class="thfoot">
 				@if ($use_misskey_note)
 				<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}">
-					<svg>
-						<use href="./theme/{{$themedir}}/icons/misskey.svg#misskey"></use>
-					</svg> Misskeyにノート</a>
+					<span class="simple-icons--misskey"></span> Misskeyにノート</a>
 				</span>
 				@endif
 				@if ($switch_sns)
 				<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
-					<svg viewBox="0 0 512 512">
-						<use href="./theme/{{$themedir}}/icons/share.svg#share">
-					</svg> SNSで共有する</a>
+					<span class="eva--share-outline"></span> SNSで共有する</a>
 				</span>
 				@else
 				<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
-					<svg viewBox="0 0 512 512">
-						<use href="./theme/{{$themedir}}/icons/twitter.svg#twitter">
-					</svg> tweet</a>
+					<span class="ri--twitter-x-line"></span> tweet</a>
 				</span>
 				@endif
 			</div>
@@ -205,128 +195,128 @@
 				@foreach ($oya as $bbsline)
 				@if (!empty($bbsline['com']))
 				<section>
-				@if ($bbsline['parent'] < 1) <h3 class="oekaki">このスレにリプライ</h3>
-				@if ($use_oekaki_reply)
-				<hr>
-				<section class="epost">
-					<form action="{{$self}}" method="post" enctype="multipart/form-data">
-						<p>
-							<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
-							<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
-							<input type="hidden" name="mode" value="paint">
-							<label for="tools">ツール</label>
-							<select name="tools" id="tools" onchange="togglePaletteVisibility()">
-								<option value="neo">PaintBBS NEO</option>
-								@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
-								@if ($use_chicken)<option value="chicken">litaChix</option> @endif
-								@if ($use_klecks)<option value="klecks">Klecks</option> @endif
-								@if ($use_tegaki)<option value="tegaki">Tegaki</option> @endif
-								@if ($use_axnos)<option value="axnos">Axnos</option> @endif
-							</select>
-							<span id="palette-container" style="display: none;">
-								<label for="palettes">パレット</label>
-								@if ($select_palettes)
-								<select name="palettes" id="palettes">
-									@foreach ($pallets_dat as $palette)
-									<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
-									@endforeach
+					@if ($bbsline['parent'] < 1) <h3 class="oekaki">このスレにリプライ</h3>
+					@if ($use_oekaki_reply)
+					<hr>
+					<section class="epost">
+						<form action="{{$self}}" method="post" enctype="multipart/form-data">
+							<p>
+								<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
+								<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
+								<input type="hidden" name="mode" value="paint">
+								<label for="tools">ツール</label>
+								<select name="tools" id="tools" onchange="togglePaletteVisibility()">
+									<option value="neo">PaintBBS NEO</option>
+									@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
+									@if ($use_chicken)<option value="chicken">litaChix</option> @endif
+									@if ($use_klecks)<option value="klecks">Klecks</option> @endif
+									@if ($use_tegaki)<option value="tegaki">Tegaki</option> @endif
+									@if ($use_axnos)<option value="axnos">Axnos</option> @endif
 								</select>
-								@else
-								<select name="palettes" id="palettes">
-									<option value="neo" id="0">標準</option>
-								</select>
+								<span id="palette-container" style="display: none;">
+									<label for="palettes">パレット</label>
+									@if ($select_palettes)
+									<select name="palettes" id="palettes">
+										@foreach ($pallets_dat as $palette)
+										<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
+										@endforeach
+									</select>
+									@else
+									<select name="palettes" id="palettes">
+										<option value="neo" id="0">標準</option>
+									</select>
+									@endif
+								</span>
+								@if ($useanime)
+								<label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
 								@endif
-							</span>
-							@if ($useanime)
-							<label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
-							@endif
-							<input class="button" type="submit" value="お絵かき">
-							<input type="hidden" name="modid" value="{{$resno}}">
-							<input type="hidden" name="resto" value="{{$resno}}">
-						</p>
-					</form>
-					<ul>
-						<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
-					</ul>
-				</section>
-				<hr>
-				@endif
-				<script>
-					function add_to_com() {
-						document.getElementById("p_input_com").value += "{{$resname}}さん";
-					}
-				</script>
-				@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) <p>
-				<button class="copy_button" onclick="add_to_com()">投稿者名をコピー</button>
-				（投稿者名をコピぺできます）
-				</p>
-				<form action="{{$self}}?mode=reply" method="post" class="postform" enctype="multipart/form-data">
-					<table>
-						<tr>
-							<td>name @if ($use_name) * @endif</td>
-							<td><input type="text" name="name" size="18" value="" autocomplete="name" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
-						</tr>
-						<tr>
-							<td>mail</td>
-							<td><input type="text" name="mail" size="18" value="" autocomplete="email" maxlength="{{$max_email}}"></td>
-						</tr>
-						<tr>
-							<td>URL</td>
-							<td><input type="text" name="url" size="18" value="" autocomplete="url" maxlength="{{$max_url}}"></td>
-						</tr>
-						<tr>
-							<td>subject @if ($use_sub) * @endif</td>
-							<td>
-								@if ($use_resub)
-								<input type="text" name="sub" size="18" value="Re:{{$bbsline['sub']}}" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
-								@else
-								<input type="text" name="sub" size="18" value="" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
-								@endif
-								<input type="hidden" name="picfile" value="">
-								<input type="hidden" name="parent" value="{{$resno}}">
-								<input type="hidden" name="invz" value="0">
-								<input type="hidden" name="img_w" value="0">
-								<input type="hidden" name="img_h" value="0">
-								<input type="hidden" name="time" value="0">
-								<input type="hidden" name="exid" value="0">
+								<input class="button" type="submit" value="お絵かき">
 								<input type="hidden" name="modid" value="{{$resno}}">
 								<input type="hidden" name="resto" value="{{$resno}}">
-								@if ($token != null)
-								<input type="hidden" name="token" value="{{$token}}">
-								@else
-								<input type="hidden" name="token" value="">
-								@endif
-							</td>
-						</tr>
-						<tr>
-							<td>comment * </td>
-							<td>
-								<textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
-										</td>
-									</tr>
-									<tr>
-										<td>pass</td>
-										<td>
-											<input type="password" name="pwd" size="8" value="" autocomplete="current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
-											(記事の編集削除用。英数字で)
-										</td>
-									</tr>
-									<tr>
-										<td><input type="submit" id="submit" name="send" value="書き込む"></td>
-										<td>
-											(PCならCtrl + Enterでも書き込めます)
-										</td>
-									</tr>
-								</table>
-							</form>
-						@else
-							<p>このスレは古いので返信できません</p>
-						@endif
-					@else
-						<p><a href="{{$self}}?mode=res&amp;res={{$bbsline['parent']}}">このスレッドへ</a></p>
-					@endif
+							</p>
+						</form>
+						<ul>
+							<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
+						</ul>
 					</section>
+					<hr>
 					@endif
+					<script>
+						function add_to_com() {
+							document.getElementById("p_input_com").value += "{{$resname}}さん";
+						}
+					</script>
+					@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) <p>
+					<button class="copy_button" onclick="add_to_com()">投稿者名をコピー</button>
+					（投稿者名をコピぺできます）
+					</p>
+					<form action="{{$self}}?mode=reply" method="post" class="postform" enctype="multipart/form-data">
+						<table>
+							<tr>
+								<td>name @if ($use_name) * @endif</td>
+								<td><input type="text" name="name" size="18" value="" autocomplete="name" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
+							</tr>
+							<tr>
+								<td>mail</td>
+								<td><input type="text" name="mail" size="18" value="" autocomplete="email" maxlength="{{$max_email}}"></td>
+							</tr>
+							<tr>
+								<td>URL</td>
+								<td><input type="text" name="url" size="18" value="" autocomplete="url" maxlength="{{$max_url}}"></td>
+							</tr>
+							<tr>
+								<td>subject @if ($use_sub) * @endif</td>
+								<td>
+									@if ($use_resub)
+									<input type="text" name="sub" size="18" value="Re:{{$bbsline['sub']}}" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
+									@else
+									<input type="text" name="sub" size="18" value="" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
+									@endif
+									<input type="hidden" name="picfile" value="">
+									<input type="hidden" name="parent" value="{{$resno}}">
+									<input type="hidden" name="invz" value="0">
+									<input type="hidden" name="img_w" value="0">
+									<input type="hidden" name="img_h" value="0">
+									<input type="hidden" name="time" value="0">
+									<input type="hidden" name="exid" value="0">
+									<input type="hidden" name="modid" value="{{$resno}}">
+									<input type="hidden" name="resto" value="{{$resno}}">
+									@if ($token != null)
+									<input type="hidden" name="token" value="{{$token}}">
+									@else
+									<input type="hidden" name="token" value="">
+									@endif
+								</td>
+							</tr>
+							<tr>
+								<td>comment * </td>
+								<td>
+									<textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
+											</td>
+										</tr>
+										<tr>
+											<td>pass</td>
+											<td>
+												<input type="password" name="pwd" size="8" value="" autocomplete="current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
+												(記事の編集削除用。英数字で)
+											</td>
+										</tr>
+										<tr>
+											<td><input type="submit" id="submit" name="send" value="書き込む"></td>
+											<td>
+												(PCならCtrl + Enterでも書き込めます)
+											</td>
+										</tr>
+									</table>
+								</form>
+							@else
+							<p>このスレは古いので返信できません</p>
+							@endif
+							@else
+							<p><a href="{{$self}}?mode=res&amp;res={{$bbsline['parent']}}">このスレッドへ</a></p>
+							@endif
+						</section>
+						@endif
 					@endforeach
 				</div>
 				<div class="thfoot">
@@ -372,34 +362,34 @@
 				new LuminousGallery(document.querySelectorAll('.luminous'), {closeTrigger: "click", closeWithEscape: true});
 			</script>
 			<script>
-      //shareするSNSのserver一覧を開く
-      let snsWindow = null; // グローバル変数としてウィンドウオブジェクトを保存する
+				//shareするSNSのserver一覧を開く
+				let snsWindow = null; // グローバル変数としてウィンドウオブジェクトを保存する
 
-      function open_sns_server_window(event, width = 600, height = 600) {
-        event.preventDefault(); // デフォルトのリンクの挙動を中断
+				function open_sns_server_window(event, width = 600, height = 600) {
+					event.preventDefault(); // デフォルトのリンクの挙動を中断
 
-        // 幅と高さが数値であることを確認
-        // 幅と高さが正の値であることを確認
-        if (isNaN(width) || width <= 350 || isNaN(height) || height <= 400) {
-          width = 350; // デフォルト値
-          height = 400; // デフォルト値
-        }
-        let url = event.currentTarget.href;
-        let windowFeatures = "width=" + width + ",height=" + height; // ウィンドウのサイズを指定
+					// 幅と高さが数値であることを確認
+					// 幅と高さが正の値であることを確認
+					if (isNaN(width) || width <= 350 || isNaN(height) || height <= 400) {
+						width = 350; // デフォルト値
+						height = 400; // デフォルト値
+					}
+					let url = event.currentTarget.href;
+					let windowFeatures = "width=" + width + ",height=" + height; // ウィンドウのサイズを指定
 
-        if (snsWindow && !snsWindow.closed) {
-          snsWindow.focus(); // 既に開かれているウィンドウがあればフォーカスする
-        } else {
-          snsWindow = window.open(url, "_blank", windowFeatures); // 新しいウィンドウを開く
-        }
-        // ウィンドウがフォーカスを失った時の処理
-        snsWindow.addEventListener("blur", function () {
-          if (snsWindow.location.href === url) {
-            snsWindow.close(); // URLが変更されていない場合はウィンドウを閉じる
-          }
-        });
-      }
-    </script>
+					if (snsWindow && !snsWindow.closed) {
+						snsWindow.focus(); // 既に開かれているウィンドウがあればフォーカスする
+					} else {
+						snsWindow = window.open(url, "_blank", windowFeatures); // 新しいウィンドウを開く
+					}
+					// ウィンドウがフォーカスを失った時の処理
+					snsWindow.addEventListener("blur", function () {
+						if (snsWindow.location.href === url) {
+							snsWindow.close(); // URLが変更されていない場合はウィンドウを閉じる
+						}
+					})
+				}
+			</script>
 		</main>
 		<footer id="footer">
 			@include('monor_footercopy')

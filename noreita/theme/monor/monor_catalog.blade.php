@@ -109,7 +109,7 @@
 			@foreach ($oya as $bbsline)
 			<div>
 				<div>
-					@if ($bbsline['picfile'] == true)
+					@if ($bbsline['picfile'])
 					<p>
 						<a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}" title="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})" loading="lazy"></a>
 					</p>

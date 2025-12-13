@@ -39,7 +39,7 @@
 						<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
 						<input type="hidden" name="mode" value="paint">
 						<label for="tools">ツール</label>
-						<select name="tools" id="tools">
+						<select name="tools" id="tools" onchange="togglePaletteVisibility()">
 							<option value="neo">PaintBBS NEO</option>
 							@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
 							@if ($use_chicken)<option value="chicken">litaChix</option> @endif
@@ -47,18 +47,20 @@
 							@if ($use_tegaki)<option value="tegaki">Tegaki</option> @endif
 							@if ($use_axnos)<option value="axnos">Axnos</option> @endif
 						</select>
-						<label for="palettes">パレット</label>
-						@if ($select_palettes)
-						<select name="palettes" id="palettes">
-							@foreach ($pallets_dat as $palette)
-							<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
-							@endforeach
-						</select>
-						@else
-						<select name="palettes" id="palettes">
-							<option value="neo" id="0">標準</option>
-						</select>
-						@endif
+						<span id="palette-container" style="display: none;">
+							<label for="palettes">パレット</label>
+							@if ($select_palettes)
+							<select name="palettes" id="palettes">
+								@foreach ($pallets_dat as $palette)
+								<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
+								@endforeach
+							</select>
+							@else
+							<select name="palettes" id="palettes">
+								<option value="neo" id="0">標準</option>
+							</select>
+							@endif
+						</span>
 						@if ($useanime)
 						<label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
 						@endif
@@ -117,13 +119,11 @@
 					<span class="will-delete" title="このスレッドはそろそろ削除されます">⚠️ このスレッドはそろそろ削除されます</span>
 					@endif
 				</h3>
-				<section id="{{$bbsline['sodane_url']}}">
-					<h4 id=oya>
+				<section>
+					<h4 class="oya">
 						<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
 						@if ($bbsline['admins'] == 1)
-						<svg viewBox="0 0 640 512">
-							<use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge">
-						</svg>
+						<span class="mingcute--user-star-fill"></span>
 						@endif
 						@if ($bbsline['modified'] == $bbsline['created'])
 						{{$bbsline['modified']}}
@@ -168,9 +168,9 @@
 						@endif
 					</h5>
 					@if ($bbsline['ext01'] == 1)
-					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy"></span></a>
+					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></span></a>
 					@else
-					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy"></a>
+					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></a>
 					@endif
 					@endif
 					<p class="comment oya">{!! $bbsline['com'] !!}</p>
@@ -186,97 +186,95 @@
 					@endif
 					@if (!empty($bbsline['res']))
 					@foreach ($bbsline['res'] as $res)
-					@if ($res['resno'] <= $bbsline['res_d_su']) @else <section class="res">
-						<section>
-							<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
-							<h4>
-								名前：<span class="resname">{{$res['a_name']}}
-									@if ($res['admins'] == 1)
-									<svg viewBox="0 0 640 512">
-										<use href="./theme/{{$themedir}}/icons/user-check.svg#admin_badge">
-									</svg>
-									@endif
-								</span>：
-								@if ($res['modified'] == $res['created'])
-								{{$res['modified']}}
-								@else
-								{{$res['created']}} {{$updatemark}} {{$res['modified']}}
+					@if ($res['resno'] <= $bbsline['res_d_su']) @else 
+					<section class="res">
+						<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
+						<h4>
+							名前：<span class="resname">{{$res['a_name']}}
+								@if ($res['admins'] == 1)
+								<span class="mingcute--user-star-fill"></span>
 								@endif
-								@if ($res['mail'])
-								<span class="mail"><a href="mailto:{{$res['mail']}}">[mail]</a></span>
-								@endif
-								@if ($res['a_url'])
-								<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
-								@endif
-								@if ($dispid)
-								<span class="id">ID：{{$res['id']}}</span>
-								@endif
-								<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
-										@if ($res['exid'] != 0)
-										x{{$res['exid']}}
-										@else
-										+
-										@endif
-									</a></span>
-							</h4>
-							@if ($res['picfile'])
-							@if ($dptime)
-							<h5>
-								{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
-								@if ($res['psec'] != null)
-								描画時間：{{$res['utime']}}
-								@endif
-								@if ($res['ext01'] == 1)
-								★NSFW
-								@endif
-							</h5>
-							@endif
-							<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
-								@if ($res['pchfile'] && (!isset($res['ext02']) || $res['ext02'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
-								<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
-								@endif
-								@if ($use_continue)
-								<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
-								@endif
-							</h5>
-							@if ($res['ext01'] == 1)
-							<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
+							</span>：
+							@if ($res['modified'] == $res['created'])
+							{{$res['modified']}}
 							@else
-							<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
+							{{$res['created']}} {{$updatemark}} {{$res['modified']}}
 							@endif
+							@if ($res['mail'])
+							<span class="mail"><a href="mailto:{{$res['mail']}}">[mail]</a></span>
 							@endif
-							<p class="comment">{!! $res['com'] !!}</p>
-						</section>
-				</section>
-				@endif
-				@endforeach
-				@endif
-				<div class="thfoot">
-					@if ($share_button)
-					@if ($switch_sns)
-					<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
-						<svg viewBox="0 0 512 512">
-							<use href="./theme/{{$themedir}}/icons/share.svg#share">
-						</svg> SNSで共有する</a>
-					</span>
-					@else
-					<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
-						<svg viewBox="0 0 512 512">
-							<use href="./theme/{{$themedir}}/icons/twitter.svg#twitter">
-						</svg> tweet</a>
-					</span>
+							@if ($res['a_url'])
+							<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
+							@endif
+							@if ($dispid)
+							<span class="id">ID：{{$res['id']}}</span>
+							@endif
+							<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
+								@if ($res['exid'] != 0)
+								x{{$res['exid']}}
+								@else
+								+
+								@endif
+							</a></span>
+						</h4>
+						@if ($res['picfile'])
+						@if ($dptime)
+						<h5>
+							{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
+							@if ($res['psec'] != null)
+							描画時間：{{$res['utime']}}
+							@endif
+							@if ($res['ext01'] == 1)
+							★NSFW
+							@endif
+						</h5>
+						@endif
+						<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
+							@if ($res['pchfile'] && (!isset($res['ext02']) || $res['ext02'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
+							<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
+							@endif
+							@if ($use_continue)
+							<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
+							@endif
+						</h5>
+						@if ($res['ext01'] == 1)
+						<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
+						@else
+						<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
+						@endif
+						@endif
+						<p class="comment">{!! $res['com'] !!}</p>
+					</section>
 					@endif
+					@endforeach
 					@endif
-					@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) <span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><svg viewBox="0 0 512 512">
-								<use href="./theme/{{$themedir}}/icons/rep.svg#rep">
-							</svg> 返信</a></span>
+					<div class="thfoot">
+						@if ($share_button)
+						@if ($use_misskey_note)
+						<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}">
+							<span class="simple-icons--misskey"></span> Misskeyにノート</a>
+						</span>
+						@endif
+						@if ($switch_sns)
+						<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
+							<span class="eva--share-outline"></span> SNSで共有する</a>
+						</span>
+						@else
+						<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
+							<span class="ri--twitter-x-line"></span> tweet</a>
+						</span>
+						@endif
+						@endif
+						@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
+						<span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><span class="ic--baseline-reply"></span> 返信</a>
+						</span>
 						@else
 						このスレは古いので返信できません…
 						@endif
 						<a href="#header">[↑]</a>
 						<hr>
-				</div>
-			</section>
+					</div>
+				</section>
 			</section>
 			@endforeach
 			@endif

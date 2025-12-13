@@ -2,8 +2,8 @@
 <div class="copy">
 	<!-- 著作権表示 -->
 	<p>
-		<a href="https://dev.oekakibbs.net/" target="_blank">noReita {{$ver}}</a>
-		Web Style by <a href="https://oekakibbs.moe/" target="_blanc" title="monor {{$tver}} (by sakots,お絵かきBBSラボ)">monor</a>
+		<a href="https://oekakibbs.moe/" target="_blank">noReita {{$ver}}</a>
+		Web Style by <a href="https://dev.oekakibbs.net/" target="_blanc" title="monor {{$tver}} (by sakots,お絵かきBBSラボ)">monor</a>
 	</p>
 	<p>
 		OekakiApplet -

@@ -143,10 +143,7 @@
 
             <div class="form-group">
               <button type="submit">
-                <svg viewBox="0 0 512 512">
-                  <use href="./theme/{{$themedir}}/icons/misskey.svg#misskey">
-                </svg>
-                Misskeyに投稿
+                <span class="simple-icons--misskey"></span> Misskeyに投稿
               </button>
             </div>
           </form>
@@ -213,9 +210,7 @@
             <input type="password" name="pwd" value="{{$pwdc}}" autocomplete="current-password">
             <input type="hidden" name="mode" value="misskey_note_edit_form">
             <button type="submit">
-              <svg viewBox="0 0 512 512">
-                <use href="./theme/{{$themedir}}/icons/misskey.svg#misskey">
-              </svg> ノート
+              <span class="simple-icons--misskey"></span> ノート
             </button>
           </form>
         </div>
