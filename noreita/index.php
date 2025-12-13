@@ -15,7 +15,7 @@ if (($php_ver = phpversion()) < "7.3.0") {
 //言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
   ? explode( ',', $http_langs )[0] : '';
-$en= (stripos($lang,'ja')!== 0);
+$en = (stripos($lang,'ja')!== 0);
 
 if (!is_file(__DIR__.'/functions.php')) {
 	die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
