@@ -69,7 +69,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
-### [2025/12/14] v2.2.4
+### [2025/12/14] v2.2.3
 
 - テーマ更新（svgアイコンをcssに埋め込んだ）
 
