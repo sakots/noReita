@@ -550,8 +550,6 @@ function regist(): void {
 				// ツールの判定
 				if ($tool === 'neo') {
 					$used_tool = 'PaintBBS NEO';
-				} elseif ($tool === 'sneo') {
-					$used_tool = 'NISE shipe';
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
 				} elseif ($tool === 'chicken') {
