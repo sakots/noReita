@@ -12,7 +12,7 @@ class image_save{
 
 		global $security_timer,$pmax_w,$pmax_h;
 
-	// $security_timer=60;	
+	// $security_timer=60;
 	$this->security_timer = $security_timer ?? 0;
 	//容量違反チェックをする する:1 しない:0
 	defined('SIZE_CHECK') or define('SIZE_CHECK', '1');
@@ -38,7 +38,7 @@ class image_save{
 	
 	}
 
-	public function save_klecks(): void { 
+	public function save_klecks(): void {
 
 		$this->error_type="klecks";
 
@@ -127,7 +127,7 @@ class image_save{
 
 		$this->timer=time()-(int)$this->stime;
 
-		if((bool)$this->security_timer && !$this->repcode && !adminpost_valid()  && ((int)$this->timer<(int)$this->security_timer)){
+		if((bool)$this->security_timer && !$this->repcode && ((int)$this->timer<(int)$this->security_timer)){
 
 			$psec=(int)$this->security_timer-(int)$this->timer;
 			$waiting_time=calcPtime ($psec);
