@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.2.8'); //lot.260205.0
+define('REITA_VER', 'v2.2.9'); //lot.260219.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -298,13 +298,41 @@ function init(): void {
 	try {
 		if (!is_file(DB_NAME . '.db')) {
 			// はじめての実行なら、テーブルを作成
-			// id, 書いた日時, 修正日時, スレ親orレス, 親スレ, コメントid, スレ構造ID,
-			// 名前, メール, タイトル, 本文, url, ホスト,
-			// そうだね, 投稿者ID, パスワード, 絵の時間(内部), 絵の時間, 絵のurl, pchのurl, 絵の幅, 絵の高さ,
-			// age/sage記憶, 表示/非表示, 絵のツール, 認証マーク, そろそろ消える, nsfw, 予備2, 予備3, 予備4
 			$db = new PDO(DB_PDO);
 			$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-			$sql = "CREATE TABLE IF NOT EXISTS tlog (tid integer primary key autoincrement, created TIMESTAMP, modified TIMESTAMP, thread VARCHAR(1), parent INT, comid BIGINT, tree BIGINT, a_name TEXT, mail TEXT, sub TEXT, com TEXT, a_url TEXT, host TEXT, exid TEXT, id TEXT, pwd TEXT, psec INT, utime TEXT, picfile TEXT, pchfile TEXT, img_w INT, img_h INT, age INT, invz VARCHAR(1), tool TEXT, admins VARCHAR(1), shd VARCHAR(1), ext01 TEXT, ext02 TEXT, ext03 TEXT, ext04 TEXT)";
+			$sql = "CREATE TABLE IF NOT EXISTS tlog (
+				tid integer primary key autoincrement, --ID
+				created TIMESTAMP, --描いた日時
+				modified TIMESTAMP, --修正日時
+				thread VARCHAR(1), --スレ親orレス
+				parent INT, --親スレ
+				comid BIGINT, --コメントID
+				tree BIGINT, --スレ構造ID
+				a_name TEXT, --名前
+				mail TEXT, --メール
+				sub TEXT, --タイトル
+				com TEXT, --本文
+				a_url TEXT, --url
+				host TEXT, --ホスト
+				exid TEXT, --そうだね
+				id TEXT, --投稿者ID
+				pwd TEXT, --パスワード
+				psec INT, --絵の時間(内部)
+				utime TEXT, --絵の時間
+				picfile TEXT, --絵のurl
+				pchfile TEXT, --pchのurl
+				img_w INT, --絵の幅
+				img_h INT, --絵の高さ
+				age INT, --age/sage記憶
+				invz VARCHAR(1), --表示/非表示（管理者削除）
+				tool TEXT, --絵のツール
+				admins VARCHAR(1), --認証マーク
+				shd VARCHAR(1), --そろそろ消える
+				ext01 TEXT, --nsfw
+				ext02 TEXT, --予備2
+				ext03 TEXT, --予備3
+				ext04 TEXT --予備4
+			)";
 			$db = $db->query($sql);
 			$db = null; //db切断
 		}
