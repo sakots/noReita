@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/03/13] v2.2.10
+
+- LitaChix、axons更新
+
 ### [2026/02/19] v2.2.9
 
 - LitaChix更新
