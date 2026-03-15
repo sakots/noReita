@@ -247,7 +247,7 @@ switch ($mode) {
     return reply();
   case 'res':
     return res();
-  case 'sodane':
+  case 'sodane': // そうだね
     return sodane();
   case 'paint':
     return paint_form("", filter_input_data('POST','modid',FILTER_VALIDATE_INT));
