@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.2.11'); //lot.260314.0
+define('REITA_VER', 'v2.3.0'); //lot.260315.0
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
@@ -241,13 +241,13 @@ $mode = $mode ?: (string)filter_input_data('GET','mode');
 // モード
 
 switch ($mode) {
-  case 'regist':
+  case 'regist': // スレ立て
     return regist();
   case 'reply':
     return reply();
   case 'res':
     return res();
-  case 'sodane':
+  case 'sodane': // そうだね
     return sodane();
   case 'paint':
     return paint_form("", filter_input_data('POST','modid',FILTER_VALIDATE_INT));
@@ -265,9 +265,9 @@ switch ($mode) {
     return paint_form($type, filter_input_data('POST','modid',FILTER_VALIDATE_INT));
   case 'picrep':
     return picreplace();
-  case 'catalog':
+  case 'catalog': // カタログ表示
     return catalog();
-  case 'search':
+  case 'search': // 検索
     return search();
   case 'edit':
     return editform();
@@ -275,11 +275,11 @@ switch ($mode) {
     return editexec();
   case 'del':
     return delmode();
-  case 'saveimage':
+  case 'saveimage': // 画像保存
     return save_image();
-  case 'admin_in':
+  case 'admin_in': // 管理モードin
     return admin_in();
-  case 'admin':
+  case 'admin': // 管理モード
     return admin();
   case 'set_share_server':
     return set_share_server();
@@ -295,7 +295,7 @@ switch ($mode) {
     return misskey_note::create_misskey_authrequesturl();
   case 'misskey_success':
     return misskey_note::misskey_success();
-  default:
+  default: // 通常表示モード
     return def();
 }
 
@@ -382,7 +382,7 @@ function init(): void {
 }
 
 
-//投稿があればデータベースへ保存する
+// 投稿があればデータベースへ保存する
 /* 記事書き込み スレ立て */
 function regist(): void {
 	global $badip, $admin_pass, $admin_name, $en;
@@ -391,7 +391,7 @@ function regist(): void {
 
 	$dat['en'] = $en;
 
-	//CSRFトークンをチェック
+	// CSRFトークンをチェック
 	if (CHECK_CSRF_TOKEN) {
 		check_csrf_token();
 	}
@@ -594,7 +594,7 @@ function regist(): void {
 					$used_tool = 'PaintBBS NEO';
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
-				} elseif ($tool === 'chicken') {
+				} elseif ($tool === 'chicken' || $tool === 'chi') {
 					$used_tool = 'litaChix';
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
@@ -671,7 +671,7 @@ function regist(): void {
 			$com = preg_replace("/(\n|\r|\r\n){3,}/us", "\n\n", $com);
 
 			//id生成
-			$id = gen_id($host, $utime);
+			$id = gen_id($host, $utime ?? time());
 
 			//管理者名は管理パスじゃないと使えない
 			if ($name === $admin_name && $pwd !== $admin_pass) {
@@ -994,7 +994,7 @@ function reply(): void {
 					$used_tool = 'PaintBBS NEO';
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
-				} elseif ($tool === 'chicken') {
+				} elseif ($tool === 'chicken' || $tool === 'chi') {
 					$used_tool = 'litaChix';
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
@@ -2329,7 +2329,7 @@ function picreplace(): void {
 			$host = gethostbyaddr(get_uip());
 
 			//id生成
-			$id = gen_id($host, $psec);
+			$id = gen_id($host, $utime ?? time());
 
 			// 念のため'のエスケープ
 			$host = str_replace("'", "''", $host);
@@ -2671,7 +2671,7 @@ function del_temp(): void {
 
 //画像保存
 function save_image(): void {
-	$tool=filter_input(INPUT_GET,"tool");
+	$tool = filter_input(INPUT_GET,"tool");
 	$image_save = new image_save;
 	header('Content-type: text/plain');
 	switch($tool){
