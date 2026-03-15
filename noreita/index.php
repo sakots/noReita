@@ -241,7 +241,7 @@ $mode = $mode ?: (string)filter_input_data('GET','mode');
 // モード
 
 switch ($mode) {
-  case 'regist':
+  case 'regist': // スレ立て
     return regist();
   case 'reply':
     return reply();
