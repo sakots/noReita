@@ -72,6 +72,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ### [2026/03/14] v2.3.0
 
 - save.phpを廃止
+- klecks更新
 
 ### [2026/03/14] v2.2.11
 
