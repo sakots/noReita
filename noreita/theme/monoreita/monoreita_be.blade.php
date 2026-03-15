@@ -309,7 +309,7 @@
 
           @if (isset($imgfile)) loadImageUrl: "{{$imgfile}}", @endif
           @if (isset($pchfile)) loadChibiFileUrl: "{{$pchfile}}", @endif
-          saveUrl: "{{$self}}?mode=saveimage&tool=chi{!! (isset($resto) && $resto != null) ? '&resto='.(int)$resto : '' !!}",
+          saveUrl: "{{$self}}?mode=saveimage&tool=chi&stime={{$stime}}{!! (isset($resto) && $resto != null) ? '&resto='.(int)$resto : '' !!}",
           postUrl: "{{$self}}?mode={!!$mode!!}&stime={{$stime}}@if (isset($resto) && $resto != null)&resto={{$resto}}@endif",
           exitUrl: "{{$self}}" + (resto ? "?resto=" + resto : ""),
 

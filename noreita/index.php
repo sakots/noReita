@@ -594,7 +594,7 @@ function regist(): void {
 					$used_tool = 'PaintBBS NEO';
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
-				} elseif ($tool === 'chicken') {
+				} elseif ($tool === 'chicken' || $tool === 'chi') {
 					$used_tool = 'litaChix';
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
@@ -671,7 +671,7 @@ function regist(): void {
 			$com = preg_replace("/(\n|\r|\r\n){3,}/us", "\n\n", $com);
 
 			//id生成
-			$id = gen_id($host, $utime);
+			$id = gen_id($host, $utime ?? time());
 
 			//管理者名は管理パスじゃないと使えない
 			if ($name === $admin_name && $pwd !== $admin_pass) {
@@ -994,7 +994,7 @@ function reply(): void {
 					$used_tool = 'PaintBBS NEO';
 				} elseif ($tool === 'shi') {
 					$used_tool = 'Shi Painter';
-				} elseif ($tool === 'chicken') {
+				} elseif ($tool === 'chicken' || $tool === 'chi') {
 					$used_tool = 'litaChix';
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
@@ -2329,7 +2329,7 @@ function picreplace(): void {
 			$host = gethostbyaddr(get_uip());
 
 			//id生成
-			$id = gen_id($host, $psec);
+			$id = gen_id($host, $utime ?? time());
 
 			// 念のため'のエスケープ
 			$host = str_replace("'", "''", $host);
