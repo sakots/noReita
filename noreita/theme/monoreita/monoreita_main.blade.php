@@ -101,15 +101,6 @@
 	</header>
 	<main>
 		<div>
-			@if (isset($will_delete_count) && $will_delete_count > 0)
-			<div class="thread">
-				<h3 class="oyat">⚠️ 注意</h3>
-				<p class="limit">
-					現在 {{$th_cnt}} スレッド中、{{$will_delete_count}} スレッドがそろそろ削除されます。<br>
-					({{$log_limit}}%を超えた古いスレッド)
-				</p>
-			</div>
-			@endif
 			@if (!empty($oya))
 			@foreach ($oya as $bbsline)
 			<section class="thread @if ($bbsline['will_delete']) will-delete-thread @endif">
@@ -139,13 +130,14 @@
 						@if ($dispid)
 						<span class="id">ID：{{$bbsline['id']}}</span>
 						@endif
-						<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$bbsline['tid']}}">{{$sodane}}
-								@if ($bbsline['exid'] != 0)
-								x{{$bbsline['exid']}}
-								@else
-								+
-								@endif
-							</a></span>
+						<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$bbsline['tid']}}">
+							{{$sodane}}
+							@if ($bbsline['exid'] != 0)
+							x{{$bbsline['exid']}}
+							@else
+							+
+							@endif
+						</a></span>
 					</h4>
 					@if ($bbsline['picfile'])
 					@if ($dptime)
@@ -167,11 +159,7 @@
 						<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
 						@endif
 					</h5>
-					@if ($bbsline['ext01'] == 1)
-					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></span></a>
-					@else
-					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></a>
-					@endif
+					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span @if ($bbsline['ext01'] == 1) class="nsfw" @endif><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></span></a>
 					@endif
 					<p class="comment oya">{!! $bbsline['com'] !!}</p>
 					@if ($bbsline['rflag'])

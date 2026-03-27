@@ -450,5 +450,8 @@ button {
   #appstage {
     display: block;
   }
+  .thread img.image, footer img.image {
+    float: none;
+  }
 }
 /*# sourceMappingURL=monored_index.css.map */
