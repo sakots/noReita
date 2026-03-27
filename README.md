@@ -69,6 +69,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/03/27] v2.3.1
+
+- LitaChix、neo、Tegaki更新
+- テーマ更新
+  - 文字回り込みあたり
+
 ### [2026/03/14] v2.3.0
 
 - save.phpを廃止
