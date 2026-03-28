@@ -174,7 +174,7 @@
 					@endif
 					@if (!empty($bbsline['res']))
 					@foreach ($bbsline['res'] as $res)
-					@if ($res['resno'] <= $bbsline['res_d_su']) @else 
+					@if ($res['resno'] > $bbsline['res_d_su'])
 					<section class="res">
 						<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
 						<h4>
