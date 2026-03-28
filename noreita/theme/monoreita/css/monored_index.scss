@@ -78,9 +78,20 @@ main {
 	img.image {
 		max-width: min(100%, 400px);
 		height: auto;
-		float: left;
 		padding-right: 8px;
 		margin-bottom: 1ex;
+	}
+	.container {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		align-content: flex-start;
+	}
+	.item_image {
+		flex-grow: 0;
+	}
+	.item_comment {
+		flex-grow: 10;
 	}
 }
 .delf {
@@ -399,11 +410,6 @@ button {
 }
 
 //以下レスポンシブ対応
-@media screen and (max-width: 1024px) {
-	.res {
-		clear: left;
-	}
-}
 @media screen and (max-width: 768px) {
 	header, .thread, footer {
 		width: 90%;
@@ -429,10 +435,5 @@ button {
 	}
 	#appstage {
 		display: block;
-	}
-	.thread {
-		img.image {
-			float: none;
-		}
 	}
 }
