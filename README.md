@@ -69,6 +69,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/03/28] v2.3.1.1
+
+- テーマ更新
+  - カタログモードで下部リンクが間違っていたの修正
+  - flexbox採用
+
 ### [2026/03/27] v2.3.1
 
 - LitaChix、neo、Tegaki更新
