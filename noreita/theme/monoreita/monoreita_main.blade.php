@@ -179,9 +179,9 @@
 						<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
 						<h4>
 							名前：<span class="resname">{{$res['a_name']}}
-								@if ($res['admins'] == 1)
-								<span class="mingcute--user-star-fill"></span>
-								@endif
+							@if ($res['admins'] == 1)
+							<span class="mingcute--user-star-fill"></span>
+							@endif
 							</span>：
 							@if ($res['modified'] == $res['created'])
 							{{$res['modified']}}
