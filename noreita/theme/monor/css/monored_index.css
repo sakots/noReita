@@ -65,9 +65,20 @@ main {
 .thread img.image, footer img.image {
   max-width: min(100%, 400px);
   height: auto;
-  float: left;
   padding-right: 8px;
   margin-bottom: 1ex;
+}
+.thread .container, footer .container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+}
+.thread .item_image, footer .item_image {
+  flex-grow: 0;
+}
+.thread .item_comment, footer .item_comment {
+  flex-grow: 10;
 }
 
 .delf {
@@ -421,11 +432,6 @@ button {
   mask-size: 100% 100%;
 }
 
-@media screen and (max-width: 1024px) {
-  .res {
-    clear: left;
-  }
-}
 @media screen and (max-width: 768px) {
   header, .thread, footer {
     width: 90%;
@@ -449,9 +455,6 @@ button {
   }
   #appstage {
     display: block;
-  }
-  .thread img.image, footer img.image {
-    float: none;
   }
 }
 /*# sourceMappingURL=monored_index.css.map */

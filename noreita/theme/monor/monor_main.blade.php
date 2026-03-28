@@ -130,7 +130,8 @@
 						@if ($dispid)
 						<span class="id">ID：{{$bbsline['id']}}</span>
 						@endif
-						<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$bbsline['tid']}}">{{$sodane}}
+						<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$bbsline['tid']}}">
+							{{$sodane}}
 							@if ($bbsline['exid'] != 0)
 							x{{$bbsline['exid']}}
 							@else
@@ -158,83 +159,95 @@
 						<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
 						@endif
 					</h5>
-					<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span @if ($bbsline['ext01'] == 1) class="nsfw" @endif><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></span></a>
+					<div class="container">
+						<div class="item_image">
+							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span @if ($bbsline['ext01'] == 1) class="nsfw" @endif><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></span></a>
+						</div>
+					@else
+					<div class="container">
 					@endif
-					<p class="comment oya">{!! $bbsline['com'] !!}</p>
-					@if ($bbsline['rflag'])
-					<div class="res">
-						<p class="limit">
-							レス{{$bbsline['res_d_su']}}件省略。すべて見るには
-							<a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}">
-								@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) 返信 @else すべて見る @endif </a>
-									を押してください。
-						</p>
+						<div class="item_comment">
+							<p class="comment oya">{!! $bbsline['com'] !!}</p>
+							@if ($bbsline['rflag'])
+							<div class="res">
+								<p class="limit">
+									レス{{$bbsline['res_d_su']}}件省略。すべて見るには
+									<a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}">
+										@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) 返信 @else すべて見る @endif </a>
+											を押してください。
+								</p>
+							</div>
+							@endif
+							@if (!empty($bbsline['res']))
+							@foreach ($bbsline['res'] as $res)
+							@if ($res['resno'] > $bbsline['res_d_su'])
+							<section class="res">
+								<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
+								<h4>
+									名前：<span class="resname">{{$res['a_name']}}
+									@if ($res['admins'] == 1)
+									<span class="mingcute--user-star-fill"></span>
+									@endif
+									</span>：
+									@if ($res['modified'] == $res['created'])
+									{{$res['modified']}}
+									@else
+									{{$res['created']}} {{$updatemark}} {{$res['modified']}}
+									@endif
+									@if ($res['mail'])
+									<span class="mail"><a href="mailto:{{$res['mail']}}">[mail]</a></span>
+									@endif
+									@if ($res['a_url'])
+									<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
+									@endif
+									@if ($dispid)
+									<span class="id">ID：{{$res['id']}}</span>
+									@endif
+									<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
+										@if ($res['exid'] != 0)
+										x{{$res['exid']}}
+										@else
+										+
+										@endif
+									</a></span>
+								</h4>
+								@if ($res['picfile'])
+								@if ($dptime)
+								<h5>
+									{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
+									@if ($res['psec'] != null)
+									描画時間：{{$res['utime']}}
+									@endif
+									@if ($res['ext01'] == 1)
+									★NSFW
+									@endif
+								</h5>
+								@endif
+								<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
+									@if ($res['pchfile'] && (!isset($res['ext02']) || $res['ext02'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
+									<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
+									@endif
+									@if ($use_continue)
+									<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
+									@endif
+								</h5>
+								@if ($res['ext01'] == 1)
+								<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
+								@else
+								<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
+								@endif
+								@endif
+								<p class="comment">{!! $res['com'] !!}</p>
+							</section>
+							@endif
+							@endforeach
+							@endif
+							@if ($bbsline['picfile'])
+						</div>
+						@else
 					</div>
 					@endif
-					@if (!empty($bbsline['res']))
-					@foreach ($bbsline['res'] as $res)
-					@if ($res['resno'] > $bbsline['res_d_su'])
-					<section class="res">
-						<h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
-						<h4>
-							名前：<span class="resname">{{$res['a_name']}}
-							@if ($res['admins'] == 1)
-							<span class="mingcute--user-star-fill"></span>
-							@endif
-							</span>：
-							@if ($res['modified'] == $res['created'])
-							{{$res['modified']}}
-							@else
-							{{$res['created']}} {{$updatemark}} {{$res['modified']}}
-							@endif
-							@if ($res['mail'])
-							<span class="mail"><a href="mailto:{{$res['mail']}}">[mail]</a></span>
-							@endif
-							@if ($res['a_url'])
-							<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
-							@endif
-							@if ($dispid)
-							<span class="id">ID：{{$res['id']}}</span>
-							@endif
-							<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
-								@if ($res['exid'] != 0)
-								x{{$res['exid']}}
-								@else
-								+
-								@endif
-							</a></span>
-						</h4>
-						@if ($res['picfile'])
-						@if ($dptime)
-						<h5>
-							{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
-							@if ($res['psec'] != null)
-							描画時間：{{$res['utime']}}
-							@endif
-							@if ($res['ext01'] == 1)
-							★NSFW
-							@endif
-						</h5>
-						@endif
-						<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
-							@if ($res['pchfile'] && (!isset($res['ext02']) || $res['ext02'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
-							<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
-							@endif
-							@if ($use_continue)
-							<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
-							@endif
-						</h5>
-						@if ($res['ext01'] == 1)
-						<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
-						@else
-						<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
-						@endif
-						@endif
-						<p class="comment">{!! $res['com'] !!}</p>
-					</section>
-					@endif
-					@endforeach
-					@endif
+					</div>
 					<div class="thfoot">
 						@if ($share_button)
 						@if ($use_misskey_note)
