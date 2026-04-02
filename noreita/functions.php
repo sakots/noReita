@@ -246,6 +246,7 @@ function set_share_server(): void {
 
 //SNSへ共有リンクを送信
 function post_share_server(): void {
+	global $en;
 
 	$sns_server_radio = (string)filter_input_data('POST',"sns_server_radio",FILTER_VALIDATE_URL);
 	$sns_server_radio_for_cookie = (string)filter_input_data('POST',"sns_server_radio");//directを判定するためurlでバリデーションしていない
@@ -279,7 +280,7 @@ function post_share_server(): void {
 	$share_url .= $encoded_t.'%20'.$encoded_u;
 	$share_url = filter_var($share_url, FILTER_VALIDATE_URL) ? $share_url : '';
 	if(!$share_url) {
-		error("SNSの共有先を選択してください。");
+		error($en ? "Please select a sharing destination for SNS." : "SNSの共有先を選択してください。");
 	}
 	redirect($share_url);
 }
@@ -400,7 +401,7 @@ function zero_check($str): bool {
 }
 
 // ファイル存在チェック
-function check_file ($path): void {
+function check_file($path): void {
 	$msg = initial_error_message();
 
 	if (!is_file($path)){
