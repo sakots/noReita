@@ -490,14 +490,14 @@ function regist(): void {
 				if ($strlen_com > 0 && $com == $msgwcom && $host == $msgwhost && $sub == $msgsub) {
 					$msgw = null;
 					$db = null; //db切断
-					error('二重投稿ですか？');
+					error($en ? 'Duplicate post?' : '二重投稿ですか ?');
 				}
 				//画像番号が一致の場合(投稿してブラウザバック、また投稿とか)
 				//二重投稿と判別(画像がない場合は処理しない)
 				if (!empty($_POST["modid"])) {
 					if ($msgwc["picfile"] !== "" && $picfile == $msgwc["picfile"]) {
 						$db = null; //db切断
-						error('二重投稿ですか？');
+						error($en ? 'Duplicate post?' : '二重投稿ですか ?');
 					}
 				}
 			}
