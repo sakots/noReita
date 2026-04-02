@@ -510,12 +510,12 @@ function regist(): void {
 
 				// アップロードファイルの検証を追加
 				if (!validate_upload_file($temp_file)) {
-					error('無効なファイルです。');
+					error($en ? 'Invalid file.' : '無効なファイルです。');
 				}
 
 				// ファイルの移動とパーミッション設定
 				if (!rename($temp_file, IMG_DIR . $picfile)) {
-					error('ファイルの保存に失敗しました。');
+					error($en ? 'Failed to save the file.' : 'ファイルの保存に失敗しました。');
 				}
 				chmod(IMG_DIR . $picfile, PERMISSION_FOR_DEST);
 
@@ -746,7 +746,7 @@ function regist(): void {
 				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
 			}
 
-			$dat['message'] = '書き込みに成功しました。';
+			$dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
 			$msgw = null;
 			$db = null; //db切断
 		}
@@ -796,7 +796,7 @@ function regist(): void {
 	$dat['thid'] = $thid;
 	$dat['will_delete_count'] = max(0, $th_cnt - $thid);
 
-	ok('書き込みに成功しました。画面を切り替えます。');
+	ok($en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
 }
 
 //記事書き込み - リプライ
@@ -804,6 +804,7 @@ function reply(): void {
 	global $badip, $admin_pass, $admin_name;
 	global $req_method;
 	global $dat;
+	global $en;
 
 	//CSRFトークンをチェック
 	if (CHECK_CSRF_TOKEN) {
@@ -893,7 +894,7 @@ function reply(): void {
 				if ($strlen_com > 0 && $com == $msgwcom && $host == $msgwhost && $sub == $msgwsub) {
 					$msgw = null;
 					$db = null; //db切断
-					error('二重投稿ですか？');
+					error($en ? 'Duplicate post?' : '二重投稿ですか ?');
 				}
 			} else {
 				//最初のレスのage処理対策
@@ -910,12 +911,12 @@ function reply(): void {
 
 				// アップロードファイルの検証を追加
 				if (!validate_upload_file($temp_file)) {
-					error('無効なファイルです。');
+					error($en ? 'Invalid file.' : '無効なファイルです。');
 				}
 
 				// ファイルの移動とパーミッション設定
 				if (!rename($temp_file, IMG_DIR . $picfile)) {
-					error('ファイルの保存に失敗しました。');
+					error($en ? 'Failed to save the file.' : 'ファイルの保存に失敗しました。');
 				}
 				chmod(IMG_DIR . $picfile, PERMISSION_FOR_DEST);
 
@@ -1126,7 +1127,7 @@ function reply(): void {
 				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
 			}
 
-			$dat['message'] = '書き込みに成功しました。';
+			$dat['message'] = $en ? 'Successfully posted.' : '書き込みに成功しました。';
 			$msgw = null;
 			$db = null; //db切断
 		}
@@ -1135,7 +1136,7 @@ function reply(): void {
 	}
 	unset($name, $mail, $sub, $com, $url, $pwd, $pwdh, $resto, $pictmp, $picfile, $mode);
 	//header('Location:'.PHP_SELF);
-	ok('書き込みに成功しました。画面を切り替えます。');
+	ok($en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
 }
 
 //通常表示モード
@@ -2126,6 +2127,8 @@ function in_continue(): void {
 function delmode(): void {
 	global $admin_pass;
 	global $dat;
+	global $en;
+
 	$delno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 
 	$ppwd = filter_input(INPUT_POST, 'pwd');
@@ -2139,12 +2142,12 @@ function delmode(): void {
 		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
 		$msgs = $db->prepare($sql);
 		if ($msgs == false) {
-			error('そんな記事ない気がします。');
+			error($en ? 'That post does not exist.' : 'そんな記事ない気がします。');
 		}
 		$msgs->execute([$delno]);
 		$msg = $msgs->fetch();
 		if (empty($msg)) {
-			error('そんな記事ない気がします。');
+			error($en ? 'That post does not exist.' : 'そんな記事ない気がします。');
 		}
 
 		//削除記事の画像を取り出す
@@ -2154,7 +2157,7 @@ function delmode(): void {
 		$msgsp->execute();
 		$msgp = $msgsp->fetch();
 		if (empty($msgp)) {
-			error('画像が見当たりません。');
+			error($en ? 'Image not found.' : '画像が見当たりません。');
 		}
 		$msgpic = $msgp['picfile']; //画像の名前取得できた
 
@@ -2180,7 +2183,7 @@ function delmode(): void {
 			$sql = "DELETE FROM tlog WHERE tid = ?";
 			$stmt = $db->prepare($sql);
 			$stmt->execute([$delno]);
-			$dat['message'] = '削除しました。';
+			$dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
 		} elseif ($admin_pass == $ppwd && $admindelmode == 1) {
 			//画像とかファイル削除
 			if (is_file(IMG_DIR . $msgpic)) {
@@ -2197,16 +2200,16 @@ function delmode(): void {
 			$sql = "DELETE FROM tlog WHERE tid = ? OR parent = ?";
 			$stmt = $db->prepare($sql);
 			$stmt->execute([$delno, $delno]);
-			$dat['message'] = '削除しました。';
+			$dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
 		} elseif ($admin_pass == $ppwd && $admindelmode != 1) {
 			//管理モード以外での管理者削除は
 			//データベースから削除はせずに非表示
 			$sql = "UPDATE tlog SET invz=1 WHERE tid = ?";
 			$stmt = $db->prepare($sql);
 			$stmt->execute([$delno]);
-			$dat['message'] = '非表示にしました。';
+			$dat['message'] = $en ? 'Post hidden.' : '非表示にしました。';
 		} else {
-			error('パスワードまたは記事番号が違います。');
+			error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
 		}
 		$msgp = null;
 		$msg = null;
@@ -2217,13 +2220,14 @@ function delmode(): void {
 	//変数クリア
 	unset($delno, $delt);
 	//header('Location:'.PHP_SELF);
-	ok('削除しました。画面を切り替えます。');
+	ok($en ? 'Successfully deleted. Switching screen.' : '削除しました。画面を切り替えます。');
 }
 
 //画像差し替え
 function picreplace(): void {
 	global $type;
 	global $path, $badip;
+	global $en;
 
 	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
 	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
@@ -2363,13 +2367,14 @@ function picreplace(): void {
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
-	ok('編集に成功しました。画面を切り替えます。');
+	ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }
 
 //編集モードくん入口
 function editform(): void {
 	global $admin_pass;
 	global $blade, $dat;
+	global $en;
 
 	//csrfトークンをセット
 	$dat['token'] = '';
@@ -2384,7 +2389,7 @@ function editform(): void {
 
 	$editno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 	if ($editno == "") {
-		error('記事番号を入力してください');
+		error($en ? 'Please enter the post number.' : '記事番号を入力してください');
 	}
 
 	//記事呼び出し
@@ -2398,7 +2403,7 @@ function editform(): void {
 		$stmt->execute([$editno]);
 		$msg = $stmt->fetch();
 		if (empty($msg)) {
-			error('そんな記事ないです。');
+			error($en ? 'That post does not exist.' : 'そんな記事ないです。');
 		}
 		if (password_verify($postpwd, $msg['pwd'])) {
 			//パスワードがあってたら
@@ -2410,7 +2415,7 @@ function editform(): void {
 				$oya[] = $bbsline;
 				$dat['oya'] = $oya;
 			}
-			$dat['message'] = '編集モード...';
+			$dat['message'] = $en ? 'Editing mode...' : '編集モード...';
 		} elseif ($admin_pass == $postpwd) {
 			//管理者編集モード
 			$sqli = "SELECT * FROM tlog WHERE tid = $editno";
@@ -2421,12 +2426,12 @@ function editform(): void {
 				$oya[] = $bbsline;
 				$dat['oya'] = $oya;
 			}
-			$dat['message'] = '管理者編集モード...';
+			$dat['message'] = $en ? 'Administrator editing mode...' : '管理者編集モード...';
 		} else {
 			$db = null;
 			$msgs = null;
 			$db = null; //db切断
-			error('パスワードまたは記事番号が違います。');
+			error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
 		}
 		$db = null;
 		$msgs = null;
@@ -2445,6 +2450,7 @@ function editexec(): void {
 	global $badip;
 	global $req_method;
 	global $dat;
+	global $en;
 
 	//CSRFトークンをチェック
 	if (CHECK_CSRF_TOKEN) {
@@ -2532,13 +2538,13 @@ function editexec(): void {
 
 		$db = $db->exec($sql);
 		$db = null;
-		$dat['message'] = '編集完了しました。';
+		$dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
 	unset($name, $mail, $sub, $com, $url, $pwd, $pwdh, $resto, $pictmp, $picfile, $mode);
 	//header('Location:'.PHP_SELF);
-	ok('編集に成功しました。画面を切り替えます。');
+	ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }
 
 //管理モードin
@@ -2553,6 +2559,7 @@ function admin_in(): void {
 function admin(): void {
 	global $admin_pass;
 	global $blade, $dat;
+	global $en;
 
 	$dat['path'] = IMG_DIR;
 
@@ -2590,7 +2597,7 @@ function admin(): void {
 			echo $blade->run(ADMINFILE, $dat);
 		} else {
 			$db = null; //db切断
-			error('管理パスを入力してください');
+			error($en ? 'Please enter the admin password.' : '管理パスを入力してください');
 		}
 		$db = null; //db切断
 	} catch (PDOException $e) {
@@ -2780,12 +2787,14 @@ function error2(): void {
 	global $db;
 	global $blade, $dat;
 	global $self;
+	global $en;
+
 	$db = null; //db切断
 	$dat['othermode'] = 'err2';
 	$async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
 	$http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
 	if($http_x_requested_with || $async_flag){
-		die("error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
+		die($en ? "error?\nImage not found. There might be a failure in the posting.<a href=\"{{$self}}?mode=piccom\">Uploaded images</a> might still be available." : "error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
 	}
 	echo $blade->run(OTHERFILE, $dat);
 	exit;
