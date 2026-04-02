@@ -7,15 +7,15 @@
 //スクリプトのバージョン
 define('REITA_VER', 'v2.3.1.1'); //lot.260328.0
 
-//phpのバージョンが古い場合動かさせない
-if (($php_ver = phpversion()) < "7.3.0") {
-	die("PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})");
-}
-
 //言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
   ? explode( ',', $http_langs )[0] : '';
 $en = (stripos($lang,'ja')!== 0);
+
+//phpのバージョンが古い場合動かさせない
+if (($php_ver = phpversion()) < "7.3.0") {
+	die($en ? "PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.3以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
+}
 
 if (!is_file(__DIR__.'/functions.php')) {
 	die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
