@@ -30,7 +30,7 @@ check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
 if (CONF_VER < 20251112 || !defined('CONF_VER')) {
-	die("コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n The configuration file is incompatible. Please reconfigure it.");
+	die($en ? "The configuration file is incompatible. Please reconfigure it." : "コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n");
 }
 
 //misskey_note.inc
