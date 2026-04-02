@@ -14,15 +14,15 @@ $en = (stripos($lang,'ja')!== 0);
 
 //phpのバージョンが古い場合動かさせない
 if (($php_ver = phpversion()) < "7.3.0") {
-	die($en ? "PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.3以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
+  die($en ? "PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.3以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
 }
 
 if (!is_file(__DIR__.'/functions.php')) {
-	die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
+  die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
 require_once(__DIR__.'/functions.php');
 if(!isset($functions_ver) || $functions_ver < 20250610) {
-	die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
+  die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
 //コンフィグ
@@ -30,21 +30,21 @@ check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
 if (CONF_VER < 20251112 || !defined('CONF_VER')) {
-	die($en ? "The configuration file is incompatible. Please reconfigure it." : "コンフィグファイルに互換性がないようです。再設定をお願いします。<br>\n");
+  die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
 //misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
 if(!isset($misskey_note_ver) || $misskey_note_ver < 20250326) {
-	die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
+  die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 //save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
 if(!isset($save_inc_ver)||$save_inc_ver < 20250918) {
-	die($en?'Please update save.inc.php to the latest version.':'save.inc.phpを最新版に更新してください。');
+	die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
 //テーマ
@@ -56,7 +56,7 @@ date_default_timezone_set(DEFAULT_TIMEZONE);
 
 //管理パスが初期値(admin_pass)の場合は動作させない
 if ($admin_pass === 'admin_pass') {
-	die("管理パスが初期設定値のままです！危険なので動かせません。<br>\n The admin pass is still at its default value! This program can't run it until you fix it.");
+  die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
 }
 
 //BladeOne v4.19.19
@@ -68,7 +68,7 @@ $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
 //キャッシュフォルダがなかったら作成
 if (!file_exists($cache)) {
-	mkdir($cache, PERMISSION_FOR_DIR);
+  mkdir($cache, PERMISSION_FOR_DIR);
 }
 
 $blade = new BladeOne($views, $cache, BladeOne::MODE_AUTO); // MODE_DEBUGだと開発モード MODE_AUTOが速い。
