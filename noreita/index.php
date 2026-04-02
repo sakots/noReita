@@ -302,6 +302,7 @@ switch ($mode) {
 /*-----------Main-------------*/
 
 function init(): void {
+	global $en;
 	// セキュリティヘッダーの設定
 	header('X-Content-Type-Options: nosniff');
 	header('X-Frame-Options: DENY');
@@ -354,14 +355,14 @@ function init(): void {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
 	$err = '';
-	if (!is_writable(realpath("./"))) error("カレントディレクトリに書けません<br>");
+	if (!is_writable(realpath("./"))) error($en ? "Current directory is not writable.<br>" : "カレントディレクトリに書けません<br>");
 	if (!is_dir(IMG_DIR)) {
 		mkdir(IMG_DIR, PERMISSION_FOR_DIR);
 		chmod(IMG_DIR, PERMISSION_FOR_DIR);
 	}
-	if (!is_dir(IMG_DIR)) $err .= IMG_DIR . "がありません<br>";
-	if (!is_writable(IMG_DIR)) $err .= IMG_DIR . "を書けません<br>";
-	if (!is_readable(IMG_DIR)) $err .= IMG_DIR . "を読めません<br>";
+	if (!is_dir(IMG_DIR)) $err .= IMG_DIR . ($en ? "does not exist<br>" : "がありません<br>");
+	if (!is_writable(IMG_DIR)) $err .= IMG_DIR . ($en ? "is not writable<br>" : "を書けません<br>");
+	if (!is_readable(IMG_DIR)) $err .= IMG_DIR . ($en ? "is not readable<br>" : "を読めません<br>");
 
 	if (!is_dir(TEMP_DIR)) {
 		mkdir(TEMP_DIR, PERMISSION_FOR_DIR);
@@ -371,9 +372,9 @@ function init(): void {
 		mkdir(__DIR__ . '/session/', PERMISSION_FOR_DIR);
 		chmod(__DIR__ . '/session/', PERMISSION_FOR_DIR);
 	}
-	if (!is_dir(TEMP_DIR)) $err .= TEMP_DIR . "がありません<br>";
-	if (!is_writable(TEMP_DIR)) $err .= TEMP_DIR . "を書けません<br>";
-	if (!is_readable(TEMP_DIR)) $err .= TEMP_DIR . "を読めません<br>";
+	if (!is_dir(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "does not exist<br>" : "がありません<br>");
+	if (!is_writable(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "is not writable<br>" : "を書けません<br>");
+	if (!is_readable(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "is not readable<br>" : "を読めません<br>");
 	if ($err) error($err);
 	if (is_file(DB_NAME . '.db')) {
 		// データベースファイルのパーミッションを明示的に設定
