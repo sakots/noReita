@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.3.1.1'); //lot.260328.0
+define('REITA_VER', 'v2.3.2'); //lot.260402.0
 
 //言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
