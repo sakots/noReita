@@ -70,6 +70,14 @@ switch ($img_type):
     header('Cache-Control: no-cache');
     header('Content-Type: image/png');
   break;
+  case 'image/webp':
+    header('Cache-Control: no-cache');
+    header('Content-Type: image/webp');
+  break;
+  case 'image/avif':
+    header('Cache-Control: no-cache');
+    header('Content-Type: image/avif');
+  break;
   case 'image/jpeg':
     header('Cache-Control: no-cache');
     header('Content-Type: image/jpeg');
