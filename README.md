@@ -69,6 +69,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/04/03] plugin
+
+- webpとavif対応
+
 ### [2026/04/02] v2.3.2
 
 - エラーメッセージの英語表記追加
