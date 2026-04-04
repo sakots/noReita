@@ -69,6 +69,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/04/04] v2.3.3
+
+- トリップ生成機能追加
+  - 名前欄に`#文字列`でトリップが生成されます（5ch互換のはず）
+- 画像チェックにavif追加
+
 ### [2026/04/03] plugin
 
 - webpとavif対応
