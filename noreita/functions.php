@@ -85,6 +85,7 @@ function get_image_type($img_type, $dest = null): string {
 		"image/jpeg" => ".jpg",
 		"image/png" => ".png",
 		"image/webp" => ".webp",
+		"image/avif" => ".avif",
 	];
 
 	if (isset($map[$mime_type])) {
