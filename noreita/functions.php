@@ -516,3 +516,34 @@ function user_del_valid(): bool {
 	session_sta();
 	return isset($_SESSION['user_del']) && ($_SESSION['user_del'] === 'user_del_mode');
 }
+
+// トリップ生成
+function generate_trip($name): string {
+	if ( ( $index = strpos($name, '#') ) === false)
+		return str_replace( '◆', '◇', $name );
+	$original_name = $name;
+	$name = str_replace( '◆', '◇', substr($name, 0, $index) );
+	$trip_key = mb_convert_encoding(substr($original_name, $index + 1), 'SJIS', 'UTF-8');
+	if ( strlen($trip_key) >= 12 ) {
+		if ( $trip_key[0] === '#' ) { // 10 digits new protocol
+			if ( preg_match( '|^#([0-9a-fA-F]{16})([./0-9a-zA-Z]{0,2})$|', $trip_key, $matches ) ) {
+				$key = pack('H*', $matches[1]);
+				if ( ( $index = strpos($key, chr(128)) ) !== false )
+					$key = substr($key, 0, $index);
+				$trip = substr(crypt($key, substr($matches[2].'..', 0, 2)), -10);
+			} else {
+				$trip = '???';
+			}
+		} elseif ( $trip_key[0] === '$' ) { // reserved
+			$trip = '???';
+		} else { // 12 digits
+			$trip = str_replace('+', '.', substr(base64_encode(sha1($trip_key, true)), 0, 12));
+		}
+	} else { // 10 digits
+		$key = htmlspecialchars($trip_key, ENT_QUOTES, 'SJIS');
+		$salt = preg_replace( '/[^.-z]/', '.', substr($key.'H.', 1, 2) );
+		$map = array(':'=>'A', ';'=>'B', '<'=>'C', '='=>'D', '>'=>'E', '?'=>'F', '@'=>'G', '['=>'a', '\\'=>'b', ']'=>'c', '^'=>'d', '_'=>'e', '`'=>'f');
+		$trip = substr(crypt($key, strtr($salt, $map)), -10);
+	}
+	return $name.'◆'.$trip;
+}

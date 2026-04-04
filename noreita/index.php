@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.3.2'); //lot.260402.0
+define('REITA_VER', 'v2.3.3'); //lot.260404.0
 
 //言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -472,6 +472,9 @@ function regist(): void {
 
 			$strlen_com = strlen($com);
 
+			// トリップ生成
+			$name = generate_trip($name);
+
 			if ($name   === "") $name = DEF_NAME;
 			if ($com  === "") $com  = DEF_COM;
 			if ($sub  === "") $sub  = DEF_SUB;
@@ -875,6 +878,9 @@ function reply(): void {
 		if (isset($_POST["send"])) {
 
 			$strlen_com = strlen($com);
+
+			// トリップ生成
+			$name = generate_trip($name);
 
 			if ($name  === "") $name = DEF_NAME;
 			if ($com  === "") $com  = DEF_COM;
