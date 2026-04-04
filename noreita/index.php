@@ -421,6 +421,9 @@ function regist(): void {
 
 	$resto = (string)filter_input(INPUT_POST, 'resto');
 
+	// クッキー保存用
+	$original_name = $name;
+
 	if ($req_method !== "POST") {
 		error(MSG006);
 	}
@@ -741,7 +744,7 @@ function regist(): void {
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = [["namec",$name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass] ,[ "palettec" , $pal]];
+			$cookies = [["namec",$original_name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass] ,[ "palettec" , $pal]];
 			foreach ($cookies as $cookie) {
 				list($c_name, $c_cookie) = $cookie;
 				$c_name = (string)$c_name;
@@ -828,6 +831,9 @@ function reply(): void {
 	$picfile = filter_input(INPUT_POST, 'picfile');
 	$img_w = trim(filter_input(INPUT_POST, 'img_w', FILTER_VALIDATE_INT));
 	$img_h = trim(filter_input(INPUT_POST, 'img_h', FILTER_VALIDATE_INT));
+
+	// クッキー保存用
+	$original_name = $name;
 
 	if ($req_method !== "POST") {
 		error(MSG006);
@@ -1125,7 +1131,7 @@ function reply(): void {
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = [["namec",$name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass]];
+			$cookies = [["namec",$original_name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass]];
 			foreach ($cookies as $cookie) {
 				list($c_name, $c_cookie) = $cookie;
 				$c_name = (string)$c_name;
