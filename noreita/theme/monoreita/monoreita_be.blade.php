@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{$btitle}}</title>
+  <title>{{$board_title}}</title>
 	<script>
 		let resto = "{{$resto}}";
 	</script>
@@ -133,8 +133,8 @@
 				bodyId: 'axnospaint_body',
 				minWidth: 300,
 				minHeight: 300,
-				maxWidth: {{$pmaxw}},
-				maxHeight: {{$pmaxh}},
+				maxWidth: {{$pmax_w}},
+				maxHeight: {{$pmax_h}},
 				width: {{$picw}},
 				height: {{$pich}},
 				checkSameBBS: true,

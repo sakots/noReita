@@ -486,4 +486,4 @@ class DynamicPaletteManager {
 }
 
 // グローバルインスタンスを作成
-window.dynamicPaletteManager = new DynamicPaletteManager(); 
+window.dynamicPaletteManager = new DynamicPaletteManager();

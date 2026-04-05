@@ -3,14 +3,14 @@
 
 <head>
 	<meta charset="utf-8">
-	<title>{{$btitle}}</title>
+	<title>{{$board_title}}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	@include('monoreita_headcss')
 </head>
 
 <body>
 	<header id="header">
-		<h1><a href="{{$self}}">{{$btitle}}</a></h1>
+		<h1><a href="{{$self}}">{{$board_title}}</a></h1>
 		<div>
 			<a href="{{$home}}" target="_top">[ホーム]</a>
 			<a href="{{$self}}?mode=admin_in">[管理モード]</a>
@@ -33,8 +33,8 @@
 			<section class="epost">
 				<form action="{{$self}}" method="post" enctype="multipart/form-data">
 					<p>
-						<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
-						<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
+						<label>幅：<input class="form" type="number" min="300" max="{{$pmax_w}}" name="picw" value="{{$pdef_w}}" required></label>
+						<label>高さ：<input class="form" type="number" min="300" max="{{$pmax_h}}" name="pich" value="{{$pdef_h}}" required></label>
 						<input type="hidden" name="mode" value="paint">
 						<label for="tools">ツール</label>
 						<select name="tools">
@@ -61,7 +61,7 @@
 				</form>
 				<ul>
 					<li>iPadやスマートフォンでも描けるお絵かき掲示板です。</li>
-					<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
+					<li>お絵かきできるサイズは幅300～{{$pmax_w}}px、高さ300～{{$pmax_h}}pxです。</li>
 					@foreach ($addinfo as $info) @if (!empty($info[$loop->index]))
 					<li>{!! $addinfo[$loop->index] !!}</li>
 					@endif @endforeach
@@ -171,8 +171,8 @@
 				<p>作者名/本文(ハッシュタグ)検索</p>
 				<form class="search" method="GET" action="{{$self}}">
 					<input type="hidden" name="mode" value="search">
-					<label><input type="radio" name="bubun" value="bubun">部分一致</label>
-					<label><input type="radio" name="bubun" value="kanzen">完全一致</label>
+					<label><input type="radio" name="similar" value="similar">部分一致</label>
+					<label><input type="radio" name="similar" value="exact">完全一致</label>
 					<label><input type="radio" name="tag" value="tag">本文(ハッシュタグ)</label>
 					<br>
 					<input type="text" name="search" placeholder="検索" size="20">
@@ -203,7 +203,7 @@
 						</span>
 					</p>
 					<script>
-						colorIdx = GetCookie('_monored_colorIdx');
+						colorIdx = GetCookie('_monoreita_colorIdx');
 						document.getElementById("mystyle").selectedIndex = colorIdx;
 					</script>
 				</form>

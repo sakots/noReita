@@ -6,16 +6,16 @@
 $dev: 0;
 
 //色指定とか
-$ushiro: #CCC;			//一番うしろ
-$haikei: #EEE;			//スレ背景
-$moji: #000;			//文字
+$bg: #CCC;			//一番うしろ
+$bg2: #EEE;			//スレ背景
+$text: #000;			//文字
 $link: #036;			//リンクの文字
 $link_visited: #666;	//訪問済みリンク
 $link_active: #F00;		//アクティブなリンク
 $link_hover: #F00;		//マウスカーソルが上に載ってる時のリンク
-$resmoji: #141;			//レスの文字
+$res_text: #141;			//レスの文字
 $button: #369;			//返信とかのボタン
-$button_moji: #FFF;		//ボタンの文字色
+$button_text: #FFF;		//ボタンの文字色
 $form_txt: #000;		//テキスト入力欄の文字色
 $form_txt_bk: #FFF;	//テキスト入力欄の背景色
 

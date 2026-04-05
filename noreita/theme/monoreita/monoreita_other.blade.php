@@ -3,7 +3,7 @@
 
 <head>
 	<meta charset="utf-8">
-	<title>{{$btitle}}</title>
+	<title>{{$board_title}}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	@include('monoreita_headcss')
 	{{-- ok画面専用ヘッダ --}}
@@ -14,7 +14,7 @@
 
 <body>
 	<header>
-		<h1><a href="{{$self}}">{{$btitle}}</a></h1>
+		<h1><a href="{{$self}}">{{$board_title}}</a></h1>
 		<div>
 			<a href="{{$home}}" target="_top">[ホーム]</a>
 			<a href="{{$self}}?mode=admin_in">[管理モード]</a>
@@ -56,7 +56,7 @@
 							<td>
 								<input type="text" name="sub" size="35" autocomplete="section-sub" value="{{$bbsline['sub']}}" maxlength="{{$max_sub}}">
 								<input type="hidden" name="invz" value="0">
-								<input type="hidden" name="exid" value="0">
+								<input type="hidden" name="sodane" value="0">
 								<input type="hidden" name="e_no" value="{{$bbsline['tid']}}">
 								@if ($token != null)
 								<input type="hidden" name="token" value="{{$token}}">
@@ -93,7 +93,7 @@
 				<figure>
 					<img src="{{$path}}{{$bbsline['picfile']}}">
 					<figcaption>{{$bbsline['picfile']}}
-						@if ($dptime)
+						@if ($display_painttime)
 						@if ($bbsline['psec'] != null)
 						描画時間：{{$bbsline['utime']}}
 						@endif

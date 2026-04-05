@@ -2,19 +2,18 @@
 /*! =====このcssファイルはsassから生成されています。===== */
 body {
   background-attachment: fixed;
-  background: -webkit-gradient(linear, left top, left bottom, from(#224), to(black)) fixed;
   background: linear-gradient(#224, black) fixed;
-  color: #EEE;
+  color: #EEF;
 }
 body svg {
-  fill: #EEE;
+  fill: #EEF;
 }
 
 a {
-  color: #EEE;
+  color: #EEF;
 }
 a:link {
-  color: #EEE;
+  color: #EEF;
 }
 a:visited {
   color: #999;
@@ -127,7 +126,6 @@ button {
 
 .oyat {
   border-color: #922;
-  background: -webkit-gradient(linear, left top, right top, from(#012), color-stop(#004488), to(#004755)) fixed;
   background: linear-gradient(to right, #012, #004488, #004755) fixed;
   color: #DFE;
 }

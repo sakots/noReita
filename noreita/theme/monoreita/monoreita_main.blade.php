@@ -3,16 +3,16 @@
 
 <head>
 	<meta charset="utf-8">
-	<title>{{$btitle}}</title>
+	<title>{{$board_title}}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="theme/{{$themedir}}/luminous/luminous-basic.min.css">
+	<link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/luminous-basic.min.css">
 	@include('monoreita_headcss')
-	<script src="theme/{{$themedir}}/js/sodane.js"></script>
+	<script src="theme/{{$theme_dir}}/js/sodane.js"></script>
 </head>
 
 <body>
 	<header id="header">
-		<h1><a href="{{$self}}">{{$btitle}}</a></h1>
+		<h1><a href="{{$self}}">{{$board_title}}</a></h1>
 		<div>
 			<a href="{{$home}}" target="_top">[ホーム]</a>
 			<a href="{{$self}}?mode=admin_in">[管理モード]</a>
@@ -35,8 +35,8 @@
 			<section class="epost">
 				<form action="{{$self}}" method="post" enctype="multipart/form-data">
 					<p>
-						<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
-						<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
+						<label>幅：<input class="form" type="number" min="300" max="{{$pmax_w}}" name="picw" value="{{$pdef_w}}" required></label>
+						<label>高さ：<input class="form" type="number" min="300" max="{{$pmax_h}}" name="pich" value="{{$pdef_h}}" required></label>
 						<input type="hidden" name="mode" value="paint">
 						<label for="tools">ツール</label>
 						<select name="tools" id="tools" onchange="togglePaletteVisibility()">
@@ -69,7 +69,7 @@
 				</form>
 				<ul>
 					<li>iPadやスマートフォンでも描けるお絵かき掲示板です。</li>
-					<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
+					<li>お絵かきできるサイズは幅300～{{$pmax_w}}px、高さ300～{{$pmax_h}}pxです。</li>
 					@foreach ($addinfo as $info) @if (!empty($info[$loop->index]))
 					<li>{!! $addinfo[$loop->index] !!}</li>
 					@endif @endforeach
@@ -112,7 +112,7 @@
 				</h3>
 				<section>
 					<h4 class="oya">
-						<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
+						<span class="oyaname"><a href="{{$self}}?mode=search&amp;similar=exact&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
 						@if ($bbsline['admins'] == 1)
 						<span class="mingcute--user-star-fill"></span>
 						@endif
@@ -127,32 +127,32 @@
 						@if ($bbsline['a_url'])
 						<span class="url"><a href="{{$bbsline['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
 						@endif
-						@if ($dispid)
+						@if ($display_id)
 						<span class="id">ID：{{$bbsline['id']}}</span>
 						@endif
 						<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$bbsline['tid']}}">
 							{{$sodane}}
-							@if ($bbsline['exid'] != 0)
-							x{{$bbsline['exid']}}
+							@if ($bbsline['sodane'] != 0)
+							x{{$bbsline['sodane']}}
 							@else
 							+
 							@endif
 						</a></span>
 					</h4>
 					@if ($bbsline['picfile'])
-					@if ($dptime)
+					@if ($display_painttime)
 					<h5>
 						{{$bbsline['tool']}} ({{$bbsline['img_w']}}x{{$bbsline['img_h']}})
 						@if ($bbsline['psec'] != null)
 						描画時間：{{$bbsline['utime']}}
 						@endif
-						@if ($bbsline['ext01'] == 1)
+						@if ($bbsline['nsfw'] == 1)
 						★NSFW
 						@endif
 					</h5>
 					@endif
 					<h5><a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
-						@if ($bbsline['pchfile'] && (!isset($bbsline['ext02']) || $bbsline['ext02'] !== 'img') && ($bbsline['tool'] !== "Chicken Paint"))
+						@if ($bbsline['pchfile'] && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img') && ($bbsline['tool'] !== "Chicken Paint"))
 						<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
 						@endif
 						@if ($use_continue)
@@ -161,7 +161,7 @@
 					</h5>
 					<div class="container">
 						<div class="item_image">
-							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span @if ($bbsline['ext01'] == 1) class="nsfw" @endif><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></span></a>
+							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><span @if ($bbsline['nsfw'] == 1) class="nsfw" @endif><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></span></a>
 						</div>
 					@else
 					<div class="container">
@@ -200,38 +200,38 @@
 									@if ($res['a_url'])
 									<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
 									@endif
-									@if ($dispid)
+									@if ($display_id)
 									<span class="id">ID：{{$res['id']}}</span>
 									@endif
 									<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
-										@if ($res['exid'] != 0)
-										x{{$res['exid']}}
+										@if ($res['sodane'] != 0)
+										x{{$res['sodane']}}
 										@else
 										+
 										@endif
 									</a></span>
 								</h4>
 								@if ($res['picfile'])
-								@if ($dptime)
+								@if ($display_painttime)
 								<h5>
 									{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
 									@if ($res['psec'] != null)
 									描画時間：{{$res['utime']}}
 									@endif
-									@if ($res['ext01'] == 1)
+									@if ($res['nsfw'] == 1)
 									★NSFW
 									@endif
 								</h5>
 								@endif
 								<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
-									@if ($res['pchfile'] && (!isset($res['ext02']) || $res['ext02'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
+									@if ($res['pchfile'] && (!isset($res['ctype']) || $res['ctype'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
 									<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
 									@endif
 									@if ($use_continue)
 									<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
 									@endif
 								</h5>
-								@if ($res['ext01'] == 1)
+								@if ($res['nsfw'] == 1)
 								<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
 								@else
 								<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
@@ -260,7 +260,7 @@
 							<span class="eva--share-outline"></span> SNSで共有する</a>
 						</span>
 						@else
-						<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
+						<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$board_title}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
 							<span class="ri--twitter-x-line"></span> tweet</a>
 						</span>
 						@endif
@@ -306,8 +306,8 @@
 				<p>作者名/本文(ハッシュタグ)検索</p>
 				<form class="search" method="GET" action="{{$self}}">
 					<input type="hidden" name="mode" value="search">
-					<label><input type="radio" name="bubun" value="bubun">部分一致</label>
-					<label><input type="radio" name="bubun" value="kanzen">完全一致</label>
+					<label><input type="radio" name="similar" value="similar">部分一致</label>
+					<label><input type="radio" name="similar" value="exact">完全一致</label>
 					<label><input type="radio" name="tag" value="tag">本文(ハッシュタグ)</label>
 					<br>
 					<input type="text" name="search" placeholder="検索" size="20">
@@ -369,7 +369,7 @@
 			});
 		</script>
 		<!-- Luminous -->
-		<script src="theme/{{$themedir}}/luminous/luminous.min.js"></script>
+		<script src="theme/{{$theme_dir}}/luminous/luminous.min.js"></script>
 		<script>
 			new LuminousGallery(document.querySelectorAll('.luminous'), {closeTrigger: "click", closeWithEscape: true});
 		</script>

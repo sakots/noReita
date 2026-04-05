@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v2.3.3'); //lot.260404.0
+define('REITA_VER', 'v3.0.0'); //lot.260405.0
 
 //言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -21,7 +21,7 @@ if (!is_file(__DIR__.'/functions.php')) {
   die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
 require_once(__DIR__.'/functions.php');
-if(!isset($functions_ver) || $functions_ver < 20250610) {
+if(!isset($functions_ver) || $functions_ver < 20260405) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
@@ -29,14 +29,14 @@ if(!isset($functions_ver) || $functions_ver < 20250610) {
 check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 20251112 || !defined('CONF_VER')) {
+if (CONF_VER < 20260405 || !defined('CONF_VER')) {
   die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
 //misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!isset($misskey_note_ver) || $misskey_note_ver < 20250326) {
+if(!isset($misskey_note_ver) || $misskey_note_ver < 20260405) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
@@ -48,7 +48,7 @@ if(!isset($save_inc_ver)||$save_inc_ver < 20250918) {
 }
 
 //テーマ
-require(__DIR__ . '/theme/' . THEMEDIR . '/theme_conf.php');
+require(__DIR__ . '/theme/' . THEME_DIR . '/theme_conf.php');
 
 //タイムゾーン設定
 date_default_timezone_set(DEFAULT_TIMEZONE);
@@ -63,7 +63,7 @@ if ($admin_pass === 'admin_pass') {
 include(__DIR__ . '/BladeOne/lib/BladeOne.php');
 use eftec\bladeone\BladeOne;
 
-$views = __DIR__ . '/theme/' . THEMEDIR; // テンプレートフォルダ
+$views = __DIR__ . '/theme/' . THEME_DIR; // テンプレートフォルダ
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
 //キャッシュフォルダがなかったら作成
@@ -77,7 +77,7 @@ $blade->pipeEnable = true; // パイプのフィルターを使えるように�
 $dat = array(); // bladeに格納する変数
 
 //CheerpJ 4.1
-define('CHEERPJ_URL','https://cjrtnc.leaningtech.com/4.1/loader.js');
+const CHEERPJ_URL = 'https:;//cjrtnc.leaningtech.com/4.1/loader.js';
 
 $dat['cheerpj_url'] = CHEERPJ_URL;
 
@@ -86,9 +86,6 @@ $dat['cheerpj_url'] = CHEERPJ_URL;
 //絶対パス取得
 $path = realpath("./") . '/' . IMG_DIR;
 $temp_path = realpath("./") . '/' . TEMP_DIR;
-
-define('IMG_PATH', $path);
-define('TMP_PATH', $temp_path);
 
 $message = "";
 $self = PHP_SELF;
@@ -104,14 +101,14 @@ $dat['axnos_dir'] = AXNOS_DIR;
 
 $dat['ver'] = REITA_VER;
 $dat['base'] = BASE;
-$dat['btitle'] = TITLE;
+$dat['board_title'] = TITLE;
 $dat['home'] = HOME;
 $dat['self'] = PHP_SELF;
 $dat['message'] = $message;
-$dat['pdefw'] = PDEF_W;
-$dat['pdefh'] = PDEF_H;
-$dat['pmaxw'] = PMAX_W;
-$dat['pmaxh'] = PMAX_H;
+$dat['pdef_w'] = PDEF_W;
+$dat['pdef_h'] = PDEF_H;
+$dat['pmax_w'] = PMAX_W;
+$dat['pmax_h'] = PMAX_H;
 
 $dat['max_name'] = MAX_NAME;
 $dat['max_email'] = MAX_EMAIL;
@@ -119,8 +116,8 @@ $dat['max_sub'] = MAX_SUB;
 $dat['max_url'] = MAX_URL;
 $dat['max_com'] = MAX_COM;
 
-$dat['themedir'] = THEMEDIR;
-$dat['tname'] = THEME_NAME;
+$dat['theme_dir'] = THEME_DIR;
+$dat['theme_name'] = THEME_NAME;
 $dat['tver'] = THEME_VER;
 
 $dat['switch_sns'] = SWITCH_SNS;
@@ -134,7 +131,7 @@ $dat['use_axnos'] = USE_AXNOS;
 $dat['select_palettes'] = USE_SELECT_PALETTES;
 $dat['pallets_dat'] = $pallets_dat;
 
-$dat['dispid'] = DISP_ID;
+$dat['display_id'] = DISP_ID;
 $dat['updatemark'] = UPDATE_MARK;
 $dat['use_resub'] = USE_RESUB;
 
@@ -149,7 +146,7 @@ $dat['use_sub'] = USE_SUB;
 
 $dat['addinfo'] = $addinfo;
 
-$dat['dptime'] = DSP_PAINTTIME;
+$dat['display_painttime'] = DSP_PAINTTIME;
 
 $dat['share_button'] = SHARE_BUTTON;
 
@@ -162,7 +159,7 @@ $dat['sodane'] = SODANE;
 $dat['use_oekaki_reply'] = USE_OEKAKI_REPLY;
 
 //ペイント画面の$pwdの暗号化
-define('CRYPT_METHOD', 'aes-128-cbc');
+const CRYPT_METHOD = 'aes-128-cbc';
 define('CRYPT_IV', 'T3pkYxNyjN7Wz3pu'); //半角英数16文字
 
 //テーマがXHTMLか設定されてないなら
@@ -176,7 +173,7 @@ defined('USE_NSFW') or define('USE_NSFW', 1);
 $dat['use_nsfw'] = USE_NSFW;
 
 //データベース接続PDO
-define('DB_PDO', 'sqlite:' . DB_NAME . '.db');
+const DB_PDO = 'sqlite:' . DB_NAME . '.db';
 
 defined("SNS_WINDOW_WIDTH") or define("SNS_WINDOW_WIDTH","600");
 defined("SNS_WINDOW_HEIGHT") or define("SNS_WINDOW_HEIGHT","600");
@@ -193,7 +190,7 @@ $message = "";
 
 //var_dump($_COOKIE);
 
-$pwdc = filter_input(INPUT_COOKIE, 'pwdc');
+$pwd_cookie = filter_input(INPUT_COOKIE, 'pwd_cookie');
 $usercode = filter_input(INPUT_COOKIE, 'usercode'); //nullならuser-codeを発行
 
 //$_SERVERから変数を取得
@@ -237,6 +234,9 @@ $_SESSION['usercode'] = $usercode;
 
 $mode = (string)filter_input_data('POST','mode');
 $mode = $mode ?: (string)filter_input_data('GET','mode');
+
+// Ajaxリクエストかどうかをチェック
+$is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
 // モード
 
@@ -315,7 +315,7 @@ function init(): void {
 			// はじめての実行なら、テーブルを作成
 			$db = new PDO(DB_PDO);
 			$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-			$sql = "CREATE TABLE IF NOT EXISTS tlog (
+			$sql = "CREATE TABLE IF NOT EXISTS board_log (
 				tid integer primary key autoincrement, --ID
 				created TIMESTAMP, --描いた日時
 				modified TIMESTAMP, --修正日時
@@ -329,7 +329,7 @@ function init(): void {
 				com TEXT, --本文
 				a_url TEXT, --url
 				host TEXT, --ホスト
-				exid TEXT, --そうだね
+				sodane TEXT, --そうだね
 				id TEXT, --投稿者ID
 				pwd TEXT, --パスワード
 				psec INT, --絵の時間(内部)
@@ -343,10 +343,10 @@ function init(): void {
 				tool TEXT, --絵のツール
 				admins VARCHAR(1), --認証マーク
 				shd VARCHAR(1), --そろそろ消える
-				ext01 TEXT, --nsfw
-				ext02 TEXT, --予備2
-				ext03 TEXT, --予備3
-				ext04 TEXT --予備4
+				nsfw TEXT, --nsfw
+				ctype TEXT, --?
+				uuid TEXT, --uuid(v7)
+				thumbnail TEXT --サムネイル
 			)";
 			$db = $db->query($sql);
 			$db = null; //db切断
@@ -375,6 +375,13 @@ function init(): void {
 	if (!is_dir(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "does not exist<br>" : "がありません<br>");
 	if (!is_writable(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "is not writable<br>" : "を書けません<br>");
 	if (!is_readable(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "is not readable<br>" : "を読めません<br>");
+	if (!is_dir(($thumbnail_dir = __DIR__ . '/thumbnail/'))) {
+		mkdir($thumbnail_dir, PERMISSION_FOR_DIR);
+		chmod($thumbnail_dir, PERMISSION_FOR_DIR);
+	}
+	if (!is_dir($thumbnail_dir)) $err .= $thumbnail_dir . ($en ? "does not exist<br>" : "がありません<br>");
+	if (!is_writable($thumbnail_dir)) $err .= $thumbnail_dir . ($en ? "is not writable<br>" : "を書けません<br>");
+	if (!is_readable($thumbnail_dir)) $err .= $thumbnail_dir . ($en ? "is not readable<br>" : "を読めません<br>");
 	if ($err) error($err);
 	if (is_file(DB_NAME . '.db')) {
 		// データベースファイルのパーミッションを明示的に設定
@@ -408,7 +415,7 @@ function regist(): void {
 	$img_h = trim(filter_input(INPUT_POST, 'img_h', FILTER_VALIDATE_INT));
 	$pwd = (string)trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd, PASSWORD_DEFAULT);
-	$exid = trim(filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
+	$sodane = trim(filter_input(INPUT_POST, 'sodane', FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
 	$nsfw_flag = (string)filter_input(INPUT_POST, 'nsfw', FILTER_VALIDATE_INT);
 	$rep = (string)filter_input(INPUT_POST, 'rep');
@@ -425,37 +432,39 @@ function regist(): void {
 	$original_name = $name;
 
 	if ($req_method !== "POST") {
-		error(MSG006);
+		error($en ? "Invalid request method." : "不正なリクエスト方法です。");
 	}
 
 	//NGワードがあれば拒絶
 	Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
+
+	//名前がない場合は拒絶
 	if (USE_NAME && !$name) {
-		error(MSG009);
+		error($en ? "Name is required." : "名前は必須です。");
 	}
 	//レスの時は本文必須
 	//if(filter_input(INPUT_POST, 'modid') && !$com) {error(MSG008);}
 	if (USE_COM && !$com) {
-		error(MSG008);
+		error($en ? "Comment is required." : "本文は必須です。");
 	}
 	if (USE_SUB && !$sub) {
-		error(MSG010);
+		error($en ? "Subject is required." : "タイトルは必須です。");
 	}
 
 	if (strlen($com) > MAX_COM) {
-		error(MSG011);
+		error($en ? "Comment is too long." : "本文が長すぎます。");
 	}
 	if (strlen($name) > MAX_NAME) {
-		error(MSG012);
+		error($en ? "Name is too long." : "名前が長すぎます。");
 	}
 	if (strlen($mail) > MAX_EMAIL) {
-		error(MSG013);
+		error($en ? "Email is too long." : "メールアドレスが長すぎます。");
 	}
 	if (strlen($sub) > MAX_SUB) {
-		error(MSG014);
+		error($en ? "Subject is too long." : "タイトルが長すぎます。");
 	}
 	if (strlen($url) > MAX_URL) {
-		error(MSG015);
+		error($en ? "URL is too long." : "URLが長すぎます。");
 	}
 
 	//ホスト取得
@@ -463,7 +472,7 @@ function regist(): void {
 
 	foreach ($badip as $value) { //拒絶host
 		if (preg_match("/$value$/i", $host)) {
-			error(MSG016);
+			error($en ? "Your host is blocked." : "あなたのホストは拒絶されています。");
 		}
 	}
 	//セキュリティ関連ここまで
@@ -484,24 +493,24 @@ function regist(): void {
 
 			// 二重投稿チェック
 			//最新コメント取得
-			$sqlw = "SELECT * FROM tlog WHERE thread=1 ORDER BY tid DESC LIMIT 1";
-			$msgw = $db->prepare($sqlw);
-			$msgw->execute();
-			$msgwc = $msgw->fetch();
-			if (!empty($msgwc)) {
-				$msgsub = $msgwc["sub"]; //最新タイトル
-				$msgwcom = $msgwc["com"]; //最新コメント取得できた
-				$msgwhost = $msgwc["host"]; //最新ホスト取得できた
+			$sql_w = "SELECT * FROM board_log WHERE thread=1 ORDER BY tid DESC LIMIT 1";
+			$msg_w = $db->prepare($sql_w);
+			$msg_w->execute();
+			$msg_wc = $msg_w->fetch();
+			if (!empty($msg_wc)) {
+				$msg_sub = $msg_wc["sub"]; //最新タイトル
+				$msg_com = $msg_wc["com"]; //最新コメント取得できた
+				$msg_host = $msg_wc["host"]; //最新ホスト取得できた
 				//どれも一致すれば二重投稿だと思う
-				if ($strlen_com > 0 && $com == $msgwcom && $host == $msgwhost && $sub == $msgsub) {
-					$msgw = null;
+				if ($strlen_com > 0 && $com == $msg_com && $host == $msg_host && $sub == $msg_sub) {
+					$msg_w = null;
 					$db = null; //db切断
 					error($en ? 'Duplicate post?' : '二重投稿ですか ?');
 				}
 				//画像番号が一致の場合(投稿してブラウザバック、また投稿とか)
 				//二重投稿と判別(画像がない場合は処理しない)
 				if (!empty($_POST["modid"])) {
-					if ($msgwc["picfile"] !== "" && $picfile == $msgwc["picfile"]) {
+					if ($msg_wc["picfile"] !== "" && $picfile == $msg_wc["picfile"]) {
 						$db = null; //db切断
 						error($en ? 'Duplicate post?' : '二重投稿ですか ?');
 					}
@@ -680,6 +689,9 @@ function regist(): void {
 			//id生成
 			$id = gen_id($host, $utime ?? time());
 
+			//UUID生成
+			$uuid = generate_uuid();
+
 			//管理者名は管理パスじゃないと使えない
 			if ($name === $admin_name && $pwd !== $admin_pass) {
 				$name = $name . ADMIN_CAP;
@@ -698,8 +710,8 @@ function regist(): void {
 			$id = str_replace("'", "''", $id);
 
 			//age値取得
-			$sqlage = "SELECT MAX(age) FROM tlog";
-			$age = $db->exec("$sqlage");
+			$sql_age = "SELECT MAX(age) FROM board_log";
+			$age = $db->exec("$sql_age");
 			$tree = time() * 100000000;
 
 			//スレ建てorお絵かきリプ
@@ -713,30 +725,30 @@ function regist(): void {
 				$thread = 0; //お絵かきリプ
 				$parent = $resto;
 				//レスの位置
-				$tree = time() - $parent - (int)$msgwc["tid"];
+				$tree = time() - $parent - (int)$msg_wc["tid"];
 				$comid = $tree + time();
 
 				//メール欄にsageが含まれるならageない
-				$age = (int)$msgwc["age"];
+				$age = (int)$msg_wc["age"];
 				if (strpos($mail, 'sage') !== false) {
 					//sage
 					$age = $age;
 				} else {
 					//age
 					$age++;
-					$agetree = $age + (time() * 100000000);
-					$sql_age = "UPDATE tlog SET age = $age, tree = $agetree WHERE tid = $parent";
+					$age_tree = $age + (time() * 100000000);
+					$sql_age = "UPDATE board_log SET age = $age, tree = $age_tree WHERE tid = $parent";
 					$db->exec($sql_age);
 				}
 			}
 			$shd = 0;
 			
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, shd, ext01, ext02) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype)";
+			$sql = "INSERT INTO board_log (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, sodane, age, invz, host, tool, admins, shd, nsfw, ctype, uuid) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :sodane, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype, :uuid)";
 
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype,
+					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'sodane'=> $sodane,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype, 'uuid'=> $uuid,
 				]
 			);
 			//$db->exec($sql);
@@ -744,7 +756,7 @@ function regist(): void {
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = [["namec",$original_name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass] ,[ "palettec" , $pal]];
+			$cookies = [["name_c",$original_name],["email_c",$mail] , ["url_c", $url], ["pwd_cookie", $c_pass] ,[ "palette_c" , $pal]];
 			foreach ($cookies as $cookie) {
 				list($c_name, $c_cookie) = $cookie;
 				$c_name = (string)$c_name;
@@ -753,7 +765,7 @@ function regist(): void {
 			}
 
 			$dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
-			$msgw = null;
+			$msg_w = null;
 			$db = null; //db切断
 		}
 	} catch (PDOException $e) {
@@ -766,28 +778,28 @@ function regist(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$sqlth = "SELECT SUM(thread) as cnt FROM tlog";
-		$th_cnt_sql = $db->query("$sqlth");
+		$sql_th = "SELECT SUM(thread) as cnt FROM board_log";
+		$th_cnt_sql = $db->query("$sql_th");
 		$th_cnt_sql = $th_cnt_sql->fetch();
 		$th_cnt = $th_cnt_sql["cnt"];
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
-	if ($th_cnt > LOG_MAX_T) {
+	if ($th_cnt > MAX_THREAD) {
 		logdel();
 	}
 
 	//そろそろ消えるスレッドのフラグを設定
-	$thid = (int)round(LOG_MAX_T * LOG_LIMIT / 100); //閾値 … 新しい方からこの件数以降がもうすぐ消える
-	if ($th_cnt > $thid) {
+	$th_id = (int)round(MAX_THREAD * LOG_LIMIT / 100); //閾値 … 新しい方からこの件数以降がもうすぐ消える
+	if ($th_cnt > $th_id) {
 		// そろそろ消えるスレッドにshdフラグを設定
 		try {
 			$db = new PDO(DB_PDO);
 			$db->exec("PRAGMA journal_mode=WAL;");
 			// 古いスレッドから順番にshdフラグを設定
-			$sql = "UPDATE tlog SET shd = '1' WHERE thread = 1 AND shd = '0' ORDER BY tid ASC LIMIT ?";
+			$sql = "UPDATE board_log SET shd = '1' WHERE thread = 1 AND shd = '0' ORDER BY tid ASC LIMIT ?";
 			$stmt = $db->prepare($sql);
-			$stmt->bindValue(1, $th_cnt - $thid, PDO::PARAM_INT);
+			$stmt->bindValue(1, $th_cnt - $th_id, PDO::PARAM_INT);
 			$stmt->execute();
 			$db = null; //db切断
 		} catch (PDOException $e) {
@@ -797,10 +809,10 @@ function regist(): void {
 
 	// そろそろ消えるスレッドの情報をテンプレートに渡す
 	$dat['log_limit'] = LOG_LIMIT;
-	$dat['log_max_t'] = LOG_MAX_T;
+	$dat['MAX_THREAD'] = MAX_THREAD;
 	$dat['th_cnt'] = $th_cnt;
-	$dat['thid'] = $thid;
-	$dat['will_delete_count'] = max(0, $th_cnt - $thid);
+	$dat['th_id'] = $th_id;
+	$dat['will_delete_count'] = max(0, $th_cnt - $th_id);
 
 	ok($en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
 }
@@ -826,7 +838,7 @@ function reply(): void {
 	$invz = trim(filter_input(INPUT_POST, 'invz', FILTER_VALIDATE_INT));
 	$pwd = trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd, PASSWORD_DEFAULT);
-	$exid = trim(filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
+	$sodane = trim(filter_input(INPUT_POST, 'sodane', FILTER_VALIDATE_INT));
 	$pal = filter_input(INPUT_POST, 'palettes');
 	$picfile = filter_input(INPUT_POST, 'picfile');
 	$img_w = trim(filter_input(INPUT_POST, 'img_w', FILTER_VALIDATE_INT));
@@ -836,36 +848,36 @@ function reply(): void {
 	$original_name = $name;
 
 	if ($req_method !== "POST") {
-		error(MSG006);
+		error($en ? "Invalid request method." : "不正なリクエスト方法です。");
 	}
 
 	//NGワードがあれば拒絶
 	Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
 	if (USE_NAME && !$name) {
-		error(MSG009);
+		error($en ? "Name is required." : "名前は必須です。");
 	}
 	//レスの時は本文必須
 	if (!$com) {
-		error(MSG008);
+		error($en ? "Comment is required." : "本文は必須です。");
 	}
 	if (USE_SUB && !$sub) {
-		error(MSG010);
+		error($en ? "Subject is required." : "タイトルは必須です。");
 	}
 
 	if (strlen($com) > MAX_COM) {
-		error(MSG011);
+		error($en ? "Comment is too long." : "本文が長すぎます。");
 	}
 	if (strlen($name) > MAX_NAME) {
-		error(MSG012);
+		error($en ? "Name is too long." : "名前が長すぎます。");
 	}
 	if (strlen($mail) > MAX_EMAIL) {
-		error(MSG013);
+		error($en ? "Email is too long." : "メールアドレスが長すぎます。");
 	}
 	if (strlen($sub) > MAX_SUB) {
-		error(MSG014);
+		error($en ? "Subject is too long." : "タイトルが長すぎます。");
 	}
 	if (strlen($url) > MAX_URL) {
-		error(MSG015);
+		error($en ? "URL is too long." : "URLが長すぎます。");
 	}
 
 	//ホスト取得
@@ -873,7 +885,7 @@ function reply(): void {
 
 	foreach ($badip as $value) { //拒絶host
 		if (preg_match("/$value$/i", $host)) {
-			error(MSG016);
+			error($en ? "Your host is blocked." : "あなたのホストは拒絶されています。");
 		}
 	}
 	//セキュリティ関連ここまで
@@ -894,25 +906,25 @@ function reply(): void {
 
 			// 二重投稿チェック
 			//最新コメント取得
-			$sqlw = "SELECT * FROM tlog WHERE thread=0 ORDER BY tid DESC LIMIT 1";
-			$msgw = $db->prepare($sqlw);
-			$msgw->execute();
-			$msgwc = $msgw->fetch() ?: [];
-			if (!empty($msgwc)) {
-				$msgwsub = $msgwc["sub"]; //最新タイトル
-				$msgwcom = $msgwc["com"]; //最新コメント取得できた
-				$msgwhost = $msgwc["host"]; //最新ホスト取得できた
+			$sql_w = "SELECT * FROM board_log WHERE thread=0 ORDER BY tid DESC LIMIT 1";
+			$msg_w = $db->prepare($sql_w);
+			$msg_w->execute();
+			$msg_wc = $msg_w->fetch() ?: [];
+			if (!empty($msg_wc)) {
+				$msg_w_sub = $msg_wc["sub"]; //最新タイトル
+				$msg_w_com = $msg_wc["com"]; //最新コメント取得できた
+				$msg_w_host = $msg_wc["host"]; //最新ホスト取得できた
 				//どれも一致すれば二重投稿だと思う
-				if ($strlen_com > 0 && $com == $msgwcom && $host == $msgwhost && $sub == $msgwsub) {
-					$msgw = null;
+				if ($strlen_com > 0 && $com == $msg_w_com && $host == $msg_w_host && $sub == $msg_w_sub) {
+					$msg_w = null;
 					$db = null; //db切断
 					error($en ? 'Duplicate post?' : '二重投稿ですか ?');
 				}
 			} else {
 				//最初のレスのage処理対策
-				$msgwc["tid"] = 0;
-				$msgwc["age"] = 0;
-				$msgwc["tree"] = 0;
+				$msg_wc["tid"] = 0;
+				$msg_wc["age"] = 0;
+				$msg_wc["tree"] = 0;
 			}
 			//↑ 二重投稿チェックおわり
 
@@ -1061,7 +1073,6 @@ function reply(): void {
 						$pchfile = "";
 					}
 				}
-				// rror_log("reply関数 - 最終的なpchfile: " . $pchfile);
 				chmod(TEMP_DIR . $picdat, PERMISSION_FOR_DEST);
 				unlink(TEMP_DIR . $picdat);
 			} else {
@@ -1082,6 +1093,9 @@ function reply(): void {
 			//id生成
 			$id = gen_id($host, $utime ?? time());
 
+			//UUID生成
+			$uuid = generate_uuid();
+
 			//管理者名は管理パスじゃないと使えない
 			if ($name === $admin_name && $pwd !== $admin_pass) {
 				$name = $name . ADMIN_CAP;
@@ -1099,11 +1113,11 @@ function reply(): void {
 			$id = str_replace("'", "''", $id);
 
 			//レスの位置
-			$tree = time() - $parent - (int)$msgwc["tid"];
+			$tree = time() - $parent - (int)$msg_wc["tid"];
 			$comid = $tree + time();
 
 			//メール欄にsageが含まれるならageない
-			$age = (int)$msgwc["age"];
+			$age = (int)$msg_wc["age"];
 			if (strpos($mail, 'sage') !== false) {
 				//sage
 				$age = $age;
@@ -1111,19 +1125,19 @@ function reply(): void {
 				//age
 				$age++;
 				$agetree = $age + (time() * 100000000);
-				$sql_age = "UPDATE tlog SET age = $age, tree = $agetree WHERE tid = $parent";
+				$sql_age = "UPDATE board_log SET age = $age, tree = $agetree WHERE tid = $parent";
 				$db->exec($sql_age);
 			}
 
 			//リプ処理
 			$thread = 0;
-			$sql = "INSERT INTO tlog (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, exid, age, invz, host, tool, admins, ext02) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :exid, :age, :invz, :host, :used_tool, :admins, :ctype)";
+			$sql = "INSERT INTO board_log (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, sodane, age, invz, host, tool, admins, ctype, uuid) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :sodane, :age, :invz, :host, :used_tool, :admins, :ctype, :uuid)";
 
 			// プレースホルダ
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'exid'=> $exid,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'ctype'=> $ctype,
+					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'sodane'=> $sodane,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'ctype'=> $ctype,'uuid'=> $uuid,
 				]
 			);
 			//$db->exec($sql);
@@ -1131,7 +1145,7 @@ function reply(): void {
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
-			$cookies = [["namec",$original_name],["emailc",$mail] , ["urlc", $url], ["pwdc", $c_pass]];
+			$cookies = [["name_c",$original_name],["email_c",$mail] , ["url_c", $url], ["pwd_cookie", $c_pass]];
 			foreach ($cookies as $cookie) {
 				list($c_name, $c_cookie) = $cookie;
 				$c_name = (string)$c_name;
@@ -1140,7 +1154,7 @@ function reply(): void {
 			}
 
 			$dat['message'] = $en ? 'Successfully posted.' : '書き込みに成功しました。';
-			$msgw = null;
+			$msg_w = null;
 			$db = null; //db切断
 		}
 	} catch (PDOException $e) {
@@ -1162,14 +1176,14 @@ function def(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$sqlth = "SELECT SUM(thread) as cnt FROM tlog";
-		$th_cnt_sql = $db->query("$sqlth");
+		$sql_th = "SELECT SUM(thread) as cnt FROM board_log";
+		$th_cnt_sql = $db->query("$sql_th");
 		$th_cnt_sql = $th_cnt_sql->fetch();
 		$th_cnt = $th_cnt_sql["cnt"];
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
-	if ($th_cnt > LOG_MAX_T) {
+	if ($th_cnt > MAX_THREAD) {
 		logdel();
 	}
 
@@ -1184,8 +1198,8 @@ function def(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$sqlcnt = "SELECT SUM(thread) as cnt FROM tlog WHERE invz=0";
-		$th_cnt_sql = $db->query("$sqlcnt");
+		$sql_cnt = "SELECT SUM(thread) as cnt FROM board_log WHERE invz=0";
+		$th_cnt_sql = $db->query("$sql_cnt");
 		$th_cnt_sql = $th_cnt_sql->fetch();
 		$count = $th_cnt_sql["cnt"];
 		if (isset($_GET['page']) && is_numeric($_GET['page'])) {
@@ -1232,7 +1246,7 @@ function def(): void {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
 		//1ページの全スレッド取得
-		$sql = "SELECT * FROM tlog WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?";
+		$sql = "SELECT * FROM board_log WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?";
 		$posts = $db->prepare($sql);
 		$posts->bindValue(1, $start, PDO::PARAM_INT);
 		$posts->bindValue(2, $page_def, PDO::PARAM_INT);
@@ -1245,10 +1259,10 @@ function def(): void {
 			if (empty($bbsline)) {
 				break;
 			} //スレがなくなったら抜ける
-			$oya_id = $bbsline["tid"]; //スレのtid(親番号)を取得
-			$sqli = "SELECT * FROM tlog WHERE parent = $oya_id AND invz=0 AND thread=0 ORDER BY comid ASC";
+			$oya_id = $bbsline["tid"]; //スレのid(親番号)を取得
+			$sql_i = "SELECT * FROM board_log WHERE parent = $oya_id AND invz=0 AND thread=0 ORDER BY comid ASC";
 			//レス取得
-			$postsi = $db->query($sqli);
+			$posts_i = $db->query($sql_i);
 			$j = 0;
 			$flag = true;
 			while ($flag == true) {
@@ -1256,13 +1270,13 @@ function def(): void {
 				if ($_pchext === 'chi') {
 					$bbsline['pchfile'] = ''; //litaChixは動画リンクを出さない
 				}
-				// 拡張子がない場合やext02がimgの場合は動画リンクを出さない
-				if ($_pchext === '' || $bbsline['pchfile'] === '' || (isset($bbsline['ext02']) && $bbsline['ext02'] === 'img')) {
+				// 拡張子がない場合やctypeがimgの場合は動画リンクを出さない
+				if ($_pchext === '' || $bbsline['pchfile'] === '' || (isset($bbsline['ctype']) && $bbsline['ctype'] === 'img')) {
 					$bbsline['pchfile'] = '';
 				}
-				$res = $postsi->fetch();
+				$res = $posts_i->fetch();
 				if (empty($res)) { //レスがなくなったら
-					$bbsline['ressu'] = $j; //スレのレス数
+					$bbsline['res_num'] = $j; //スレのレス数
 					$bbsline['res_d_su'] = $j - DSP_RES; //スレのレス省略数
 					if ($j > DSP_RES) { //スレのレス数が規定より多いと
 						$bbsline['rflag'] = true; //省略フラグtrue
@@ -1362,8 +1376,8 @@ function catalog(): void {
 		$start = $page_def * ($page - 1);
 
 		//最大何ページあるのか
-		$sqlth = "SELECT SUM(thread) as cnt FROM tlog WHERE invz=0";
-		$th_cnt_sql = $db->query("$sqlth");
+		$sql_th = "SELECT SUM(thread) as cnt FROM board_log WHERE invz=0";
+		$th_cnt_sql = $db->query("$sql_th");
 		$th_cnt_sql = $th_cnt_sql->fetch();
 		$th_cnt = $th_cnt_sql["cnt"];
 		$max_page = floor($th_cnt / $page_def) + 1;
@@ -1402,12 +1416,11 @@ function catalog(): void {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
 		//1ページの全スレッド取得
-		$sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, exid, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime FROM tlog WHERE thread=1 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
+		$sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, sodane, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime FROM board_log WHERE thread=1 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
 		$posts = $db->prepare($sql);
 		$posts->bindValue(':start', $start, PDO::PARAM_INT);
 		$posts->bindValue(':page_def', $page_def, PDO::PARAM_INT);
 		$posts->execute();
-
 
 		$oya = array();
 
@@ -1438,10 +1451,10 @@ function catalog(): void {
 function search(): void {
 	global $blade, $dat;
 
-	$searchf = filter_input(INPUT_GET, 'search');
-	$search = str_replace("'", "''", $searchf); //SQL
+	$search_f = filter_input(INPUT_GET, 'search');
+	$search = str_replace("'", "''", $search_f); //SQL
 	//部分一致検索
-	$bubun =  filter_input(INPUT_GET, 'bubun');
+	$similar =  filter_input(INPUT_GET, 'similar');
 	//本文検索
 	$tag = filter_input(INPUT_GET, 'tag');
 
@@ -1452,25 +1465,25 @@ function search(): void {
 		//全スレッド取得
 		//まずtagがあれば全文検索
 		if ($tag == 'tag') {
-			$sql = "SELECT * FROM tlog WHERE com LIKE ? AND invz=0 ORDER BY age DESC, tree DESC";
+			$sql = "SELECT * FROM board_log WHERE com LIKE ? AND invz=0 ORDER BY age DESC, tree DESC";
 			$posts = $db->prepare($sql);
 			$posts->execute(["%$search%"]);
 			$dat['catalogmode'] = 'hashsearch';
-			$dat['tag'] = $searchf;
+			$dat['tag'] = $search_f;
 		} else {
 			//tagがなければ作者名検索(スレッドのみ)
-			if ($bubun == "bubun") {
-				$sql = "SELECT * FROM tlog WHERE a_name LIKE ? AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
+			if ($similar == "similar") {
+				$sql = "SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
 				$posts = $db->prepare($sql);
 				$posts->execute(["%$search%"]);
 			} else {
 				//完全一致
-				$sql = "SELECT * FROM tlog WHERE a_name LIKE ? AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
+				$sql = "SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
 				$posts = $db->prepare($sql);
 				$posts->execute([$search]);
 			}
 			$dat['catalogmode'] = 'search';
-			$dat['author'] = $searchf;
+			$dat['author'] = $search_f;
 		}
 
 		$oya = array();
@@ -1503,14 +1516,14 @@ function sodane(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$stmt = $db->prepare("UPDATE tlog SET exid = exid + 1 WHERE tid = ?");
+		$stmt = $db->prepare("UPDATE board_log SET sodane = CAST((CAST(sodane AS INTEGER) + 1) AS TEXT) WHERE tid = ?");
 		$stmt->execute([$resto]);
 
 		// 更新後のそうだね数を取得
-		$stmt = $db->prepare("SELECT exid FROM tlog WHERE tid = ?");
+		$stmt = $db->prepare("SELECT CAST(sodane AS INTEGER) as sodane FROM board_log WHERE tid = ?");
 		$stmt->execute([$resto]);
 		$result = $stmt->fetch();
-		$new_exid = $result['exid'] ?? 0;
+		$new_sodane = (int)($result['sodane'] ?? 0);
 
 		$db = null;
 
@@ -1519,7 +1532,7 @@ function sodane(): void {
 			header('Content-Type: application/json');
 			echo json_encode([
 				'success' => true,
-				'exid' => $new_exid,
+				'sodane' => $new_sodane,
 				'message' => 'そうだねしました'
 			]);
 			return;
@@ -1567,7 +1580,7 @@ function res(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$sql = "SELECT * FROM tlog WHERE tid = ? ORDER BY tree DESC";
+		$sql = "SELECT * FROM board_log WHERE tid = ? ORDER BY tree DESC";
 		$posts = $db->prepare($sql);
 		$posts->execute([$resno]);
 
@@ -1575,10 +1588,11 @@ function res(): void {
 		$ko = array();
 		while ($bbsline = $posts->fetch()) {
 			//スレッドの記事を取得
-			$sqli = "SELECT * FROM tlog WHERE parent = $resno AND invz = 0 ORDER BY comid ASC";
-			$postsi = $db->query($sqli);
-			$rresname = array();
-			while ($res = $postsi->fetch()) {
+			$sql_i = "SELECT * FROM board_log WHERE parent = ? AND invz = 0 ORDER BY comid ASC";
+			$posts_i = $db->prepare($sql_i);
+			$posts_i->execute([$resno]);
+			$r_res_name = array();
+			while ($res = $posts_i->fetch()) {
 				$res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
 
 				if (AUTOLINK) {
@@ -1600,8 +1614,8 @@ function res(): void {
 				$res['modified'] = date(DATE_FORMAT, strtotime($res['modified']));
 				$ko[] = $res;
 				//投稿者名取得
-				if (!in_array($res['a_name'], $rresname)) { //重複除外
-					$rresname[] = $res['a_name']; //投稿者名を配列に入れる
+				if (!in_array($res['a_name'], $r_res_name)) { //重複除外
+					$r_res_name[] = $res['a_name']; //投稿者名を配列に入れる
 				}
 				// http、https以外のURLの場合表示しない
 				if (!filter_var($res['a_url'], FILTER_VALIDATE_URL) || !preg_match('|^https?://.*$|', $res['a_url'])) {
@@ -1627,15 +1641,15 @@ function res(): void {
 			$bbsline['past'] = strtotime($bbsline['created']); //古いので用
 			$bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
 			$bbsline['modified'] = date(DATE_FORMAT, strtotime($bbsline['modified']));
-			if (!in_array($bbsline['a_name'], $rresname)) {
-				$rresname[] = $bbsline['a_name'];
+			if (!in_array($bbsline['a_name'], $r_res_name)) {
+				$r_res_name[] = $bbsline['a_name'];
 			}
 			// http、https以外のURLの場合表示しない
 			if (!filter_var($bbsline['a_url'], FILTER_VALIDATE_URL) || !preg_match('|^https?://.*$|', $bbsline['a_url'])) {
 				$bbsline['a_url'] = "";
 			}
 			//名前付きレス用
-			$resname = implode(A_NAME_SAN . ' ', $rresname);
+			$resname = implode(A_NAME_SAN . ' ', $r_res_name);
 			$dat['resname'] = $resname;
 
 			$bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.TITLE);
@@ -1725,7 +1739,7 @@ function paint_form($rep, $reply_to): void {
 	if ($rep !== "") {
 		$ctype = filter_input(INPUT_POST, 'ctype');
 		$type = $rep;
-		$pwdf = filter_input(INPUT_POST, 'pwd');
+		$pwd_f = filter_input(INPUT_POST, 'pwd');
 
 		// 動画ファイルの存在をチェックしてctypeを自動設定
 		if ($ctype === null || $ctype === '') {
@@ -1742,17 +1756,13 @@ function paint_form($rep, $reply_to): void {
 			}
 		}
 
-		// デバッグ用：ctypeの値を確認
-		error_log("paintform関数 - ctype: " . $ctype);
-		error_log("paintform関数 - rep: " . $rep);
-
 		session_sta();
 
 		// 続きから描く場合は一時画像を除外するフラグを設定
 		$dat['exclude_temp_images'] = true;
 
 		$dat['no'] = $no;
-		$dat['pwd'] = $pwdf;
+		$dat['pwd'] = $pwd_f;
 		$dat['ctype'] = $ctype;
 		if (is_file(IMG_DIR . $pch . '.pch')) {
 			$dat['useneo'] = true;
@@ -1810,21 +1820,21 @@ function paint_form($rep, $reply_to): void {
 		$palettes .= '";';
 		$arr_pal[$i] = $palettes;
 	}
-	$user_pallete_i = $initial_palette . implode('', $arr_pal);
-	$dat['palettes'] = $user_pallete_i;
+	$user_palette_i = $initial_palette . implode('', $arr_pal);
+	$dat['palettes'] = $user_palette_i;
 
-	$count_dynp = count($DynP) + 1;
+	$count_dyn_p = count($DynP) + 1;
 
-	$dat['palsize'] = $count_dynp;
+	$dat['palsize'] = $count_dyn_p;
 
 	//パスワード暗号化
-	$pwdf = openssl_encrypt($pwd, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //暗号化
-	$pwdf = bin2hex($pwdf); //16進数に
-	$arr_dynp=[];
+	$pwd_f = openssl_encrypt($pwd, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //暗号化
+	$pwd_f = bin2hex($pwd_f); //16進数に
+	$arr_dyn_p=[];
 	foreach ($DynP as $p) {
-		$arr_dynp[] = '<option>' . $p . '</option>';
+		$arr_dyn_p[] = '<option>' . $p . '</option>';
 	}
-	$dat['dynp'] = implode('', $arr_dynp);
+	$dat['dynp'] = implode('', $arr_dyn_p);
 
 	if ($ctype == 'pch' || $ctype == 'spch') {
 		$pchfile = filter_input(INPUT_POST, 'pch');
@@ -1855,10 +1865,10 @@ function paint_form($rep, $reply_to): void {
 
 		session_sta();
 		$time = time();
-		$repcode = substr(crypt(md5($no . $userip . $pwdf . date("Ymd", $time)), $time), -8);
+		$repcode = substr(crypt(md5($no . $userip . $pwd_f . date("Ymd", $time)), $time), -8);
 		//念の為にエスケープ文字があればアルファベットに変換
 		$repcode = strtr($repcode, "!\"#$%&'()+,/:;<=>?@[\\]^`/{|}~", "ABCDEFGHIJKLMNOabcdefghijklmn");
-		$datmode = 'picrep&no=' . $no . '&pwd=' . $pwdf . '&repcode=' . $repcode;
+		$datmode = 'picrep&no=' . $no . '&pwd=' . $pwd_f . '&repcode=' . $repcode;
 		$usercode .= '&repcode=' . $repcode;
 	}
 	$dat['usercode'] = $usercode; //usercodeにいろいろくっついたものをまとめて出力
@@ -1897,18 +1907,18 @@ function open_pch($pch, $sp = ""): void {
 	$message = "";
 
 	$pch = filter_input(INPUT_GET, 'pch');
-	$pchh = str_replace(strrchr($pch, "."), "", $pch); //拡張子除去
-	$extn = substr($pch, strrpos($pch, '.') + 1); //拡張子取得
+	$pch_h = str_replace(strrchr($pch, "."), "", $pch); //拡張子除去
+	$extension = substr($pch, strrpos($pch, '.') + 1); //拡張子取得
 
-	$picfile = IMG_DIR . $pchh . ".png";
+	$picfile = IMG_DIR . $pch_h . ".png";
 
-	if ($extn == 'spch') {
+	if ($extension == 'spch') {
 		$pchfile = IMG_DIR . $pch;
 		$dat['tool'] = 'shi'; //拡張子がspchのときはしぃぺ
-	} elseif ($extn == 'pch') {
+	} elseif ($extension == 'pch') {
 		$pchfile = IMG_DIR . $pch;
 		$dat['tool'] = 'neo'; //拡張子がpchのときはNEO
-		//}elseif($extn=='chi'){
+		//}elseif($extension=='chi'){
 		//	$pchfile = IMG_DIR.$pch;
 		//	$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChix 対応してくれるといいな
 	} else {
@@ -1991,36 +2001,36 @@ function paint_com($tmpmode): void {
 	//var_dump($_POST);
 	$userip = get_uip();
 	//テンポラリ画像リスト作成
-	$tmplist = array();
+	$tmp_list = array();
 	$handle = opendir(TEMP_DIR);
 	while (false !== ($file = readdir($handle))) {
 		if (!is_dir($file) && preg_match("/\.(dat)\z/i", $file)) {
 			$fp = fopen(TEMP_DIR . $file, "r");
 			$userdata = fread($fp, 1024);
 			fclose($fp);
-			list($uip, $uhost, $uagent, $imgext, $ucode,, $starttime, $postedtime,, $tool) = explode("\t", rtrim($userdata) . "\t");
-			$file_name = preg_replace("/\.(dat)\z/i", "", $file); //拡張子除去
-			if (is_file(TEMP_DIR . $file_name . $imgext)) //画像があればリストに追加
+			list($uip, $uhost, $u_agent, $imgext, $ucode,, $starttime, $postedtime,, $tool) = explode("\t", rtrim($userdata) . "\t");
+			$filename = preg_replace("/\.(dat)\z/i", "", $file); //拡張子除去
+			if (is_file(TEMP_DIR . $filename . $imgext)) //画像があればリストに追加
 				//描画時間を$userdataをもとに計算
 				//(表示用)
 				$utime = calcPtime((int)$postedtime - (int)$starttime);
 			//描画時間(内部用)
 			$psec = (int)$postedtime - (int)$starttime;
-			$tmplist[] = $ucode . "\t" . $uip . "\t" . $file_name . $imgext . "\t" . $utime . "\t" . $psec . "\t" . $tool;
+			$tmp_list[] = $ucode . "\t" . $uip . "\t" . $filename . $imgext . "\t" . $utime . "\t" . $psec . "\t" . $tool;
 		}
 	}
 	closedir($handle);
 	$tmp = array();
-	if (count($tmplist) != 0) {
+	if (count($tmp_list) != 0) {
 		//user-codeとipアドレスでチェック
-		foreach ($tmplist as $tmpimg) {
-			list($ucode, $uip, $ufilename, $utime, $psec, $tool) = explode("\t", $tmpimg);
+		foreach ($tmp_list as $tmpimg) {
+			list($ucode, $uip, $u_filename, $utime, $psec, $tool) = explode("\t", $tmpimg);
 			if ($ucode == $usercode || $uip == $userip) {
 				// 続きから描く場合は一時画像を除外
 				if (isset($dat['exclude_temp_images']) && $dat['exclude_temp_images']) {
 					continue;
 				}
-				$tmp[] = $ufilename;
+				$tmp[] = $u_filename;
 			}
 		}
 	}
@@ -2029,7 +2039,7 @@ function paint_com($tmpmode): void {
 	$regist = true;
 	$ipcheck = true;
 	if (count($tmp) == 0) {
-		$notmp = true;
+		$no_tmp = true;
 		$pictmp = 1;
 	} else {
 		$pictmp = 2;
@@ -2038,9 +2048,9 @@ function paint_com($tmpmode): void {
 		$temp = array();
 		foreach ($tmp as $tmpfile) {
 			$src = TEMP_DIR . $tmpfile;
-			$srcname = $tmpfile;
+			$src_name = $tmpfile;
 			$date = gmdate("Y/m/d H:i", filemtime($src) + 9 * 60 * 60);
-			$temp[] = compact('src', 'srcname', 'date', 'tool', 'utime', 'psec');
+			$temp[] = compact('src', 'src_name', 'date', 'tool', 'utime', 'psec');
 		}
 		$dat['temp'] = $temp;
 	}
@@ -2074,7 +2084,7 @@ function in_continue(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$sql = "SELECT *, ext02 as ctype FROM tlog WHERE picfile=? ORDER BY tree DESC";
+		$sql = "SELECT *, ctype as ctype FROM board_log WHERE picfile=? ORDER BY tree DESC";
 		$posts = $db->prepare($sql);
 		$posts->execute([$no]);
 		$oya = array();
@@ -2084,25 +2094,25 @@ function in_continue(): void {
 			$dat['oya'] = $oya; //配列に格納
 		}
 		$hist_ope = pathinfo($no, PATHINFO_FILENAME); //拡張子除去
-		$histfilename = IMG_DIR . $hist_ope;
+		$hist_filename = IMG_DIR . $hist_ope;
 		
 		// データベースからctypeを取得
 		$db_ctype = $oya[0]['ctype'] ?? null;
 		
-		if (is_file($histfilename . '.pch')) {
+		if (is_file($hist_filename . '.pch')) {
 			//$pchfile = IMG_DIR.$pch;
 			$dat['tool'] = 'neo'; //拡張子がpchのときはNEO
 			$dat['useshi'] = false;
 			$dat['useneo'] = true;
 			$dat['ctype_pch'] = true;
 			$dat['ctype_img'] = false;
-		} elseif (is_file($histfilename . '.spch')) {
+		} elseif (is_file($hist_filename . '.spch')) {
 			$dat['tool'] = 'shi'; //拡張子がspchのときはしぃぺ
 			$dat['useshi'] = true;
 			$dat['useneo'] = false;
 			$dat['ctype_pch'] = true;
 			$dat['ctype_img'] = false;
-		} elseif (is_file($histfilename . '.chi')) {
+		} elseif (is_file($hist_filename . '.chi')) {
 			$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChix
 			$dat['useshi'] = false;
 			$dat['useneo'] = false;
@@ -2143,7 +2153,7 @@ function delmode(): void {
 
 	$delno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 
-	$ppwd = filter_input(INPUT_POST, 'pwd');
+	$p_pwd = filter_input(INPUT_POST, 'pwd');
 
 	//記事呼び出し
 	try {
@@ -2151,7 +2161,7 @@ function delmode(): void {
 		$db->exec("PRAGMA journal_mode=WAL;");
 
 		//パスワードを取り出す
-		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
+		$sql = "SELECT pwd FROM board_log WHERE tid = ?";
 		$msgs = $db->prepare($sql);
 		if ($msgs == false) {
 			error($en ? 'That post does not exist.' : 'そんな記事ない気がします。');
@@ -2163,67 +2173,67 @@ function delmode(): void {
 		}
 
 		//削除記事の画像を取り出す
-		$sqlp = "SELECT picfile FROM tlog WHERE tid = ?";
-		$msgsp = $db->prepare($sqlp);
-		$msgsp->execute([$delno]);
-		$msgsp->execute();
-		$msgp = $msgsp->fetch();
-		if (empty($msgp)) {
+		$sql_p = "SELECT picfile FROM board_log WHERE tid = ?";
+		$msg_sp = $db->prepare($sql_p);
+		$msg_sp->execute([$delno]);
+		$msg_sp->execute();
+		$msg_p = $msg_sp->fetch();
+		if (empty($msg_p)) {
 			error($en ? 'Image not found.' : '画像が見当たりません。');
 		}
-		$msgpic = $msgp['picfile']; //画像の名前取得できた
+		$msg_pic = $msg_p['picfile']; //画像の名前取得できた
 
 		if (isset($_POST["admindel"])) {
-			$admindelmode = 1;
+			$admindel_mode = 1;
 		} else {
-			$admindelmode = 0;
+			$admindel_mode = 0;
 		}
 
-		if (password_verify($ppwd, $msg['pwd'])) {
+		if (password_verify($p_pwd, $msg['pwd'])) {
 			//画像とかファイル削除
-			if (is_file(IMG_DIR . $msgpic)) {
-				$msgdat = str_replace(strrchr($msgpic, "."), "", $msgpic); //拡張子除去
-				safe_unlink(IMG_DIR . $msgdat . '.png');
-				safe_unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
-				safe_unlink(IMG_DIR . $msgdat . '.pch');
-				safe_unlink(IMG_DIR . $msgdat . '.spch');
-				safe_unlink(IMG_DIR . $msgdat . '.dat');
-				safe_unlink(IMG_DIR . $msgdat . '.chi');
+			if (is_file(IMG_DIR . $msg_pic)) {
+				$msg_dat = str_replace(strrchr($msg_pic, "."), "", $msg_pic); //拡張子除去
+				safe_unlink(IMG_DIR . $msg_dat . '.png');
+				safe_unlink(IMG_DIR . $msg_dat . '.jpg'); //一応jpgも
+				safe_unlink(IMG_DIR . $msg_dat . '.pch');
+				safe_unlink(IMG_DIR . $msg_dat . '.spch');
+				safe_unlink(IMG_DIR . $msg_dat . '.dat');
+				safe_unlink(IMG_DIR . $msg_dat . '.chi');
 			}
 			//↑画像とか削除処理完了
 			//データベースから削除
-			$sql = "DELETE FROM tlog WHERE tid = ?";
+			$sql = "DELETE FROM board_log WHERE tid = ?";
 			$stmt = $db->prepare($sql);
 			$stmt->execute([$delno]);
 			$dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
-		} elseif ($admin_pass == $ppwd && $admindelmode == 1) {
+		} elseif ($admin_pass == $p_pwd && $admindel_mode == 1) {
 			//画像とかファイル削除
-			if (is_file(IMG_DIR . $msgpic)) {
-				$msgdat = str_replace(strrchr($msgpic, "."), "", $msgpic); //拡張子除去
-				safe_unlink(IMG_DIR . $msgdat . '.png');
-				safe_unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
-				safe_unlink(IMG_DIR . $msgdat . '.pch');
-				safe_unlink(IMG_DIR . $msgdat . '.spch');
-				safe_unlink(IMG_DIR . $msgdat . '.dat');
-				safe_unlink(IMG_DIR . $msgdat . '.chi');
+			if (is_file(IMG_DIR . $msg_pic)) {
+				$msg_dat = str_replace(strrchr($msg_pic, "."), "", $msg_pic); //拡張子除去
+				safe_unlink(IMG_DIR . $msg_dat . '.png');
+				safe_unlink(IMG_DIR . $msg_dat . '.jpg'); //一応jpgも
+				safe_unlink(IMG_DIR . $msg_dat . '.pch');
+				safe_unlink(IMG_DIR . $msg_dat . '.spch');
+				safe_unlink(IMG_DIR . $msg_dat . '.dat');
+				safe_unlink(IMG_DIR . $msg_dat . '.chi');
 			}
 			//↑画像とか削除処理完了
 			//データベースから削除
-			$sql = "DELETE FROM tlog WHERE tid = ? OR parent = ?";
+			$sql = "DELETE FROM board_log WHERE tid = ? OR parent = ?";
 			$stmt = $db->prepare($sql);
 			$stmt->execute([$delno, $delno]);
 			$dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
-		} elseif ($admin_pass == $ppwd && $admindelmode != 1) {
+		} elseif ($admin_pass == $p_pwd && $admindel_mode != 1) {
 			//管理モード以外での管理者削除は
 			//データベースから削除はせずに非表示
-			$sql = "UPDATE tlog SET invz=1 WHERE tid = ?";
+			$sql = "UPDATE board_log SET invz=1 WHERE tid = ?";
 			$stmt = $db->prepare($sql);
 			$stmt->execute([$delno]);
 			$dat['message'] = $en ? 'Post hidden.' : '非表示にしました。';
 		} else {
 			error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
 		}
-		$msgp = null;
+		$msg_p = null;
 		$msg = null;
 		$db = null; //db切断
 	} catch (PDOException $e) {
@@ -2244,16 +2254,16 @@ function picreplace(): void {
 	$stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
 	$no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
 	$repcode = filter_input(INPUT_GET, 'repcode');
-	$pwdf = filter_input(INPUT_GET, 'pwd');
-	$pwdf = hex2bin($pwdf); //バイナリに
-	$pwdf = openssl_decrypt($pwdf, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //復号化
+	$pwd_f = filter_input(INPUT_GET, 'pwd');
+	$pwd_f = hex2bin($pwd_f); //バイナリに
+	$pwd_f = openssl_decrypt($pwd_f, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //復号化
 	$nsfw_flag = filter_input(INPUT_POST, 'nsfw');
 
 	//ホスト取得
 	$host = gethostbyaddr(get_uip());
 
 	foreach ($badip as $value) { //拒絶host
-		if (preg_match("/$value$/i", $host)) error(MSG016);
+		if (preg_match("/$value$/i", $host)) error($en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。');
 	}
 
 	/*--- テンポラリ捜査 ---*/
@@ -2264,9 +2274,9 @@ function picreplace(): void {
 			$fp = fopen(TEMP_DIR . $file, "r");
 			$userdata = fread($fp, 1024);
 			fclose($fp);
-			list($uip, $uhost, $uagent, $imgext, $ucode, $urepcode, $starttime, $postedtime,, $tool) = explode("\t", rtrim($userdata) . "\t"); //区切りの"\t"を行末にして配列へ格納
-			$file_name = pathinfo($file, PATHINFO_FILENAME); //拡張子除去
-			if ($file_name && is_file(TEMP_DIR . $file_name . $imgext) && $urepcode === $repcode) {
+			list($uip, $uhost, $u_agent, $imgext, $ucode, $u_repcode, $starttime, $postedtime,, $tool) = explode("\t", rtrim($userdata) . "\t"); //区切りの"\t"を行末にして配列へ格納
+			$filename = pathinfo($file, PATHINFO_FILENAME); //拡張子除去
+			if ($filename && is_file(TEMP_DIR . $filename . $imgext) && $u_repcode === $repcode) {
 				$find = true;
 				break;
 			}
@@ -2274,7 +2284,7 @@ function picreplace(): void {
 	}
 	closedir($handle);
 	if (!$find) {
-		error(MSG007);
+		error($en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。');
 	}
 
 	// ログ読み込み
@@ -2282,19 +2292,21 @@ function picreplace(): void {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
 		//記事を取り出す
-		$sql = "SELECT * FROM tlog WHERE tid = ?";
+		$sql = "SELECT * FROM board_log WHERE tid = ?";
 		$msgs = $db->prepare($sql);
 		$msgs->execute([$no]);
 		$msg_d = $msgs->fetch();
 		//パスワード照合
 		// $flag = false;
-		if (password_verify($pwdf, $msg_d["pwd"])) {
+		if (password_verify($pwd_f, $msg_d["pwd"])) {
 			//パスワードがあってたら画像アップロード処理
-			$up_picfile = TEMP_DIR . $file_name . $imgext;
+			$up_picfile = TEMP_DIR . $filename . $imgext;
 			$dest = IMG_DIR . $stime . '.tmp';
 			copy($up_picfile, $dest);
 
-			if (!is_file($dest)) error(MSG003);
+			if (!is_file($dest)) {
+				error($en ? 'Failed to upload image.' : '画像のアップロードに失敗しました。');
+			}
 			chmod($dest, PERMISSION_FOR_DEST);
 			//元ファイル削除
 			safe_unlink(IMG_DIR . $msg_d["picfile"]);
@@ -2303,38 +2315,38 @@ function picreplace(): void {
 			$imgext = get_image_type($img_type, $dest);
 
 			//新しい画像の名前(DB保存用)
-			$new_picfile = $file_name . $imgext;
+			$new_picfile = $filename . $imgext;
 
 			chmod($dest, PERMISSION_FOR_DEST);
 			rename($dest, IMG_DIR . $new_picfile);
 
 			//ワークファイル削除
 			safe_unlink($up_picfile);
-			safe_unlink(TEMP_DIR . $file_name . ".dat");
+			safe_unlink(TEMP_DIR . $filename . ".dat");
 
 			//動画ファイルアップロード
 			//拡張子チェック
 			$pchext = '';
-			if (is_file(TEMP_DIR . $file_name . '.chi')) {
+			if (is_file(TEMP_DIR . $filename . '.chi')) {
 				$pchext = '.chi';
-			} elseif (is_file(TEMP_DIR . $file_name . '.spch')) {
+			} elseif (is_file(TEMP_DIR . $filename . '.spch')) {
 				$pchext = '.spch';
-			} elseif (is_file(TEMP_DIR . $file_name . '.pch')) {
+			} elseif (is_file(TEMP_DIR . $filename . '.pch')) {
 				$pchext = '.pch';
 			}
 			//元ファイル削除
 			safe_unlink(IMG_DIR . $msg_d["pchfile"]);
 
 			//新しい動画ファイルの名前(DB保存用)
-			$new_pchfile = $file_name . $pchext;
+			$new_pchfile = $filename . $pchext;
 
 			//動画ファイルアップロード本編
-			if (is_file(TEMP_DIR . $file_name . $pchext)) {
-				$pchsrc = TEMP_DIR . $file_name . $pchext;
+			if (is_file(TEMP_DIR . $filename . $pchext)) {
+				$pch_src = TEMP_DIR . $filename . $pchext;
 				$dst = IMG_DIR . $new_pchfile;
-				if (copy($pchsrc, $dst)) {
+				if (copy($pch_src, $dst)) {
 					chmod($dst, PERMISSION_FOR_DEST);
-					safe_unlink($pchsrc);
+					safe_unlink($pch_src);
 				}
 			}
 
@@ -2359,10 +2371,10 @@ function picreplace(): void {
 			}
 
 			//db上書き
-			$sqlrep = "UPDATE tlog set modified = datetime('now', 'localtime'), host = :host, picfile = :new_picfile, pchfile = :new_pchfile, id = :id, psec = :psec, utime = :utime, ext01 = :nsfw WHERE tid = :no";
+			$sql_rep = "UPDATE board_log set modified = datetime('now', 'localtime'), host = :host, picfile = :new_picfile, pchfile = :new_pchfile, id = :id, psec = :psec, utime = :utime, nsfw = :nsfw WHERE tid = :no";
 			// プレースホルダ
 			try {
-				$stmt = $db->prepare($sqlrep);
+				$stmt = $db->prepare($sql_rep);
 				$stmt->execute(
 					[
 						':host'=>$host, ':new_picfile'=>$new_picfile, ':new_pchfile'=>$new_pchfile, ':id'=>$id,':psec'=>$psec,':utime'=>$utime,':nsfw'=>$nsfw,':no'=>$no,
@@ -2371,9 +2383,9 @@ function picreplace(): void {
 			} catch(PDOException $e) {
 				echo "DB接続エラー:" . $e->getMessage();
 			}
-			$db = $db->exec($sqlrep);
+			$db = $db->exec($sql_rep);
 		} else {
-			error(MSG028);
+			error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
 		}
 		$db = null; //db切断
 	} catch (PDOException $e) {
@@ -2397,10 +2409,10 @@ function editform(): void {
 	}
 
 	//入力されたパスワード
-	$postpwd = filter_input(INPUT_POST, 'pwd');
+	$post_pwd = filter_input(INPUT_POST, 'pwd');
 
-	$editno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
-	if ($editno == "") {
+	$edit_no = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
+	if ($edit_no == "") {
 		error($en ? 'Please enter the post number.' : '記事番号を入力してください');
 	}
 
@@ -2410,17 +2422,17 @@ function editform(): void {
 		$db->exec("PRAGMA journal_mode=WAL;");
 
 		//パスワードを取り出す
-		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
+		$sql = "SELECT pwd FROM board_log WHERE tid = ?";
 		$stmt = $db->prepare($sql);
-		$stmt->execute([$editno]);
+		$stmt->execute([$edit_no]);
 		$msg = $stmt->fetch();
 		if (empty($msg)) {
 			error($en ? 'That post does not exist.' : 'そんな記事ないです。');
 		}
-		if (password_verify($postpwd, $msg['pwd'])) {
+		if (password_verify($post_pwd, $msg['pwd'])) {
 			//パスワードがあってたら
-			$sqli = "SELECT * FROM tlog WHERE tid = $editno";
-			$posts = $db->query($sqli);
+			$sql_i = "SELECT * FROM board_log WHERE tid = $edit_no";
+			$posts = $db->query($sql_i);
 			$oya = array();
 			while ($bbsline = $posts->fetch()) {
 				$bbsline['com'] = nl2br(htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
@@ -2428,10 +2440,10 @@ function editform(): void {
 				$dat['oya'] = $oya;
 			}
 			$dat['message'] = $en ? 'Editing mode...' : '編集モード...';
-		} elseif ($admin_pass == $postpwd) {
+		} elseif ($admin_pass == $post_pwd) {
 			//管理者編集モード
-			$sqli = "SELECT * FROM tlog WHERE tid = $editno";
-			$posts = $db->query($sqli);
+			$sql_i = "SELECT * FROM board_log WHERE tid = $edit_no";
+			$posts = $db->query($sql_i);
 			$oya = array();
 			while ($bbsline = $posts->fetch()) {
 				$bbsline['com'] = nl2br(htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
@@ -2473,7 +2485,7 @@ function editexec(): void {
 	$e_no = trim((string)filter_input(INPUT_POST, 'e_no'));
 
 	if ($req_method !== "POST") {
-		error(MSG006);
+		error($en ? "Request denied." : "拒絶されました");
 	}
 
 	$sub = (string)filter_input(INPUT_POST, 'sub');
@@ -2484,33 +2496,36 @@ function editexec(): void {
 	$picfile = trim((string)filter_input(INPUT_POST, 'picfile'));
 	$pwd = (string)trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd, PASSWORD_DEFAULT);
-	$exid = trim((string)filter_input(INPUT_POST, 'exid', FILTER_VALIDATE_INT));
+	$sodane = trim((string)filter_input(INPUT_POST, 'sodane', FILTER_VALIDATE_INT));
 
 	//NGワードがあれば拒絶
 	Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
 
 	if (USE_NAME && !$name) {
-		error(MSG009);
+		error($en ? "Name is required." : "名前は必須です。");
 	}
 	//本文必須でいいだろ
 	if (!$com) {
-		error(MSG008);
+		error($en ? "Comment is required." : "本文は必須です。");
 	}
 	if (USE_SUB && !$sub) {
-		error(MSG010);
+		error($en ? "Subject is required." : "タイトルは必須です。");
 	}
 
 	if (strlen($com) > MAX_COM) {
-		error(MSG011);
+		error($en ? "Comment is too long." : "本文が長すぎます。");
 	}
 	if (strlen($name) > MAX_NAME) {
-		error(MSG012);
+		error($en ? "Name is too long." : "名前が長すぎます。");
 	}
 	if (strlen($mail) > MAX_EMAIL) {
-		error(MSG013);
+		error($en ? "Email is too long." : "メールアドレスが長すぎます。");
 	}
 	if (strlen($sub) > MAX_SUB) {
-		error(MSG014);
+		error($en ? "Subject is too long." : "タイトルが長すぎます。");
+	}
+	if (strlen($url) > MAX_URL) {
+		error($en ? "URL is too long." : "URLが長すぎます。");
 	}
 
 	//ホスト取得
@@ -2518,7 +2533,7 @@ function editexec(): void {
 
 	foreach ($badip as $value) { //拒絶host
 		if (preg_match("/$value$/i", $host)) {
-			error(MSG016);
+			error($en ? "Your host is blocked." : "あなたのホストは拒絶されています。");
 		}
 	}
 	//↑セキュリティ関連ここまで
@@ -2534,14 +2549,14 @@ function editexec(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$sql = "UPDATE tlog set modified = datetime('now', 'localtime'), a_name = :name, mail = :mail, sub = :sub, com = :com, a_url = :url, host = :host, exid = :exid, pwd = :pwdh where tid = :e_no";
+		$sql = "UPDATE board_log set modified = datetime('now', 'localtime'), a_name = :name, mail = :mail, sub = :sub, com = :com, a_url = :url, host = :host, sodane = :sodane, pwd = :pwdh where tid = :e_no";
 
 		// プレースホルダ
 		try {
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					':name'=>$name, ':mail'=>$mail, ':sub'=>$sub, ':com'=>$com,':url'=>$url,':host'=>$host,':exid'=> $exid,':pwdh'=> $pwdh, ':e_no'=>$e_no,
+					':name'=>$name, ':mail'=>$mail, ':sub'=>$sub, ':com'=>$com,':url'=>$url,':host'=>$host,':sodane'=> $sodane,':pwdh'=> $pwdh, ':e_no'=>$e_no,
 					]
 			);
 			} catch(PDOException $e) {
@@ -2583,7 +2598,7 @@ function admin(): void {
 		//読み込み
 		$adminpass = filter_input(INPUT_POST, 'adminpass');
 		if ($adminpass === $admin_pass) {
-			$sql = "SELECT * FROM tlog WHERE thread=1 ORDER BY age DESC,tree DESC";
+			$sql = "SELECT * FROM board_log WHERE thread=1 ORDER BY age DESC,tree DESC";
 			$oya = array();
 			$posts = $db->prepare($sql);
 			$posts->execute();
@@ -2598,10 +2613,10 @@ function admin(): void {
 			$dat['oya'] = $oya;
 
 			//スレッドの記事を取得
-			$sqli = "SELECT * FROM tlog WHERE thread=0 ORDER BY tree ASC";
+			$sql_i = "SELECT * FROM board_log WHERE thread=0 ORDER BY tree ASC";
 			$ko = array();
-			$postsi = $db->query($sqli);
-			while ($res = $postsi->fetch()) {
+			$posts_i = $db->query($sql_i);
+			while ($res = $posts_i->fetch()) {
 				$res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
 				$ko[] = $res;
 			}
@@ -2619,18 +2634,20 @@ function admin(): void {
 
 // コンティニュー認証 (画像)
 function usrchk(): void {
+	global $en;
+
 	$no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
-	$pwdf = filter_input(INPUT_POST, 'pwd');
+	$pwd_f = filter_input(INPUT_POST, 'pwd');
 	$flag = FALSE;
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
 		//パスワードを取り出す
-		$sql = "SELECT pwd FROM tlog WHERE tid = ?";
+		$sql = "SELECT pwd FROM board_log WHERE tid = ?";
 		$msgs = $db->prepare($sql);
 		$msgs->execute([$no]);
 		$msg = $msgs->fetch();
-		if (password_verify($pwdf, $msg['pwd'])) {
+		if (password_verify($pwd_f, $msg['pwd'])) {
 			$flag = true;
 		} else {
 			$flag = false;
@@ -2640,7 +2657,7 @@ function usrchk(): void {
 		echo "DB接続エラー:" . $e->getMessage();
 	}
 	if (!$flag) {
-		error(MSG028);
+		error($en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています");
 	}
 }
 
@@ -2719,43 +2736,43 @@ function logdel(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$sqlimg = "SELECT * FROM tlog ORDER BY tid LIMIT 1";
-		$msgs = $db->prepare($sqlimg);
+		$sql_img = "SELECT * FROM board_log ORDER BY tid LIMIT 1";
+		$msgs = $db->prepare($sql_img);
 		$msgs->execute();
 		$msg = $msgs->fetch();
 
-		$del_tid = (int)$msg["tid"]; //消す行のスレ番号
-		$msgpic = $msg["picfile"]; //画像の名前取得できた
+		$del_id = (int)$msg["tid"]; //消す行のスレ番号
+		$msg_pic = $msg["picfile"]; //画像の名前取得できた
 		//画像とかの削除処理
-		if (is_file(IMG_DIR . $msgpic)) {
-			$msgdat = pathinfo($msgpic, PATHINFO_FILENAME); //拡張子除去
-			safe_unlink(IMG_DIR . $msgdat . '.png');
-			safe_unlink(IMG_DIR . $msgdat . '.jpg'); //一応jpgも
-			safe_unlink(IMG_DIR . $msgdat . '.pch');
-			safe_unlink(IMG_DIR . $msgdat . '.spch');
-			safe_unlink(IMG_DIR . $msgdat . '.dat');
-			safe_unlink(IMG_DIR . $msgdat . '.chi');
+		if (is_file(IMG_DIR . $msg_pic)) {
+			$msg_dat = pathinfo($msg_pic, PATHINFO_FILENAME); //拡張子除去
+			safe_unlink(IMG_DIR . $msg_dat . '.png');
+			safe_unlink(IMG_DIR . $msg_dat . '.jpg'); //一応jpgも
+			safe_unlink(IMG_DIR . $msg_dat . '.pch');
+			safe_unlink(IMG_DIR . $msg_dat . '.spch');
+			safe_unlink(IMG_DIR . $msg_dat . '.dat');
+			safe_unlink(IMG_DIR . $msg_dat . '.chi');
 		}
 
 		//レスあれば削除
 		//カウント
-		$sqlc = "SELECT COUNT(*) as cnti FROM tlog WHERE parent = $del_tid";
-		$countres = $db->query("$sqlc");
-		$countres = $countres->fetch();
-		$logcount = $countres["cnti"];
+		$sql_c = "SELECT COUNT(*) as cnt_i FROM board_log WHERE parent = $del_id";
+		$count_res = $db->query("$sql_c");
+		$count_res = $count_res->fetch();
+		$log_count = $count_res["cnt_i"];
 		//削除
-		if ($logcount !== 0) {
-			$delres = "DELETE FROM tlog WHERE parent = $del_tid";
-			$db->exec($delres);
+		if ($log_count !== 0) {
+			$del_res = "DELETE FROM board_log WHERE parent = $del_id";
+			$db->exec($del_res);
 		}
 		//スレ削除
-		$delths = "DELETE FROM tlog WHERE tid = $del_tid";
-		$db->exec($delths);
+		$del_ths = "DELETE FROM board_log WHERE tid = $del_id";
+		$db->exec($del_ths);
 
-		$sqlimg = null;
-		$delths = null;
+		$sql_img = null;
+		$del_ths = null;
 		$msg = null;
-		$del_tid = null;
+		$del_id = null;
 		$db = null; //db切断
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
@@ -2770,7 +2787,7 @@ function misskey_note(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
-		$sql = "SELECT * FROM tlog WHERE id=? ORDER BY tree DESC";
+		$sql = "SELECT * FROM board_log WHERE id=? ORDER BY tree DESC";
 		$posts = $db->prepare($sql);
 		$posts->execute([$no]);
 	} catch (PDOException $e) {

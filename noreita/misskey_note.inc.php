@@ -1,9 +1,9 @@
 <?php
-//Petit Note 2021-2025 (c)satopian MIT LICENSE
+//Petit Note 2021-2026 (c)satopian MIT LICENSE
 //https://paintbbs.sakura.ne.jp/
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
-$misskey_note_ver = 20250521;
+$misskey_note_ver = 20260405;
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -18,7 +18,7 @@ function get_post_from_db($no): ?array {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-		$sql = "SELECT * FROM tlog WHERE tid = :no";
+		$sql = "SELECT * FROM board_log WHERE tid = :no";
 		$stmt = $db->prepare($sql);
 		$stmt->execute(['no' => $no]);
 		$post = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -36,7 +36,7 @@ function get_post_from_db($no): ?array {
 			'mail'     => $post['mail'],
 			'a_url'    => $post['a_url'],
 			'id'       => $post['id'],
-			'exid'     => $post['exid'],
+			'sodane'   => $post['sodane'],
 			'picfile'  => $post['picfile'],
 			'pchfile'  => $post['pchfile'],
 			'img_w'    => $post['img_w'],
@@ -61,7 +61,7 @@ function check_post_exists($no): bool {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-		$sql = "SELECT COUNT(*) as count FROM tlog WHERE tid = :no";
+		$sql = "SELECT COUNT(*) as count FROM board_log WHERE tid = :no";
 		$stmt = $db->prepare($sql);
 		$stmt->execute([':no' => $no]);
 		$result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -80,7 +80,7 @@ function verify_post_password($no, $id, $pwd): bool {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-		$sql = "SELECT pwd FROM tlog WHERE tid = :no AND id = :id";
+		$sql = "SELECT pwd FROM board_log WHERE tid = :no AND id = :id";
 		$stmt = $db->prepare($sql);
 		$stmt->execute([':no' => $no, ':id' => $id]);
 		$post = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -103,7 +103,7 @@ function check_edit_permission($no, $id, $pwd, $admin): bool {
 		$db = new PDO(DB_PDO);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-		$sql = "SELECT created, admins FROM tlog WHERE tid = :no AND id = :id";
+		$sql = "SELECT created, admins FROM board_log WHERE tid = :no AND id = :id";
 		$stmt = $db->prepare($sql);
 		$stmt->execute([':no' => $no, ':id' => $id]);
 		$post = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -142,7 +142,7 @@ function create_res($post): array {
 			'mail' => $post['mail'],
 			'a_url' => $post['a_url'],
 			'id' => $post['id'],
-			'exid' => $post['exid'],
+			'sodane' => $post['sodane'],
 			'picfile' => $post['picfile'],
 			'pchfile' => $post['pchfile'],
 			'img_w' => $post['img_w'],
@@ -197,7 +197,7 @@ class misskey_note {
 		$admin_post = admin_post_valid();
 		$admin_del = admin_del_valid();
 
-		$dat['pwdc'] = (string)filter_input_data('COOKIE', 'pwdc');
+		$dat['pwd_cookie'] = (string)filter_input_data('COOKIE', 'pwd_cookie');
 		$dat['no'] = t(filter_input_data('POST', 'no', FILTER_VALIDATE_INT));
 		$dat['no'] = $dat['no'] ? $dat['no'] : t(filter_input_data('GET', 'no', FILTER_VALIDATE_INT));
 
@@ -219,11 +219,11 @@ class misskey_note {
 		$dat['token'] = get_csrf_token();
 
 		// nsfw
-		$dat['nsfwc'] = (bool)filter_input_data('COOKIE', 'nsfwc', FILTER_VALIDATE_BOOLEAN);
+		$dat['nsfw_c'] = (bool)filter_input_data('COOKIE', 'nsfw_c', FILTER_VALIDATE_BOOLEAN);
 		$dat['set_nsfw_show_hide'] = (bool)filter_input_data('COOKIE', 'p_n_set_nsfw_show_hide', FILTER_VALIDATE_BOOLEAN);
 
 		$dat['count_r_arr'] = count($dat['post']);
-		$dat['edit_mode'] = 'editmode';
+		$dat['edit_mode'] = 'edit_mode';
 
 		$admin_pass = null;
 
@@ -246,8 +246,8 @@ class misskey_note {
 		$dat['admin'] = ($dat['admin_del'] || $dat['admin_post']);
 
 		$pwd = (string)filter_input_data('POST', 'pwd');
-		$pwdc = (string)filter_input_data('COOKIE', 'pwdc');
-		$pwd = $pwd ? $pwd : $pwdc;
+		$pwd_cookie = (string)filter_input_data('COOKIE', 'pwd_cookie');
+		$pwd = $pwd ? $pwd : $pwd_cookie;
 
 		$id_and_no = (string)filter_input_data('POST', 'id_and_no');
 
@@ -277,7 +277,7 @@ class misskey_note {
 		// Misskeyサーバーリストをセット
 		$dat['misskey_servers'] = $misskey_servers;
 
-		$dat['nsfwc'] = (bool)filter_input_data('COOKIE', 'nsfwc', FILTER_VALIDATE_BOOLEAN);
+		$dat['nsfw_c'] = (bool)filter_input_data('COOKIE', 'nsfw_c', FILTER_VALIDATE_BOOLEAN);
 		$dat['set_nsfw_show_hide'] = (bool)filter_input_data('COOKIE', 'p_n_set_nsfw_show_hide', FILTER_VALIDATE_BOOLEAN);
 
 		$page = $_SESSION['current_page_context']["page"] ?? 0;
@@ -444,7 +444,7 @@ class misskey_note {
 			curl_setopt($postCurl, CURLOPT_RETURNTRANSFER, true);
 			$postResponse = curl_exec($postCurl);
 			$postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE);
-			curl_close($postCurl);
+			// curl_close($postCurl);
 
 			// HTTPステータスコードが403の時は、トークン不一致と判断しアプリを認証
 			if ($postStatusCode === 403) {

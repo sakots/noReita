@@ -6,19 +6,19 @@
 $dev: 0;
 
 //色指定とか
-$ushiro: #111111;		//一番後ろ
-$haikei: #333333;		//スレ背景
-$moji: #FEFEFE;			//文字
+$bg: #111111;		//一番後ろ
+$bg2: #333333;		//スレ背景
+$text: #FEFEFE;			//文字
 $link: #FEFEFE;			//リンクの文字
 $link_visited: #999;	//訪問済みリンク
 $link_active: #FEFEFE;	//アクティブなリンク
 $link_hover: #FEFEFE;	//マウスカーソルが上に載ってる時のリンク
-$resmoji: #999;			//レスの文字
+$res_text: #999;			//レスの文字
 $border: #396;          //ボーダーとスレタイトルの左
 $b_border: #6C9;        //ボタンのボーダー
 $b_border_u: #063;       //ボタンのボーダーその2
 $button: #396;			//返信とかのボタン
-$button_moji: #FFF;		//ボタンの文字色
+$button_text: #FFF;		//ボタンの文字色
 $form_txt: #000;		//テキスト入力欄の文字色
 $form_txt_bk: #EEEEEE;	//テキスト入力欄の背景色
 $th_bg: #111111;        //スレタイトルの背景と削除画面のテーブルの奇数行

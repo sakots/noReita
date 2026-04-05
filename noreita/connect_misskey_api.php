@@ -50,7 +50,7 @@ class connect_misskey_api{
 		curl_setopt($checkCurl, CURLOPT_RETURNTRANSFER, true);
 
 		$checkResponse = curl_exec($checkCurl);
-		curl_close($checkCurl);
+		// curl_close($checkCurl);
 
 		if (!$checkResponse) {
 			die("Error: " . ($en ? "Authentication failed." :"認証に失敗しました。") . " (Curl error)");
@@ -103,7 +103,7 @@ class connect_misskey_api{
 		$uploadResponse = curl_exec($uploadCurl);
 		$uploadStatusCode = curl_getinfo($uploadCurl, CURLINFO_HTTP_CODE);
 		$curlError = curl_error($uploadCurl);
-		curl_close($uploadCurl);
+		// curl_close($uploadCurl);
 
 		if ($uploadResponse === false) {
 			die("Error: 画像のアップロードに失敗しました (cURL Error: " . $curlError . ")");
@@ -141,7 +141,7 @@ class connect_misskey_api{
 		$updateResponse = curl_exec($updateCurl);
 		$updateStatusCode = curl_getinfo($updateCurl, CURLINFO_HTTP_CODE);
 		$updateCurlError = curl_error($updateCurl);
-		curl_close($updateCurl);
+		// curl_close($updateCurl);
 
 		if ($updateResponse === false) {
 			die("Error: ファイルの更新に失敗しました (cURL Error: " . $updateCurlError . ")");
@@ -194,7 +194,7 @@ class connect_misskey_api{
 		$postResponse = curl_exec($postCurl);
 		$postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE);
 		$postCurlError = curl_error($postCurl);
-		curl_close($postCurl);
+		// curl_close($postCurl);
 
 		if ($postResponse === false) {
 			die("Error: Misskeyへの投稿に失敗しました (cURL Error: " . $postCurlError . ")");

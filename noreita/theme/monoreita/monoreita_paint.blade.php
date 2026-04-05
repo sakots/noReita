@@ -2,7 +2,7 @@
 <html lang="ja">
 	<head>
 		<meta charset="utf-8">
-		<title>{{$btitle}}</title>
+		<title>{{$board_title}}</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		@include('monoreita_headcss')
 		@if ($tool == 'neo')
@@ -13,7 +13,7 @@
 			const originalWidth = {{$w}};
 			const originalHeight = {{$h}};
 		</script>
-		<script src="theme/{{$themedir}}/js/appFit.js" charset="utf-8"></script>
+		<script src="theme/{{$theme_dir}}/js/appFit.js" charset="utf-8"></script>
 		<!-- アプレットフィットここまで -->
 		@endif
 		@if ($tool == 'shi')
@@ -23,7 +23,7 @@
 	</head>
 	<body id="paintmode">
 		<header>
-			<h1><a href="{{$self}}">{{$btitle}}</a></h1>
+			<h1><a href="{{$self}}">{{$board_title}}</a></h1>
 			<div>
 				<a href="{{$home}}" target="_top">[ホーム]</a>
 				<a href="{{$self}}?mode=admin_in">[管理モード]</a>
@@ -48,7 +48,7 @@
 					{!!$palettes!!}
 				@endif
 			</script>
-			<script src="theme/{{$themedir}}/js/dynamicPalette.js?{{$stime}}" charset="utf-8"></script>
+			<script src="theme/{{$theme_dir}}/js/dynamicPalette.js?{{$stime}}" charset="utf-8"></script>
 			<script>
 				// パレットデータをマネージャーに設定
 				document.addEventListener('DOMContentLoaded', function() {

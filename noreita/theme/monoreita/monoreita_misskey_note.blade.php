@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{$btitle}}</title>
+  <title>{{$board_title}}</title>
   @include('monoreita_headcss')
   <style>
     .form-group {
@@ -38,7 +38,7 @@
 </head>
 <body>
   <header id="header">
-    <h1><a href="{{$self}}">{{$btitle}}</a></h1>
+    <h1><a href="{{$self}}">{{$board_title}}</a></h1>
     <div>
       <a href="{{$home}}" target="_top">[ホーム]</a>
       <a href="{{$self}}?mode=admin_in">[管理モード]</a>
@@ -207,7 +207,7 @@
             <input type="hidden" name="id_and_no" value="{{$post['id']}},{{$post['tid']}}">
             <input type="hidden" name="created" value="{{$post['created']}}">
             <input type="hidden" name="modified" value="{{$post['modified']}}">
-            <input type="password" name="pwd" value="{{$pwdc}}" autocomplete="current-password">
+            <input type="password" name="pwd" value="{{$pwd_cookie}}" autocomplete="current-password">
             <input type="hidden" name="mode" value="misskey_note_edit_form">
             <button type="submit">
               <span class="simple-icons--misskey"></span> ノート
