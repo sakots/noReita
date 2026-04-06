@@ -1,6 +1,6 @@
 <?php
 //--------------------------------------------------
-//  noReita v2.0.0～
+//  noReita v3.0.0～
 //  by sakots >> https://oekakibbs.moe/
 //  noReitaの設定ファイルです。
 //--------------------------------------------------
@@ -271,6 +271,9 @@ const C_SECURITY_TIMER = '';
 
 // 画像と動画データ保存ディレクトリ。index.phpから見て
 const IMG_DIR = 'img/';
+
+// サムネイルのディレクトリ。index.phpから見て
+const THUMB_DIR = 'thumbnail/';
 
 // 投稿容量制限 KB
 const MAX_KB = 2000;
