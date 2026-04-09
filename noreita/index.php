@@ -364,32 +364,15 @@ function init(): void {
 	}
 	$err = '';
 	if (!is_writable(realpath("./"))) error($en ? "Current directory is not writable.<br>" : "カレントディレクトリに書けません<br>");
-	if (!is_dir(IMG_DIR)) {
-		mkdir(IMG_DIR, PERMISSION_FOR_DIR);
-		chmod(IMG_DIR, PERMISSION_FOR_DIR);
-	}
-	if (!is_dir(IMG_DIR)) $err .= IMG_DIR . ($en ? "does not exist<br>" : "がありません<br>");
-	if (!is_writable(IMG_DIR)) $err .= IMG_DIR . ($en ? "is not writable<br>" : "を書けません<br>");
-	if (!is_readable(IMG_DIR)) $err .= IMG_DIR . ($en ? "is not readable<br>" : "を読めません<br>");
 
-	if (!is_dir(TEMP_DIR)) {
-		mkdir(TEMP_DIR, PERMISSION_FOR_DIR);
-		chmod(TEMP_DIR, PERMISSION_FOR_DIR);
-	}
-	if (!is_dir(__DIR__ . '/session/')) {
-		mkdir(__DIR__ . '/session/', PERMISSION_FOR_DIR);
-		chmod(__DIR__ . '/session/', PERMISSION_FOR_DIR);
-	}
-	if (!is_dir(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "does not exist<br>" : "がありません<br>");
-	if (!is_writable(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "is not writable<br>" : "を書けません<br>");
-	if (!is_readable(TEMP_DIR)) $err .= TEMP_DIR . ($en ? "is not readable<br>" : "を読めません<br>");
-	if (!is_dir(($thumbnail_dir = __DIR__ . '/thumbnail/'))) {
-		mkdir($thumbnail_dir, PERMISSION_FOR_DIR);
-		chmod($thumbnail_dir, PERMISSION_FOR_DIR);
-	}
-	if (!is_dir($thumbnail_dir)) $err .= $thumbnail_dir . ($en ? "does not exist<br>" : "がありません<br>");
-	if (!is_writable($thumbnail_dir)) $err .= $thumbnail_dir . ($en ? "is not writable<br>" : "を書けません<br>");
-	if (!is_readable($thumbnail_dir)) $err .= $thumbnail_dir . ($en ? "is not readable<br>" : "を読めません<br>");
+	check_dir(__DIR__.'/'.IMG_DIR);
+	check_dir(__DIR__.'/'.TEMP_DIR);
+	check_dir(__DIR__.'/'.THUMB_DIR);
+	check_dir(__DIR__.'/webp/');
+	check_dir(__DIR__.'/avif/');
+	check_dir(__DIR__.'/thumbnail/');
+	check_dir(__DIR__.'/session/');
+
 	if ($err) error($err);
 	if (is_file(DB_NAME . '.db')) {
 		// データベースファイルのパーミッションを明示的に設定
@@ -542,6 +525,14 @@ function regist(): void {
 				}
 				chmod(IMG_DIR . $picfile, PERMISSION_FOR_DEST);
 
+				// サムネイル作成
+				$thumbnail = make_thumbnail($temp_file, $path_filename, PMAX_W, PMAX_H);
+
+				// nsfw
+				if (USE_NSFW && $nsfw_flag) {
+					$thumbnail = blur_image($thumbnail);
+				}
+
 				// 既存の処理を保持
 				$fp = fopen(TEMP_DIR . $path_filename . ".dat", "r");
 				$userdata = fread($fp, 1024);
@@ -671,7 +662,6 @@ function regist(): void {
 						$pchfile = "";
 					}
 				}
-				error_log("regist関数 - 最終的なpchfile: " . $pchfile);
 				chmod(TEMP_DIR . $picdat, PERMISSION_FOR_DEST);
 				unlink(TEMP_DIR . $picdat);
 
@@ -751,12 +741,12 @@ function regist(): void {
 			}
 			$shd = 0;
 			
-			$sql = "INSERT INTO board_log (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, sodane, age, invz, host, tool, admins, shd, nsfw, ctype, uuid) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :sodane, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype, :uuid)";
+			$sql = "INSERT INTO board_log (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, sodane, age, invz, host, tool, admins, shd, nsfw, ctype, uuid, thumbnail) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :sodane, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype, :uuid, :thumbnail)";
 
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'sodane'=> $sodane,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype, 'uuid'=> $uuid,
+					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'sodane'=> $sodane,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype, 'uuid'=> $uuid, 'thumbnail'=>$thumbnail,
 				]
 			);
 			//$db->exec($sql);
@@ -1267,6 +1257,8 @@ function def(): void {
 			if (empty($bbsline)) {
 				break;
 			} //スレがなくなったら抜ける
+			$bbsline['thumb'] = '';
+			$bbsline['thumb_avif'] = '';
 			$oya_id = $bbsline["tid"]; //スレのid(親番号)を取得
 			$sql_i = "SELECT * FROM board_log WHERE parent = $oya_id AND invz=0 AND thread=0 ORDER BY comid ASC";
 			//レス取得
@@ -1283,6 +1275,10 @@ function def(): void {
 					$bbsline['pchfile'] = '';
 				}
 				$res = $posts_i->fetch();
+				if ($res) {
+					$res['thumb'] = '';
+					$res['thumb_avif'] = '';
+				}
 				if (empty($res)) { //レスがなくなったら
 					$bbsline['res_num'] = $j; //スレのレス数
 					$bbsline['res_d_su'] = $j - DSP_RES; //スレのレス省略数
@@ -1341,11 +1337,12 @@ function def(): void {
 			$bbsline['com'] = tobr($bbsline['com']);
 			//引用の色
 			$bbsline['com'] = quote($bbsline['com']);
-            if (!empty($bbsline['picfile'])) {
-                $thumb = create_post_thumbnail($bbsline['picfile'], (int)$bbsline['img_w'], (int)$bbsline['img_h']);
-                $bbsline['thumb'] = $thumb['thumb'];
-                $bbsline['thumb_avif'] = $thumb['thumb_avif'];
-            }
+      if (!empty($bbsline['picfile'])) {
+        $thumb = create_post_thumbnail($bbsline['picfile'], (int)$bbsline['img_w'], (int)$bbsline['img_h']);
+        $bbsline['thumb'] = $thumb['thumb'];
+        $bbsline['thumb_avif'] = $thumb['thumb_avif'];
+      }
+      $bbsline['past'] = strtotime($bbsline['created']);
 			$bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
 			$bbsline['modified'] = date(DATE_FORMAT, strtotime($bbsline['modified']));
 
@@ -1598,12 +1595,16 @@ function res(): void {
 		$oya = array();
 		$ko = array();
 		while ($bbsline = $posts->fetch()) {
+			$bbsline['thumb'] = '';
+			$bbsline['thumb_avif'] = '';
 			//スレッドの記事を取得
 			$sql_i = "SELECT * FROM board_log WHERE parent = ? AND invz = 0 ORDER BY comid ASC";
 			$posts_i = $db->prepare($sql_i);
 			$posts_i->execute([$resno]);
 			$r_res_name = array();
 			while ($res = $posts_i->fetch()) {
+				$res['thumb'] = '';
+				$res['thumb_avif'] = '';
 				$res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
 
 				if (AUTOLINK) {

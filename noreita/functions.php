@@ -763,3 +763,52 @@ function download_image($url): string|false {
 	}
 	return false;
 }
+
+//サムネイル作成
+function make_thumbnail($imgfile,$time,$max_w,$max_h): string {
+	$thumbnail='';
+	if(thumbnail_gd::thumb(IMG_DIR,$imgfile,$time,$max_w,$max_h,['thumbnail_avif'=>true])){
+		$thumbnail='thumbnail_avif';
+	} else if(thumbnail_gd::thumb(IMG_DIR,$imgfile,$time,$max_w,$max_h,['thumbnail_webp'=>true])) {
+		$thumbnail='thumbnail_webp';
+	}
+	//avifやwebpのサムネイルが作成できなかった時はjpegのサムネイルを作る
+	if(!$thumbnail && thumbnail_gd::thumb(IMG_DIR,$imgfile,$time,$max_w,$max_h)){
+		$thumbnail='thumbnail';
+	}
+	//カタログ用サムネイル
+	thumbnail_gd::thumb(IMG_DIR,$imgfile,$time,300,300,['webp'=>true]);
+
+	return $thumbnail;
+}
+
+// 画像をぼかす(nsfw)
+function blur_image($image, $blur_strength = 50): void {
+	imagefilter($image, IMG_FILTER_GAUSSIAN_BLUR);
+	for ($i = 0; $i < $blur_strength; $i++) {
+		imagefilter($image, IMG_FILTER_GAUSSIAN_BLUR);
+	}
+}
+
+//ディレクトリ作成
+function check_dir ($path): void {
+
+	$msg = initial_error_message();
+
+	if (!is_dir($path)) {
+			mkdir($path, PERMISSION_FOR_DIR);
+			chmod($path, PERMISSION_FOR_DIR);
+	}
+	if (!is_readable($path) || !is_writable($path)) {
+		chmod($path, PERMISSION_FOR_DIR);
+	}
+	if (!is_dir($path)){
+		die(h($path) . $msg['001']);
+	}
+	if (!is_readable($path)){
+		die(h($path) . $msg['002']);
+	}
+	if (!is_writable($path)){
+		die(h($path) . $msg['003']);
+	}
+}
