@@ -155,9 +155,21 @@ function safe_unlink($path): bool {
 /* オートリンク */
 function auto_link($proto): string {
 	if (!(stripos($proto, "script") !== false)) { //scriptがなければ続行
+		// 画像URLを一時的にプレースホルダーに置き換え
+		$image_urls = [];
+		preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?/i', $proto, $matches);
+		foreach ($matches[0] as $img_url) {
+			$placeholder = '<!--IMGURL' . md5($img_url) . '-->';
+			$proto = str_replace($img_url, $placeholder, $proto);
+			$image_urls[$placeholder] = $img_url;
+		}
 		$pattern = "{(https?|ftp)(://[[:alnum:]\+\$\;\?\.%,!#~*/:@&=_-]+)}";
 		$replace = "<a href=\"\\1\\2\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">\\1\\2</a>";
 		$proto = preg_replace($pattern, $replace, $proto);
+		// プレースホルダーを元の画像URLに戻す
+		foreach ($image_urls as $placeholder => $img_url) {
+			$proto = str_replace($placeholder, $img_url, $proto);
+		}
 		return $proto;
 	} else {
 		return $proto;
@@ -580,50 +592,137 @@ function generate_uuid(): string {
 
 // 本文中の画像URLにサムネイルを追加
 function image_thumbnail_link($com): string {
-    // URLを抽出
-    preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+/i', $com, $matches);
-    $urls = array_unique($matches[0]); // 重複を除去
+  // URLを抽出
+  preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+/i', $com, $matches);
+  $urls = array_unique($matches[0]); // 重複を除去
 
-    foreach ($urls as $url) {
-        // 画像拡張子チェック
-        if (preg_match('/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i', $url)) {
-            // サムネイルパス生成
-            $hash = md5($url);
-            $thumb_path = __DIR__ . '/thumbnail/' . $hash . '_thumb.jpg';
+  foreach ($urls as $url) {
+    // 画像拡張子チェック
+    if (preg_match('/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i', $url)) {
+      // サムネイルパス生成（一旦jpgとして、後で変更）
+      $hash = md5($url);
+      $temp_thumb_path = __DIR__ . '/thumbnail/' . $hash . '_thumb';
 
-            if (!file_exists($thumb_path)) {
-                // ダウンロードしてサムネイル作成
-                $context = stream_context_create([
-                    'http' => [
-                        'timeout' => 10, // タイムアウト設定
-                        'user_agent' => 'noReita/1.0',
-                    ]
-                ]);
-                $image_data = @file_get_contents($url, false, $context);
-                if ($image_data && strlen($image_data) > 0) {
-                    $temp_file = tempnam(sys_get_temp_dir(), 'img');
-                    file_put_contents($temp_file, $image_data);
+      // 拡張子は後で決定
+      if (!file_exists($temp_thumb_path . '.jpg') && !file_exists($temp_thumb_path . '.png') && !file_exists($temp_thumb_path . '.gif') && !file_exists($temp_thumb_path . '.webp' && !file_exists($temp_thumb_path . '.avif'))) {
+        // ダウンロードしてサムネイル作成
+        $image_data = download_image($url);
+        if ($image_data && strlen($image_data) > 0 && strlen($image_data) < 1024 * 1024) { // 1MB未満
+          $temp_file = tempnam(sys_get_temp_dir(), 'img');
+          file_put_contents($temp_file, $image_data);
 
-                    // サムネイル作成
-                    $thumb_result = thumbnail_gd::thumb('', $temp_file, time(), 200, 200);
-                    if ($thumb_result && file_exists($thumb_result)) {
-                        // thumbnail/ に移動
-                        if (!is_dir(__DIR__ . '/thumbnail/')) {
-                            mkdir(__DIR__ . '/thumbnail/', PERMISSION_FOR_DIR);
-                        }
-                        rename($thumb_result, $thumb_path);
-                        chmod($thumb_path, PERMISSION_FOR_DEST);
-                    }
-                    unlink($temp_file);
+          $image_info = @GetImageSize($temp_file);
+          if ($image_info) {
+            $w = $image_info[0];
+            $h = $image_info[1];
+            $type = $image_info[2];
+            $mime = $image_info['mime'];
+            $ext = image_type_to_extension($type, false); // jpg, png, gif, webp
+            if (!$ext) $ext = 'jpg'; // デフォルト
+            $thumb_path = $temp_thumb_path . '.' . $ext;
+
+            // サムネイル作成
+            if (!is_dir(__DIR__ . '/thumbnail/')) {
+              mkdir(__DIR__ . '/thumbnail/', PERMISSION_FOR_DIR);
+            }
+            if ($mime === 'image/png') {
+              $im = @imagecreatefrompng($temp_file);
+            } elseif ($mime === 'image/jpeg') {
+              $im = @imagecreatefromjpeg($temp_file);
+            } elseif ($mime === 'image/gif') {
+              $im = @imagecreatefromgif($temp_file);
+            } elseif ($mime === 'image/webp') {
+              $im = @imagecreatefromwebp($temp_file);
+            } else {
+              $im = false;
+            }
+
+            if ($im) {
+              if ($w > 200 || $h > 200) {
+                // リサイズ
+                $ratio = min(200 / $w, 200 / $h);
+                $new_w = ceil($w * $ratio);
+                $new_h = ceil($h * $ratio);
+                $im_new = imagecreatetruecolor($new_w, $new_h);
+                if ($mime === 'image/png') {
+                  imagealphablending($im_new, false);
+                  imagesavealpha($im_new, true);
+                } else {
+                  $white = imagecolorallocate($im_new, 255, 255, 255);
+                  imagefill($im_new, 0, 0, $white);
                 }
+                imagecopyresampled($im_new, $im, 0, 0, 0, 0, $new_w, $new_h, $w, $h);
+                imagejpeg($im_new, $thumb_path, 90);
+                imagedestroy($im_new);
+              } else {
+                // 小さい画像はそのままコピー
+                copy($temp_file, $thumb_path);
+              }
+              imagedestroy($im);
+              chmod($thumb_path, PERMISSION_FOR_DEST);
+            } else {
+              // 画像作成失敗
             }
-
-            if (file_exists($thumb_path)) {
-                // <img> タグ追加
-                $relative_thumb_path = 'thumbnail/' . basename($thumb_path);
-                $com = str_replace($url, $url . '<br><img src="' . $relative_thumb_path . '" alt="thumbnail" style="max-width:200px; max-height:200px;">', $com);
-            }
+          } else {
+            // GetImageSize失敗
+          }
+          unlink($temp_file);
+        } else {
+          // ダウンロード失敗またはサイズオーバー
         }
+      }
+
+      // 実際のファイルパスを決定
+      $actual_thumb_path = '';
+      foreach (['jpg', 'png', 'gif', 'webp', 'avif'] as $e) {
+        if (file_exists($temp_thumb_path . '.' . $e)) {
+          $actual_thumb_path = $temp_thumb_path . '.' . $e;
+          break;
+        }
+      }
+
+      if ($actual_thumb_path) {
+        // <img> タグ追加 (リンク付き)
+        $relative_thumb_path = 'thumbnail/' . basename($actual_thumb_path);
+        $com = str_replace($url, '<a href="' . $url . '" target="_blank" rel="nofollow noopener noreferrer">' . $url . '</a><br><a href="' . $url . '" target="_blank" rel="nofollow noopener noreferrer"><img src="' . $relative_thumb_path . '" alt="thumbnail" style="max-width:200px; max-height:200px;"></a>', $com);
+      } else {
+        // サムネイルファイルなし
+      }
     }
-    return $com;
+  }
+  return $com;
+}
+
+// 画像ダウンロード関数
+function download_image($url): string|false {
+	if (function_exists('curl_init')) {
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+		curl_setopt($ch, CURLOPT_USERAGENT, 'noReita/1.0');
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+		curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+		$data = curl_exec($ch);
+		$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		if(PHP_VERSION_ID < 80000) { //PHP8.0未満の時は
+			curl_close($ch);
+		}
+		if ($http_code == 200 && $data) {
+			return $data;
+		}
+	} elseif (ini_get('allow_url_fopen')) {
+		$context = stream_context_create([
+			'http' => [
+				'timeout' => 10,
+				'user_agent' => 'noReita/1.0',
+				'follow_location' => 1,
+				'max_redirects' => 5,
+			]
+		]);
+		return @file_get_contents($url, false, $context);
+	}
+	return false;
 }

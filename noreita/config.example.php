@@ -124,6 +124,14 @@ $misskey_servers=
 	["mk.shrimpia.network","https://mk.shrimpia.network"],
 ];
 
+/* ---------- 外部画像 ---------- */
+
+// 外部の画像URLをサムネイル化する する:1 しない:0
+const EXTERNAL_IMAGE_THUMB = 1;
+
+// 外部の画像URLサムネイルの保存日数
+const EXTERNAL_IMAGE_THUMB_DAYS = 30;
+
 /* ---------- NSFW画像 ---------- */
 
 // NSFW画像機能を使う 使う:1 使わない:0

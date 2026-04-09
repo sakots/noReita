@@ -193,6 +193,8 @@ init();
 
 del_temp();
 
+clean_old_thumbnails();
+
 $message = "";
 
 //var_dump($_COOKIE);
@@ -1300,15 +1302,13 @@ function def(): void {
 				$res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
 
 				//オートリンク
-				if (AUTOLINK) {
-					$res['com'] = auto_link($res['com']);
-				}
+				if (AUTOLINK) $res['com'] = auto_link($res['com']);
 				//画像URLにサムネイルを追加
-				$res['com'] = image_thumbnail_link($res['com']);
-				//ハッシュタグ
-				if (USE_HASHTAG) {
-					$res['com'] = hashtag_link($res['com']);
+				if (EXTERNAL_IMAGE_THUMB) {
+					$res['com'] = image_thumbnail_link($res['com']);
 				}
+				//ハッシュタグ
+				if (USE_HASHTAG) $res['com'] = hashtag_link($res['com']);
 				//空行を縮める
 				$res['com'] = preg_replace('/(\n|\r|\r\n|\n\r){3,}/us', "\n\n", $res['com']);
 				//<br>に
@@ -1328,15 +1328,13 @@ function def(): void {
 			$bbsline['com'] = htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5);
 
 			//オートリンク
-			if (AUTOLINK) {
-				$bbsline['com'] = auto_link($bbsline['com']);
-			}
+			if (AUTOLINK) $bbsline['com'] = auto_link($bbsline['com']);
 			//画像URLにサムネイルを追加
-			$bbsline['com'] = image_thumbnail_link($bbsline['com']);
-			//ハッシュタグ
-			if (USE_HASHTAG) {
-				$bbsline['com'] = hashtag_link($bbsline['com']);
+			if (EXTERNAL_IMAGE_THUMB) {
+				$bbsline['com'] = image_thumbnail_link($bbsline['com']);
 			}
+			//ハッシュタグ
+			if (USE_HASHTAG) $bbsline['com'] = hashtag_link($bbsline['com']);
 			//空行を縮める
 			$bbsline['com'] = preg_replace('/(\n|\r|\r\n){3,}/us', "\n\n", $bbsline['com']);
 			//<br>に
@@ -2712,6 +2710,28 @@ function del_temp(): void {
 				if ($lapse > (300)) { //5分
 					safe_unlink(TEMP_DIR . $file);
 				}
+			}
+		}
+	}
+	closedir($handle);
+}
+
+//古い外部画像サムネイルの削除
+function clean_old_thumbnails(): void {
+	if (!defined('EXTERNAL_IMAGE_THUMB_DAYS') || EXTERNAL_IMAGE_THUMB_DAYS <= 0) {
+		return;
+	}
+	$thumbnail_dir = __DIR__ . '/thumbnail/';
+	if (!is_dir($thumbnail_dir)) {
+		return;
+	}
+	$handle = opendir($thumbnail_dir);
+	while ($file = readdir($handle)) {
+		$file_path = $thumbnail_dir . $file;
+		if (!is_dir($file_path) && preg_match('/_thumb\.(jpg|png|gif|webp|avif)$/', $file)) {
+			$lapse = time() - filemtime($file_path);
+			if ($lapse > (EXTERNAL_IMAGE_THUMB_DAYS * 24 * 3600)) {
+				safe_unlink($file_path);
 			}
 		}
 	}
