@@ -693,43 +693,6 @@ function image_thumbnail_link($com): string {
   return $com;
 }
 
-// 投稿画像のサムネイルを生成・取得
-function create_post_thumbnail(string $picfile, int $img_w, int $img_h): array {
-  $result = ['thumb' => '', 'thumb_avif' => ''];
-  if (!$picfile || $img_w <= 0 || $img_h <= 0) {
-    return $result;
-  }
-  if ($img_w <= MAX_W && $img_h <= MAX_H) {
-    return $result;
-  }
-  $thumb_dir = __DIR__ . '/' . THUMB_DIR;
-  if (!is_dir($thumb_dir)) {
-    @mkdir($thumb_dir, PERMISSION_FOR_DIR);
-  }
-  $base = pathinfo($picfile, PATHINFO_FILENAME);
-  $thumb_jpg = THUMB_DIR . $base . 's.jpg';
-  $thumb_avif = THUMB_DIR . $base . 's.avif';
-  $thumb_jpg_file = __DIR__ . '/' . $thumb_jpg;
-  $thumb_avif_file = __DIR__ . '/' . $thumb_avif;
-
-  if (!file_exists($thumb_jpg_file)) {
-    @thumbnail_gd::thumb(IMG_DIR, $picfile, $base, MAX_W, MAX_H);
-  }
-  if (function_exists('ImageAVIF') && !file_exists($thumb_avif_file)) {
-    @thumbnail_gd::thumb(IMG_DIR, $picfile, $base, MAX_W, MAX_H, ['thumbnail_avif' => true]);
-  }
-
-  if (file_exists($thumb_jpg_file)) {
-    $result['thumb'] = $thumb_jpg;
-  } elseif (file_exists($thumb_avif_file)) {
-    $result['thumb'] = $thumb_avif;
-  }
-  if (file_exists($thumb_avif_file)) {
-    $result['thumb_avif'] = $thumb_avif;
-  }
-  return $result;
-}
-
 // 画像ダウンロード関数
 function download_image($url): string|false {
 	if (function_exists('curl_init')) {
@@ -762,32 +725,6 @@ function download_image($url): string|false {
 		return @file_get_contents($url, false, $context);
 	}
 	return false;
-}
-
-//サムネイル作成
-function make_thumbnail($imgfile,$time,$max_w,$max_h): string {
-	$thumbnail='';
-	if(thumbnail_gd::thumb(IMG_DIR,$imgfile,$time,$max_w,$max_h,['thumbnail_avif'=>true])){
-		$thumbnail='thumbnail_avif';
-	} else if(thumbnail_gd::thumb(IMG_DIR,$imgfile,$time,$max_w,$max_h,['thumbnail_webp'=>true])) {
-		$thumbnail='thumbnail_webp';
-	}
-	//avifやwebpのサムネイルが作成できなかった時はjpegのサムネイルを作る
-	if(!$thumbnail && thumbnail_gd::thumb(IMG_DIR,$imgfile,$time,$max_w,$max_h)){
-		$thumbnail='thumbnail';
-	}
-	//カタログ用サムネイル
-	thumbnail_gd::thumb(IMG_DIR,$imgfile,$time,300,300,['webp'=>true]);
-
-	return $thumbnail;
-}
-
-// 画像をぼかす(nsfw)
-function blur_image($image, $blur_strength = 50): void {
-	imagefilter($image, IMG_FILTER_GAUSSIAN_BLUR);
-	for ($i = 0; $i < $blur_strength; $i++) {
-		imagefilter($image, IMG_FILTER_GAUSSIAN_BLUR);
-	}
 }
 
 //ディレクトリ作成

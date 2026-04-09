@@ -47,11 +47,11 @@ if(!isset($save_inc_ver)||$save_inc_ver < 20250918) {
 	die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
-// thumbnail_gd.inc
-check_file(__DIR__.'/thumbnail_gd.inc.php');
-require_once(__DIR__.'/thumbnail_gd.inc.php');
-if(!isset($thumbnail_gd_ver)||$thumbnail_gd_ver < 20260406) {
-	error($en ? 'Please update thumbnail_gd.inc.php to the latest version.' : 'thumbnail_gd.inc.phpを最新版に更新してください。');
+// thumbnail.inc
+check_file(__DIR__.'/thumbnail.inc.php');
+require_once(__DIR__.'/thumbnail.inc.php');
+if(!isset($thumbnail_ver)||$thumbnail_ver < 20260406) {
+	error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。');
 }
 
 //テーマ
@@ -368,8 +368,6 @@ function init(): void {
 	check_dir(__DIR__.'/'.IMG_DIR);
 	check_dir(__DIR__.'/'.TEMP_DIR);
 	check_dir(__DIR__.'/'.THUMB_DIR);
-	check_dir(__DIR__.'/webp/');
-	check_dir(__DIR__.'/avif/');
 	check_dir(__DIR__.'/thumbnail/');
 	check_dir(__DIR__.'/session/');
 
@@ -525,14 +523,6 @@ function regist(): void {
 				}
 				chmod(IMG_DIR . $picfile, PERMISSION_FOR_DEST);
 
-				// サムネイル作成
-				$thumbnail = make_thumbnail($temp_file, $path_filename, PMAX_W, PMAX_H);
-
-				// nsfw
-				if (USE_NSFW && $nsfw_flag) {
-					$thumbnail = blur_image($thumbnail);
-				}
-
 				// 既存の処理を保持
 				$fp = fopen(TEMP_DIR . $path_filename . ".dat", "r");
 				$userdata = fread($fp, 1024);
@@ -621,8 +611,22 @@ function regist(): void {
 					$used_tool = '???';
 				}
 
-				// 画像サイズの取得
+				// 画像の縦横サイズを取得
 				list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
+
+				// 横幅がPDEF_Wを超えている場合はサムネイルを作成
+				if ($img_w > PDEF_W) {
+					// さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
+					if (USE_NSFW && $nsfw_flag) {
+						$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, 1);
+						$thumb->createThumbnail();
+						$thumbnail = $thumb->getOutputName();
+					} else {
+					$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W);
+					$thumb->createThumbnail();
+					$thumbnail = $thumb->getOutputName();
+					}
+				}
 
 				$picdat = $path_filename . '.dat';
 
@@ -841,6 +845,7 @@ function reply(): void {
 	$picfile = filter_input(INPUT_POST, 'picfile');
 	$img_w = trim(filter_input(INPUT_POST, 'img_w', FILTER_VALIDATE_INT));
 	$img_h = trim(filter_input(INPUT_POST, 'img_h', FILTER_VALIDATE_INT));
+	$nsfw_flag = (string)filter_input(INPUT_POST, 'nsfw', FILTER_VALIDATE_INT);
 
 	// クッキー保存用
 	$original_name = $name;
@@ -1033,6 +1038,20 @@ function reply(): void {
 				// 画像サイズの取得
 				list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
 
+				// 横幅がPDEF_Wを超えている場合はサムネイルを作成
+				if ($img_w > PDEF_W) {
+					// さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
+					if (USE_NSFW && $nsfw_flag) {
+						$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, 1);
+						$thumb->createThumbnail();
+						$thumbnail = $thumb->getOutputName();
+					} else {
+					$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W);
+					$thumb->createThumbnail();
+					$thumbnail = $thumb->getOutputName();
+					}
+				}
+
 				$picdat = $path_filename . '.dat';
 
 				$chifile = $path_filename . '.chi';
@@ -1129,13 +1148,13 @@ function reply(): void {
 
 			//リプ処理
 			$thread = 0;
-			$sql = "INSERT INTO board_log (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, sodane, age, invz, host, tool, admins, ctype, uuid) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :sodane, :age, :invz, :host, :used_tool, :admins, :ctype, :uuid)";
+			$sql = "INSERT INTO board_log (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, sodane, age, invz, host, tool, admins, ctype, uuid, thumbnail) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :sodane, :age, :invz, :host, :used_tool, :admins, :ctype, :uuid, :thumbnail)";
 
 			// プレースホルダ
 			$stmt = $db->prepare($sql);
 			$stmt->execute(
 				[
-					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'sodane'=> $sodane,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'ctype'=> $ctype,'uuid'=> $uuid,
+					'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid,'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'sodane'=> $sodane,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'ctype'=> $ctype,'uuid'=> $uuid, 'thumbnail'=>$thumbnail,
 				]
 			);
 			//$db->exec($sql);
@@ -1337,11 +1356,6 @@ function def(): void {
 			$bbsline['com'] = tobr($bbsline['com']);
 			//引用の色
 			$bbsline['com'] = quote($bbsline['com']);
-      if (!empty($bbsline['picfile'])) {
-        $thumb = create_post_thumbnail($bbsline['picfile'], (int)$bbsline['img_w'], (int)$bbsline['img_h']);
-        $bbsline['thumb'] = $thumb['thumb'];
-        $bbsline['thumb_avif'] = $thumb['thumb_avif'];
-      }
       $bbsline['past'] = strtotime($bbsline['created']);
 			$bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
 			$bbsline['modified'] = date(DATE_FORMAT, strtotime($bbsline['modified']));
@@ -1620,11 +1634,6 @@ function res(): void {
 				$res['com'] = tobr($res['com']);
 				//引用の色
 				$res['com'] = quote($res['com']);
-				if (!empty($res['picfile'])) {
-					$thumb = create_post_thumbnail($res['picfile'], (int)$res['img_w'], (int)$res['img_h']);
-					$res['thumb'] = $thumb['thumb'];
-					$res['thumb_avif'] = $thumb['thumb_avif'];
-				}
 				//日付をUNIX時間に
 				$bbsline['past'] = strtotime($bbsline['created']); // このスレは古いので用
 				$res['created'] = date(DATE_FORMAT, strtotime($res['created']));
@@ -1656,11 +1665,6 @@ function res(): void {
 			$bbsline['com'] = tobr($bbsline['com']);
 			//引用の色
 			$bbsline['com'] = quote($bbsline['com']);
-			if (!empty($bbsline['picfile'])) {
-				$thumb = create_post_thumbnail($bbsline['picfile'], (int)$bbsline['img_w'], (int)$bbsline['img_h']);
-				$bbsline['thumb'] = $thumb['thumb'];
-				$bbsline['thumb_avif'] = $thumb['thumb_avif'];
-			}
 			//日付をUNIX時間に
 			$bbsline['past'] = strtotime($bbsline['created']); //古いので用
 			$bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
