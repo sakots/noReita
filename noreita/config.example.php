@@ -353,7 +353,7 @@ const USE_HASHTAG = 1;
 // フォーム下の追加お知らせ <li></li>で囲まれます。
 // (例) $addinfo = array('まだまだ開発中…','バグがあったら教えてね');
 // 設定しないなら $addinfo = array(''); で
-$addinfo = array('<a href="https://github.com/sakots/noReita3">ソースはこちら</a>', 'まだまだ開発中…バグがあったら教えてね。');
+$addinfo = array('<a href="https://github.com/sakots/noReita">ソースはこちら</a>', 'まだまだ開発中…バグがあったら教えてね。');
 
 /* ---------- お絵かき設定 ---------- */
 
