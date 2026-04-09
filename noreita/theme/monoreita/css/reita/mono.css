@@ -3,17 +3,17 @@
 body {
   background-attachment: fixed;
   background: linear-gradient(#224, black) fixed;
-  color: #EEF;
+  color: #EEE;
 }
 body svg {
-  fill: #EEF;
+  fill: #EEE;
 }
 
 a {
-  color: #EEF;
+  color: #EEE;
 }
 a:link {
-  color: #EEF;
+  color: #EEE;
 }
 a:visited {
   color: #999;

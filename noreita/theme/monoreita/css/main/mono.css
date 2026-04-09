@@ -3,10 +3,10 @@
 body {
   background-attachment: unset;
   background: #CCC;
-  color: #FFF;
+  color: #000;
 }
 body svg {
-  fill: #FFF;
+  fill: #000;
 }
 
 a {

@@ -32,15 +32,15 @@ body {
 		background-attachment: unset;
 		background: $bg;
 	}
-	color: $text;
+	color: $body;
 	svg {
-		fill: $text;
+		fill: $body;
 	}
 }
 a {
-	color: $text;
+	color: $body;
 	&:link {
-		color: $text;
+		color: $body;
 	}
 	&:visited {
 		color: $link_visited;
