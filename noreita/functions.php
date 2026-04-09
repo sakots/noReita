@@ -604,7 +604,7 @@ function image_thumbnail_link($com): string {
       $temp_thumb_path = __DIR__ . '/thumbnail/' . $hash . '_thumb';
 
       // 拡張子は後で決定
-      if (!file_exists($temp_thumb_path . '.jpg') && !file_exists($temp_thumb_path . '.png') && !file_exists($temp_thumb_path . '.gif') && !file_exists($temp_thumb_path . '.webp' && !file_exists($temp_thumb_path . '.avif'))) {
+      if (!file_exists($temp_thumb_path . '.jpg') && !file_exists($temp_thumb_path . '.png') && !file_exists($temp_thumb_path . '.gif') && !file_exists($temp_thumb_path . '.webp') && !file_exists($temp_thumb_path . '.avif')) {
         // ダウンロードしてサムネイル作成
         $image_data = download_image($url);
         if ($image_data && strlen($image_data) > 0 && strlen($image_data) < 1024 * 1024) { // 1MB未満
@@ -653,12 +653,12 @@ function image_thumbnail_link($com): string {
                 }
                 imagecopyresampled($im_new, $im, 0, 0, 0, 0, $new_w, $new_h, $w, $h);
                 imagejpeg($im_new, $thumb_path, 90);
-                imagedestroy($im_new);
+                if(PHP_VERSION_ID < 80000) imagedestroy($im_new);
               } else {
                 // 小さい画像はそのままコピー
                 copy($temp_file, $thumb_path);
               }
-              imagedestroy($im);
+              if(PHP_VERSION_ID < 80000) imagedestroy($im);
               chmod($thumb_path, PERMISSION_FOR_DEST);
             } else {
               // 画像作成失敗
@@ -691,6 +691,43 @@ function image_thumbnail_link($com): string {
     }
   }
   return $com;
+}
+
+// 投稿画像のサムネイルを生成・取得
+function create_post_thumbnail(string $picfile, int $img_w, int $img_h): array {
+  $result = ['thumb' => '', 'thumb_avif' => ''];
+  if (!$picfile || $img_w <= 0 || $img_h <= 0) {
+    return $result;
+  }
+  if ($img_w <= MAX_W && $img_h <= MAX_H) {
+    return $result;
+  }
+  $thumb_dir = __DIR__ . '/' . THUMB_DIR;
+  if (!is_dir($thumb_dir)) {
+    @mkdir($thumb_dir, PERMISSION_FOR_DIR);
+  }
+  $base = pathinfo($picfile, PATHINFO_FILENAME);
+  $thumb_jpg = THUMB_DIR . $base . 's.jpg';
+  $thumb_avif = THUMB_DIR . $base . 's.avif';
+  $thumb_jpg_file = __DIR__ . '/' . $thumb_jpg;
+  $thumb_avif_file = __DIR__ . '/' . $thumb_avif;
+
+  if (!file_exists($thumb_jpg_file)) {
+    @thumbnail_gd::thumb(IMG_DIR, $picfile, $base, MAX_W, MAX_H);
+  }
+  if (function_exists('ImageAVIF') && !file_exists($thumb_avif_file)) {
+    @thumbnail_gd::thumb(IMG_DIR, $picfile, $base, MAX_W, MAX_H, ['thumbnail_avif' => true]);
+  }
+
+  if (file_exists($thumb_jpg_file)) {
+    $result['thumb'] = $thumb_jpg;
+  } elseif (file_exists($thumb_avif_file)) {
+    $result['thumb'] = $thumb_avif;
+  }
+  if (file_exists($thumb_avif_file)) {
+    $result['thumb_avif'] = $thumb_avif;
+  }
+  return $result;
 }
 
 // 画像ダウンロード関数

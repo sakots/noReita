@@ -1341,8 +1341,11 @@ function def(): void {
 			$bbsline['com'] = tobr($bbsline['com']);
 			//引用の色
 			$bbsline['com'] = quote($bbsline['com']);
-			//日付をUNIX時間にしたあと整形
-			$bbsline['past'] = strtotime($bbsline['created']); // このスレは古いので用
+            if (!empty($bbsline['picfile'])) {
+                $thumb = create_post_thumbnail($bbsline['picfile'], (int)$bbsline['img_w'], (int)$bbsline['img_h']);
+                $bbsline['thumb'] = $thumb['thumb'];
+                $bbsline['thumb_avif'] = $thumb['thumb_avif'];
+            }
 			$bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
 			$bbsline['modified'] = date(DATE_FORMAT, strtotime($bbsline['modified']));
 
@@ -1616,6 +1619,11 @@ function res(): void {
 				$res['com'] = tobr($res['com']);
 				//引用の色
 				$res['com'] = quote($res['com']);
+				if (!empty($res['picfile'])) {
+					$thumb = create_post_thumbnail($res['picfile'], (int)$res['img_w'], (int)$res['img_h']);
+					$res['thumb'] = $thumb['thumb'];
+					$res['thumb_avif'] = $thumb['thumb_avif'];
+				}
 				//日付をUNIX時間に
 				$bbsline['past'] = strtotime($bbsline['created']); // このスレは古いので用
 				$res['created'] = date(DATE_FORMAT, strtotime($res['created']));
@@ -1647,6 +1655,11 @@ function res(): void {
 			$bbsline['com'] = tobr($bbsline['com']);
 			//引用の色
 			$bbsline['com'] = quote($bbsline['com']);
+			if (!empty($bbsline['picfile'])) {
+				$thumb = create_post_thumbnail($bbsline['picfile'], (int)$bbsline['img_w'], (int)$bbsline['img_h']);
+				$bbsline['thumb'] = $thumb['thumb'];
+				$bbsline['thumb_avif'] = $thumb['thumb_avif'];
+			}
 			//日付をUNIX時間に
 			$bbsline['past'] = strtotime($bbsline['created']); //古いので用
 			$bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));

@@ -100,7 +100,18 @@
 					</h5>
 					<div class="container">
 						<div class="item_image">
-							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></a>
+							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
+								@if ($bbsline['thumb'])
+								<picture>
+									@if ($bbsline['thumb_avif'])
+									<source srcset="{{$bbsline['thumb_avif']}}" type="image/avif">
+									@endif
+									<img src="{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+								</picture>
+								@else
+								<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+								@endif
+							</a>
 						</div>
 						@else
 						<div class="container">
@@ -164,9 +175,31 @@
 										@endif
 									</h5>
 									@if ($res['nsfw'] == 1)
-									<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
+									<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw">
+								@if ($res['thumb'])
+								<picture>
+									@if ($res['thumb_avif'])
+									<source srcset="{{$res['thumb_avif']}}" type="image/avif">
+									@endif
+									<img src="{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+								</picture>
+								@else
+								<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+								@endif
+							</span></a>
 									@else
-									<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
+									<a class="luminous" href="{{$path}}{{$res['picfile']}}">
+								@if ($res['thumb'])
+								<picture>
+									@if ($res['thumb_avif'])
+									<source srcset="{{$res['thumb_avif']}}" type="image/avif">
+									@endif
+									<img src="{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+								</picture>
+								@else
+								<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+								@endif
+							</a>
 									@endif
 									@endif
 									<p class="comment">{!! $res['com'] !!}</p>
