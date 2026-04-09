@@ -314,7 +314,6 @@ function init(): void {
 	header('X-Content-Type-Options: nosniff');
 	header('X-Frame-Options: DENY');
 	header('X-XSS-Protection: 1; mode=block');
-	header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://cjrtnc.leaningtech.com https://cdn.jsdelivr.net https://unpkg.com; style-src \'self\' \'unsafe-inline\' https://cjrtnc.leaningtech.com https://fonts.googleapis.com; font-src \'self\' data: https://fonts.gstatic.com; img-src \'self\' data: blob:; media-src \'self\' blob:; connect-src \'self\' https://cjrtnc.leaningtech.com; worker-src \'self\' blob: https://cjrtnc.leaningtech.com; frame-src \'self\' https://cjrtnc.leaningtech.com;');
 	header('Referrer-Policy: strict-origin-when-cross-origin');
 	header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 	try {
