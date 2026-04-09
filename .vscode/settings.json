@@ -69,6 +69,7 @@
     "HTTPHEADER",
     "iconselect",
     "imageavif",
+    "imagecreatefromavif",
     "imgdata",
     "imgext",
     "imgfile",
