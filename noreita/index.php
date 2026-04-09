@@ -1276,7 +1276,7 @@ function def(): void {
 			if (empty($bbsline)) {
 				break;
 			} //スレがなくなったら抜ける
-			$bbsline['thumb'] = '';
+			$bbsline['thumb'] = $bbsline['thumbnail'] ?? '';
 			$bbsline['thumb_avif'] = '';
 			$oya_id = $bbsline["tid"]; //スレのid(親番号)を取得
 			$sql_i = "SELECT * FROM board_log WHERE parent = $oya_id AND invz=0 AND thread=0 ORDER BY comid ASC";
@@ -1295,7 +1295,7 @@ function def(): void {
 				}
 				$res = $posts_i->fetch();
 				if ($res) {
-					$res['thumb'] = '';
+					$res['thumb'] = $res['thumbnail'] ?? '';
 					$res['thumb_avif'] = '';
 				}
 				if (empty($res)) { //レスがなくなったら
@@ -1438,7 +1438,7 @@ function catalog(): void {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
 		//1ページの全スレッド取得
-		$sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, sodane, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime FROM board_log WHERE thread=1 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
+		$sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, sodane, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime, thumbnail FROM board_log WHERE thread=1 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
 		$posts = $db->prepare($sql);
 		$posts->bindValue(':start', $start, PDO::PARAM_INT);
 		$posts->bindValue(':page_def', $page_def, PDO::PARAM_INT);
@@ -1452,6 +1452,7 @@ function catalog(): void {
 			if (empty($bbsline)) {
 				break;
 			} //スレがなくなったら抜ける
+			$bbsline['thumb'] = $bbsline['thumbnail'] ?? '';
 			$bbsline['com'] = nl2br(htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
 			$oya[] = $bbsline;
 			$i++;
@@ -1509,15 +1510,22 @@ function search(): void {
 		}
 
 		$oya = array();
+		$ko = array();
 
 		$i = 0;
 		while ($bbsline = $posts->fetch()) {
+			$bbsline['thumb'] = $bbsline['thumbnail'] ?? '';
 			$bbsline['com'] = nl2br(htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
-			$oya[] = $bbsline;
+			if ($bbsline['thread'] == 1) {
+				$oya[] = $bbsline;
+			} else {
+				$ko[] = $bbsline;
+			}
 			$i++;
 		}
 
 		$dat['oya'] = $oya;
+		$dat['ko'] = $ko;
 		$dat['path'] = IMG_DIR;
 
 		$dat['s_result'] = $i;
@@ -1609,7 +1617,7 @@ function res(): void {
 		$oya = array();
 		$ko = array();
 		while ($bbsline = $posts->fetch()) {
-			$bbsline['thumb'] = '';
+			$bbsline['thumb'] = $bbsline['thumbnail'] ?? '';
 			$bbsline['thumb_avif'] = '';
 			//スレッドの記事を取得
 			$sql_i = "SELECT * FROM board_log WHERE parent = ? AND invz = 0 ORDER BY comid ASC";
@@ -1617,7 +1625,7 @@ function res(): void {
 			$posts_i->execute([$resno]);
 			$r_res_name = array();
 			while ($res = $posts_i->fetch()) {
-				$res['thumb'] = '';
+				$res['thumb'] = $res['thumbnail'] ?? '';
 				$res['thumb_avif'] = '';
 				$res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
 

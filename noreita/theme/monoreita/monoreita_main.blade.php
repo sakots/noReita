@@ -164,12 +164,7 @@
 							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
 							<span @if ($bbsline['nsfw'] == 1) class="nsfw" @endif>
 								@if ($bbsline['thumb'])
-								<picture>
-									@if ($bbsline['thumb_avif'])
-									<source srcset="{{$bbsline['thumb_avif']}}" type="image/avif">
-									@endif
-									<img src="{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
-								</picture>
+								<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
 								@else
 								<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
 								@endif
@@ -247,12 +242,7 @@
 								@if ($res['nsfw'] == 1)
 								<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw">
 							@if ($res['thumb'])
-							<picture>
-								@if ($res['thumb_avif'])
-								<source srcset="{{$res['thumb_avif']}}" type="image/avif">
-								@endif
-								<img src="{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
-							</picture>
+							<img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
 							@else
 							<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
 							@endif
@@ -260,12 +250,7 @@
 								@else
 								<a class="luminous" href="{{$path}}{{$res['picfile']}}">
 							@if ($res['thumb'])
-							<picture>
-								@if ($res['thumb_avif'])
-								<source srcset="{{$res['thumb_avif']}}" type="image/avif">
-								@endif
-								<img src="{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
-							</picture>
+							<img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
 							@else
 							<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
 							@endif
