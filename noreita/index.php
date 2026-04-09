@@ -33,18 +33,25 @@ if (CONF_VER < 20260405 || !defined('CONF_VER')) {
   die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
-//misskey_note.inc
+// misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
 if(!isset($misskey_note_ver) || $misskey_note_ver < 20260405) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
-//save.inc
+// save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
 if(!isset($save_inc_ver)||$save_inc_ver < 20250918) {
 	die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
+}
+
+// thumbnail_gd.inc
+check_file(__DIR__.'/thumbnail_gd.inc.php');
+require_once(__DIR__.'/thumbnail_gd.inc.php');
+if(!isset($thumbnail_gd_ver)||$thumbnail_gd_ver < 20260406) {
+	error($en ? 'Please update thumbnail_gd.inc.php to the latest version.' : 'thumbnail_gd.inc.phpを最新版に更新してください。');
 }
 
 //テーマ
