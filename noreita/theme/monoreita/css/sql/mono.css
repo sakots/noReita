@@ -3,17 +3,17 @@
 body {
   background-attachment: unset;
   background: #FFFFEF;
-  color: #79160A;
+  color: #FFF;
 }
 body svg {
-  fill: #79160A;
+  fill: #FFF;
 }
 
 a {
-  color: #79160A;
+  color: #FFF;
 }
 a:link {
-  color: #79160A;
+  color: #FFF;
 }
 a:visited {
   color: #79160A;

@@ -3,14 +3,14 @@
 
 <head>
 	<meta charset="utf-8">
-	<title>{{$btitle}}</title>
+	<title>{{$board_title}}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="theme/{{$themedir}}/luminous/luminous-basic.min.css">
+	<link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/luminous-basic.min.css">
 	@include('monoreita_headcss')
 	@if ( !empty($oya) )
 	@foreach ($oya as $bbsline)
 	<meta name="twitter:card" content="summary">
-	<meta property="og:title" content="[{{$bbsline['tid']}}] {{$bbsline['sub']}} by {{$bbsline['a_name']}} - {{$btitle}}">
+	<meta property="og:title" content="[{{$bbsline['tid']}}] {{$bbsline['sub']}} by {{$bbsline['a_name']}} - {{$board_title}}">
 	<meta property="og:type" content="article">
 	<meta property="og:url" content="{{$base}}{{$self}}?mode=res&amp;res={{$resno}}">
 	@if (isset($bbsline['picfile']))
@@ -23,7 +23,7 @@
 
 <body>
 	<header id="header">
-		<h1><a href="{{$self}}">{{$btitle}}</a></h1>
+		<h1><a href="{{$self}}">{{$board_title}}</a></h1>
 		<div>
 			<a href="{{$home}}" target="_top">[ホーム]</a>
 			<a href="{{$self}}?mode=admin_in">[管理モード]</a>
@@ -56,7 +56,7 @@
 				</h3>
 				<section>
 					<h4 id=oya>
-						<span class="oyaname"><a href="{{$self}}?mode=search&amp;bubun=kanzen&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
+						<span class="oyaname"><a href="{{$self}}?mode=search&amp;similar=exact&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
 						@if ($bbsline['admins'] == 1)
 						<span class="mingcute--user-star-fill"></span>
 						@endif
@@ -71,12 +71,12 @@
 						@if ($bbsline['a_url'] == true)
 						<span class="url"><a href="{{$bbsline['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
 						@endif
-						@if ($dispid == 1)
+						@if ($display_id == 1)
 						<span class="id">ID : {{$bbsline['id']}}</span>
 						@endif
 						<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$bbsline['tid']}}">{{$sodane}}
-							@if ($bbsline['exid'] != 0)
-							x{{$bbsline['exid']}}
+							@if ($bbsline['sodane'] != 0)
+							x{{$bbsline['sodane']}}
 							@else
 							+
 							@endif
@@ -91,7 +91,7 @@
 					</h5>
 					<h5>
 						<a href="{{$path}}{{$bbsline['picfile']}}" target="_blank">{{$bbsline['picfile']}}</a>
-						@if ($bbsline['pchfile'] != null && $bbsline['pchfile'] !== '' && pathinfo($bbsline['pchfile'], PATHINFO_EXTENSION) !== '' && (!isset($bbsline['ext02']) || $bbsline['ext02'] !== 'img'))
+						@if ($bbsline['pchfile'] != null && $bbsline['pchfile'] !== '' && pathinfo($bbsline['pchfile'], PATHINFO_EXTENSION) !== '' && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img'))
 						<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}">●動画</a>
 						@endif
 						@if ($use_continue)
@@ -100,7 +100,13 @@
 					</h5>
 					<div class="container">
 						<div class="item_image">
-							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image"></a>
+							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
+								@if ($bbsline['thumb'])
+								<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+								@else
+								<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+								@endif
+							</a>
 						</div>
 						@else
 						<div class="container">
@@ -132,41 +138,58 @@
 										@if ($res['a_url'])
 										<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
 										@endif
-										@if ($dispid)
+										@if ($display_id)
 										<span class="id">ID：{{$res['id']}}</span>
 										@endif
 										<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
-												@if ($res['exid'] != 0)
-												x{{$res['exid']}}
+												@if ($res['sodane'] != 0)
+												x{{$res['sodane']}}
 												@else
 												+
 												@endif
 											</a></span>
 									</h4>
 									@if ($res['picfile'])
-									@if ($dptime)
+									@if ($display_painttime)
 									<h5>
 										{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
 										@if ($res['psec'] != null)
 										描画時間：{{$res['utime']}}
 										@endif
-										@if ($res['ext01'] == 1)
+										@if ($res['nsfw'] == 1)
 										★NSFW
 										@endif
 									</h5>
 									@endif
 									<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
-										@if ($res['pchfile'] && (!isset($res['ext02']) || $res['ext02'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
+										@if ($res['pchfile'] && (!isset($res['ctype']) || $res['ctype'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
 										<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
 										@endif
 										@if ($use_continue)
 										<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
 										@endif
 									</h5>
-									@if ($res['ext01'] == 1)
-									<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></span></a>
+									@if ($res['nsfw'] == 1)
+									<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw">
+								@if ($res['thumb'])
+								<picture>
+									@if ($res['thumb_avif'])
+									<source srcset="{{$res['thumb_avif']}}" type="image/avif">
+									@endif
+									<img src="{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+								</picture>
+								@else
+								<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+								@endif
+							</span></a>
 									@else
-									<a class="luminous" href="{{$path}}{{$res['picfile']}}"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image"></a>
+									<a class="luminous" href="{{$path}}{{$res['picfile']}}">
+								@if ($res['thumb'])
+								<img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+								@else
+								<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+								@endif
+							</a>
 									@endif
 									@endif
 									<p class="comment">{!! $res['com'] !!}</p>
@@ -191,7 +214,7 @@
 					<span class="eva--share-outline"></span> SNSで共有する</a>
 				</span>
 				@else
-				<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$btitle}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
+				<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$board_title}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
 					<span class="ri--twitter-x-line"></span> tweet</a>
 				</span>
 				@endif
@@ -208,8 +231,8 @@
 					<section class="epost">
 						<form action="{{$self}}" method="post" enctype="multipart/form-data">
 							<p>
-								<label>幅：<input class="form" type="number" min="300" max="{{$pmaxw}}" name="picw" value="{{$pdefw}}" required></label>
-								<label>高さ：<input class="form" type="number" min="300" max="{{$pmaxh}}" name="pich" value="{{$pdefh}}" required></label>
+								<label>幅：<input class="form" type="number" min="300" max="{{$pmax_w}}" name="picw" value="{{$pdef_w}}" required></label>
+								<label>高さ：<input class="form" type="number" min="300" max="{{$pmax_h}}" name="pich" value="{{$pdef_h}}" required></label>
 								<input type="hidden" name="mode" value="paint">
 								<label for="tools">ツール</label>
 								<select name="tools" id="tools" onchange="togglePaletteVisibility()">
@@ -243,7 +266,7 @@
 							</p>
 						</form>
 						<ul>
-							<li>お絵かきできるサイズは幅300～{{$pmaxw}}px、高さ300～{{$pmaxh}}pxです。</li>
+							<li>お絵かきできるサイズは幅300～{{$pmax_w}}px、高さ300～{{$pmax_h}}pxです。</li>
 						</ul>
 					</section>
 					<hr>
@@ -285,7 +308,7 @@
 									<input type="hidden" name="img_w" value="0">
 									<input type="hidden" name="img_h" value="0">
 									<input type="hidden" name="time" value="0">
-									<input type="hidden" name="exid" value="0">
+									<input type="hidden" name="sodane" value="0">
 									<input type="hidden" name="modid" value="{{$resno}}">
 									<input type="hidden" name="resto" value="{{$resno}}">
 									@if ($token != null)
@@ -362,9 +385,9 @@
 					togglePaletteVisibility();
 				});
 			</script>
-			<script src="theme/{{$themedir}}/js/sodane.js"></script>
+			<script src="theme/{{$theme_dir}}/js/sodane.js"></script>
 			<!-- Luminous -->
-			<script src="theme/{{$themedir}}/luminous/luminous.min.js"></script>
+			<script src="theme/{{$theme_dir}}/luminous/luminous.min.js"></script>
 			<script>
 				new LuminousGallery(document.querySelectorAll('.luminous'), {closeTrigger: "click", closeWithEscape: true});
 			</script>

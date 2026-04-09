@@ -3,14 +3,14 @@
 
 <head>
 	<meta charset="utf-8">
-	<title>{{$btitle}}</title>
+	<title>{{$board_title}}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	@include('monoreita_headcss')
 </head>
 
 <body>
 	<header>
-		<h1><a href="{{$self}}">{{$btitle}}</a></h1>
+		<h1><a href="{{$self}}">{{$board_title}}</a></h1>
 		<div>
 			<a href="{{$home}}" target="_top">[ホーム]</a>
 			<a href="{{$self}}?mode=admin_in">[管理モード]</a>
@@ -35,10 +35,10 @@
 					<div>
 						@foreach ($temp as $tmp)
 						<div class="imgs">
-							@if (isset($tmp['src']) && isset($tmp['srcname']))
+							@if (isset($tmp['src']) && isset($tmp['src_name']))
 							<figure>
 								<img src="{{$tmp['src']}}">
-								<figcaption>{{$tmp['srcname']}}[{{$tmp['date']}}] 描画時間{{$tmp['utime']}}</figcaption>
+								<figcaption>{{$tmp['src_name']}}[{{$tmp['date']}}] 描画時間{{$tmp['utime']}}</figcaption>
 							</figure>
 							@endif
 						</div>
@@ -79,7 +79,7 @@
 							<td>
 								<select name="picfile">
 									@foreach ($temp as $tmp)
-									@if (isset($tmp['srcname'])) <option value="{{$tmp['srcname']}}">{{$tmp['srcname']}}</option>
+									@if (isset($tmp['src_name'])) <option value="{{$tmp['src_name']}}">{{$tmp['src_name']}}</option>
 									@endif
 									@endforeach
 								</select>
@@ -111,7 +111,7 @@
 								<input type="hidden" name="invz" value="0">
 								<input type="hidden" name="img_w" value="0">
 								<input type="hidden" name="img_h" value="0">
-								<input type="hidden" name="exid" value="0">
+								<input type="hidden" name="sodane" value="0">
 								@if (isset($resto) && $resto != null)
 								<input type="hidden" name="resto" value="{{$resto}}">
 								@endif

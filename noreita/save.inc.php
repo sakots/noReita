@@ -2,11 +2,11 @@
 //Petit Note (c)さとぴあ @satopian 2021-2025 MIT License
 //https://paintbbs.sakura.ne.jp/
 
-$save_inc_ver=20250918;
+$save_inc_ver=20260405;
 class image_save{
 
 	private $security_timer,$imgfile,$en,$count,$errtext,$session_usercode; // プロパティとして宣言
-	private $tool,$repcode,$stime,$resto,$timer,$error_type,$hide_animation,$pmax_w,$pmax_h;
+	private $tool,$repcode,$stime,$resto,$timer,$error_type,$hide_animation,$pmax_w,$pmax_h,$usercode_header;
 	
 	function __construct(){
 
@@ -71,6 +71,7 @@ class image_save{
 		$this->resto = isset($u['resto']) ? t($u['resto']) : '';
 		$this->stime = isset($u['stime']) ? t($u['stime']) : '';
 		$this->hide_animation = isset($u['hide_animation']) ? t($u['hide_animation']) : '';
+		$this->usercode_header = isset($u['usercode']) ? t($u['usercode']) : '';
 
 		$this->count = isset($u['count']) ? t($u['count']) : 0;
 
@@ -99,9 +100,13 @@ class image_save{
 	}
 
 	private function check_async_request(): void {
-		if(!isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-			$this->error_msg($this->en ? "The post has been rejected." : "拒絶されました。");
+		if(isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+			return;
 		}
+		if(isset($_SERVER['HTTP_ORIGIN']) || isset($_SERVER['HTTP_REFERER'])) {
+			return;
+		}
+		$this->error_msg($this->en ? "The post has been rejected." : "拒絶されました。");
 	}
 
 	private function check_security(): void {
@@ -111,7 +116,15 @@ class image_save{
 		session_sta();
 		$this->session_usercode = $_SESSION['usercode'] ?? "";
 		$cookie_usercode = t(filter_input_data('COOKIE', 'usercode'));
-		if(!$this->session_usercode || !$cookie_usercode || ($this->session_usercode !== $cookie_usercode)){
+		if ($this->session_usercode && $cookie_usercode) {
+			if ($this->session_usercode !== $cookie_usercode) {
+				$this->error_msg($this->en ? "User code has been reissued.\nPlease try again." : "ユーザーコードを再発行しました。\n再度投稿してみてください。");
+			}
+		} elseif ($cookie_usercode) {
+			$this->session_usercode = $cookie_usercode;
+		} elseif (!empty($this->usercode_header)) {
+			$this->session_usercode = $this->usercode_header;
+		} else {
 			$this->error_msg($this->en ? "User code has been reissued.\nPlease try again." : "ユーザーコードを再発行しました。\n再度投稿してみてください。");
 		}
 
@@ -169,7 +182,7 @@ class image_save{
 		chmod(TEMP_DIR.$this->imgfile.'.dat',PERMISSION_FOR_LOG);
 
 	}
-					
+	
 	private function move_uploaded_image(): void {
 
 		if(!isset ($_FILES["picture"]) || $_FILES['picture']['error'] != UPLOAD_ERR_OK) {
@@ -189,9 +202,9 @@ class image_save{
 			if(!$im_in){
 				$this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。");
 			}else{
-				if(PHP_VERSION_ID < 80000) {//PHP8.0未満の時は
-					ImageDestroy($im_in);
-				}
+				// if(PHP_VERSION_ID < 80000) {//PHP8.0未満の時は
+				//	ImageDestroy($im_in);
+				// }
 			}
 		}
 

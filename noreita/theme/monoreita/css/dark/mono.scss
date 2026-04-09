@@ -3,11 +3,11 @@
 
 @use "mono_conf" as *;
 
-// 押すボタンやinput:1, テキストエリア、書くinptutなど:-1
+// 押すボタンやinput:1, テキストエリア、書くinputなど:-1
 @mixin txt_box($box){
 	@if $box == 1 {
 		border-color: $b_border $b_border_u $b_border_u $b_border;
-		color: $button_moji;
+		color: $button_text;
 		background-color: $button;
 	} @else if $box == -1 {
 		border-color: $b_border_u $b_border $b_border $b_border_u;
@@ -16,7 +16,7 @@
 	} @else {
 		background-color: $button;
 		border-color: $b_border $b_border_u $b_border_u $b_border;
-		color: $button_moji;
+		color: $button_text;
 	}
 }
 
@@ -24,23 +24,23 @@
 body {
 	@if $dev == 1 {
 		background-attachment: fixed;
-		background: linear-gradient($ushiro, darken($ushiro,20%)) fixed;
+		background: linear-gradient($bg, darken($bg,20%)) fixed;
 	} @else if $dev == -1 {
 		background-attachment: fixed;
-		background: linear-gradient($ushiro, lighten($ushiro,20%)) fixed;
+		background: linear-gradient($bg, lighten($bg,20%)) fixed;
 	} @else {
 		background-attachment: unset;
-		background: $ushiro;
+		background: $bg;
 	}
-	color: $moji;
+	color: $text;
 	svg {
-		fill: $moji;
+		fill: $text;
 	}
 }
 a {
-	color: $moji;
+	color: $text;
 	&:link {
-		color: $moji;
+		color: $text;
 	}
 	&:visited {
 		color: $link_visited;
@@ -59,7 +59,7 @@ hr {
 }
 //----------
 header, .thread, footer {
-	background-color: $haikei;
+	background-color: $bg2;
 }
 header {
 	border-color: $border;
@@ -78,7 +78,7 @@ h1 {
 .thread {
 	border-color: $border;
 	img.image {
-		background-color: $haikei;
+		background-color: $bg2;
 	}
 }
 footer {
@@ -98,14 +98,14 @@ input[name="upfile"] {
 }
 
 figure {
-	background-color: $haikei;
+	background-color: $bg2;
 }
 
 .oyaname {
     border: solid 1px $button;
 }
 .oyaname:hover {
-    background-color: $ushiro;
+    background-color: $bg;
 }
 
 .res {
@@ -118,21 +118,21 @@ figure {
 	background-color: $limit;
 }
 .resma {
-	color: $resmoji;
-	background-color: $ushiro;
+	color: $res_text;
+	background-color: $bg;
 }
 
 button {
 	@include txt_box(1);
 	background-color: $button;
-	color: $button_moji;
+	color: $button_text;
 }
 .button {
 	@include txt_box(1);
 	a {
-		color: $button_moji;
+		color: $button_text;
 		svg{
-			fill: $button_moji;
+			fill: $button_text;
 		}
 	}
 }
@@ -174,7 +174,7 @@ button {
 
 .delfo {
 	th, td {
-		border-color: $ushiro;
+		border-color: $bg;
 	}
 	tr:nth-of-type(2n) td {
 		background-color: $th_bg;

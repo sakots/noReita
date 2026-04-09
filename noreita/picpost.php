@@ -8,6 +8,7 @@
 // このスクリプトはPaintBBS（藍珠CGI）のPNG保存ルーチンを参考に
 // PHP用に作成したものです。
 //----------------------------------------------------------------------
+// 2026/04/05 軽微なエラー修正
 // 2021/11/24 langの処理を修正、CSRF対策にusercodeを使用。cookieが確認できない場合は画像を保存しない。
 // 2021/08/30 使用ツールも記録 by sakots
 // 2021/05/17 エラーが発生した時はお絵かき画面から移動せず、エラーの内容を表示する。
@@ -53,8 +54,8 @@ if($lang==="ja"){//ブラウザの言語が日本語の時
 	$errormsg_1 = "Failed to get data. Please try posting again after a while.";
 	$errormsg_2 = "The size of the picture is too big. The drawing image is not saved.";
 	$errormsg_3 = "Failed to create the image file. Please try posting again after a while.";
-	$errormsg_4 = "The size of the picture too large.drawng image will not be saved.";
-	$errormsg_5 = "There was an illegal image. The drawng image is not saved.";
+	$errormsg_4 = "The size of the picture too large. drawing image will not be saved.";
+	$errormsg_5 = "There was an illegal image. The drawing image is not saved.";
 	$errormsg_6 = "Failed to open PCH file. Please try posting again after a while.";
 	$errormsg_7 = "Failed to create user data. Please try posting again after a while.";
 }
@@ -73,7 +74,7 @@ defined('DEFAULT_TIMEZONE') or define('DEFAULT_TIMEZONE','Asia/Tokyo');
 date_default_timezone_set(DEFAULT_TIMEZONE);
 
 //容量違反チェックをする する:1 しない:0
-define('SIZE_CHECK', '1');
+const SIZE_CHECK = '1';
 //投稿容量制限 KB
 define('PICPOST_MAX_KB', '5120');//5MBまで
 
@@ -143,9 +144,9 @@ if(SIZE_CHECK && ($imgLength > PICPOST_MAX_KB * 1024)){
 // 画像イメージを取り出す
 $imgdata = substr($buffer, 1 + 8 + $headerLength + 8 + 2, $imgLength);
 // 画像ヘッダーを獲得
-$imgh = substr($imgdata, 1, 5);
+$img_h = substr($imgdata, 1, 5);
 // 拡張子設定
-if($imgh=="PNG\r\n"){
+if($img_h=="PNG\r\n"){
 	$imgext = '.png';	// PNG
 }else{
 	$imgext = '.jpg';	// JPEG
@@ -252,7 +253,8 @@ if($sendheader){
 $userdata .= "\n";
 
 //CSRF
-if($usercode && $usercode !== filter_input(INPUT_COOKIE, 'usercode')){
+$cookie_usercode = filter_input(INPUT_COOKIE, 'usercode');
+if($usercode && $cookie_usercode && $usercode !== $cookie_usercode){
 	die("error\n{$errormsg_1}");
 }
 

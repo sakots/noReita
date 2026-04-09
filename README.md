@@ -28,6 +28,10 @@ Reactで絵板を作れなかったので、noReita。
 
 BladeOneとSQLiteは使っていますが、データベースの形式を変えました。
 
+## noReita v2以前との互換
+
+- データベースの形式が違いますが、移行スクリプトがあります。
+
 ## 設置
 
 `config.example.php`を`config.php`に名称変更し、その管理者パスワードをテキストエディタ(VSCodeなど)で編集してください。
@@ -69,6 +73,15 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/04/06] v3.0.0
+
+- エラーメッセージをすべて本体で記述した
+- 投稿にUUIDを付加
+- データベースの形式を変更
+- 本文中に画像URLがあった場合サムネイルを作成し表示
+  - config.php内に使う/使わないの設定等あります
+- LitaChix、Neo更新
+
 ### [2026/04/04] v2.3.3
 
 - トリップ生成機能追加
@@ -88,7 +101,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 - テーマ更新
   - カタログモードで下部リンクが間違っていたの修正
-  - flexbox採用
+  - flexBox採用
 
 ### [2026/03/27] v2.3.1
 
