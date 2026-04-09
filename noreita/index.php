@@ -615,6 +615,7 @@ function regist(): void {
 				list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
 
 				// 横幅がPDEF_Wを超えている場合はサムネイルを作成
+				$thumbnail ='';
 				if ($img_w > PDEF_W) {
 					// さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
 					if (USE_NSFW && $nsfw_flag) {
@@ -1039,6 +1040,7 @@ function reply(): void {
 				list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
 
 				// 横幅がPDEF_Wを超えている場合はサムネイルを作成
+				$thumbnail = '';
 				if ($img_w > PDEF_W) {
 					// さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
 					if (USE_NSFW && $nsfw_flag) {
