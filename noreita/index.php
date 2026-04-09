@@ -1303,6 +1303,8 @@ function def(): void {
 				if (AUTOLINK) {
 					$res['com'] = auto_link($res['com']);
 				}
+				//画像URLにサムネイルを追加
+				$res['com'] = image_thumbnail_link($res['com']);
 				//ハッシュタグ
 				if (USE_HASHTAG) {
 					$res['com'] = hashtag_link($res['com']);
@@ -1329,6 +1331,8 @@ function def(): void {
 			if (AUTOLINK) {
 				$bbsline['com'] = auto_link($bbsline['com']);
 			}
+			//画像URLにサムネイルを追加
+			$bbsline['com'] = image_thumbnail_link($bbsline['com']);
 			//ハッシュタグ
 			if (USE_HASHTAG) {
 				$bbsline['com'] = hashtag_link($bbsline['com']);
@@ -1633,6 +1637,8 @@ function res(): void {
 			if (AUTOLINK) {
 				$bbsline['com'] = auto_link($bbsline['com']);
 			}
+			//画像URLにサムネイルを追加
+			$bbsline['com'] = image_thumbnail_link($bbsline['com']);
 			//ハッシュタグ
 			if (USE_HASHTAG) {
 				$bbsline['com'] = hashtag_link($bbsline['com']);

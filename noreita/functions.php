@@ -577,3 +577,53 @@ function generate_uuid(): string {
 		random_int(0, 0xFFFFFFFFFFFF),
 	);
 }
+
+// 本文中の画像URLにサムネイルを追加
+function image_thumbnail_link($com): string {
+    // URLを抽出
+    preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+/i', $com, $matches);
+    $urls = array_unique($matches[0]); // 重複を除去
+
+    foreach ($urls as $url) {
+        // 画像拡張子チェック
+        if (preg_match('/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i', $url)) {
+            // サムネイルパス生成
+            $hash = md5($url);
+            $thumb_path = __DIR__ . '/thumbnail/' . $hash . '_thumb.jpg';
+
+            if (!file_exists($thumb_path)) {
+                // ダウンロードしてサムネイル作成
+                $context = stream_context_create([
+                    'http' => [
+                        'timeout' => 10, // タイムアウト設定
+                        'user_agent' => 'noReita/1.0',
+                    ]
+                ]);
+                $image_data = @file_get_contents($url, false, $context);
+                if ($image_data && strlen($image_data) > 0) {
+                    $temp_file = tempnam(sys_get_temp_dir(), 'img');
+                    file_put_contents($temp_file, $image_data);
+
+                    // サムネイル作成
+                    $thumb_result = thumbnail_gd::thumb('', $temp_file, time(), 200, 200);
+                    if ($thumb_result && file_exists($thumb_result)) {
+                        // thumbnail/ に移動
+                        if (!is_dir(__DIR__ . '/thumbnail/')) {
+                            mkdir(__DIR__ . '/thumbnail/', PERMISSION_FOR_DIR);
+                        }
+                        rename($thumb_result, $thumb_path);
+                        chmod($thumb_path, PERMISSION_FOR_DEST);
+                    }
+                    unlink($temp_file);
+                }
+            }
+
+            if (file_exists($thumb_path)) {
+                // <img> タグ追加
+                $relative_thumb_path = 'thumbnail/' . basename($thumb_path);
+                $com = str_replace($url, $url . '<br><img src="' . $relative_thumb_path . '" alt="thumbnail" style="max-width:200px; max-height:200px;">', $com);
+            }
+        }
+    }
+    return $com;
+}
