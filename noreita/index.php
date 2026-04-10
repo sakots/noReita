@@ -508,6 +508,7 @@ function regist(): void {
 			//↑ 二重投稿チェックおわり
 
 			//画像ファイルとか処理
+			$thumbnail = '';
 			if ($picfile) {
 				$path_filename = pathinfo($picfile, PATHINFO_FILENAME);
 				$temp_file = TEMP_DIR . $picfile;
@@ -933,6 +934,7 @@ function reply(): void {
 			//↑ 二重投稿チェックおわり
 
 			//画像ファイルとか処理
+			$thumbnail = '';
 			if ($picfile) {
 				$path_filename = pathinfo($picfile, PATHINFO_FILENAME);
 				$temp_file = TEMP_DIR . $picfile;
