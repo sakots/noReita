@@ -358,18 +358,6 @@ function init(): void {
 			)";
 			$db = $db->query($sql);
 			$db = null; //db切断
-		} else {
-			// 既にデータベースがある場合は接続
-			$db = new PDO(DB_PDO);
-			$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-			// 旧バージョンのテーブル名でクエリを実行してみる
-			$sql = "SELECT 1 FROM tlog WHERE thread = 1";
-			$db = $db->query($sql);
-			$data = $db->fetchAll(PDO::FETCH_ASSOC);
-			if($data['0']['?column?'] == 1){
-				die($en ? "An old version of the table was found. Please migrate the database format before running the script." : "旧バージョンのテーブルが存在しました。スクリプトを動かす前に、データベースの形式を移行してください。");
-			}
-			$db = null; //db切断
 		}
 	} catch (PDOException $e) {
 		echo "DB接続エラー:" . $e->getMessage();
