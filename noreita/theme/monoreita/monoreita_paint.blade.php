@@ -13,7 +13,7 @@
 			const originalWidth = {{$w}};
 			const originalHeight = {{$h}};
 		</script>
-		<script src="theme/{{$theme_dir}}/js/appFit.js" charset="utf-8"></script>
+		<script src="theme/{{$theme_dir}}/js/appFit.js?{{$stime}}" charset="utf-8"></script>
 		<!-- アプレットフィットここまで -->
 		@endif
 		@if ($tool == 'shi')

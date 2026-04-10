@@ -10,7 +10,7 @@ class AppFitManager {
   init() {
     this.document = document;
     this.appstage = this.document.getElementById("appstage");
-    this.target = this.document.getElementById("pageView");
+    this.target = this.document.getElementById("neo-pageView");
     this.fitExp = this.document.getElementById("fit_exp");
     this.fitComp = this.document.getElementById("fit_comp");
   }
@@ -42,6 +42,7 @@ class AppFitManager {
     this.isExpanded = true;
     
     this.resetZoom();
+    console.log("Expanded: ", this.target.style.width, this.target.style.height);
   }
 
   compress() {
