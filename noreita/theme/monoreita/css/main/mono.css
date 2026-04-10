@@ -10,10 +10,10 @@ body svg {
 }
 
 a {
-  color: #FFF;
+  color: #000;
 }
 a:link {
-  color: #FFF;
+  color: #000;
 }
 a:visited {
   color: #666;
