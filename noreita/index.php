@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v3.0.3'); //lot.2604011.0
+define('REITA_VER', 'v3.0.4'); //lot.2604015.0
 
 //言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -615,19 +615,17 @@ function regist(): void {
 				// 画像の縦横サイズを取得
 				list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
 
+				$thumbnail = '';
 				// 横幅がPDEF_Wを超えている場合はサムネイルを作成
-				$thumbnail ='';
-				if ($img_w > PDEF_W) {
-					// さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
-					if (USE_NSFW && $nsfw_flag) {
-						$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, 1);
-						$thumb->createThumbnail();
-						$thumbnail = $thumb->getOutputName();
-					} else {
-					$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W);
+				// さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
+				$isNsfw = false;
+				if (USE_NSFW && $nsfw_flag) {
+					$isNsfw = true;
+				}
+				if ($img_w > PDEF_W || (USE_NSFW && $nsfw_flag)) {
+					$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, $isNsfw);
 					$thumb->createThumbnail();
 					$thumbnail = $thumb->getOutputName();
-					}
 				}
 
 				$picdat = $path_filename . '.dat';
@@ -1041,19 +1039,17 @@ function reply(): void {
 				// 画像サイズの取得
 				list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
 
-				// 横幅がPDEF_Wを超えている場合はサムネイルを作成
 				$thumbnail = '';
-				if ($img_w > PDEF_W) {
-					// さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
-					if (USE_NSFW && $nsfw_flag) {
-						$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, 1);
-						$thumb->createThumbnail();
-						$thumbnail = $thumb->getOutputName();
-					} else {
-					$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W);
+				// 横幅がPDEF_Wを超えている場合はサムネイルを作成
+				// さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
+				$isNsfw = false;
+				if (USE_NSFW && $nsfw_flag) {
+					$isNsfw = true;
+				}
+				if ($img_w > PDEF_W || (USE_NSFW && $nsfw_flag)) {
+					$thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, $isNsfw);
 					$thumb->createThumbnail();
 					$thumbnail = $thumb->getOutputName();
-					}
 				}
 
 				$picdat = $path_filename . '.dat';
