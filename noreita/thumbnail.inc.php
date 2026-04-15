@@ -10,8 +10,9 @@
 // 使い方
 // $thumb = new Thumbnail('input.png', 'thumb_dir', 300, 1);
 // $thumb->create();
-// これでinput.pngを幅300pxにしてthumb_dirディレクトリにinput.webpと可能ならinput.avifに保存します。
-// nsfwスイッチを1にすると、サムネイル画像をぼかします。省略すればぼかしません。
+// これでinput.pngを幅300pxにしてthumb_dirディレクトリに保存します。
+// nsfwスイッチを1またはtrueにすると、サムネイル画像をぼかします。
+// 省略またはfalse、0ならぼかしません。
 
 $thumbnail_ver = 20260406;
 
@@ -19,10 +20,10 @@ class Thumbnail {
   private string $image_url; // 入力画像URL
   private string $thumb_dir; // 出力ディレクトリ
   private int $thumb_width; // サムネイルの幅（高さは幅で決まります）
-  private int $nsfw; // nsfwスイッチ
+  private bool $nsfw; // nsfwスイッチ
   private ?string $last_output_path = null;
 
-  public function __construct(string $image_url, string $thumb_dir, int $thumb_width, int $nsfw = 0) {
+  public function __construct(string $image_url, string $thumb_dir, int $thumb_width, bool $nsfw = false) {
     $this->image_url = $image_url;
     $this->thumb_dir = rtrim($thumb_dir, DIRECTORY_SEPARATOR);
     $this->thumb_width = $thumb_width;
