@@ -73,6 +73,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/04/11] v3.0.4
+
+- NSFW画像の表示変更
+- NEO、Litachix更新
+
 ### [2026/04/11] v3.0.3
 
 - 明るいタイプのテーマの文字色が白かったの修正
