@@ -50,7 +50,7 @@ if(!isset($save_inc_ver)||$save_inc_ver < 20250918) {
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!isset($thumbnail_ver)||$thumbnail_ver < 20260406) {
+if(!isset($thumbnail_ver)||$thumbnail_ver < 20260415) {
 	error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。');
 }
 
