@@ -314,21 +314,6 @@ button {
 	}
 }
 
-.nsfw {
-	//display: block;
-	overflow: hidden;
-	//float: left;
-	//position: relative;
-	img {
-		//position: relative;
-		filter: blur(6px);
-		transition: .1s;
-		top: -6px;
-		bottom: -6px;
-		left: -6px;
-		right: -6px;
-	}
-}
 //アイコン
 .simple-icons--misskey {
   display: inline-block;

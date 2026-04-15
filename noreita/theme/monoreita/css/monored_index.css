@@ -336,18 +336,6 @@ button {
   align-content: flex-start;
 }
 
-.nsfw {
-  overflow: hidden;
-}
-.nsfw img {
-  filter: blur(6px);
-  transition: 0.1s;
-  top: -6px;
-  bottom: -6px;
-  left: -6px;
-  right: -6px;
-}
-
 .simple-icons--misskey {
   display: inline-block;
   width: 12px;
