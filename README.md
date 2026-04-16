@@ -73,7 +73,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
-### [2026/04/11] v3.0.4
+### [2026/04/16] v3.0.5
+
+- 名前とトリップの間に半角スペース追加
+- NEO、Litachix更新
+
+### [2026/04/15] v3.0.4
 
 - NSFW画像の表示変更
 - NEO、Litachix更新
