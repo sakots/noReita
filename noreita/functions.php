@@ -1,5 +1,5 @@
 <?php
-$functions_ver = 20260405;
+$functions_ver = 20260416;
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {
@@ -559,7 +559,7 @@ function generate_trip($name): string {
 		$map = array(':'=>'A', ';'=>'B', '<'=>'C', '='=>'D', '>'=>'E', '?'=>'F', '@'=>'G', '['=>'a', '\\'=>'b', ']'=>'c', '^'=>'d', '_'=>'e', '`'=>'f');
 		$trip = substr(crypt($key, strtr($salt, $map)), -10);
 	}
-	return $name.'◆'.$trip;
+	return $name.' ◆'.$trip;
 }
 
 // UUIDv7生成
