@@ -71,7 +71,7 @@
 						</tr>
 						<tr>
 							<td>pass</td>
-							<td><input type="password" name="pwd" size="8" value="" autocomplete="section-edit current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};"></td>
+							<td><input type="password" name="pwd" size="8" value="{{$pwd_cookie}}" autocomplete="section-edit current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};"></td>
 						</tr>
 						<tr>
 							<td><input type="submit" name="send" id="send" value="書き込む"></td>

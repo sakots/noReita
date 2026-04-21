@@ -200,6 +200,11 @@ $message = "";
 //var_dump($_COOKIE);
 
 $pwd_cookie = filter_input(INPUT_COOKIE, 'pwd_cookie');
+$dat['name_cookie'] = (string)t(filter_input_data('COOKIE', 'name_c'));
+$dat['email_cookie'] = (string)t(filter_input_data('COOKIE', 'email_c'));
+$dat['url_cookie'] = (string)t(filter_input_data('COOKIE', 'url_c'));
+$dat['pwd_cookie'] = (string)t(filter_input_data('COOKIE', 'pwd_cookie'));
+$dat['palette_cookie'] = (string)t(filter_input_data('COOKIE', 'palette_c'));
 $usercode = filter_input(INPUT_COOKIE, 'usercode'); //nullならuser-codeを発行
 
 //$_SERVERから変数を取得
