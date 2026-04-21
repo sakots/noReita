@@ -53,7 +53,7 @@
 					<table>
 						<tr>
 							<td>name @if ($use_name) * @endif</td>
-							<td><input type="text" name="name" size="28" autocomplete="username" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
+							<td><input type="text" name="name" size="28" autocomplete="name" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
 						</tr>
 						<tr>
 							<td>mail</td>

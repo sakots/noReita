@@ -41,15 +41,15 @@
 					<table>
 						<tr>
 							<td>name</td>
-							<td><input type="text" name="name" size="28" autocomplete="username" value="{{$bbsline['a_name']}}" maxlength="{{$max_name}}"></td>
+							<td><input type="text" name="name" size="28" autocomplete="name" value="{{$bbsline['a_name']}}" maxlength="{{$max_name}}"></td>
 						</tr>
 						<tr>
 							<td>mail</td>
-							<td><input type="text" name="mail" size="28" value="" autocomplete="email" value="{{$bbsline['mail']}}" maxlength="{{$max_email}}"></td>
+							<td><input type="text" name="mail" size="28" autocomplete="email" value="{{$bbsline['mail']}}" maxlength="{{$max_email}}"></td>
 						</tr>
 						<tr>
 							<td>URL</td>
-							<td><input type="text" name="url" size="28" value="" autocomplete="url" value="{{$bbsline['a_url']}}" maxlength="{{$max_url}}"></td>
+							<td><input type="text" name="url" size="28" autocomplete="url" value="{{$bbsline['a_url']}}" maxlength="{{$max_url}}"></td>
 						</tr>
 						<tr>
 							<td>subject</td>
