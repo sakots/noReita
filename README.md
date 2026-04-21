@@ -73,6 +73,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/04/21] v3.0.7
+
+- 名前が正常に保存されなないの修正
+- NEO更新
+
 ### [2026/04/18] v3.0.6
 
 - NEO更新
