@@ -53,15 +53,15 @@
 					<table>
 						<tr>
 							<td>name @if ($use_name) * @endif</td>
-							<td><input type="text" name="name" size="28" autocomplete="name" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
+							<td><input type="text" name="name" size="28" value="{{$name_cookie}}" autocomplete="section-post username" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
 						</tr>
 						<tr>
 							<td>mail</td>
-							<td><input type="text" name="mail" size="28" value="" autocomplete="email" maxlength="{{$max_email}}"></td>
+							<td><input type="text" name="mail" size="28" value="{{$email_cookie}}" autocomplete="email" maxlength="{{$max_email}}"></td>
 						</tr>
 						<tr>
 							<td>URL</td>
-							<td><input type="text" name="url" size="28" value="" autocomplete="url" maxlength="{{$max_url}}"></td>
+							<td><input type="text" name="url" size="28" value="{{$url_cookie}}" autocomplete="url" maxlength="{{$max_url}}"></td>
 						</tr>
 						<tr>
 							<td>subject @if ($use_sub) * @endif</td>
@@ -89,7 +89,7 @@
 						<tr>
 							<td>pass</td>
 							<td>
-								<input type="password" name="pwd" size="8" value="" autocomplete="current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
+								<input type="password" name="pwd" size="8" value="{{$pwd_cookie}}" autocomplete="section-post current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
 								(記事の編集削除用。英数字で)
 							</td>
 						</tr>
