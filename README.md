@@ -73,6 +73,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2-26/04/23] v3.0.9
+
+- PHPのバージョンチェックを正確に
+- litaChixの著者名をsatopianに
+- Cookieにセキュア属性とhttpOnly属性を追加してCookieの外部への流出を防止
+
 ### [2026/04/21] v3.0.8
 
 - 名前が正常に保存されなないの修正
