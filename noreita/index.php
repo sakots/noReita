@@ -13,7 +13,7 @@ $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 $en = (stripos($lang,'ja')!== 0);
 
 //phpのバージョンが古い場合動かさせない
-if (($php_ver = phpversion()) < "7.3.0") {
+if (version_compare($php_ver = phpversion(),'7.3.0', '<')) {
   die($en ? "PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.3以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
 }
 
@@ -763,12 +763,14 @@ function regist(): void {
 			$c_pass = $pwd;
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
+			$https_only = (bool)($_SERVER['HTTPS'] ?? '');
+
 			$cookies = [["name_c",$original_name],["email_c",$mail] , ["url_c", $url], ["pwd_cookie", $c_pass] ,[ "palette_c" , $pal]];
 			foreach ($cookies as $cookie) {
 				list($c_name, $c_cookie) = $cookie;
 				$c_name = (string)$c_name;
 				$c_cookie = (string)$c_cookie;
-				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
+				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600),"","",$https_only,true);
 			}
 
 			$dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
@@ -1164,7 +1166,9 @@ function reply(): void {
 			);
 			//$db->exec($sql);
 
+			$https_only = (bool)($_SERVER['HTTPS'] ?? '');
 			$c_pass = $pwd;
+
 			//-- クッキー保存 --
 			//クッキー項目："クッキー名 クッキー値"
 			$cookies = [["name_c",$original_name],["email_c",$mail] , ["url_c", $url], ["pwd_cookie", $c_pass]];
@@ -1172,7 +1176,7 @@ function reply(): void {
 				list($c_name, $c_cookie) = $cookie;
 				$c_name = (string)$c_name;
 				$c_cookie = (string)$c_cookie;
-				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600));
+				setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600),"","",$https_only,true);
 			}
 
 			$dat['message'] = $en ? 'Successfully posted.' : '書き込みに成功しました。';
