@@ -73,7 +73,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
-### [2-26/04/23] v3.0.9
+### [2026/04/23] v3.0.9
 
 - PHPのバージョンチェックを正確に
 - litaChixの著者名をsatopianに
