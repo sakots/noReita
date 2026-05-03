@@ -20,20 +20,20 @@ function set_page_context_to_session(): void {
 }
 
 //管理者パスワードを確認
-function is_admin_pass($pwd): bool {
+function is_admin_pass(string $pwd): bool {
 	global $admin_pass,$second_pass;
 	$pwd=(string)$pwd;
 	return ($admin_pass && $pwd && $second_pass !== $admin_pass && $pwd === $admin_pass);
 }
 
 // 文字コード変換
-function charconvert($str): string {
+function charconvert(string $str): string {
 	mb_language(LANG);
 	return mb_convert_encoding($str, "UTF-8", "auto");
 }
 
 /* NGワードがあれば拒絶 */
-function Reject_if_NGword_exists_in_the_post($com, $name, $email, $url, $sub): void {
+function Reject_if_NGword_exists_in_the_post(string $com, string $name, string $email, string $url, string $sub): void {
 	global $badstring, $badname, $badstr_A, $badstr_B, $pwd, $admin_pass;
 	global $en;
 	//チェックする項目から改行・スペース・タブを消す
@@ -72,7 +72,7 @@ function Reject_if_NGword_exists_in_the_post($com, $name, $email, $url, $sub): v
 }
 
 //念のため画像タイプチェック
-function get_image_type($img_type, $dest = null): string {
+function get_image_type(string $img_type, ?string $dest = null): string {
 	global $en;
 	// 既にMIMEタイプが渡されている場合はそのまま使用
 	if (strpos($img_type, 'image/') === 0) {
@@ -93,7 +93,7 @@ function get_image_type($img_type, $dest = null): string {
 	if (isset($map[$mime_type])) {
 		return $map[$mime_type];
 	}
-	error($en ? "Invalid image type." : "無効な画像タイプです。", $dest);
+	error($en ? "Invalid image type." : "無効な画像タイプです。");
 	return ''; // この行は実際には実行されないが、リンターを満足させるために必要
 }
 
@@ -103,7 +103,7 @@ function get_image_type($img_type, $dest = null): string {
  * @param string|array $strs
  * @return bool
  */
-function is_ngword($ngwords, $strs): bool {
+function is_ngword(array $ngwords, string|array $strs): bool {
 	if (empty($ngwords)) {
 		return false;
 	}
@@ -120,12 +120,8 @@ function is_ngword($ngwords, $strs): bool {
 	return false;
 }
 
-/**
- * 描画時間を計算
- * @param $starttime
- * @return string
- */
-function calcPtime($psec): string {
+// 描画時間を計算
+function calcPtime(int $psec): string {
 
 	$D = floor($psec / 86400);
 	$H = floor($psec % 86400 / 3600);
@@ -139,7 +135,7 @@ function calcPtime($psec): string {
  * @param $path
  * @return bool
  */
-function safe_unlink($path): bool {
+function safe_unlink(string $path): bool {
 	if ($path && is_file($path)) {
 		try {
 			return @unlink($path);
@@ -153,7 +149,7 @@ function safe_unlink($path): bool {
 }
 
 /* オートリンク */
-function auto_link($proto): string {
+function auto_link(string $proto): string {
 	if (!(stripos($proto, "script") !== false)) { //scriptがなければ続行
 		// 画像URLを一時的にプレースホルダーに置き換え
 		$image_urls = [];
@@ -177,7 +173,7 @@ function auto_link($proto): string {
 }
 
 /* ハッシュタグリンク */
-function hashtag_link($hashtag): string {
+function hashtag_link(string $hashtag): string {
 	$self = PHP_SELF;
 	$pattern = "/(?:^|[^ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9&_\/]+)[#＃]([ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9_]*[ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z]+[ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9_]*)/u";
 	$replace = " <a href=\"{$self}?mode=search&amp;tag=tag&amp;search=\\1\">#\\1</a>";
@@ -186,13 +182,13 @@ function hashtag_link($hashtag): string {
 }
 
 /* '>'色設定 */
-function quote($quote): string {
+function quote(string $quote): string {
 	$quote = preg_replace("/(^|>)((&gt;|＞)[^<]*)/i", "\\1" . RE_START . "\\2" . RE_END, $quote);
 	return $quote;
 }
 
 /* 改行を<br>に */
-function tobr($com): string {
+function tobr(string $com): string {
 	if (TH_XHTML !== 1) {
 		$com = nl2br($com, false);
 	} else {
@@ -202,7 +198,7 @@ function tobr($com): string {
 }
 
 /* ID生成 */
-function gen_id($userip, $time): string {
+function gen_id(string $userip, int $time): string {
 	if (ID_CYCLE === '0') {
 		return substr(crypt(md5($userip . ID_SEED), 'id'), -8);
 	} elseif (ID_CYCLE === '1') {
@@ -220,7 +216,7 @@ function gen_id($userip, $time): string {
 }
 
 //リダイレクト
-function redirect($url): void {
+function redirect(string $url): void {
 	header("Location: {$url}");
 	exit();
 }
@@ -380,7 +376,7 @@ function session_sta(): void {
 }
 
 //エスケープ
-function h($str): string {
+function h(string $str): string {
 	if(zero_check($str)){
 		return '0';
 	}
@@ -390,7 +386,7 @@ function h($str): string {
 	return htmlspecialchars($str,ENT_QUOTES,"utf-8",false);
 }
 //タブ除去
-function t($str): string {
+function t(string $str): string {
 	if(zero_check($str)){
 		return '0';
 	}
@@ -400,7 +396,7 @@ function t($str): string {
 	return str_replace("\t","",(string)$str);
 }
 //タグ除去
-function s($str): string {
+function s(string $str): string {
 	if(zero_check($str)){
 		return '0';
 	}
@@ -411,12 +407,12 @@ function s($str): string {
 }
 
 // 0 または "0" かどうか
-function zero_check($str): bool {
+function zero_check(string|int $str): bool {
 	return($str === 0 || $str === '0');
 }
 
 // ファイル存在チェック
-function check_file($path): void {
+function check_file(string $path): void {
 	$msg = initial_error_message();
 
 	if (!is_file($path)){
@@ -428,14 +424,14 @@ function check_file($path): void {
 }
 
 //PaintBBS NEOのpchかどうか調べる
-function is_neo($src): bool {
+function is_neo(string $src): bool {
 	$fp = fopen("$src", "rb");
 	$is_neo=(fread($fp,3) === "NEO");
 	fclose($fp);
 	return $is_neo;
 }
 //pchデータから幅と高さを取得
-function get_pch_size($src): ?array {
+function get_pch_size(string $src): ?array {
 	if(!$src){
 		return null;
 	}
@@ -494,7 +490,7 @@ function check_same_origin(): void {
 }
 }
 
-function switch_tool($tool): string {
+function switch_tool(string $tool): string {
 	switch($tool){
 	case 'neo':
 		$tool='PaintBBS NEO';
@@ -532,7 +528,7 @@ function user_del_valid(): bool {
 }
 
 // トリップ生成
-function generate_trip($name): string {
+function generate_trip(string $name): string {
 	if ( ( $index = strpos($name, '#') ) === false)
 		return str_replace( '◆', '◇', $name );
 	$original_name = $name;
@@ -591,7 +587,7 @@ function generate_uuid(): string {
 }
 
 // 本文中の画像URLにサムネイルを追加
-function image_thumbnail_link($com): string {
+function image_thumbnail_link(string $com): string {
   // URLを抽出
   preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+/i', $com, $matches);
   $urls = array_unique($matches[0]); // 重複を除去
@@ -694,7 +690,7 @@ function image_thumbnail_link($com): string {
 }
 
 // 画像ダウンロード関数
-function download_image($url): string|false {
+function download_image(string $url): string|false {
 	if (function_exists('curl_init')) {
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
@@ -728,7 +724,7 @@ function download_image($url): string|false {
 }
 
 //ディレクトリ作成
-function check_dir ($path): void {
+function check_dir (string $path): void {
 
 	$msg = initial_error_message();
 

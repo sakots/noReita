@@ -1733,7 +1733,7 @@ function res(): void {
 }
 
 //お絵描き画面
-function paint_form($rep, $reply_to): void {
+function paint_form(string $rep, int $reply_to): void {
 	global $message, $usercode, $quality, $qualitys, $no;
 	global $mode, $ctype, $pch, $type;
 	global $blade, $dat;
@@ -1966,7 +1966,7 @@ function paint_form($rep, $reply_to): void {
 
 //アニメ再生
 
-function open_pch($pch, $sp = ""): void {
+function open_pch(string $pch, $sp = ""): void {
 	global $blade, $dat;
 	$message = "";
 
@@ -2027,7 +2027,7 @@ function open_pch($pch, $sp = ""): void {
 }
 
 //お絵かき投稿
-function paint_com($tmpmode): void {
+function paint_com(string $tmpmode): void {
 	global $usercode, $ptime;
 	global $blade, $dat;
 
@@ -2734,7 +2734,7 @@ function usrchk(): void {
 }
 
 //OK画面
-function ok($mes): void {
+function ok(string $mes): void {
 	global $blade, $dat;
 	$dat['okmes'] = $mes;
 	$dat['othermode'] = 'ok';
@@ -2890,7 +2890,7 @@ function misskey_note(): void {
 }
 
 //エラー画面
-function error($mes): void {
+function error(string $mes): void {
 	global $db;
 	global $blade, $dat;
 	$db = null; //db切断
@@ -2924,7 +2924,7 @@ function error2(): void {
 }
 
 // ファイルアップロードのセキュリティ検証関数
-function validate_upload_file($file_path, $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
+function validate_upload_file(string $file_path, $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
     // ファイルの存在確認
     if (!file_exists($file_path)) {
         return false;
