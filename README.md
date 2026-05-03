@@ -73,6 +73,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/05/03] v3.0.10
+
+- NEO、Litachix、Tegaki.js更新
+
 ### [2026/04/23] v3.0.9
 
 - PHPのバージョンチェックを正確に
