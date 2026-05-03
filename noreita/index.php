@@ -43,7 +43,7 @@ if(!isset($misskey_note_ver) || $misskey_note_ver < 20260405) {
 // save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
-if(!isset($save_inc_ver)||$save_inc_ver < 20250918) {
+if(!isset($save_inc_ver)||$save_inc_ver < 20260504) {
 	die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
@@ -514,6 +514,10 @@ function regist(): void {
 
 			//画像ファイルとか処理
 			$thumbnail = '';
+			$psec = 0;
+			$utime = "";
+			$used_tool = "";
+			$nsfw = false;
 			if ($picfile) {
 				$path_filename = pathinfo($picfile, PATHINFO_FILENAME);
 				$temp_file = TEMP_DIR . $picfile;
@@ -686,6 +690,10 @@ function regist(): void {
 				$pchfile = "";
 				$utime = "";
 				$used_tool = "";
+				$psec = 0;
+				$utime = "";
+				$thumbnail = "";
+				$nsfw = false;
 			}
 
 			// 値を追加する
@@ -853,6 +861,11 @@ function reply(): void {
 	$img_w = trim(filter_input(INPUT_POST, 'img_w', FILTER_VALIDATE_INT));
 	$img_h = trim(filter_input(INPUT_POST, 'img_h', FILTER_VALIDATE_INT));
 	$nsfw_flag = (string)filter_input(INPUT_POST, 'nsfw', FILTER_VALIDATE_INT);
+
+	$psec = 0;
+	$utime = "";
+	$used_tool = "";
+	$nsfw = false;
 
 	// クッキー保存用
 	$original_name = $name;
@@ -1197,6 +1210,8 @@ function def(): void {
 	$dsp_res = DSP_RES;
 	$page_def = PAGE_DEF;
 
+	$start = 0;
+
 	//ログ行数オーバー処理
 	//スレ数カウント
 	try {
@@ -1393,6 +1408,8 @@ function def(): void {
 function catalog(): void {
 	global $blade, $dat;
 	$page_def = CATALOG_N;
+
+	$start = 0;
 
 	//ページング
 	try {
@@ -1850,6 +1867,8 @@ function paint_form($rep, $reply_to): void {
 	//お絵かきリプ
 	$dat['resto'] = $reply_to;
 
+	$datmode = NULL;
+
 	$pal = array();
 	$DynP = array();
 	$p_cnt = 0;
@@ -2021,6 +2040,8 @@ function paint_com($tmpmode): void {
 	$dat['parent'] = $_SERVER['REQUEST_TIME'];
 	$dat['usercode'] = $usercode;
 	$dat['resto'] = $resto;
+
+	$utime = NULL;
 
 	//----------
 
@@ -2303,6 +2324,12 @@ function picreplace(): void {
 	$pwd_f = hex2bin($pwd_f); //バイナリに
 	$pwd_f = openssl_decrypt($pwd_f, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //復号化
 	$nsfw_flag = filter_input(INPUT_POST, 'nsfw');
+
+	//初期化
+	$filename = '';
+	$imgext = '';
+	$starttime = '';
+	$postedtime = '';
 
 	//ホスト取得
 	$host = gethostbyaddr(get_uip());
