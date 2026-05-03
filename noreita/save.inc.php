@@ -5,8 +5,8 @@
 $save_inc_ver=20260504;
 class image_save{
 
-	private $security_timer,$imgfile,$en,$count,$errtext,$session_usercode; // プロパティとして宣言
-	private $tool,$repcode,$stime,$resto,$timer,$error_type,$hide_animation,$pmax_w,$pmax_h,$usercode_header;
+	private int|string $security_timer,$imgfile,$en,$count,$errtext,$session_usercode; // プロパティとして宣言
+	private int|string $tool,$repcode,$stime,$resto,$timer,$error_type,$hide_animation,$pmax_w,$pmax_h,$usercode_header;
 	
 	function __construct(){
 
@@ -274,7 +274,7 @@ class image_save{
 		}
 	}
 
-	private function error_msg($message): void {
+	private function error_msg(string $message): void {
 		switch ($this->error_type){
 			case "neo":
 				$errtext="error\n";
