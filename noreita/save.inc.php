@@ -2,7 +2,7 @@
 //Petit Note (c)さとぴあ @satopian 2021-2025 MIT License
 //https://paintbbs.sakura.ne.jp/
 
-$save_inc_ver=20260405;
+$save_inc_ver=20260504;
 class image_save{
 
 	private $security_timer,$imgfile,$en,$count,$errtext,$session_usercode; // プロパティとして宣言
@@ -145,9 +145,9 @@ class image_save{
 			$psec=(int)$this->security_timer-(int)$this->timer;
 			$waiting_time=calcPtime ($psec);
 			if($this->en){
-				$this->error_msg("Please draw for another {$waiting_time['en']}.");
+				$this->error_msg("Please draw for another {$waiting_time}.");
 			}else{
-				$this->error_msg("描画時間が短すぎます。あと{$waiting_time['ja']}。");
+				$this->error_msg("描画時間が短すぎます。あと{$waiting_time}。");
 			}
 		}
 	}
