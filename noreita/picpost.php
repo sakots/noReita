@@ -82,8 +82,11 @@ $time = time();
 $imgfile = $time.substr(microtime(),2,6);	//画像ファイル名
 
 /* エラー発生時にSystemLOGにエラーを記録 */
-function error($error){
+function error(String $error){
 	global $imgfile,$syslog,$syslogmax;
+
+	$lines = array();
+
 	$time = time();
 	$youbi = array('日','月','火','水','木','金','土');
 	$yd = $youbi[date("w", $time)] ;
@@ -235,6 +238,7 @@ if($pchLength){
 $userdata = "$u_ip\t$u_host\t$u_agent\t$imgext";
 // 拡張ヘッダーを取り出す
 $sendheader = substr($buffer, 1 + 8, $headerLength);
+$usercode = '';
 if($sendheader){
 	$sendheader = str_replace("&amp;", "&", $sendheader);
 	$query_str = explode("&", $sendheader);
