@@ -73,6 +73,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/05/04] v3.0.11
+
+- 本文中の画像のサムネイル生成にthumbnail.inc.phpを使うようにした
+- 各種型定義や宣言を厳格にした
+
 ### [2026/05/03] v3.0.10
 
 - NEO、Litachix、Tegaki.js更新

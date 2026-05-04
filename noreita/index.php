@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v3.0.10'); //lot.260503.0
+define('REITA_VER', 'v3.0.11'); //lot.260504.0
 
 //言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -21,7 +21,7 @@ if (!is_file(__DIR__.'/functions.php')) {
   die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
 require_once(__DIR__.'/functions.php');
-if(!isset($functions_ver) || $functions_ver < 20260416) {
+if(!isset($functions_ver) || $functions_ver < 20260504) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
@@ -1733,7 +1733,7 @@ function res(): void {
 }
 
 //お絵描き画面
-function paint_form(string $rep, int $reply_to): void {
+function paint_form(string $rep, int|null $reply_to): void {
 	global $message, $usercode, $quality, $qualitys, $no;
 	global $mode, $ctype, $pch, $type;
 	global $blade, $dat;

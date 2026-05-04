@@ -1,5 +1,5 @@
 <?php
-$functions_ver = 20260416;
+$functions_ver = 20260504;
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {
@@ -198,7 +198,7 @@ function tobr(string $com): string {
 }
 
 /* ID生成 */
-function gen_id(string $userip, int $time): string {
+function gen_id(string $userip, string $time): string {
 	if (ID_CYCLE === '0') {
 		return substr(crypt(md5($userip . ID_SEED), 'id'), -8);
 	} elseif (ID_CYCLE === '1') {
@@ -297,7 +297,7 @@ function post_share_server(): void {
 }
 
 //filter_input のラッパー関数
-function filter_input_data(string $input, string $key, int $filter=0): mixed {
+function filter_input_data(string $input, string $key, int|string $filter=0): mixed {
 	// $_GETまたは$_POSTからデータを取得
 	$value = null;
 	if ($input === 'GET') {
@@ -376,7 +376,7 @@ function session_sta(): void {
 }
 
 //エスケープ
-function h(string $str): string {
+function h(string|null $str): string {
 	if(zero_check($str)){
 		return '0';
 	}
@@ -386,7 +386,7 @@ function h(string $str): string {
 	return htmlspecialchars($str,ENT_QUOTES,"utf-8",false);
 }
 //タブ除去
-function t(string $str): string {
+function t(string|null $str): string {
 	if(zero_check($str)){
 		return '0';
 	}
@@ -396,7 +396,7 @@ function t(string $str): string {
 	return str_replace("\t","",(string)$str);
 }
 //タグ除去
-function s(string $str): string {
+function s(string|null $str): string {
 	if(zero_check($str)){
 		return '0';
 	}
@@ -407,7 +407,7 @@ function s(string $str): string {
 }
 
 // 0 または "0" かどうか
-function zero_check(string|int $str): bool {
+function zero_check(string|int|null $str): bool {
 	return($str === 0 || $str === '0');
 }
 
@@ -595,82 +595,36 @@ function image_thumbnail_link(string $com): string {
   foreach ($urls as $url) {
     // 画像拡張子チェック
     if (preg_match('/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i', $url)) {
-      // サムネイルパス生成（一旦jpgとして、後で変更）
       $hash = md5($url);
       $temp_thumb_path = __DIR__ . '/thumbnail/' . $hash . '_thumb';
 
-      // 拡張子は後で決定
       if (!file_exists($temp_thumb_path . '.jpg') && !file_exists($temp_thumb_path . '.png') && !file_exists($temp_thumb_path . '.gif') && !file_exists($temp_thumb_path . '.webp') && !file_exists($temp_thumb_path . '.avif')) {
-        // ダウンロードしてサムネイル作成
         $image_data = download_image($url);
         if ($image_data && strlen($image_data) > 0 && strlen($image_data) < 1024 * 1024) { // 1MB未満
-          $temp_file = tempnam(sys_get_temp_dir(), 'img');
+          if (!class_exists('Thumbnail')) {
+            require_once(__DIR__ . '/thumbnail.inc.php');
+          }
+          if (!is_dir(__DIR__ . '/thumbnail/')) {
+            mkdir(__DIR__ . '/thumbnail/', PERMISSION_FOR_DIR);
+          }
+
+          $temp_file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $hash . '_thumb';
           file_put_contents($temp_file, $image_data);
 
-          $image_info = @GetImageSize($temp_file);
-          if ($image_info) {
-            $w = $image_info[0];
-            $h = $image_info[1];
-            $type = $image_info[2];
-            $mime = $image_info['mime'];
-            $ext = image_type_to_extension($type, false); // jpg, png, gif, webp
-            if (!$ext) $ext = 'jpg'; // デフォルト
-            $thumb_path = $temp_thumb_path . '.' . $ext;
-
-            // サムネイル作成
-            if (!is_dir(__DIR__ . '/thumbnail/')) {
-              mkdir(__DIR__ . '/thumbnail/', PERMISSION_FOR_DIR);
-            }
-            if ($mime === 'image/png') {
-              $im = @imagecreatefrompng($temp_file);
-            } elseif ($mime === 'image/jpeg') {
-              $im = @imagecreatefromjpeg($temp_file);
-            } elseif ($mime === 'image/gif') {
-              $im = @imagecreatefromgif($temp_file);
-            } elseif ($mime === 'image/webp') {
-              $im = @imagecreatefromwebp($temp_file);
-            } else {
-              $im = false;
-            }
-
-            if ($im) {
-              if ($w > 200 || $h > 200) {
-                // リサイズ
-                $ratio = min(200 / $w, 200 / $h);
-                $new_w = ceil($w * $ratio);
-                $new_h = ceil($h * $ratio);
-                $im_new = imagecreatetruecolor($new_w, $new_h);
-                if ($mime === 'image/png') {
-                  imagealphablending($im_new, false);
-                  imagesavealpha($im_new, true);
-                } else {
-                  $white = imagecolorallocate($im_new, 255, 255, 255);
-                  imagefill($im_new, 0, 0, $white);
-                }
-                imagecopyresampled($im_new, $im, 0, 0, 0, 0, $new_w, $new_h, $w, $h);
-                imagejpeg($im_new, $thumb_path, 90);
-                if(PHP_VERSION_ID < 80000) imagedestroy($im_new);
-              } else {
-                // 小さい画像はそのままコピー
-                copy($temp_file, $thumb_path);
-              }
-              if(PHP_VERSION_ID < 80000) imagedestroy($im);
+          $thumb = new Thumbnail($temp_file, __DIR__ . '/thumbnail', 200);
+          if ($thumb->createThumbnail()) {
+            $thumb_path = $thumb->getOutputPath();
+            if ($thumb_path && is_file($thumb_path)) {
               chmod($thumb_path, PERMISSION_FOR_DEST);
-            } else {
-              // 画像作成失敗
             }
-          } else {
-            // GetImageSize失敗
           }
           unlink($temp_file);
-        } else {
-          // ダウンロード失敗またはサイズオーバー
         }
       }
 
       // 実際のファイルパスを決定
       $actual_thumb_path = '';
-      foreach (['jpg', 'png', 'gif', 'webp', 'avif'] as $e) {
+      foreach (['avif', 'webp', 'jpg', 'png', 'gif'] as $e) {
         if (file_exists($temp_thumb_path . '.' . $e)) {
           $actual_thumb_path = $temp_thumb_path . '.' . $e;
           break;
