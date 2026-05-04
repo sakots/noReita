@@ -3,7 +3,7 @@
 //https://paintbbs.sakura.ne.jp/
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
-$misskey_note_ver = 20260405;
+$misskey_note_ver = 20260504;
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -12,7 +12,7 @@ global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
 require_once __DIR__ . '/index.php';
 
 // データベースから投稿を取得する
-function get_post_from_db($no): ?array {
+function get_post_from_db(int $no): ?array {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
@@ -55,7 +55,7 @@ function get_post_from_db($no): ?array {
 }
 
 // 投稿の存在確認
-function check_post_exists($no): bool {
+function check_post_exists(int $no): bool {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
@@ -74,7 +74,7 @@ function check_post_exists($no): bool {
 }
 
 // 投稿のパスワード検証
-function verify_post_password($no, $id, $pwd): bool {
+function verify_post_password(int $no, string $id, string $pwd): bool {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
@@ -97,7 +97,7 @@ function verify_post_password($no, $id, $pwd): bool {
 }
 
 // 投稿の編集権限チェック
-function check_edit_permission($no, $id, $pwd, $admin): bool {
+function check_edit_permission(int $no, string $id, string $pwd, bool $admin): bool {
 	global $en;
 	try {
 		$db = new PDO(DB_PDO);
@@ -128,7 +128,7 @@ function check_edit_permission($no, $id, $pwd, $admin): bool {
 }
 
 // 投稿データを整形して表示用の配列を作成
-function create_res($post): array {
+function create_res(array $post): array {
 	global $en, $autolink, $use_hashtag;
 
 	try {
@@ -267,7 +267,7 @@ class misskey_note {
 
 		check_AsyncRequest();
 
-		$post = get_post_from_db($no, $id);
+		$post = get_post_from_db($no);
 		if (!$post) {
 			error($en ? 'The article was not found.' : '記事が見つかりません。');
 		}
