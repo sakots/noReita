@@ -1733,7 +1733,7 @@ function res(): void {
 }
 
 //お絵描き画面
-function paint_form(string $rep, int $reply_to): void {
+function paint_form(string $rep, int|null $reply_to): void {
 	global $message, $usercode, $quality, $qualitys, $no;
 	global $mode, $ctype, $pch, $type;
 	global $blade, $dat;
