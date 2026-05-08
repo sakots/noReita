@@ -133,6 +133,15 @@
 							<legend>TOOL</legend>
 							<input class="button" type="button" value="左" onclick="Neo.setToolSide(true)">
 							<input class="button" type="button" value="右" onclick="Neo.setToolSide(false)">
+							手ぶれ補正
+							<select onchange="Neo.setStabilizeLevel(this.value)">
+								<option value="0">0</option>
+								<option value="1" selected>1</option>
+								<option value="2">2</option>
+								<option value="3">3</option>
+								<option value="4">4</option>
+								<option value="5">5</option>
+							</select>
 						</fieldset>
 						@endif
 						<fieldset>
