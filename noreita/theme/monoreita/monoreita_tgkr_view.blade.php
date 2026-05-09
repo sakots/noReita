@@ -27,7 +27,7 @@
   <script>
     Tegaki.open({
       replayMode: true,
-      replayURL: '{{$pchfile}}' // Store replay files preferably with the .tgkr extension
+      replayURL: '{{$path}}{{$pchfile}}' // Store replay files preferably with the .tgkr extension
     });
   </script>
 </body>
