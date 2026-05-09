@@ -240,8 +240,8 @@
 									@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
 									@if ($use_chicken)<option value="chicken">litaChix</option> @endif
 									@if ($use_klecks)<option value="klecks">Klecks</option> @endif
-									@if ($use_tegaki)<option value="tegaki">Tegaki</option> @endif
-									@if ($use_axnos)<option value="axnos">Axnos</option> @endif
+									@if ($use_tegaki)<option value="tegaki">Tegaki.js</option> @endif
+									@if ($use_axnos)<option value="axnos">AxnosPaint</option> @endif
 								</select>
 								<span id="palette-container" style="display: none;">
 									<label for="palettes">パレット</label>
