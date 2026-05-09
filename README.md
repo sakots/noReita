@@ -17,8 +17,8 @@ Reactで絵板を作れなかったので、noReita。
 
 [PaintBBS NEO](https://github.com/funige/neo/)
 と
-[chickenPaint Be](https://github.com/satopian/ChickenPaint_Be)
-が使えます。
+[Litachix](https://github.com/satopian/ChickenPaint_Be)、
+Tegaki.jsとAxnosPaintを使えます。
 
 データベースを使ってるので検索が強いです。ハッシュタグも使えます。
 
@@ -72,6 +72,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ## 履歴
 
 [すべての履歴はこちら](changelog.md)
+
+### [2026/05/09] v3.0.12
+
+- NEOに手振れ補正追加
+- Tegaki.jsの動画再生機能追加
+- NEO、Litachix更新
 
 ### [2026/05/04] v3.0.11
 
