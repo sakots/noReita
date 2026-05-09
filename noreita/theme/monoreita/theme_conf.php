@@ -8,7 +8,7 @@
 const THEME_NAME = "monoreita";
 
 //テーマのバージョン
-const THEME_VER = "3.0.2 lot.260508.0";
+const THEME_VER = "3.1.0 lot.260509.0";
 
 /* -------------------- */
 
@@ -41,8 +41,11 @@ const PAINTFILE = "monoreita_paint";
 //お絵かき(chickenPaint/Klecks/Tegaki/Axnos)のテンプレートファイル
 const PAINTFILE_BE = "monoreita_be";
 
-//動画再生のテンプレートファイル
+//動画再生(PaintBBS NEO/しぃペインター)のテンプレートファイル
 const ANIMEFILE = "monoreita_anime";
+
+//動画再生(Tegaki)のテンプレートファイル
+const ANIMEFILE_TEGAKI = "monoreita_tgkr_view";
 
 //投稿時のテンプレートファイル
 const PICFILE = "monoreita_picpost";
