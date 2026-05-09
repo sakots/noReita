@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 //スクリプトのバージョン
-define('REITA_VER', 'v3.0.11'); //lot.260504.0
+define('REITA_VER', 'v3.0.12'); //lot.260509.0
 
 //言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -614,9 +614,9 @@ function regist(): void {
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
 				} elseif ($tool === 'tegaki') {
-					$used_tool = 'Tegaki';
+					$used_tool = 'Tegaki.js';
 				} elseif ($tool === 'axnos') {
-					$used_tool = 'Axnos';
+					$used_tool = 'AxnosPaint';
 				} else {
 					$used_tool = '???';
 				}
@@ -642,6 +642,7 @@ function regist(): void {
 				$chifile = $path_filename . '.chi';
 				$spchfile = $path_filename . '.spch';
 				$pchfile = $path_filename . '.pch';
+				$tgkrfile = $path_filename . '.tgkr';
 
 				// 画像から続きを描いた場合のみ動画ファイルを処理しない
 				if ($ctype === 'img') {
@@ -668,6 +669,14 @@ function regist(): void {
 						if ($success) {
 							chmod(IMG_DIR . $chifile, PERMISSION_FOR_DEST);
 							$pchfile = $chifile;
+						} else {
+							$pchfile = "";
+						}
+					} elseif (is_file(TEMP_DIR . $tgkrfile)) {
+						$success = rename(TEMP_DIR . $tgkrfile, IMG_DIR . $tgkrfile);
+						if ($success) {
+							chmod(IMG_DIR . $tgkrfile, PERMISSION_FOR_DEST);
+							$pchfile = $tgkrfile;
 						} else {
 							$pchfile = "";
 						}
@@ -1049,9 +1058,9 @@ function reply(): void {
 				} elseif ($tool === 'klecks') {
 					$used_tool = 'Klecks';
 				} elseif ($tool === 'tegaki') {
-					$used_tool = 'Tegaki';
+					$used_tool = 'Tegaki.js';
 				} elseif ($tool === 'axnos') {
-					$used_tool = 'Axnos';
+					$used_tool = 'AxnosPaint';
 				} else {
 					$used_tool = '???';
 				}
@@ -1077,6 +1086,7 @@ function reply(): void {
 				$chifile = $path_filename . '.chi';
 				$spchfile = $path_filename . '.spch';
 				$pchfile = $path_filename . '.pch';
+				$tgkrfile = $path_filename . '.tgkr';
 
 				// 画像から続きを描いた場合のみ動画ファイルを処理しない
 				if ($ctype === 'img') {
@@ -1103,6 +1113,14 @@ function reply(): void {
 						if ($success) {
 							chmod(IMG_DIR . $chifile, PERMISSION_FOR_DEST);
 							$pchfile = $chifile;
+						} else {
+							$pchfile = "";
+						}
+					}  elseif (is_file(TEMP_DIR . $tgkrfile)) {
+						$success = rename(TEMP_DIR . $tgkrfile, IMG_DIR . $tgkrfile);
+						if ($success) {
+							chmod(IMG_DIR . $tgkrfile, PERMISSION_FOR_DEST);
+							$pchfile = $tgkrfile;
 						} else {
 							$pchfile = "";
 						}
@@ -1978,17 +1996,21 @@ function open_pch(string $pch, $sp = ""): void {
 
 	if ($extension == 'spch') {
 		$pchfile = IMG_DIR . $pch;
-		$dat['tool'] = 'shi'; //拡張子がspchのときはしぃぺ
+		$dat['tool'] = 'shi'; //拡張子がspchのときはしぃペインター
+		$template = ANIMEFILE;
 	} elseif ($extension == 'pch') {
 		$pchfile = IMG_DIR . $pch;
 		$dat['tool'] = 'neo'; //拡張子がpchのときはNEO
-		//}elseif($extension=='chi'){
-		//	$pchfile = IMG_DIR.$pch;
-		//	$dat['tool'] = 'chicken'; //拡張子がchiのときはlitaChix 対応してくれるといいな
+		$template = ANIMEFILE;
+	} elseif ($extension=='tgkr'){
+		$pchfile = IMG_DIR . $pch;
+		$dat['tool'] = 'tegaki'; //拡張子がtgkrのときはTegaki
+		$template = ANIMEFILE_TEGAKI;
 	} else {
 		$w = $h = $picw = $pich = $datasize = ""; //動画が無い時は処理しない
 		$dat['tool'] = 'neo';
 		$pchfile = null; // pchfileを明示的にnullに設定
+		$template = ANIMEFILE; // 念のため
 	}
 	
 	// pchfileが定義されている場合のみfilesizeを実行
@@ -2023,7 +2045,7 @@ function open_pch(string $pch, $sp = ""): void {
 	$dat['path'] = IMG_DIR;
 	$dat['a_stime'] = time();
 
-	echo $blade->run(ANIMEFILE, $dat);
+	echo $blade->run($template, $dat);
 }
 
 //お絵かき投稿
@@ -2405,6 +2427,8 @@ function picreplace(): void {
 				$pchext = '.spch';
 			} elseif (is_file(TEMP_DIR . $filename . '.pch')) {
 				$pchext = '.pch';
+			} elseif (is_file(TEMP_DIR . $filename . '.tgkr')) {
+				$pchext = '.tgkr';
 			}
 			//元ファイル削除
 			safe_unlink(IMG_DIR . $msg_d["pchfile"]);
