@@ -385,7 +385,7 @@ const PALETTEFILE = 'palette.txt';
 const USE_SELECT_PALETTES = 1;
 
 //パレットデータファイル切り替え機能を使用する する:1 の時のパレットデーターファイル名
-$pallets_dat = array(['標準', 'palette.txt'], ['PCCS_HSL', 'p_PCCS.txt'], ['マンセルHV/C', 'p_munsellHVC.txt']);
+$pallets_dat = array(['標準', 'palette.txt'], ['PCCS_HSL', 'p_PCCS.txt'], ['マンセルHV/C', 'p_munsellHVC.txt'], ['マンセル(V2)', 'p_munsell_V2.txt']);
 
 // 動画機能を使用する する:1 しない:0
 const USE_ANIME = 1;
