@@ -76,6 +76,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ### [2026/05/12] v3.0.13
 
 - テーマ修正
+  - パレットマトリクスの入力欄のバリデーション
 - 新パレット追加
 - NEO、Litachix更新
 
