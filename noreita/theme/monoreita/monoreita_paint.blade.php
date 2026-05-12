@@ -197,7 +197,7 @@
 									<option>13</option>
 									<option>14</option>
 								</select>
-								<input class="form "type="text" name="pst" size="8" onkeypress="Change_()" onchange="Change_()"><br>
+								<input class="form" type="text" name="pst" size="8" onkeypress="Change_()" onchange="Change_()"><br>
 								<select class="form" name="p_ed" onchange="GetPalette()">
 									<option>1</option>
 									<option>2</option>
