@@ -259,7 +259,7 @@ switch ($mode) {
   case 'regist': // スレ立て
     return regist();
   case 'reply':
-    return reply();
+    return regist();
   case 'res':
     return res();
   case 'sodane': // そうだね
@@ -386,7 +386,7 @@ function init(): void {
 
 
 // 投稿があればデータベースへ保存する
-/* 記事書き込み スレ立て */
+/* 記事書き込み スレ立てとリプライ */
 function regist(): void {
 	global $badip, $admin_pass, $admin_name, $en;
 	global $req_method;
@@ -430,16 +430,15 @@ function regist(): void {
 		error($en ? "Invalid request method." : "不正なリクエスト方法です。");
 	}
 
-	//NGワードがあれば拒絶
+	// NGワードがあれば拒絶
 	Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
 
-	//名前がない場合は拒絶
+	// 名前がない場合は拒絶
 	if (USE_NAME && !$name) {
 		error($en ? "Name is required." : "名前は必須です。");
 	}
-	//レスの時は本文必須
-	//if(filter_input(INPUT_POST, 'modid') && !$com) {error(MSG008);}
-	if (USE_COM && !$com) {
+	// 本文必須 リプライのときは必ず必要、スレ立てのときは設定次第
+	if (($resto || USE_COM) && !$com) {
 		error($en ? "Comment is required." : "本文は必須です。");
 	}
 	if (USE_SUB && !$sub) {
@@ -844,12 +843,14 @@ function regist(): void {
 	ok($en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
 }
 
-//記事書き込み - リプライ
+// 記事書き込み - スレ立てとリプライ
 function reply(): void {
 	global $badip, $admin_pass, $admin_name;
 	global $req_method;
 	global $dat;
 	global $en;
+
+	$dat['en'] = $en;
 
 	//CSRFトークンをチェック
 	if (CHECK_CSRF_TOKEN) {
@@ -861,7 +862,7 @@ function reply(): void {
 	$mail = (string)filter_input(INPUT_POST, 'mail');
 	$url = (string)filter_input(INPUT_POST, 'url');
 	$com = (string)filter_input(INPUT_POST, 'com');
-	$parent = trim(filter_input(INPUT_POST, 'parent', FILTER_VALIDATE_INT));
+
 	$invz = trim(filter_input(INPUT_POST, 'invz', FILTER_VALIDATE_INT));
 	$pwd = trim(filter_input(INPUT_POST, 'pwd'));
 	$pwdh = password_hash($pwd, PASSWORD_DEFAULT);
@@ -877,6 +878,11 @@ function reply(): void {
 	$used_tool = "";
 	$nsfw = false;
 
+	// リプライのとき
+	$parent = trim(filter_input(INPUT_POST, 'parent', FILTER_VALIDATE_INT));
+	$resto = trim(filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT));
+	$modid = trim(filter_input(INPUT_POST, 'modid', FILTER_VALIDATE_INT));
+
 	// クッキー保存用
 	$original_name = $name;
 
@@ -884,13 +890,13 @@ function reply(): void {
 		error($en ? "Invalid request method." : "不正なリクエスト方法です。");
 	}
 
-	//NGワードがあれば拒絶
+	// NGワードがあれば拒絶
 	Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
 	if (USE_NAME && !$name) {
 		error($en ? "Name is required." : "名前は必須です。");
 	}
-	//レスの時は本文必須
-	if (!$com) {
+	// 本文必須 リプライのときは必ず必要、スレ立てのときは設定次第
+	if (($parent || $resto || USE_COM) && !$com) {
 		error($en ? "Comment is required." : "本文は必須です。");
 	}
 	if (USE_SUB && !$sub) {
@@ -1143,20 +1149,20 @@ function reply(): void {
 
 			// 値を追加する
 
-			//不要改行圧縮
+			// 不要改行圧縮
 			$com = preg_replace("/(\n|\r|\r\n){3,}/us", "\n\n", $com);
 
-			//id生成
+			// id生成
 			$id = gen_id($host, $utime ?? time());
 
-			//UUID生成
+			// UUID生成
 			$uuid = generate_uuid();
 
-			//管理者名は管理パスじゃないと使えない
+			// 管理者名は管理パスじゃないと使えない
 			if ($name === $admin_name && $pwd !== $admin_pass) {
 				$name = $name . ADMIN_CAP;
 			}
-			//管理者名の投稿でパスワードが管理パスなら管理者バッジつける
+			// 管理者名の投稿でパスワードが管理パスなら管理者バッジつける
 			$admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0;
 
 			// 'のエスケープ(入りうるところがありそうなとこだけにしといた)
@@ -1168,24 +1174,24 @@ function reply(): void {
 			$host = str_replace("'", "''", $host);
 			$id = str_replace("'", "''", $id);
 
-			//レスの位置
+			// レスの位置
 			$tree = time() - $parent - (int)$msg_wc["tid"];
 			$comid = $tree + time();
 
-			//メール欄にsageが含まれるならageない
+			// メール欄にsageが含まれるならageない
 			$age = (int)$msg_wc["age"];
 			if (strpos($mail, 'sage') !== false) {
-				//sage
+				// sage
 				$age = $age;
 			} else {
-				//age
+				// age
 				$age++;
 				$agetree = $age + (time() * 100000000);
 				$sql_age = "UPDATE board_log SET age = $age, tree = $agetree WHERE tid = $parent";
 				$db->exec($sql_age);
 			}
 
-			//リプ処理
+			// リプ処理
 			$thread = 0;
 			$sql = "INSERT INTO board_log (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, sodane, age, invz, host, tool, admins, ctype, uuid, thumbnail) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :sodane, :age, :invz, :host, :used_tool, :admins, :ctype, :uuid, :thumbnail)";
 
