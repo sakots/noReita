@@ -1256,7 +1256,7 @@ function sodane(): void {
 function res(): void {
 	global $blade, $dat;
 	$resno = filter_input(INPUT_GET, 'res',FILTER_VALIDATE_INT);
-	$dat['resno'] = $resno;
+	$uuid = trim((string)filter_input(INPUT_GET, 'uuid'));
 
 	//csrfトークンをセット
 	$dat['token'] = '';
@@ -1276,6 +1276,18 @@ function res(): void {
 	try {
 		$db = new PDO(DB_PDO);
 		$db->exec("PRAGMA journal_mode=WAL;");
+
+		if ($uuid !== '') {
+			$sql = "SELECT tid, parent, thread FROM board_log WHERE uuid = ? AND invz = 0 LIMIT 1";
+			$uuid_post = $db->prepare($sql);
+			$uuid_post->execute([$uuid]);
+			$post = $uuid_post->fetch();
+			if ($post) {
+				$resno = ((int)$post['thread'] === 1) ? (int)$post['tid'] : (int)$post['parent'];
+			}
+		}
+		$dat['resno'] = $resno;
+
 		$sql = "SELECT * FROM board_log WHERE tid = ? ORDER BY tree DESC";
 		$posts = $db->prepare($sql);
 		$posts->execute([$resno]);
