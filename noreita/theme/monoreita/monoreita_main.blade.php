@@ -159,17 +159,17 @@
 						<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
 						@endif
 					</h5>
-						<div class="item_image">
-							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
-							<span @if ($bbsline['nsfw'] == 1) class="nsfw" @endif>
-								@if ($bbsline['thumb'])
-								<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
-								@else
-								<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
-								@endif
-							</span>
-						</a>
-						</div>
+					<div class="item_image">
+						<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
+						<span @if ($bbsline['nsfw'] == 1) class="nsfw" @endif>
+							@if ($bbsline['thumb'])
+							<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+							@else
+							<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+							@endif
+						</span>
+					</a>
+					</div>
 					@else
 					@endif
 						<div class="item_comment">
@@ -245,8 +245,8 @@
 							<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
 							@endif
 						</span></a>
-								@else
-								<a class="luminous" href="{{$path}}{{$res['picfile']}}">
+							@else
+							<a class="luminous" href="{{$path}}{{$res['picfile']}}">
 							@if ($res['thumb'])
 							<img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
 							@else
