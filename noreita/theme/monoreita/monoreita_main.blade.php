@@ -159,7 +159,6 @@
 						<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
 						@endif
 					</h5>
-					<div class="container">
 						<div class="item_image">
 							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
 							<span @if ($bbsline['nsfw'] == 1) class="nsfw" @endif>
@@ -172,7 +171,6 @@
 						</a>
 						</div>
 					@else
-					<div class="container">
 					@endif
 						<div class="item_comment">
 							<p class="comment oya">{!! $bbsline['com'] !!}</p>
@@ -267,7 +265,6 @@
 						@else
 					</div>
 					@endif
-					</div>
 					<div class="thfoot">
 						@if ($share_button)
 						@if ($use_misskey_note)

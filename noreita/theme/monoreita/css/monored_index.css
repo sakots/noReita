@@ -68,17 +68,8 @@ main {
   padding-right: 8px;
   margin-bottom: 1ex;
 }
-.thread .container, footer .container {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  align-content: flex-start;
-}
 .thread .item_image, footer .item_image {
-  flex-grow: 0;
-}
-.thread .item_comment, footer .item_comment {
-  flex-grow: 10;
+  float: left;
 }
 
 .delf {
@@ -201,11 +192,13 @@ h4.oya {
 .res {
   margin-top: 1em;
   border-top: dashed 1px;
+  padding: 1em 0;
+  display: table;
 }
 .res section {
   margin-top: 1em;
   padding-top: 1em;
-  display: table-cell;
+  display: table;
   max-width: 100%;
 }
 .res h3 {

@@ -81,17 +81,8 @@ main {
 		padding-right: 8px;
 		margin-bottom: 1ex;
 	}
-	.container {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: flex-start;
-		align-content: flex-start;
-	}
 	.item_image {
-		flex-grow: 0;
-	}
-	.item_comment {
-		flex-grow: 10;
+		float: left;
 	}
 }
 .delf {
@@ -184,10 +175,12 @@ h4.oya {
 .res {
 	margin-top: 1em;
 	border-top: dashed 1px;
+	padding: 1em 0;
+	display: table;
 	section {
 		margin-top: 1em;
 		padding-top: 1em;
-		display: table-cell;
+		display: table;
 		max-width: 100%;
 	}
 	h3 {

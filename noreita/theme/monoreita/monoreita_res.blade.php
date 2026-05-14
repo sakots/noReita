@@ -98,7 +98,6 @@
 						<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
 						@endif
 					</h5>
-					<div class="container">
 						<div class="item_image">
 							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
 								@if ($bbsline['thumb'])
@@ -108,15 +107,12 @@
 								@endif
 							</a>
 						</div>
-						@else
-						<div class="container">
 						@endif
 						<div class="item_comment">
 							<p class="comment oya">{!! $bbsline['com'] !!}</p>
 							@if (!empty($ko))
 							@foreach ($ko as $res)
 							<section class="res">
-								<section>
 									<h3>
 										<span class="oyano">[{{$res['tid']}}]</span>
 										{{$res['sub']}}
@@ -193,12 +189,10 @@
 									@endif
 									@endif
 									<p class="comment">{!! $res['com'] !!}</p>
-								</section>
 							</section>
 							@endforeach
 							@endif
 						</div>
-					</div>
 					</section>
 				<hr>
 			</section>
