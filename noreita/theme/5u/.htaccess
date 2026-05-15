@@ -1,0 +1,3 @@
+<Files ~ "\.blade.php?$">
+	deny from all
+</Files>
