@@ -1,7 +1,7 @@
 // モダンなCSS切り替え機能
 class CssSwitcher {
   constructor() {
-    this.cookieName = "_monoreita_colorIdx";
+    this.cookieName = "_5u_colorIdx";
     this.init();
   }
 
