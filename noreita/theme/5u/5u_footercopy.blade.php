@@ -16,7 +16,7 @@
 		, <a href="https://github.com/satopian/ChickenPaint_Be" target="_blank" rel="nofollow noopener noreferrer" title="by satopian">LitaChix</a>
 		@endif
 		@if ($use_tegaki)
-		, <a href="https://github.com/desuwa/tegaki" target="_blank" rel="noopener noreferrer" title="by Maxime Youdine">Tegaki</a>
+		, <a href="https://github.com/desuwa/tegaki" target="_blank" rel="noopener noreferrer" title="by Maxime Youdine">Tegaki.js</a>
 		@endif
 		@if ($use_klecks)
 		, <a href="https://github.com/bitbof/klecks" target="_blank" rel="noopener noreferrer" title="by bitbof">Klecks</a>
