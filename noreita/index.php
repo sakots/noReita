@@ -1064,7 +1064,7 @@ function catalog(): void {
     $start = $page_def * ($page - 1);
 
     //最大何ページあるのか
-    $sql_th = "SELECT SUM(thread) as cnt FROM board_log WHERE invz=0";
+    $sql_th = "SELECT COUNT(*) as cnt FROM board_log WHERE picfile > 0 AND invz=0";
     $th_cnt_sql = $db->query("$sql_th");
     $th_cnt_sql = $th_cnt_sql->fetch();
     $th_cnt = $th_cnt_sql["cnt"];
@@ -1104,7 +1104,7 @@ function catalog(): void {
     $db = new PDO(DB_PDO);
     $db->exec("PRAGMA journal_mode=WAL;");
     //1ページの全スレッド取得
-    $sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, sodane, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime, thumbnail FROM board_log WHERE thread=1 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
+    $sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, sodane, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime, thumbnail FROM board_log WHERE picfile > 0 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
     $posts = $db->prepare($sql);
     $posts->bindValue(':start', $start, PDO::PARAM_INT);
     $posts->bindValue(':page_def', $page_def, PDO::PARAM_INT);
@@ -1160,14 +1160,14 @@ function search(): void {
       $dat['catalogmode'] = 'hashsearch';
       $dat['tag'] = $search_f;
     } else {
-      //tagがなければ作者名検索(スレッドのみ)
+      //tagがなければ作者名検索
       if ($similar == "similar") {
-        $sql = "SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
+        $sql = "SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND picfile > 0 ORDER BY age DESC, tree DESC";
         $posts = $db->prepare($sql);
         $posts->execute(["%$search%"]);
       } else {
         //完全一致
-        $sql = "SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND thread=1 ORDER BY age DESC, tree DESC";
+        $sql = "SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND picfile > 0 ORDER BY age DESC, tree DESC";
         $posts = $db->prepare($sql);
         $posts->execute([$search]);
       }
