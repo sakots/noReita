@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  @include('components.headCss')
+  @include('components.5u_headCss')
 </head>
 <body>
   <header id="header">
@@ -31,12 +31,12 @@
     <hr>
     <div>
       <section class="epost">
-        @include('components.picpostForm')
-        @include('components.info')
+        @include('components.5u_picpostForm')
+        @include('components.5u_info')
       </section>
       <hr>
       <section class="paging">
-        @include('components.paging')
+        @include('components.5u_paging')
       </section>
     </div>
   </header>
@@ -45,8 +45,8 @@
       @if (!empty($oya))
         @foreach ($oya as $bbsline)
           <section class="thread @if ($bbsline['will_delete']) will-delete-thread @endif">
-            @include('components.threadTitle', ['bbsline' => $bbsline])
-            @include('components.thread', ['bbsline' => $bbsline])
+            @include('components.5u_threadTitle', ['bbsline' => $bbsline])
+            @include('components.5u_thread', ['bbsline' => $bbsline])
           </section>
         @endforeach
       @endif
@@ -54,20 +54,20 @@
     <div>
       <section class="thread">
         <section class="paging">
-          @include('components.paging')
+          @include('components.5u_paging')
         </section>
         <hr>
-        @include('components.searchForm')
-        @include('components.deleteForm')
+        @include('components.5u_searchForm')
+        @include('components.5u_deleteForm')
       </section>
     </div>
   </main>
   <footer id="footer">
-    @include('components.footerCopy')
+    @include('components.5u_footerCopy')
   </footer>
   <!-- scripts -->
   <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
-  @include('components.togglePaletteVisibility')
-  @include('components.luminous')
-  @include('components.snsShare')
+  @include('components.5u_togglePaletteVisibility')
+  @include('components.5u_luminous')
+  @include('components.5u_snsShare')
 </html>

@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  @include('components.headCss')
+  @include('components.5u_headCss')
 </head>
 
 <body>
@@ -42,7 +42,7 @@
     <div>
       <div class="thread">
         <section class="delf">
-          @include('components.adminDeleteForm')
+          @include('components.5u_adminDeleteForm')
         </section>
       </div>
       <section class="thread">
@@ -100,12 +100,12 @@
     </div>
     <div class="thread">
       <section class="delf">
-        @include('components.adminDeleteForm')
+        @include('components.5u_adminDeleteForm')
       </section>
     </div>
   </main>
   <footer id="footer">
-    @include('components.footerCopy')
+    @include('components.5u_footerCopy')
   </footer>
 </body>
 

@@ -1,4 +1,3 @@
-@section('togglePaletteVisibility')
 <script>
 // パレットの表示/非表示を切り替える関数
 function togglePaletteVisibility() {
@@ -19,4 +18,3 @@ document.addEventListener('DOMContentLoaded', function() {
   togglePaletteVisibility();
 });
 </script>
-@show

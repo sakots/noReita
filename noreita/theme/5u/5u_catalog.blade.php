@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  @include('components.headCss')
+  @include('components.5u_headCss')
 </head>
 
 <body>
@@ -31,8 +31,8 @@
     <hr>
     <div>
       <section class="epost">
-        @include('components.picpostForm')
-        @include('components.info')
+        @include('components.5u_picpostForm')
+        @include('components.5u_info')
       </section>
       <hr>
       @if ($catalogmode == 'catalog')
@@ -46,7 +46,7 @@
       @endif
       @if ($catalogmode == 'catalog')
       <hr>
-      @include('components.pagingCatalogMode')
+      @include('components.5u_pagingCatalogMode')
       @endif
     </div>
   </header>
@@ -98,7 +98,7 @@
     <div>
       <section class="thread">
         @if ($catalogmode == 'catalog')
-          @include('components.pagingCatalogMode')
+          @include('components.5u_pagingCatalogMode')
           <hr>
         @endif
         <p>作者名/本文(ハッシュタグ)検索</p>
@@ -111,12 +111,12 @@
           <input type="text" name="search" placeholder="検索" size="20">
           <input type="submit" value=" 検索 ">
         </form>
-        @include('components.deleteForm')
+        @include('components.5u_deleteForm')
       </section>
     </div>
   </main>
   <footer id="footer">
-    @include('components.footerCopy')
+    @include('components.5u_footerCopy')
   </footer>
 </body>
 

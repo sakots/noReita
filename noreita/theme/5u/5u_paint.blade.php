@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>{{$board_title}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('components.headCss')
+    @include('components.5u_headCss')
     @if ($tool == 'neo')
     <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$stime}}" type="text/css">
     <script src="{{$neo_dir}}neo.js?{{$stime}}" charset="utf-8"></script>
@@ -119,22 +119,22 @@
           @endif
         </div>
         <div class="palette" id="dyntools">
-          @include('components.dynamicPalette')
+          @include('components.5u_dynamicPalette')
         </div>
       </section>
       <section>
         <div class="thread">
           <hr>
-          @include('components.timer')
+          @include('components.5u_timer')
         </div>
       </section>
       <section>
-        @include('components.siiHelp')
+        @include('components.5u_siiHelp')
       </section>
       @endif
     </main>
     <footer id="footer">
-      @include('components.footerCopy')
+      @include('components.5u_footerCopy')
     </footer>
   </body>
 </html>

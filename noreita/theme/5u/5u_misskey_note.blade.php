@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{$board_title}}</title>
-  @include('components.headCss')
+  @include('components.5u_headCss')
   <style>
     .form-group {
       margin: 1em 0;
@@ -220,7 +220,7 @@
   @endif
 
   <footer id="footer">
-    @include('components.footerCopy')
+    @include('components.5u_footerCopy')
   </footer>
 </body>
 </html>

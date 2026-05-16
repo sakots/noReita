@@ -5,14 +5,13 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  @include('components.headCss')
+  @include('components.5u_headCss')
   @if ($tool == 'neo')
     <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
     <script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
   @elseif ($tool == 'shi')
     <script src="{{$cheerpj_url}}"></script>
   @endif
-  <script src="loadcookie.js"></script>
 </head>
 
 <body id="paintmode">
@@ -71,7 +70,7 @@
     </section>
   </main>
   <footer id="footer">
-    @include('components.footerCopy')
+    @include('components.5u_footerCopy')
   </footer>
 </body>
 

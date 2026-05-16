@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	@include('components.headCss')
+	@include('components.5u_headCss')
   <style>
     form.form_radio_sns_server {
       margin: 1em 0 0;

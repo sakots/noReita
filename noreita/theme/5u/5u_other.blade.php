@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  @include('monoreita_headcss')
+  @include('components.5u_headCss')
   {{-- ok画面専用ヘッダ --}}
   @if ($othermode == 'ok')
   <meta http-equiv="refresh" content="1; URL={{$self}}">
@@ -33,37 +33,37 @@
   <main>
     {{-- 記事編集モードスタート --}}
     @if ($othermode == 'edit')
-      @include('components.editMode')
+      @include('components.5u_editMode')
     @endif
     {{-- 記事編集モードおわり --}}
     {{-- コンティニューモードin --}}
     @if ($othermode == 'incontinue')
-      @include('components.inContinueMode')
+      @include('components.5u_inContinueMode')
     @endif
     {{-- コンティニューモードin おわり --}}
     {{-- 管理モードin --}}
     @if ($othermode == 'admin_in')
-      @include('components.inAdminMode')
+      @include('components.5u_adminInMode')
     @endif
     {{-- 管理モードin おわり --}}
     {{-- ok画面 --}}
     @if ($othermode == 'ok')
-      @include('components.ok')
+      @include('components.5u_ok')
     @endif
     {{-- ok画面 おわり --}}
     {{-- エラー画面 --}}
     @if ($othermode == 'err')
-      @include('components.err')
+      @include('components.5u_err')
     @endif
     {{-- エラー画面 おわり --}}
     {{-- 画像差し替え失敗専用エラー --}}
     @if ($othermode == 'err2')
-      @include('components.err2')
+      @include('components.5u_err2')
     @endif
     {{-- 画像差し替え失敗専用エラー おわり --}}
   </main>
   <footer id="footer">
-    @include('components.footerCopy')
+    @include('components.5u_footerCopy')
   </footer>
 </body>
 

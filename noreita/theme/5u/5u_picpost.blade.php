@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  @include('components.headCss')
+  @include('components.5u_headCss')
 </head>
 
 <body>
@@ -132,7 +132,7 @@
     </section>
   </main>
   <footer id="footer">
-    @include('components.footerCopy')
+    @include('components.5u_footerCopy')
   </footer>
 </body>
 
