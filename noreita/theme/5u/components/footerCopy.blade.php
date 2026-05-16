@@ -1,4 +1,4 @@
-@section('footercopy')
+@section('footerCopy')
 <div class="copy">
 	<!-- 著作権表示 -->
 	<p>

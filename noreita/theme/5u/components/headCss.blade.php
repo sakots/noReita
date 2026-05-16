@@ -1,5 +1,5 @@
-@section('headcss')
-<link rel="stylesheet" href="theme/{{$theme_dir}}/css/monored_index.min.css">
+@section('headCss')
+<link rel="stylesheet" href="theme/{{$theme_dir}}/css/5u_main.min.css">
 <link rel="stylesheet" href="theme/{{$theme_dir}}/css/reita/mono.min.css">
 <link rel="stylesheet" href="theme/{{$theme_dir}}/css/red/mono.min.css" id="css1" disabled>
 <link rel="stylesheet" href="theme/{{$theme_dir}}/css/main/mono.min.css" id="css2" disabled>
