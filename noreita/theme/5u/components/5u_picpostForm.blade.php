@@ -30,5 +30,10 @@
     <label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
     @endif
     <input class="button" type="submit" value="お絵かき">
+    @if (isset($resno)) <input type="hidden" name="modid" value="{{$resno}}"> @endif
+    @if (isset($resno)) <input type="hidden" name="resto" value="{{$resno}}"> @endif
   </p>
+  <ul>
+    <li>お絵かきできるサイズは幅300～{{$pmax_w}}px、高さ300～{{$pmax_h}}pxです。</li>
+  </ul>
 </form>
