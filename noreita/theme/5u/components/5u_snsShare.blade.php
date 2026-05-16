@@ -1,4 +1,3 @@
-@section('snsShare')
 <script>
   //shareするSNSのserver一覧を開く
   let snsWindow = null; // グローバル変数としてウィンドウオブジェクトを保存する
@@ -28,4 +27,3 @@
     });
   }
 </script>
-@show
