@@ -26,18 +26,18 @@
         </p>
       </section>
       <section>
-        <p class="sysmsg">{{$message ?? ''}}</p>
+        <p class="sysmsg">{{$message ?? ''}}</p> <!-- システムメッセージ -->
       </section>
     </div>
     <hr>
     <div>
       <section class="epost">
-        @include('components.5u_picpostForm')
-        @include('components.5u_info')
+        @include('components.5u_picpostForm') <!-- 絵の投稿フォーム -->
+        @include('components.5u_info') <!-- お知らせ -->
       </section>
       <hr>
       <section class="paging">
-        @include('components.5u_paging')
+        @include('components.5u_paging') <!-- ページング -->
       </section>
     </div>
   </header>
@@ -46,8 +46,8 @@
       @if (!empty($oya))
         @foreach ($oya as $bbsline)
           <section class="thread @if ($bbsline['will_delete']) will-delete-thread @endif">
-            @include('components.5u_threadTitle', ['bbsline' => $bbsline])
-            @include('components.5u_thread', ['bbsline' => $bbsline])
+            @include('components.5u_threadTitle', ['bbsline' => $bbsline]) <!-- スレッドタイトル -->
+            @include('components.5u_thread', ['bbsline' => $bbsline]) <!-- スレッド内容 -->
           </section>
         @endforeach
       @endif
@@ -55,16 +55,16 @@
     <div>
       <section class="thread">
         <section class="paging">
-          @include('components.5u_paging')
+          @include('components.5u_paging') <!-- ページング -->
         </section>
         <hr>
-        @include('components.5u_searchForm')
-        @include('components.5u_deleteForm')
+        @include('components.5u_searchForm') <!-- 検索フォーム -->
+        @include('components.5u_deleteForm') <!-- 削除フォームとcssスイッチ -->
       </section>
     </div>
   </main>
   <footer id="footer">
-    @include('components.5u_footerCopy')
+    @include('components.5u_footerCopy') <!-- コピーライト -->
   </footer>
   <!-- scripts -->
   <script src="theme/{{$theme_dir}}/js/sodane.js"></script>

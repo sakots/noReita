@@ -34,15 +34,15 @@
     <div>
       <section class="epost">
       <p>ADMIN MODE</p>
-    </section>
-    <hr>
+      </section>
+      <hr>
     </div>
   </header>
   <main>
     <div>
       <div class="thread">
         <section class="delf">
-          @include('components.5u_adminDeleteForm')
+          @include('components.5u_adminDeleteForm') <!-- 管理モードの削除フォーム -->
         </section>
       </div>
       <section class="thread">
@@ -100,12 +100,12 @@
     </div>
     <div class="thread">
       <section class="delf">
-        @include('components.5u_adminDeleteForm')
+        @include('components.5u_adminDeleteForm') <!-- 管理モードの削除フォーム -->
       </section>
     </div>
   </main>
   <footer id="footer">
-    @include('components.5u_footerCopy')
+    @include('components.5u_footerCopy') <!-- コピーライト -->
   </footer>
 </body>
 
