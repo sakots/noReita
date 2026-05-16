@@ -361,10 +361,6 @@
 				</script>
 			</section>
 		</div>
-		<script src="loadcookie.js"></script>
-		<script>
-			l(); //LoadCookie
-		</script>
 		<script>
 			// パレットの表示/非表示を切り替える関数
 			function togglePaletteVisibility() {
