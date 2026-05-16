@@ -5,7 +5,6 @@
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   @include('components.headCss')
-  <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
 </head>
 <body>
   <header id="header">
@@ -41,18 +40,33 @@
       </section>
     </div>
   </header>
-
   <main id="main">
-    @if (!empty($oya))
-      @foreach ($oya as $bbsline)
-        @include('components.thread', ['bbsline' => $bbsline])
-      @endforeach
-    @endif
+    <div>
+      @if (!empty($oya))
+        @foreach ($oya as $bbsline)
+          <section class="thread @if ($bbsline['will_delete']) will-delete-thread @endif">
+            @include('components.threadTitle', ['bbsline' => $bbsline])
+            @include('components.thread', ['bbsline' => $bbsline])
+          </section>
+        @endforeach
+      @endif
+    </div>
+    <div>
+      <section class="thread">
+        <section class="paging">
+          @include('components.paging')
+        </section>
+        <hr>
+        @include('components.searchForm')
+        @include('components.deleteForm')
+      </section>
+    </div>
   </main>
   <footer id="footer">
     @include('components.footerCopy')
   </footer>
   <!-- scripts -->
+  <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
   @include('components.togglePaletteVisibility')
   @include('components.luminous')
   @include('components.snsShare')
