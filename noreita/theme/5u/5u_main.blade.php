@@ -43,7 +43,11 @@
   </header>
 
   <main id="main">
-    @yield('content')
+    @if (!empty($oya))
+      @foreach ($oya as $bbsline)
+        @include('components.thread', ['bbsline' => $bbsline])
+      @endforeach
+    @endif
   </main>
   <footer id="footer">
     @include('components.footerCopy')

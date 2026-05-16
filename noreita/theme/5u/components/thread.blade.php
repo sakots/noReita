@@ -1,0 +1,185 @@
+<section class="thread @if ($bbsline['will_delete']) will-delete-thread @endif">
+  @include('components.threadTitle')
+  <section>
+    <h4 class="oya">
+      <span class="oyaname"><a href="{{$self}}?mode=search&amp;similar=exact&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
+      @if ($bbsline['admins'] == 1)
+      <span class="mingcute--user-star-fill"></span>
+      @endif
+      @if ($bbsline['modified'] == $bbsline['created'])
+      {{$bbsline['modified']}}
+      @else
+      {{$bbsline['created']}} {{$updatemark}} {{$bbsline['modified']}}
+      @endif
+      @if ($bbsline['mail'])
+      <span class="mail"><a href="mailto:{{$bbsline['mail']}}">[mail]</a></span>
+      @endif
+      @if ($bbsline['a_url'])
+      <span class="url"><a href="{{$bbsline['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
+      @endif
+      @if ($display_id)
+      <span class="id">ID：{{$bbsline['id']}}</span>
+      @endif
+      <span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$bbsline['tid']}}">
+        {{$sodane}}
+        @if ($bbsline['sodane'] != 0)
+        x{{$bbsline['sodane']}}
+        @else
+        +
+        @endif
+      </a></span>
+    </h4>
+    @if ($bbsline['picfile'])
+    @if ($display_painttime)
+    <h5>
+      {{$bbsline['tool']}} ({{$bbsline['img_w']}}x{{$bbsline['img_h']}})
+      @if ($bbsline['psec'] != null)
+      描画時間：{{$bbsline['utime']}}
+      @endif
+      @if ($bbsline['nsfw'] == 1)
+      ★NSFW
+      @endif
+    </h5>
+    @endif
+    <h5><a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
+      @if ($bbsline['pchfile'] && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img') && ($bbsline['tool'] !== "Chicken Paint"))
+      <a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
+      @endif
+      @if ($use_continue)
+      <a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
+      @endif
+    </h5>
+    <div class="item_image">
+      <a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
+      <span @if ($bbsline['nsfw'] == 1) class="nsfw" @endif>
+        @if ($bbsline['thumb'])
+        <img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+        @else
+        <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+        @endif
+      </span>
+    </a>
+    </div>
+    @else
+    @endif
+      <div class="item_comment">
+        <p class="comment oya">{!! $bbsline['com'] !!}</p>
+        @if ($bbsline['rflag'])
+        <div class="res">
+          <p class="limit">
+            レス{{$bbsline['res_d_su']}}件省略。すべて見るには
+            <a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}">
+              @if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) 返信 @else すべて見る @endif </a>
+                を押してください。
+          </p>
+        </div>
+        @endif
+        @if (!empty($bbsline['res']))
+        @foreach ($bbsline['res'] as $res)
+        @if ($res['resno'] > $bbsline['res_d_su'])
+        <section class="res">
+          <h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
+          <h4>
+            名前：<span class="resname">{{$res['a_name']}}
+            @if ($res['admins'] == 1)
+            <span class="mingcute--user-star-fill"></span>
+            @endif
+            </span>：
+            @if ($res['modified'] == $res['created'])
+            {{$res['modified']}}
+            @else
+            {{$res['created']}} {{$updatemark}} {{$res['modified']}}
+            @endif
+            @if ($res['mail'])
+            <span class="mail"><a href="mailto:{{$res['mail']}}">[mail]</a></span>
+            @endif
+            @if ($res['a_url'])
+            <span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
+            @endif
+            @if ($display_id)
+            <span class="id">ID：{{$res['id']}}</span>
+            @endif
+            <span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
+              @if ($res['sodane'] != 0)
+              x{{$res['sodane']}}
+              @else
+              +
+              @endif
+            </a></span>
+          </h4>
+          @if ($res['picfile'])
+          @if ($display_painttime)
+          <h5>
+            {{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
+            @if ($res['psec'] != null)
+            描画時間：{{$res['utime']}}
+            @endif
+            @if ($res['nsfw'] == 1)
+            ★NSFW
+            @endif
+          </h5>
+          @endif
+          <h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
+            @if ($res['pchfile'] && (!isset($res['ctype']) || $res['ctype'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
+            <a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
+            @endif
+            @if ($use_continue)
+            <a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
+            @endif
+          </h5>
+          @if ($res['nsfw'] == 1)
+          <a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw">
+        @if ($res['thumb'])
+        <img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+        @else
+        <img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+        @endif
+      </span></a>
+        @else
+        <a class="luminous" href="{{$path}}{{$res['picfile']}}">
+        @if ($res['thumb'])
+        <img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+        @else
+        <img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+        @endif
+      </a>
+          @endif
+          @endif
+          <p class="comment">{!! $res['com'] !!}</p>
+        </section>
+        @endif
+        @endforeach
+        @endif
+        @if ($bbsline['picfile'])
+      </div>
+      @else
+    </div>
+    @endif
+    <div class="thfoot">
+      @if ($share_button)
+      @if ($use_misskey_note)
+      <span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}">
+        <span class="simple-icons--misskey"></span> Misskeyにノート</a>
+      </span>
+      @endif
+      @if ($switch_sns)
+      <span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
+        <span class="eva--share-outline"></span> SNSで共有する</a>
+      </span>
+      @else
+      <span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$board_title}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
+        <span class="ri--twitter-x-line"></span> tweet</a>
+      </span>
+      @endif
+      @endif
+      @if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
+      <span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><span class="ic--baseline-reply"></span> 返信</a>
+      </span>
+      @else
+      このスレは古いので返信できません…
+      @endif
+      <a href="#header">[↑]</a>
+      <hr>
+    </div>
+  </section>
+</section>
