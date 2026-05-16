@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/luminous-basic.min.css">
   @include('components.5u_headCss')
 </head>
 <body>
