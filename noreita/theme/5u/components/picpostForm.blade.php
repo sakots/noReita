@@ -1,4 +1,3 @@
-@section('picpostForm')
 <form action="{{$self}}" method="post" enctype="multipart/form-data">
   <p>
     <label>幅：<input class="form" type="number" min="300" max="{{$pmax_w}}" name="picw" value="{{$pdef_w}}" required></label>
@@ -33,4 +32,3 @@
     <input class="button" type="submit" value="お絵かき">
   </p>
 </form>
-@show

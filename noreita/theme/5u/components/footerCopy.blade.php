@@ -1,4 +1,3 @@
-@section('footerCopy')
 <div class="copy">
 	<!-- 著作権表示 -->
 	<p>
@@ -32,4 +31,3 @@
 		<a href="https://github.com/EFTEC/BladeOne" target="_blank" rel="noopener noreferrer" title="by EFTEC">BladeOne</a>
 	</p>
 </div>
-@show
