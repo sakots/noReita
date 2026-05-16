@@ -35,13 +35,13 @@ header, .thread, footer {
   margin-left: auto;
   margin-right: auto;
   width: 70%;
+  border-width: 1px;
+  border-style: solid;
 }
 
 header {
   margin-top: 12px;
   margin-bottom: 12px;
-  border-width: 1px;
-  border-style: solid;
 }
 
 h1 a {
@@ -57,8 +57,6 @@ main {
 
 .thread, footer {
   display: block;
-  border-width: 1px;
-  border-style: solid;
   margin-top: 12px;
   margin-bottom: 12px;
 }
