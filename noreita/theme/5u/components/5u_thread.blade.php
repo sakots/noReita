@@ -18,9 +18,9 @@
         </p>
       </div>
     @endif
-    @if (!empty($thread_res))
-      @foreach ($thread_res as $res)
-        @if (!isset($res['resno']) || $res['resno'] > $res_d_su)
+    @if (!empty($bbsline['res']))
+      @foreach ($bbsline['res'] as $res)
+        @if (!isset($res['resno']) || $res['resno'] > $bbsline['res_d_su'])
           <section class="res">
             @include('components.5u_threadRepName', ['res' => $res])
             @if ($res['picfile'])
