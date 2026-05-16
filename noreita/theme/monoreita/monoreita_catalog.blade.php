@@ -125,7 +125,6 @@
 			</div>
 			@endforeach
 			@endif
-			@if ($catalogmode == 'hashsearch')
 			@if (!empty($ko))
 			@foreach ($ko as $res)
 			<div>
@@ -145,7 +144,6 @@
 				</div>
 			</div>
 			@endforeach
-			@endif
 			@endif
 		</div>
 		<div>
