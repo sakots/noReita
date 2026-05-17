@@ -172,13 +172,13 @@ p.oya {
   text-decoration: none;
 }
 
-.oyaname {
+.oyaname, .resname {
   line-height: 1em;
   border: solid 1px;
   border-radius: 5px;
   display: inline-block;
 }
-.oyaname a {
+.oyaname a, .resname a {
   text-decoration: none;
   display: block;
   padding: 5px;

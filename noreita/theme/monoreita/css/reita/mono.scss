@@ -101,11 +101,11 @@ figure {
 	background-color: $bg2;
 }
 
-.oyaname {
-    border: solid 1px $button;
-}
-.oyaname:hover {
-    background-color: $bg;
+.oyaname, .resname {
+  border: solid 1px $button;
+	&:hover {
+		background-color: $bg;
+	}
 }
 
 .res {

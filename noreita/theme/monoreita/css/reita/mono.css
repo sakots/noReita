@@ -80,11 +80,10 @@ figure {
   background-color: #122;
 }
 
-.oyaname {
+.oyaname, .resname {
   border: solid 1px #335;
 }
-
-.oyaname:hover {
+.oyaname:hover, .resname:hover {
   background-color: #224;
 }
 

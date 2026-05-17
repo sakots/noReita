@@ -1,7 +1,6 @@
 <h3>[{{$res['tid']}}] {{$res['sub']}}</h3>
 <h4>
-  名前：
-  <span class="resname">{{$res['a_name']}}
+  <span class="resname"><a href="{{$self}}?mode=search&amp;similar=exact&amp;search={{$res['a_name']}}">{{$res['a_name']}}</a></span>
     @if ($res['admins'] == 1)
       <span class="mingcute--user-star-fill"></span>
     @endif
