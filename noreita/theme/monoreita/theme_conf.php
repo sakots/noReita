@@ -8,7 +8,7 @@
 const THEME_NAME = "monoreita";
 
 //テーマのバージョン
-const THEME_VER = "3.2.0 lot.260514.0";
+const THEME_VER = "3.3.0 lot.260517.0";
 
 /* -------------------- */
 
