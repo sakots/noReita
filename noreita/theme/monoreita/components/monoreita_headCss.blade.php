@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="theme/{{$theme_dir}}/css/monored_index.min.css">
+<link rel="stylesheet" href="theme/{{$theme_dir}}/css/monoreita_index.min.css">
 <link rel="stylesheet" href="theme/{{$theme_dir}}/css/reita/mono.min.css" id="css1">
 <link rel="stylesheet" href="theme/{{$theme_dir}}/css/red/mono.min.css" id="css2" disabled>
 <link rel="stylesheet" href="theme/{{$theme_dir}}/css/main/mono.min.css" id="css3" disabled>
