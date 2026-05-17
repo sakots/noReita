@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{$board_title}}</title>
-  @include('monoreita_headcss')
+  @include('components.monoreita_headCss')
   <style>
     .form-group {
       margin: 1em 0;
@@ -220,7 +220,7 @@
   @endif
 
   <footer id="footer">
-    @include('monoreita_footercopy')
+    @include('components.monoreita_footerCopy')
   </footer>
 </body>
 </html>

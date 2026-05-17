@@ -5,7 +5,7 @@
 	<meta charset="utf-8">
 	<title>{{$board_title}}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	@include('monoreita_headcss')
+	@include('components.monoreita_headCss')
 	<script src="{{$tegaki_dir}}tegaki.js?{{$a_stime}}"></script>
   <link rel="stylesheet" href="{{$tegaki_dir}}tegaki.css?{{$a_stime}}" type="text/css">
 	<script src="loadcookie.js"></script>

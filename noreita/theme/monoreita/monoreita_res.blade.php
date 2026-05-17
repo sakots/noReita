@@ -2,421 +2,141 @@
 <html lang="ja">
 
 <head>
-	<meta charset="utf-8">
-	<title>{{$board_title}}</title>
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/luminous-basic.min.css">
-	@include('monoreita_headcss')
-	@if ( !empty($oya) )
-	@foreach ($oya as $bbsline)
-	<meta name="twitter:card" content="summary">
-	<meta property="og:title" content="[{{$bbsline['tid']}}] {{$bbsline['sub']}} by {{$bbsline['a_name']}} - {{$board_title}}">
-	<meta property="og:type" content="article">
-	<meta property="og:url" content="{{$base}}{{$self}}?mode=res&amp;res={{$resno}}">
-	@if (isset($bbsline['picfile']))
-	<meta property="og:image" content="{{$base}}{{$path}}{{$bbsline['picfile']}}"> @endif
-	<meta property="og:site_name" content="">
-	<meta property="og:description" content="{{$bbsline['com']}}">
-	@endforeach
-	@endif
+  <meta charset="utf-8">
+  <title>{{$board_title}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/luminous-basic.min.css">
+  @include('components.monoreita_headCss')
+  @if (!empty($oya))
+    @foreach ($oya as $bbsline)
+    <meta name="twitter:card" content="summary">
+    <meta property="og:title" content="[{{$bbsline['tid']}}] {{$bbsline['sub']}} by {{$bbsline['a_name']}} - {{$board_title}}">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{$base}}{{$self}}?mode=res&amp;res={{$resno}}">
+    @if (isset($bbsline['picfile']))
+      <meta property="og:image" content="{{$base}}{{$path}}{{$bbsline['picfile']}}">
+    @endif
+    <meta property="og:site_name" content="">
+    <meta property="og:description" content="{{$bbsline['com']}}">
+    @endforeach
+  @endif
 </head>
 
 <body>
-	<header id="header">
-		<h1><a href="{{$self}}">{{$board_title}}</a></h1>
-		<div>
-			<a href="{{$home}}" target="_top">[ホーム]</a>
-			<a href="{{$self}}?mode=admin_in">[管理モード]</a>
-		</div>
-		<hr>
-		<div>
-			<section>
-				<p class="top menu">
-					<a href="{{$self}}">[トップ]</a>
-					<a href="#footer">[↓]</a>
-				</p>
-			</section>
-			<section>
-				<hr>
-				<p>RES MODE</p>
-				<p class="sysmsg">{{$message}}</p>
-			</section>
-		</div>
-		<hr>
-	</header>
-	<main>
-		<div class="thread">
-			@if ( !empty($oya) )
-			@foreach ($oya as $bbsline)
-			@if (isset($bbsline['com']))
-			<section>
-				<h3 class="oyat">
-					<span class="oyano">[{{$bbsline['tid']}}]</span>
-					{{$bbsline['sub']}}
-				</h3>
-				<section>
-					<h4 id=oya>
-						<span class="oyaname"><a href="{{$self}}?mode=search&amp;similar=exact&amp;search={{$bbsline['a_name']}}">{{$bbsline['a_name']}}</a></span>
-						@if ($bbsline['admins'] == 1)
-						<span class="mingcute--user-star-fill"></span>
-						@endif
-						@if ($bbsline['modified'] == $bbsline['created'])
-						{{$bbsline['modified']}}
-						@else
-						{{$bbsline['created']}} {{$updatemark}} {{$bbsline['modified']}}
-						@endif
-						@if ($bbsline['mail'] == true)
-						<span class="mail"><a href="mailto:{{$bbsline['mail']}}">[mail]</a></span>
-						@endif
-						@if ($bbsline['a_url'] == true)
-						<span class="url"><a href="{{$bbsline['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
-						@endif
-						@if ($display_id == 1)
-						<span class="id">ID : {{$bbsline['id']}}</span>
-						@endif
-						<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$bbsline['tid']}}">{{$sodane}}
-							@if ($bbsline['sodane'] != 0)
-							x{{$bbsline['sodane']}}
-							@else
-							+
-							@endif
-						</a></span>
-					</h4>
-					@if ($bbsline['picfile'])
-					<h5>
-						{{$bbsline['tool']}} ({{$bbsline['img_w']}}x{{$bbsline['img_h']}})
-						@if ($bbsline['psec'] != null)
-						描画時間：{{$bbsline['utime']}}
-						@endif
-					</h5>
-					<h5>
-						<a href="{{$path}}{{$bbsline['picfile']}}" target="_blank">{{$bbsline['picfile']}}</a>
-						@if ($bbsline['pchfile'] != null && $bbsline['pchfile'] !== '' && pathinfo($bbsline['pchfile'], PATHINFO_EXTENSION) !== '' && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img'))
-						<a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}">●動画</a>
-						@endif
-						@if ($use_continue)
-						<a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
-						@endif
-					</h5>
-						<div class="item_image">
-							<a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
-								@if ($bbsline['thumb'])
-								<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
-								@else
-								<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
-								@endif
-							</a>
-						</div>
-						@endif
-						<div class="item_comment">
-							<p class="comment oya">{!! $bbsline['com'] !!}</p>
-							@if (!empty($ko))
-							@foreach ($ko as $res)
-							<section class="res">
-									<h3>
-										<span class="oyano">[{{$res['tid']}}]</span>
-										{{$res['sub']}}
-									</h3>
-									<h4>
-										名前：<span class="resname">{{$res['a_name']}}
-										@if ($res['admins'] == 1)
-										<span class="mingcute--user-star-fill"></span>
-										@endif
-										</span>：
-										@if ($res['modified'] == $res['created'])
-										{{$res['modified']}}
-										@else
-										{{$res['created']}} {{$updatemark}} {{$res['modified']}}
-										@endif
-										@if ($res['mail'])
-										<span class="mail"><a href="mailto:{{$res['mail']}}">[mail]</a></span>
-										@endif
-										@if ($res['a_url'])
-										<span class="url"><a href="{{$res['a_url']}}" target="_blank" rel="nofollow noopener noreferrer">[URL]</a></span>
-										@endif
-										@if ($display_id)
-										<span class="id">ID：{{$res['id']}}</span>
-										@endif
-										<span class="sodane"><a href="{{$self}}?mode=sodane&amp;resto={{$res['tid']}}">{{$sodane}}
-												@if ($res['sodane'] != 0)
-												x{{$res['sodane']}}
-												@else
-												+
-												@endif
-											</a></span>
-									</h4>
-									@if ($res['picfile'])
-									@if ($display_painttime)
-									<h5>
-										{{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
-										@if ($res['psec'] != null)
-										描画時間：{{$res['utime']}}
-										@endif
-										@if ($res['nsfw'] == 1)
-										★NSFW
-										@endif
-									</h5>
-									@endif
-									<h5><a target="_blank" href="{{$path}}{{$res['picfile']}}">{{$res['picfile']}}</a>
-										@if ($res['pchfile'] && (!isset($res['ctype']) || $res['ctype'] !== 'img') && ($res['tool'] !== "Chicken Paint"))
-										<a href="{{$self}}?mode=anime&amp;pch={{$res['pchfile']}}" target="_blank">●動画</a>
-										@endif
-										@if ($use_continue)
-										<a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
-										@endif
-									</h5>
-									@if ($res['nsfw'] == 1)
-									<a class="luminous" href="{{$path}}{{$res['picfile']}}"><span class="nsfw">
-								@if ($res['thumb'])
-								<picture>
-									@if ($res['thumb_avif'])
-									<source srcset="{{$res['thumb_avif']}}" type="image/avif">
-									@endif
-									<img src="{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
-								</picture>
-								@else
-								<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
-								@endif
-							</span></a>
-									@else
-									<a class="luminous" href="{{$path}}{{$res['picfile']}}">
-								@if ($res['thumb'])
-								<img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
-								@else
-								<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
-								@endif
-							</a>
-									@endif
-									@endif
-									<p class="comment">{!! $res['com'] !!}</p>
-							</section>
-							@endforeach
-							@endif
-						</div>
-					</section>
-				<hr>
-			</section>
-			@if ($share_button)
-			<div class="thfoot">
-				@if ($use_misskey_note)
-				<span class="button"><a href="{{$self}}?mode=before_misskey_note&amp;no={{$bbsline['tid']}}">
-					<span class="simple-icons--misskey"></span> Misskeyにノート</a>
-				</span>
-				@endif
-				@if ($switch_sns)
-				<span class="button"><a href="{{$self}}?mode=set_share_server&amp;encoded_t={{$bbsline['encoded_t']}}&amp;encoded_u={{$bbsline['encoded_u']}}" onClick="open_sns_server_window(event,600,600)">
-					<span class="eva--share-outline"></span> SNSで共有する</a>
-				</span>
-				@else
-				<span class="button"><a href="https://x.com/intent/tweet?&amp;text=%5B{{$bbsline['tid']}}%5D%20{{$bbsline['sub']}}%20by%20{{$bbsline['a_name']}}%20-%20{{$board_title}}&amp;url={{$base}}{{$self}}?mode=res%26res={{$bbsline['tid']}}" target="_blank">
-					<span class="ri--twitter-x-line"></span> tweet</a>
-				</span>
-				@endif
-			</div>
-			@endif
-			@endif
-			<div>
-				@foreach ($oya as $bbsline)
-				@if (!empty($bbsline['com']))
-				<section>
-					@if ($bbsline['parent'] < 1) <h3 class="oekaki">このスレにリプライ</h3>
-					@if ($use_oekaki_reply)
-					<hr>
-					<section class="epost">
-						<form action="{{$self}}" method="post" enctype="multipart/form-data">
-							<p>
-								<label>幅：<input class="form" type="number" min="300" max="{{$pmax_w}}" name="picw" value="{{$pdef_w}}" required></label>
-								<label>高さ：<input class="form" type="number" min="300" max="{{$pmax_h}}" name="pich" value="{{$pdef_h}}" required></label>
-								<input type="hidden" name="mode" value="paint">
-								<label for="tools">ツール</label>
-								<select name="tools" id="tools" onchange="togglePaletteVisibility()">
-									<option value="neo">PaintBBS NEO</option>
-									@if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
-									@if ($use_chicken)<option value="chicken">litaChix</option> @endif
-									@if ($use_klecks)<option value="klecks">Klecks</option> @endif
-									@if ($use_tegaki)<option value="tegaki">Tegaki.js</option> @endif
-									@if ($use_axnos)<option value="axnos">AxnosPaint</option> @endif
-								</select>
-								<span id="palette-container" style="display: none;">
-									<label for="palettes">パレット</label>
-									@if ($select_palettes)
-									<select name="palettes" id="palettes">
-										@foreach ($pallets_dat as $palette)
-										<option value="{{$pallets_dat[$loop->index][1]}}" id="{{$loop->index}}">{{$pallets_dat[$loop->index][0]}}</option>
-										@endforeach
-									</select>
-									@else
-									<select name="palettes" id="palettes">
-										<option value="neo" id="0">標準</option>
-									</select>
-									@endif
-								</span>
-								@if ($useanime)
-								<label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
-								@endif
-								<input class="button" type="submit" value="お絵かき">
-								<input type="hidden" name="modid" value="{{$resno}}">
-								<input type="hidden" name="resto" value="{{$resno}}">
-							</p>
-						</form>
-						<ul>
-							<li>お絵かきできるサイズは幅300～{{$pmax_w}}px、高さ300～{{$pmax_h}}pxです。</li>
-						</ul>
-					</section>
-					<hr>
-					@endif
-					<script>
-						function add_to_com() {
-							document.getElementById("p_input_com").value += "{{$resname}}さん";
-						}
-					</script>
-					@if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) <p>
-					<button class="copy_button" onclick="add_to_com()">投稿者名をコピー</button>
-					（投稿者名をコピぺできます）
-					</p>
-					<form action="{{$self}}?mode=reply" method="post" class="postform" enctype="multipart/form-data">
-						<table>
-							<tr>
-								<td>name @if ($use_name) * @endif</td>
-								<td><input type="text" name="name" size="18" value="{{$name_cookie}}" autocomplete="section-reply username" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
-							</tr>
-							<tr>
-								<td>mail</td>
-								<td><input type="text" name="mail" size="18" value="{{$email_cookie}}" autocomplete="email" maxlength="{{$max_email}}"></td>
-							</tr>
-							<tr>
-								<td>URL</td>
-								<td><input type="text" name="url" size="18" value="{{$url_cookie}}" autocomplete="url" maxlength="{{$max_url}}"></td>
-							</tr>
-							<tr>
-								<td>subject @if ($use_sub) * @endif</td>
-								<td>
-									@if ($use_resub)
-									<input type="text" name="sub" size="18" value="Re:{{$bbsline['sub']}}" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
-									@else
-									<input type="text" name="sub" size="18" value="" autocomplete="section-sub" @if ($use_sub) required @endif maxlength="{{$max_sub}}">
-									@endif
-									<input type="hidden" name="picfile" value="">
-									<input type="hidden" name="parent" value="{{$resno}}">
-									<input type="hidden" name="invz" value="0">
-									<input type="hidden" name="img_w" value="0">
-									<input type="hidden" name="img_h" value="0">
-									<input type="hidden" name="time" value="0">
-									<input type="hidden" name="sodane" value="0">
-									<input type="hidden" name="modid" value="{{$resno}}">
-									<input type="hidden" name="resto" value="{{$resno}}">
-									@if ($token != null)
-									<input type="hidden" name="token" value="{{$token}}">
-									@else
-									<input type="hidden" name="token" value="">
-									@endif
-								</td>
-							</tr>
-							<tr>
-								<td>comment * </td>
-								<td>
-									<textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
-											</td>
-										</tr>
-										<tr>
-											<td>pass</td>
-											<td>
-												<input type="password" name="pwd" size="8" value="{{$pwd_cookie}}" autocomplete="section-reply current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
-												(記事の編集削除用。英数字で)
-											</td>
-										</tr>
-										<tr>
-											<td><input type="submit" id="submit" name="send" value="書き込む"></td>
-											<td>
-												(PCならCtrl + Enterでも書き込めます)
-											</td>
-										</tr>
-									</table>
-								</form>
-							@else
-							<p>このスレは古いので返信できません</p>
-							@endif
-							@else
-							<p><a href="{{$self}}?mode=res&amp;res={{$bbsline['parent']}}">このスレッドへ</a></p>
-							@endif
-						</section>
-						@endif
-					@endforeach
-				</div>
-				<div class="thfoot">
-					<a href="#header">[↑]</a>
-				</div>
-			@endforeach
-			@else
-			<section>
-				<h3 class="oyat">エラー</h3>
-				<h4>none</h4>
-				<p>そんなスレッドないです。</p>
-			</section>
-			@endif
-			</div>
-			<script src="loadcookie.js"></script>
-			<script>
-				l(); //LoadCookie
-			</script>
-			<script>
-				// パレットの表示/非表示を切り替える関数
-				function togglePaletteVisibility() {
-					const toolsSelect = document.getElementById('tools');
-					const paletteContainer = document.getElementById('palette-container');
-					const selectedTool = toolsSelect.value;
-					
-					// PaintBBS NEOまたはしぃペインターが選択されている場合のみパレットを表示
-					if (selectedTool === 'neo' || selectedTool === 'shi') {
-						paletteContainer.style.display = 'inline';
-					} else {
-						paletteContainer.style.display = 'none';
-					}
-				}
-				
-				// ページ読み込み時に初期状態を設定
-				document.addEventListener('DOMContentLoaded', function() {
-					togglePaletteVisibility();
-				});
-			</script>
-			<script src="theme/{{$theme_dir}}/js/sodane.js"></script>
-			<!-- Luminous -->
-			<script src="theme/{{$theme_dir}}/luminous/luminous.min.js"></script>
-			<script>
-				new LuminousGallery(document.querySelectorAll('.luminous'), {closeTrigger: "click", closeWithEscape: true});
-			</script>
-			<script>
-				//shareするSNSのserver一覧を開く
-				let snsWindow = null; // グローバル変数としてウィンドウオブジェクトを保存する
-
-				function open_sns_server_window(event, width = 600, height = 600) {
-					event.preventDefault(); // デフォルトのリンクの挙動を中断
-
-					// 幅と高さが数値であることを確認
-					// 幅と高さが正の値であることを確認
-					if (isNaN(width) || width <= 350 || isNaN(height) || height <= 400) {
-						width = 350; // デフォルト値
-						height = 400; // デフォルト値
-					}
-					let url = event.currentTarget.href;
-					let windowFeatures = "width=" + width + ",height=" + height; // ウィンドウのサイズを指定
-
-					if (snsWindow && !snsWindow.closed) {
-						snsWindow.focus(); // 既に開かれているウィンドウがあればフォーカスする
-					} else {
-						snsWindow = window.open(url, "_blank", windowFeatures); // 新しいウィンドウを開く
-					}
-					// ウィンドウがフォーカスを失った時の処理
-					snsWindow.addEventListener("blur", function () {
-						if (snsWindow.location.href === url) {
-							snsWindow.close(); // URLが変更されていない場合はウィンドウを閉じる
-						}
-					})
-				}
-			</script>
-		</main>
-		<footer id="footer">
-			@include('monoreita_footercopy')
-		</footer>
-	</body>
+  <header id="header">
+    <h1><a href="{{$self}}">{{$board_title}}</a></h1>
+    <div>
+      <a href="{{$home}}" target="_top">[ホーム]</a>
+      <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+    </div>
+    <hr>
+    <div>
+      <section>
+        <p class="top menu">
+          <a href="{{$self}}">[トップ]</a>
+          <a href="#footer">[↓]</a>
+        </p>
+      </section>
+      <section>
+        <hr>
+        <p>RES MODE</p>
+        <p class="sysmsg">{{$message}}</p>
+      </section>
+    </div>
+    <hr>
+  </header>
+  <main>
+    <div class="thread">
+      @if (!empty($oya))
+      @foreach ($oya as $bbsline)
+      @if (isset($bbsline['com']))
+      <section>
+        <h3 class="oyat">
+          <span class="oyano">[{{$bbsline['tid']}}]</span>
+          {{$bbsline['sub']}}
+        </h3>
+        <section>
+          @include('components.monoreita_threadOyaName', ['bbsline' => $bbsline]) <!-- スレ主の名前 -->
+          @if ($bbsline['picfile'])
+          @include('components.monoreita_threadOyaPicfile', ['bbsline' => $bbsline]) <!-- スレ主の画像 -->
+            @endif
+            <div class="item_comment">
+              <p class="comment oya">{!! $bbsline['com'] !!}</p>
+              @if (!empty($ko))
+                @foreach ($ko as $res)
+                  <section class="res">
+                  @include('components.monoreita_threadRepName', ['res' => $res]) <!-- レスの名前 -->
+                    @if ($res['picfile'])
+                      @include('components.monoreita_threadRepPicfile', ['res' => $res]) <!-- レスの画像 -->
+                    @endif
+                    <p class="comment">{!! $res['com'] !!}</p>
+                  </section>
+                @endforeach
+              @endif
+            </div>
+          </section>
+        <hr>
+      </section>
+      @if ($share_button)
+        <div class="thfoot">
+          @include('components.monoreita_resThreadFoot', ['bbsline' => $bbsline]) <!-- スレッドフッタ（SNSシェアボタンなど） -->
+        </div>
+      @endif
+      @endif
+      <div>
+        @foreach ($oya as $bbsline)
+          @if (!empty($bbsline['com']))
+            <section>
+              @if ($bbsline['parent'] < 1)
+                <h3 class="oekaki">このスレにリプライ</h3>
+                @if ($use_oekaki_reply)
+                  <hr>
+                  <section class="epost">
+                    @include('components.monoreita_picpostForm', ['resno' => $bbsline['tid']]) <!-- お絵かき返信フォーム -->
+                  </section>
+                  <hr>
+                @endif
+                <script>
+                  function add_to_com() {
+                    document.getElementById("p_input_com").value += "{{$resname}}さん";
+                  }
+                </script>
+                @if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
+                  <p>
+                    <button class="copy_button" onclick="add_to_com()">投稿者名をコピー</button>
+                    （投稿者名をコピぺできます）
+                  </p>
+                  @include('components.monoreita_resForm', ['resno' => $bbsline['tid']]) <!-- 返信フォーム -->
+                @else
+                  <p>このスレは古いので返信できません</p>
+                @endif
+              @else
+                <p><a href="{{$self}}?mode=res&amp;res={{$bbsline['parent']}}">このスレッドへ</a></p>
+              @endif
+            </section>
+          @endif
+        @endforeach
+      </div>
+      <div class="thfoot">
+        <a href="#header">[↑]</a>
+      </div>
+    @endforeach
+  @else
+    <section>
+      <h3 class="oyat">エラー</h3>
+      <h4>none</h4>
+      <p>そんなスレッドないです。</p>
+    </section>
+  @endif
+</div>
+  </main>
+    <footer id="footer">
+      @include('components.monoreita_footerCopy')
+    </footer>
+    <!-- scripts -->
+    <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
+    @include('components.monoreita_togglePaletteVisibility')
+    @include('components.monoreita_luminous')
+    @include('components.monoreita_snsShare')
+  </body>
 </html>

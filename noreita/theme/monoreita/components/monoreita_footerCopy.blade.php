@@ -1,9 +1,8 @@
-@section('footercopy')
 <div class="copy">
 	<!-- 著作権表示 -->
 	<p>
 		<a href="https://oekakibbs.moe/" target="_blank">noReita {{$ver}}</a>
-		Web Style by <a href="https://dev.oekakibbs.net/" target="_blanc" title="monoreita {{$tver}} (by sakots,お絵かきBBSラボ)">monoreita</a>
+		Web Style by <a href="https://dev.oekakibbs.net/" target="_blanc" title="{{$theme_name}} {{$tver}} (by sakots,お絵かきBBSラボ)">{{$theme_name}}</a>
 	</p>
 	<p>
 		OekakiApplet -
@@ -16,7 +15,7 @@
 		, <a href="https://github.com/satopian/ChickenPaint_Be" target="_blank" rel="nofollow noopener noreferrer" title="by satopian">LitaChix</a>
 		@endif
 		@if ($use_tegaki)
-		, <a href="https://github.com/desuwa/tegaki" target="_blank" rel="noopener noreferrer" title="by Maxime Youdine">Tegaki</a>
+		, <a href="https://github.com/desuwa/tegaki" target="_blank" rel="noopener noreferrer" title="by Maxime Youdine">Tegaki.js</a>
 		@endif
 		@if ($use_klecks)
 		, <a href="https://github.com/bitbof/klecks" target="_blank" rel="noopener noreferrer" title="by bitbof">Klecks</a>
@@ -32,4 +31,3 @@
 		<a href="https://github.com/EFTEC/BladeOne" target="_blank" rel="noopener noreferrer" title="by EFTEC">BladeOne</a>
 	</p>
 </div>
-@show
