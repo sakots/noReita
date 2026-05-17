@@ -166,6 +166,8 @@ $dat['sodane'] = SODANE;
 
 $dat['use_oekaki_reply'] = USE_OEKAKI_REPLY;
 
+$dat['theme_name'] = THEME_NAME;
+
 //ペイント画面の$pwdの暗号化
 const CRYPT_METHOD = 'aes-128-cbc';
 define('CRYPT_IV', 'T3pkYxNyjN7Wz3pu'); //半角英数16文字
