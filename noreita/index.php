@@ -1919,10 +1919,13 @@ function delmode(): void {
         $msg_dat = str_replace(strrchr($msg_pic, "."), "", $msg_pic); //拡張子除去
         safe_unlink(IMG_DIR . $msg_dat . '.png');
         safe_unlink(IMG_DIR . $msg_dat . '.jpg'); //一応jpgも
+        safe_unlink(IMG_DIR . $msg_dat . '.webp');
+        safe_unlink(IMG_DIR . $msg_dat . '.avif');
         safe_unlink(IMG_DIR . $msg_dat . '.pch');
         safe_unlink(IMG_DIR . $msg_dat . '.spch');
         safe_unlink(IMG_DIR . $msg_dat . '.dat');
         safe_unlink(IMG_DIR . $msg_dat . '.chi');
+        safe_unlink(IMG_DIR . $msg_dat . '.tgkr');
       }
       //↑画像とか削除処理完了
       //データベースから削除
@@ -1936,10 +1939,13 @@ function delmode(): void {
         $msg_dat = str_replace(strrchr($msg_pic, "."), "", $msg_pic); //拡張子除去
         safe_unlink(IMG_DIR . $msg_dat . '.png');
         safe_unlink(IMG_DIR . $msg_dat . '.jpg'); //一応jpgも
+        safe_unlink(IMG_DIR . $msg_dat . '.webp');
+        safe_unlink(IMG_DIR . $msg_dat . '.avif');
         safe_unlink(IMG_DIR . $msg_dat . '.pch');
         safe_unlink(IMG_DIR . $msg_dat . '.spch');
         safe_unlink(IMG_DIR . $msg_dat . '.dat');
         safe_unlink(IMG_DIR . $msg_dat . '.chi');
+        safe_unlink(IMG_DIR . $msg_dat . '.tgkr');
       }
       //↑画像とか削除処理完了
       //データベースから削除
