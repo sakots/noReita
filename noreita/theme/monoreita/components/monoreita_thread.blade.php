@@ -10,7 +10,7 @@
     @if (!empty($bbsline['rflag']))
       <div class="res">
         <p class="limit">
-          レス{{$res_d_su}}件省略。すべて見るには
+          レス{{$bbsline['res_d_su']}}件省略。すべて見るには
           <a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}">
             @if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time) 返信 @else すべて見る @endif
           </a>
