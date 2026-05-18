@@ -12,7 +12,7 @@
       <select class="form" name="select" id="mystyle" onchange="SetCss(this);">
         <option value="reita/mono.min.css">REITA</option>
         <option value="red/mono.min.css">RED</option>
-        <option value="main/mono.min.css">MONO</option>
+        <option value="mono/mono.min.css">MONO</option>
         <option value="dark/mono.min.css">dark</option>
         <option value="deep/mono.min.css">deep</option>
         <option value="mayo/mono.min.css">MAYO</option>
