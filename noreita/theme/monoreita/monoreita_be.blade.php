@@ -76,18 +76,18 @@
   </script>
   @endif
   @if ($tool == 'axnos')
-		@include('components.monoreita_axnos')
+		@include('components.monoreita_paintAxnos')
   @endif
 </head>
 <body>
   @if ($tool == 'chicken')
-		@include('components.monoreita_chicken')
+		@include('components.monoreita_paintChicken')
   @endif
   @if ($tool == 'klecks')
-    @include('components.monoreita_klecks')
+    @include('components.monoreita_paintKlecks')
   @endif
   @if ($tool == 'tegaki')
-		@include('components.monoreita_tegaki')
+		@include('components.monoreita_paintTegaki')
   @endif
   @if ($tool == 'axnos')
   <div id="axnospaint_body"></div>
