@@ -3,6 +3,7 @@
   @if ($bbsline['admins'] == 1)
     <span class="mingcute--user-star-fill"></span>
   @endif
+  ：
   @if ($bbsline['modified'] == $bbsline['created'])
     {{$bbsline['modified']}}
   @else
