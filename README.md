@@ -73,6 +73,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/06/01] v3.1.6
+
+- app
+  - NEO、AxnosPaint、Litachix更新
+
 ### [2026/05/21] v3.1.5
 
 - テーマ
