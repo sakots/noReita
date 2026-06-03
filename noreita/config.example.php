@@ -39,9 +39,6 @@ const HOME = '../';
 // litaChixを使う 使う:1 使わない:0
 const USE_CHICKENPAINT = 1;
 
-// しぃペインターを使用する する:1 しない:0
-const USE_SHI_PAINTER = 1;
-
 // Klecksを使う 使う:1 使わない:0
 const USE_KLECKS = 1;
 

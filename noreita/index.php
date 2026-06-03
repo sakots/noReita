@@ -130,7 +130,6 @@ $dat['tver'] = THEME_VER;
 
 $dat['switch_sns'] = SWITCH_SNS;
 
-$dat['use_shi_painter'] = USE_SHI_PAINTER;
 $dat['use_chicken'] = USE_CHICKENPAINT;
 $dat['use_klecks'] = USE_KLECKS;
 $dat['use_tegaki'] = USE_TEGAKI;
