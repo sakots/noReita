@@ -1587,6 +1587,10 @@ function paint_form(string $rep, int|null $reply_to): void {
     $repcode = strtr($repcode, "!\"#$%&'()+,/:;<=>?@[\\]^`/{|}~", "ABCDEFGHIJKLMNOabcdefghijklmn");
     $datmode = 'picrep&no=' . $no . '&pwd=' . $pwd_f . '&repcode=' . $repcode;
     $usercode .= '&repcode=' . $repcode;
+    $dat['rep'] = true;
+    $dat['repcode'] = $repcode;
+    $dat['enc_pwd'] = $pwd_f;
+    $dat['pwd'] = $pwd_f;
   }
   $dat['usercode'] = $usercode; //usercodeにいろいろくっついたものをまとめて出力
 
