@@ -73,6 +73,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/06/04] v3.2.0
+
+- 旧しぃペインター削除
+
 ### [2026/06/01] v3.1.6
 
 - app
