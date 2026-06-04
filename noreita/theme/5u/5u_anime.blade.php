@@ -6,12 +6,18 @@
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   @include('components.5u_headCss')
-  @if ($tool == 'neo')
-    <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
-    <script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
-  @elseif ($tool == 'shi')
-    <script src="{{$cheerpj_url}}"></script>
-  @endif
+  <script>
+    document.paintBBSCallback = function (str) {
+      console.log('paintBBSCallback', str)
+      if (str == 'check') {
+        return true;
+      } else {
+        return;
+      }
+    }
+	</script>
+  <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
+  <script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
 </head>
 
 <body id="paintmode">
@@ -34,28 +40,21 @@
   <main>
     <section id="appstage">
       <div class="app">
-      @if ($tool == 'neo')
-        <applet-dummy name="pch" code="pch.PCHViewer.class" archive="PCHViewer.jar,PaintBBS.jar" width="{{$w}}" height="{{$h}}" mayscript>
-      @elseif ($tool == 'shi')
-        <applet code="pch2.PCHViewer.class" archive="{{$shi_painter_dir}}PCHViewer.jar,{{$shi_painter_dir}}PaintBBS.jar" name="pch" width="{{$w}}" height="{{$h}}" codebase="./" mayscript>
-        <param name="res.zip" value="{{$shi_painter_dir}}res.zip">
-        <param name="tt.zip" value="{{$shi_painter_dir}}tt_def.zip">
-        <param name="tt_size" value="31">
-      @endif
-      <param name="image_width" value="{{$picw}}">
-      <param name="image_height" value="{{$pich}}">
-      <param name="pch_file" value="{{$path}}{{$pchfile}}">
-      <param name="speed" value="{{$speed}}">
-      <param name="buffer_progress" value="false">
-      <param name="buffer_canvas" value="false">
-      @if ($tool == 'shi')
-        </applet>
+        <div class="neo-applet-pch" data-width="{{$w}}" data-height="{{$h}}"></div>
         <script>
-        cheerpjInit();
+          Neo.param = {
+            pch:{
+              image_width: "{{$picw}}",
+              image_height: "{{$pich}}",
+              pch_file: "{{$path}}{{$pchfile}}",
+              speed: "{{$speed}}",
+              buffer_progress: "false",
+              buffer_canvas: "false",
+              neo_enable_zoom_out:true,
+              neo_viewer_buttonswrapper_top:true,
+            }
+          }
         </script>
-      @elseif ($tool == 'neo')
-        </applet-dummy>
-      @endif
       </div>
     </section>
     <section class="thread">
