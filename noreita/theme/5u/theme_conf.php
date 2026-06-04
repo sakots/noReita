@@ -8,7 +8,7 @@
 const THEME_NAME = "5u";
 
 //テーマのバージョン
-const THEME_VER = "0.0.0 lot.260514.0";
+const THEME_VER = "0.0.0 lot.260604.0";
 
 /* -------------------- */
 
