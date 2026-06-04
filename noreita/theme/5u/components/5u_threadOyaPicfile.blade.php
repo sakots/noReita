@@ -9,7 +9,7 @@
 </h5>
 <h5>
   <a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
-  @if ($bbsline['pchfile'] && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img') && ($bbsline['tool'] == ("neo" || "PaintBBS NEO" || "Tegaki" || "Tegaki.js" || "shi" || "Shi Painter")))
+  @if ($bbsline['pchfile'] && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img') && ($bbsline['tool'] == ("neo" || "PaintBBS NEO" || "Tegaki" || "Tegaki.js")))
     <a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
   @endif
   @if ($use_continue)

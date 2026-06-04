@@ -6,10 +6,6 @@
 	</p>
 	<p>
 		OekakiApplet -
-		@if ($use_shi_painter)
-		<!-- https://hp.vector.co.jp/authors/VA016309/ -->
-		<span title="by しぃちゃん">Shi-Painter, </span>
-		@endif
 		<a href="https://github.com/funige/neo/" target="_blank" rel="noopener noreferrer" title="by funige">PaintBBS NEO</a>
 		@if ($use_chicken)
 		, <a href="https://github.com/satopian/ChickenPaint_Be" target="_blank" rel="nofollow noopener noreferrer" title="by satopian">LitaChix</a>

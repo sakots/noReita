@@ -6,7 +6,6 @@
     <label for="tools">ツール</label>
     <select name="tools" id="tools" onchange="togglePaletteVisibility()">
       <option value="neo">PaintBBS NEO</option>
-      @if ($use_shi_painter)<option value="shi">しぃペインター</option> @endif
       @if ($use_chicken)<option value="chicken">litaChix</option> @endif
       @if ($use_klecks)<option value="klecks">Klecks</option> @endif
       @if ($use_tegaki)<option value="tegaki">Tegaki.js</option> @endif
