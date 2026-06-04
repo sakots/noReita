@@ -1981,11 +1981,21 @@ function picreplace(): void {
   global $en;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
+  $stime = $stime ?: ($_SERVER['REQUEST_TIME'] ?? time());
   $no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
+  $no = $no ?: filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
   $repcode = filter_input(INPUT_GET, 'repcode');
-  $pwd_f = filter_input(INPUT_GET, 'pwd');
-  $pwd_f = hex2bin($pwd_f); //バイナリに
-  $pwd_f = openssl_decrypt($pwd_f, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //復号化
+  $repcode = $repcode ?: filter_input(INPUT_POST, 'repcode');
+  $pwd = filter_input(INPUT_GET, 'pwd');
+  $pwd = $pwd ?: filter_input(INPUT_POST, 'enc_pwd');
+  if (!$no || !$repcode || !$pwd || !ctype_xdigit($pwd) || strlen($pwd) % 2 !== 0) {
+    error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
+  }
+  $pwd_bin = hex2bin($pwd); //バイナリに
+  $pwd_f = $pwd_bin === false ? false : openssl_decrypt($pwd_bin, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //復号化
+  if ($pwd_f === false) {
+    error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
+  }
   $nsfw_flag = filter_input(INPUT_POST, 'nsfw');
 
   //初期化

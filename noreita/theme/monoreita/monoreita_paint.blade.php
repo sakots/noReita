@@ -5,7 +5,6 @@
     <title>{{$board_title}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('components.monoreita_headCss')
-    @if ($tool == 'neo')
     <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$stime}}" type="text/css">
     <script src="{{$neo_dir}}neo.js?{{$stime}}" charset="utf-8"></script>
     <!-- アプレットフィット -->
@@ -15,7 +14,6 @@
     </script>
     <script src="theme/{{$theme_dir}}/js/appFit.js?{{$stime}}" charset="utf-8"></script>
     <!-- アプレットフィットここまで -->
-    @endif
   </head>
   <body id="paintmode">
     <header>
@@ -62,36 +60,50 @@
       <!-- 動的パレットスクリプトここまで -->
       <section id="appstage">
         <div class="app" id="apps">
-          <applet-dummy code="pbbs.PaintBBS.class" archive="./PaintBBS.jar" name="paintbbs" width="{{$w}}" height="{{$h}}" mayscript>
-          <param name="image_width" value="{{$picw}}">
-          <param name="image_height" value="{{$pich}}">
-          <param name="undo" value="{{$undo}}">
-          <param name="undo_in_mg" value="{{$undo_in_mg}}">
-          <param name="url_save" value="{{$self}}?mode=saveimage&amp;tool=neo">
-          @if (isset($resto))
-          <param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}&amp;resto={{$resto}}">
-          @else
-          <param name="url_exit" value="{{$self}}?mode={{$mode}}&amp;stime={{$stime}}">
-          @endif
-          @if (isset($imgfile))<param name="image_canvas" value="{{$imgfile}}">@endif
-          @if (isset($pchfile))<param name="pch_file" value="{{$pchfile}}">@endif
-          <param name="poo" value="false">
-          <param name="send_advance" value="true">
-          <param name="send_header" value="usercode={{$usercode}}">
-          <param name="thumbnail_width" value="100%">
-          <param name="thumbnail_height" value="100%">
-          <param name="tool_advance" value="true">
-          @if ($anime) <param name="thumbnail_type" value="animation"> @endif
-          @if (isset($security))
-          @if (isset($security_click)) <param name="security_click" value="{{$security_click}}"> @endif
-          @if (isset($security_timer)) <param name="security_timer" value="{{$security_timer}}"> @endif
-          <param name="security_url" value="{{$security_url}}">
-          <param name="security_post" value="false">
-          @endif
-          <param name="neo_confirm_unload" value="true">
-          <param name="neo_show_right_button" value="true">
-          <param name="neo_send_with_formdata" value="true">
-          </applet-dummy>
+          <div class="neo-applet-paintbbs" data-width="{{$w}}" data-height="{{$h}}"></div>
+          <script>
+            Neo.param = {
+              paintbbs: {
+                image_width:{{$picw}},
+                image_height:{{$pich}},
+                undo:{{$undo}},
+                undo_in_mg:{{$undo_in_mg}},
+                neo_max_pch: 2048,
+                neo_send_with_formdata:true,
+                neo_validate_exact_ok_text_in_response:true,
+                neo_confirm_layer_info_notsaved:true,
+                neo_confirm_unload:true,
+                neo_show_right_button:true,
+                neo_animation_skip:true,
+                neo_disable_grid_touch_move:true,
+                neo_enable_zoom_out:true,
+                neo_disable_turn_original_glitch:true,
+                send_header_count:true,
+                send_header_timer:true,
+                
+                thumbnail_width:"100%",
+                thumbnail_height:"100%",
+                url_save:"{{$self}}?mode=saveimage&tool=neo",
+                @if (isset($resto))
+                  url_exit:"{{$self}}?mode={!!$mode!!}&stime={{$stime}}&resto={{$resto}}",
+                @else
+                  url_exit:"{{$self}}?mode={!!$mode!!}&stime={{$stime}}",
+                @endif
+                @if (isset($imgfile)) image_canvas:"{{$imgfile}}", @endif
+                @if (isset($pchfile)) pch_file:"{{$pchfile}}", @endif
+                poo:false,
+                send_advance:true,
+                send_header:"usercode={{$usercode}}",
+                @if ($anime) thumbnail_type:"animation", @endif
+                @if (isset($security))
+                  @if (isset($security_click)) security_click:"{{$security_click}}", @endif
+                  @if (isset($security_timer)) security_timer:"{{$security_timer}}", @endif
+                  security_url:"{{$security_url}}",
+                  security_post:false
+                @endif
+              }
+            }
+          </script>
         </div>
         <div class="palette" id="dyntools">
           @include('components.monoreita_dynamicPalette') <!-- 動的パレット -->
