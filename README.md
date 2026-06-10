@@ -73,6 +73,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/06/10] v3.3.260610.0
+
+- バージョン表記の変更
+- misskeyに投稿する機能でリプお絵かきも投稿できるようにした
+- connect_misskey_api修正
+
 ### [2026/06/04] v3.2.0
 
 - 旧しぃペインター削除
