@@ -15,6 +15,9 @@
   @if ($use_continue)
     <a href="{{$self}}?mode=continue&amp;no={{$res['picfile']}}">●続きを描く</a>
   @endif
+  @if ($use_misskey_note)
+    <a href="{{$self}}?mode=before_misskey_note&amp;no={{$res['tid']}}"><span class="simple-icons--misskey"></span> Misskeyにノート</a>
+  @endif
 </h5>
 @if ($res['nsfw'] == 1)
   <a class="luminous" href="{{$path}}{{$res['picfile']}}">

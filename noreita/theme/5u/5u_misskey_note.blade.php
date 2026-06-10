@@ -189,12 +189,12 @@
         @if (isset($post['picfile']))
         <div class="post">
           <h4>
-            <span class="oyaname">{{$post['name']}}</span>
+            <span class="oyaname">{{$post['a_name']}}</span>
             {{$post['created']}}
           </h4>
           <div class="image">
             <a href="{{$path}}{{$post['picfile']}}" target="_blank">
-              <img src="{{$path}}{{$post['picfile']}}" alt="{{$post['sub']}}" width="{{$post['w']}}" height="{{$post['h']}}">
+              <img src="{{$path}}{{$post['picfile']}}" alt="{{$post['sub']}}" width="{{$post['img_w']}}" height="{{$post['img_h']}}">
             </a>
           </div>
           <p class="comment">{!! $post['com'] !!}</p>
