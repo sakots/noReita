@@ -15,27 +15,6 @@ $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 ? explode( ',', $http_langs )[0] : '';
 $en= (stripos($lang,'ja')!==0);
 
-session_sta();
-
-if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
-	die("Error: セッションがありません。Misskey投稿フローが正しく動作していません。");
-};
-
-$baseUrl = $_SESSION['misskey_server_radio'] ?? "";
-if(!filter_var($baseUrl,FILTER_VALIDATE_URL)){
-	die("Error: サーバのURLが無効です。: " . $baseUrl);
-}
-
-$skip_auth_check = (bool)filter_input_data('GET','skip_auth_check',FILTER_VALIDATE_BOOLEAN);
-if($skip_auth_check){
-	if((string)filter_input_data('GET','s_id') !== $_SESSION['sns_api_session_id']){
-		die("Error: " . ($en ? "Operation failed." :"失敗しました。"));
-	}
-	return connect_misskey_api::create_misskey_note();
-}
-
-connect_misskey_api::mi_auth_check();
-
 // 認証チェック
 class connect_misskey_api{
 
@@ -238,4 +217,34 @@ class connect_misskey_api{
 			die("Error: " . ($en ? "Failed to post the content." : "投稿に失敗しました。") . " (API response missing createdNote)");
 		}
 	}
+}
+
+function connect_misskey_api_dispatch(): void {
+	global $en, $baseUrl;
+
+	session_sta();
+
+	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
+		die("Error: セッションがありません。Misskey投稿フローが正しく動作していません。");
+	};
+
+	$baseUrl = $_SESSION['misskey_server_radio'] ?? "";
+	if(!filter_var($baseUrl,FILTER_VALIDATE_URL)){
+		die("Error: サーバのURLが無効です。: " . $baseUrl);
+	}
+
+	$skip_auth_check = (bool)filter_input_data('GET','skip_auth_check',FILTER_VALIDATE_BOOLEAN);
+	if($skip_auth_check){
+		if((string)filter_input_data('GET','s_id') !== $_SESSION['sns_api_session_id']){
+			die("Error: " . ($en ? "Operation failed." :"失敗しました。"));
+		}
+		connect_misskey_api::create_misskey_note();
+		return;
+	}
+
+	connect_misskey_api::mi_auth_check();
+}
+
+if (realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) === realpath(__FILE__)) {
+	connect_misskey_api_dispatch();
 }
