@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.3.260610.1';
+const REITA_VER = 'v3.3.260610.2';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -37,7 +37,7 @@ if (CONF_VER < 20260405 || !defined('CONF_VER')) {
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!isset($misskey_note_ver) || $misskey_note_ver < 20260504) {
+if(!isset($misskey_note_ver) || $misskey_note_ver < 20260610) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 

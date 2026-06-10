@@ -3,7 +3,7 @@
 //https://paintbbs.sakura.ne.jp/
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
-$misskey_note_ver = 20260504;
+$misskey_note_ver = 20260610;
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -261,7 +261,7 @@ class misskey_note {
       error($en ? 'The article does not exist.' : '記事がありません。');
     }
 
-    if (!check_edit_permission($no, $id, $pwd, $admin)) {
+    if (!check_edit_permission($no, $id, $pwd, $dat['admin'])) {
       error($en ? 'Password is incorrect.' : 'パスワードが違います。');
     }
 
