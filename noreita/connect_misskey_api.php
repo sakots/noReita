@@ -9,6 +9,8 @@
 require_once(__DIR__.'/config.php');
 require_once(__DIR__.'/functions.php');
 
+$connect_misskey_api_ver = 20260610;
+
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 ? explode( ',', $http_langs )[0] : '';
 $en= (stripos($lang,'ja')!==0);
@@ -36,6 +38,22 @@ connect_misskey_api::mi_auth_check();
 
 // 認証チェック
 class connect_misskey_api{
+
+	private static function get_thread_no(int $no): int {
+		try {
+			$db = new PDO(DB_PDO);
+			$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+			$stmt = $db->prepare("SELECT tid, parent, thread FROM board_log WHERE tid = :no LIMIT 1");
+			$stmt->execute([':no' => $no]);
+			$post = $stmt->fetch(PDO::FETCH_ASSOC);
+			if (!$post) {
+				return $no;
+			}
+			return ((int)$post['thread'] === 1) ? (int)$post['tid'] : (int)$post['parent'];
+		} catch (PDOException $e) {
+			return $no;
+		}
+	}
 
 	public static function mi_auth_check(): void {
 		global $en,$baseUrl;
@@ -165,7 +183,8 @@ class connect_misskey_api{
 
 		$src_image_filename = pathinfo($src_image, PATHINFO_FILENAME );//拡張子除去
 
-		$fixed_link = BASE.'?mode=res&res='.$no.'#'.$src_image_filename;
+		$thread_no = self::get_thread_no((int)$no);
+		$fixed_link = BASE.'?mode=res&res='.$thread_no.'#'.$src_image_filename;
 		$fixed_link = filter_var($fixed_link,FILTER_VALIDATE_URL) ? $fixed_link : '';
 		$article_url_link = $article_url_link ? $fixed_link : '';
 		$com=str_replace(["\r\n","\r"],"\n",$com);
@@ -213,7 +232,7 @@ class connect_misskey_api{
 			unset($_SESSION['sns_api_val']);
 			unset($_SESSION['userdel']);
 
-			redirect(BASE.'?mode=misskey_success&no='.$no);
+			redirect(BASE.'?mode=misskey_success&no='.$thread_no);
 		}
 		else {
 			die("Error: " . ($en ? "Failed to post the content." : "投稿に失敗しました。") . " (API response missing createdNote)");

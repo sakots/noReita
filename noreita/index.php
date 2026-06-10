@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-define('REITA_VER', 'v3.2.0'); //lot.260604.0
+define('REITA_VER', 'v3.3.260610.0');
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -39,6 +39,13 @@ check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
 if(!isset($misskey_note_ver) || $misskey_note_ver < 20260504) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
+}
+
+// connect_misskey_api.php
+check_file(__DIR__.'/connect_misskey_api.php');
+require_once(__DIR__.'/connect_misskey_api.php');
+if(!isset($connect_misskey_api_ver) || $connect_misskey_api_ver < 20260610) {
+  die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
 // save.inc
