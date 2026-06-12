@@ -62,7 +62,7 @@
         <div class="app" id="apps">
           <div class="neo-applet-paintbbs" data-width="{{$w}}" data-height="{{$h}}"></div>
           <script>
-            Neo.param = {
+            Neo.params = {
               paintbbs: {
                 image_width:{{$picw}},
                 image_height:{{$pich}},
