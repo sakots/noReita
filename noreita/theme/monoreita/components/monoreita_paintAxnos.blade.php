@@ -130,7 +130,7 @@
                   @if (isset($rep))
                     return repData();
                   @endif
-                  return window.location.href = "{{$self}}?mode=piccom" + (resto ? "&resto=" + resto : "");
+                  return window.location.href = "{{$self}}?mode={!!$mode!!}" + (resto ? "&resto=" + resto : "");
                 }
                 resolve(false);
                 return alert(text);
