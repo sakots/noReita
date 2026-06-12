@@ -73,6 +73,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/06/12] v3.3.260612.0
+
+- neo以外で続きから描いて画像差し替えができないのを修正
+
 ### [2026/06/10] v3.3.260610.2
 
 - misskey_note.inc.phpのエラー修正
