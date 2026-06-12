@@ -76,18 +76,18 @@
   </script>
   @endif
   @if ($tool == 'axnos')
-		@include('components.5u_axnos')
+		@include('components.5u_paintAxnos')
   @endif
 </head>
 <body>
   @if ($tool == 'chicken')
-		@include('components.5u_chicken')
+		@include('components.5u_paintChicken')
   @endif
   @if ($tool == 'klecks')
-    @include('components.5u_klecks')
+    @include('components.5u_paintKlecks')
   @endif
   @if ($tool == 'tegaki')
-		@include('components.5u_tegaki')
+		@include('components.5u_paintTegaki')
   @endif
   @if ($tool == 'axnos')
   <div id="axnospaint_body"></div>

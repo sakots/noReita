@@ -56,7 +56,7 @@
                   return repData();
                 @endif
                 Tegaki.hide(); //｢このサイトを離れますか?｣を解除
-                return window.location.href = "{{$self}}?mode=piccom" + (resto ? "&resto=" + resto : "");
+                return window.location.href = "{{$self}}?mode={!!$mode!!}" + (resto ? "&resto=" + resto : "");
               }
               return showAlert(text);
             })
@@ -113,7 +113,7 @@
                 if (text.startsWith("error\n")) {
                   console.log(text);
                   Tegaki.hide(); //｢このサイトを離れますか?｣を解除
-                  return window.location.href = "{{$self}}?mode=piccom";
+                  return window.location.href = "{{$self}}?mode={!!$mode!!}" + (resto ? "&resto=" + resto : "");
                 }
               })
             }
@@ -121,7 +121,7 @@
           .catch(error => {
             console.error('There was a problem with the fetch operation:', error);
             Tegaki.hide(); //｢このサイトを離れますか?｣を解除
-            return window.location.href = "{{$self}}?mode=piccom";
+            return window.location.href = "{{$self}}?mode={!!$mode!!}" + (resto ? "&resto=" + resto : "");
           });
         }
       @endif

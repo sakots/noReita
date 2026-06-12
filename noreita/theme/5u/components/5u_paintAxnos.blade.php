@@ -130,7 +130,7 @@
                   @if (isset($rep))
                     return repData();
                   @endif
-                  return window.location.href = "{{$self}}?mode=piccom" + (resto ? "&resto=" + resto : "");
+                  return window.location.href = "{{$self}}?mode={!!$mode!!}" + (resto ? "&resto=" + resto : "");
                 }
                 resolve(false);
                 return alert(text);
@@ -201,14 +201,14 @@
           response.text().then((text) => {
             if (text.startsWith("error\n")) {
               console.log(text);
-              return window.location.href = "{{$self}}?mode=piccom";
+              return window.location.href = "{{$self}}?mode={!!$mode!!}";
             }
           })
         }
       })
       .catch(error => {
         console.error('There was a problem with the fetch operation:', error);
-        return window.location.href = "{{$self}}?mode=piccom";
+        return window.location.href = "{{$self}}?mode={!!$mode!!}";
       });
     }
   @endif
