@@ -260,8 +260,25 @@ button {
 	width: 10ex;
 }
 .colorPicker {
-	width: 3ex;
-	height: 2em;
+	width: 2.4em;
+	height: 1.8em;
+	padding: 0;
+	border-radius: 4px;
+	background: transparent;
+	cursor: pointer;
+	vertical-align: middle;
+
+	&::-webkit-color-swatch-wrapper {
+		padding: 2px;
+	}
+	&::-webkit-color-swatch {
+		border: 0;
+		border-radius: 2px;
+	}
+	&::-moz-color-swatch {
+		border: 0;
+		border-radius: 2px;
+	}
 }
 
 .siihelp{

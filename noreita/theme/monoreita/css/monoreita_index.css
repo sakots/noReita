@@ -288,8 +288,24 @@ button {
 }
 
 .colorPicker {
-  width: 3ex;
-  height: 2em;
+  width: 2.4em;
+  height: 1.8em;
+  padding: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.colorPicker::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+.colorPicker::-webkit-color-swatch {
+  border: 0;
+  border-radius: 2px;
+}
+.colorPicker::-moz-color-swatch {
+  border: 0;
+  border-radius: 2px;
 }
 
 .siihelp dt {
