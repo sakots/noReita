@@ -283,6 +283,15 @@ button {
   text-align: center;
 }
 
+.gradation {
+  width: 10ex;
+}
+
+.colorPicker {
+  width: 3ex;
+  height: 2em;
+}
+
 .siihelp dt {
   font-weight: bold;
 }

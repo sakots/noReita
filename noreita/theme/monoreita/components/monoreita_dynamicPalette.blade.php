@@ -58,7 +58,6 @@
     <form name="grad">
       <input type="checkbox" name="view" onclick="showHideLayer()">
       <input type="button" class="button" value=" OK " onclick="ChangeGrad()">
-      <input type="color">
       <br>
       <select class="form" name="p_st" onchange="GetPalette()">
         <option>1</option>
@@ -76,7 +75,8 @@
         <option>13</option>
         <option>14</option>
       </select>
-      <input class="form" type="text" name="pst" size="8" onkeypress="Change_()" onchange="Change_()" maxlength="6" pattern="^#[0-9a-fA-F]{6}$"><br>
+      <input class="form gradation" type="text" name="pst" size="8" onkeypress="Change_()" onchange="Change_()" maxlength="6" pattern="^[0-9a-fA-F]{6}$">
+      <input type="color" class="colorPicker" onchange="ColorPickerToGradation(this, 'pst')"><br>
       <select class="form" name="p_ed" onchange="GetPalette()">
         <option>1</option>
         <option>2</option>
@@ -93,7 +93,9 @@
         <option>13</option>
         <option>14</option>
       </select>
-      <input class="form" type="text" name="ped" size="8" onkeypress="Change_()" onchange="Change_()" maxlength="6" pattern="^#[0-9a-fA-F]{6}$"><div id="psft" style="position:absolute;width:100px;height:30px;z-index:1;left:5px;top:10px;"></div>
+      <input class="form gradation" type="text" name="ped" size="8" onkeypress="Change_()" onchange="Change_()" maxlength="6" pattern="^[0-9a-fA-F]{6}$">
+      <input type="color" class="colorPicker" onchange="ColorPickerToGradation(this, 'ped')">
+      <div id="psft" style="position:absolute;width:100px;height:30px;z-index:1;left:5px;top:10px;"></div>
     </form>
   </fieldset>
   <p class="c">DynamicPalette &copy;NoraNeko</p>
