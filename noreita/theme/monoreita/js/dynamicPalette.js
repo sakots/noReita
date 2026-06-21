@@ -33,6 +33,7 @@ class DynamicPaletteManager {
 		window.GradSelC = this.GradSelC.bind(this);
 		window.GradView = this.GradView.bind(this);
 		window.showHideLayer = this.showHideLayer.bind(this);
+		window.ColorPickerToGradation = this.ColorPickerToGradation.bind(this);
 	}
 
 	// パレットデータを設定
@@ -327,6 +328,14 @@ class DynamicPaletteManager {
 		this.GradView("#" + st, "#" + ed);
 	}
 
+	ColorPickerToGradation(colorPicker, targetName) {
+		const target = document.grad ? document.grad[targetName] : null;
+		if (!target || !colorPicker.value) return;
+
+		target.value = colorPicker.value.replace("#", "").toUpperCase();
+		this.Change_();
+	}
+
 	// グラデーション生成
 	ChangeGrad() {
 		const d = document;
@@ -420,6 +429,10 @@ class DynamicPaletteManager {
 		
 		d.grad.pst.value = ps[st].substring(1, 7);
 		d.grad.ped.value = ps[ed].substring(1, 7);
+
+		const colorPickers = d.grad.querySelectorAll(".colorPicker");
+		if (colorPickers[0]) colorPickers[0].value = ps[st];
+		if (colorPickers[1]) colorPickers[1].value = ps[ed];
 		
 		this.GradSelC();
 		this.GradView(ps[st], ps[ed]);
