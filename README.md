@@ -73,6 +73,13 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/07/01] v3.3.260701.0
+
+- theme
+  - カラーピッカー整理
+- app
+  - neo、litachix更新
+
 ### [2026/06/21] v3.3.260621.0
 
 - 不要なコード削除
