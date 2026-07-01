@@ -54,6 +54,10 @@
     </form>
   </fieldset>
   <fieldset>
+    <legend>COLOR</legend>
+    <input id="neo-colorPicker" class="colorPicker" type="color" oninput="Neo.setColor(this.value)">
+  </fieldset>
+  <fieldset>
     <legend>GRADATION</legend>
     <form name="grad">
       <input type="checkbox" name="view" onclick="showHideLayer()">
