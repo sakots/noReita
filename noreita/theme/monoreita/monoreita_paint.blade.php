@@ -80,7 +80,7 @@
                 neo_disable_turn_original_glitch:true,
                 send_header_count:true,
                 send_header_timer:true,
-                
+                neo_visibility_change_title_rewrite:true,
                 thumbnail_width:"100%",
                 thumbnail_height:"100%",
                 url_save:"{{$self}}?mode=saveimage&tool=neo",
