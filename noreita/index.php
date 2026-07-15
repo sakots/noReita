@@ -13,8 +13,8 @@ $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 $en = (stripos($lang,'ja')!== 0);
 
 // phpのバージョンが古い場合動かさせない
-if (version_compare($php_ver = phpversion(),'7.3.0', '<')) {
-  die($en ? "PHP version 7.3 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.3以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
+if (version_compare($php_ver = phpversion(),'7.4.0', '<')) {
+  die($en ? "PHP version 7.4 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.4以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
 }
 
 // functions.phpの存在とバージョンを確認
