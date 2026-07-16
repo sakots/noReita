@@ -28,6 +28,8 @@ final class PostValidator {
       'enc_pwd' => (string)filter_input(INPUT_POST, 'enc_pwd'),
       'modid' => (string)filter_input(INPUT_POST, 'modid'),
       'resto' => (string)filter_input(INPUT_POST, 'resto'),
+      'resedit' => trim((string)filter_input(INPUT_POST, 'resedit')),
+      'e_no' => trim((string)filter_input(INPUT_POST, 'e_no')),
     ];
   }
 

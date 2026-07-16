@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.4.1 lot.260716.0';
+const REITA_VER = 'v3.5.0 lot.260716.1';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -1749,60 +1749,34 @@ function editexec(): void {
     check_csrf_token();
   }
 
-  $resedit = trim((string)filter_input(INPUT_POST, 'resedit'));
-  $e_no = trim((string)filter_input(INPUT_POST, 'e_no'));
-
-  if ($req_method !== "POST") {
-    error($en ? "Request denied." : "拒絶されました");
-  }
-
-  $sub = (string)filter_input(INPUT_POST, 'sub');
-  $name = (string)filter_input(INPUT_POST, 'name');
-  $mail = (string)filter_input(INPUT_POST, 'mail');
-  $url = (string)filter_input(INPUT_POST, 'url');
-  $com = (string)filter_input(INPUT_POST, 'com');
-  $picfile = trim((string)filter_input(INPUT_POST, 'picfile'));
-  $pwd = (string)trim(filter_input(INPUT_POST, 'pwd'));
+  $input = PostValidator::inputFromHttp();
+  $resedit = $input['resedit'];
+  $e_no = $input['e_no'];
+  $sub = $input['sub'];
+  $name = $input['name'];
+  $mail = $input['mail'];
+  $url = $input['url'];
+  $com = $input['com'];
+  $picfile = (string)$input['picfile'];
+  $pwd = $input['pwd'];
   $pwdh = password_hash($pwd, PASSWORD_DEFAULT);
-  $sodane = trim((string)filter_input(INPUT_POST, 'sodane', FILTER_VALIDATE_INT));
-
-  //NGワードがあれば拒絶
-  Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
-
-  if (USE_NAME && !$name) {
-    error($en ? "Name is required." : "名前は必須です。");
-  }
-  //本文必須でいいだろ
-  if (!$com) {
-    error($en ? "Comment is required." : "本文は必須です。");
-  }
-  if (USE_SUB && !$sub) {
-    error($en ? "Subject is required." : "タイトルは必須です。");
-  }
-
-  if (strlen($com) > MAX_COM) {
-    error($en ? "Comment is too long." : "本文が長すぎます。");
-  }
-  if (strlen($name) > MAX_NAME) {
-    error($en ? "Name is too long." : "名前が長すぎます。");
-  }
-  if (strlen($mail) > MAX_EMAIL) {
-    error($en ? "Email is too long." : "メールアドレスが長すぎます。");
-  }
-  if (strlen($sub) > MAX_SUB) {
-    error($en ? "Subject is too long." : "タイトルが長すぎます。");
-  }
-  if (strlen($url) > MAX_URL) {
-    error($en ? "URL is too long." : "URLが長すぎます。");
-  }
+  $sodane = $input['sodane'];
 
   //ホスト取得
   $host = gethostbyaddr(get_uip());
-
-  foreach ($badip as $value) { //拒絶host
-    if (preg_match("/$value$/i", $host)) {
-      error($en ? "Your host is blocked." : "あなたのホストは拒絶されています。");
-    }
+  try {
+    PostValidator::validate($input, [
+      'en' => $en, 'request_method' => $req_method, 'host' => $host, 'blocked_hosts' => $badip,
+      'require_name' => USE_NAME, 'require_comment' => true, 'require_subject' => USE_SUB,
+      'max_comment' => MAX_COM, 'max_name' => MAX_NAME, 'max_email' => MAX_EMAIL,
+      'max_subject' => MAX_SUB, 'max_url' => MAX_URL, 'japanese_filter' => USE_JAPANESEFILTER,
+      'deny_comment_urls' => DENY_COMMENTS_URL, 'admin_pass' => $GLOBALS['admin_pass'] ?? '',
+      'bad_strings' => $GLOBALS['badstring'] ?? [], 'bad_names' => $GLOBALS['badname'] ?? [],
+      'bad_strings_a' => $GLOBALS['badstr_A'] ?? [], 'bad_strings_b' => $GLOBALS['badstr_B'] ?? [],
+    ]);
+  } catch (PostValidationException $e) {
+    error($e->getMessage());
+    return;
   }
   //↑セキュリティ関連ここまで
 

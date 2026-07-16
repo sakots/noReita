@@ -169,6 +169,17 @@ try {
   });
 
   $post_id = (int)($row['tid'] ?? 0);
+  [$edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'EditedUser', 'mail' => '', 'url' => '',
+    'sub' => 'Edited subject', 'com' => "編集後の結合テスト {$marker}", 'pwd' => 'delete-pass',
+    'sodane' => '0', 'token' => $token,
+  ]);
+  $edited = $db->query('SELECT sub, com FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
+  integration_test('edit is validated and stored through HTTP', static function () use ($edit_status, $edited, $marker): bool {
+    return $edit_status === 200 && is_array($edited) && $edited['sub'] === 'Edited subject'
+      && str_contains($edited['com'], $marker);
+  });
+
   [$delete_status, $delete_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'del', 'delno' => (string)$post_id, 'pwd' => 'delete-pass',
   ]);
