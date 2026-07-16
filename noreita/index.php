@@ -1496,8 +1496,6 @@ function paint_com(string $tmpmode): void {
   $dat['usercode'] = $usercode;
   $dat['resto'] = $resto;
 
-  $utime = NULL;
-
   //----------
 
   //csrfトークンをセット
@@ -1521,38 +1519,11 @@ function paint_com(string $tmpmode): void {
 
   //var_dump($_POST);
   $userip = get_uip();
-  //テンポラリ画像リスト作成
-  $tmp_list = array();
-  $handle = opendir(TEMP_DIR);
-  while (false !== ($file = readdir($handle))) {
-    if (!is_dir($file) && preg_match("/\.(dat)\z/i", $file)) {
-      $fp = fopen(TEMP_DIR . $file, "r");
-      $userdata = fread($fp, 1024);
-      fclose($fp);
-      list($uip, $uhost, $u_agent, $imgext, $ucode,, $starttime, $postedtime,, $tool) = explode("\t", rtrim($userdata) . "\t");
-      $filename = preg_replace("/\.(dat)\z/i", "", $file); //拡張子除去
-      if (is_file(TEMP_DIR . $filename . $imgext)) //画像があればリストに追加
-        //描画時間を$userdataをもとに計算
-        //(表示用)
-        $utime = calcPtime((int)$postedtime - (int)$starttime);
-      //描画時間(内部用)
-      $psec = (int)$postedtime - (int)$starttime;
-      $tmp_list[] = $ucode . "\t" . $uip . "\t" . $filename . $imgext . "\t" . $utime . "\t" . $psec . "\t" . $tool;
-    }
-  }
-  closedir($handle);
-  $tmp = array();
-  if (count($tmp_list) != 0) {
-    //user-codeとipアドレスでチェック
-    foreach ($tmp_list as $tmpimg) {
-      list($ucode, $uip, $u_filename, $utime, $psec, $tool) = explode("\t", $tmpimg);
-      if ($ucode == $usercode || $uip == $userip) {
-        // 続きから描く場合は一時画像を除外
-        if (isset($dat['exclude_temp_images']) && $dat['exclude_temp_images']) {
-          continue;
-        }
-        $tmp[] = $u_filename;
-      }
+  $tmp = [];
+  foreach (ImageService::listTemporaryImages(TEMP_DIR) as $temporary_image) {
+    if ($temporary_image['user_code'] === $usercode || $temporary_image['ip'] === $userip) {
+      if (!empty($dat['exclude_temp_images'])) continue;
+      $tmp[] = $temporary_image;
     }
   }
 
@@ -1564,13 +1535,14 @@ function paint_com(string $tmpmode): void {
     $pictmp = 1;
   } else {
     $pictmp = 2;
-    sort($tmp);
-    reset($tmp);
     $temp = array();
-    foreach ($tmp as $tmpfile) {
-      $src = TEMP_DIR . $tmpfile;
-      $src_name = $tmpfile;
+    foreach ($tmp as $temporary_image) {
+      $src = TEMP_DIR . $temporary_image['filename'];
+      $src_name = $temporary_image['filename'];
       $date = gmdate("Y/m/d H:i", filemtime($src) + 9 * 60 * 60);
+      $tool = $temporary_image['tool'];
+      $utime = $temporary_image['paint_time'];
+      $psec = $temporary_image['paint_seconds'];
       $temp[] = compact('src', 'src_name', 'date', 'tool', 'utime', 'psec');
     }
     $dat['temp'] = $temp;
@@ -1735,12 +1707,6 @@ function picreplace(): void {
   }
   $nsfw_flag = filter_input(INPUT_POST, 'nsfw');
 
-  //初期化
-  $filename = '';
-  $imgext = '';
-  $starttime = '';
-  $postedtime = '';
-
   //ホスト取得
   $host = gethostbyaddr(get_uip());
 
@@ -1748,26 +1714,14 @@ function picreplace(): void {
     if (preg_match("/$value$/i", $host)) error($en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。');
   }
 
-  /*--- テンポラリ捜査 ---*/
-  $find = false;
-  $handle = opendir(TEMP_DIR);
-  while (false !== ($file = readdir($handle))) {
-    if (!is_dir($file) && preg_match("/\.(dat)\z/i", $file)) {
-      $fp = fopen(TEMP_DIR . $file, "r");
-      $userdata = fread($fp, 1024);
-      fclose($fp);
-      list($uip, $uhost, $u_agent, $imgext, $ucode, $u_repcode, $starttime, $postedtime,, $tool) = explode("\t", rtrim($userdata) . "\t"); //区切りの"\t"を行末にして配列へ格納
-      $filename = pathinfo($file, PATHINFO_FILENAME); //拡張子除去
-      if ($filename && is_file(TEMP_DIR . $filename . $imgext) && $u_repcode === $repcode) {
-        $find = true;
-        break;
-      }
-    }
-  }
-  closedir($handle);
-  if (!$find) {
+  $temporary_image = ImageService::findTemporaryImageByReplacementCode(TEMP_DIR, (string)$repcode);
+  if ($temporary_image === null) {
     error($en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。');
   }
+  $filename = $temporary_image['base_name'];
+  $imgext = $temporary_image['image_extension'];
+  $starttime = $temporary_image['start_time'];
+  $postedtime = $temporary_image['posted_time'];
 
   // ログ読み込み
   try {
@@ -2050,23 +2004,7 @@ function check_AsyncRequest($picfile=''): void {
 
 /* テンポラリ内のゴミ除去 */
 function del_temp(): void {
-  $handle = opendir(TEMP_DIR);
-  while ($file = readdir($handle)) {
-    if (!is_dir($file)) {
-      $lapse = time() - filemtime(TEMP_DIR . $file);
-      if ($lapse > (TEMP_LIMIT * 24 * 3600)) {
-        safe_unlink(TEMP_DIR . $file);
-      }
-      //pchアップロードペイントファイル削除
-      if (preg_match("/\A(pchup-.*-tmp\.s?pch)\z/i", $file)) {
-        $lapse = time() - filemtime(TEMP_DIR . $file);
-        if ($lapse > (300)) { //5分
-          safe_unlink(TEMP_DIR . $file);
-        }
-      }
-    }
-  }
-  closedir($handle);
+  ImageService::cleanupTemporaryFiles(TEMP_DIR, TEMP_LIMIT);
 }
 
 //古い外部画像サムネイルの削除

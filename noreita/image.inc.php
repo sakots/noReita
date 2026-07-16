@@ -17,6 +17,82 @@ final class ImageService {
     return in_array(strtolower($matches[1]), self::PLAYABLE_ANIMATION_EXTENSIONS, true);
   }
 
+  public static function parseTemporaryMetadata(string $metadata_file): ?array {
+    if (!is_file($metadata_file) || !is_readable($metadata_file)
+      || strtolower(pathinfo($metadata_file, PATHINFO_EXTENSION)) !== 'dat') {
+      return null;
+    }
+    $base_name = pathinfo($metadata_file, PATHINFO_FILENAME);
+    if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_-]{0,127}\z/D', $base_name) !== 1) {
+      return null;
+    }
+    $metadata = @file_get_contents($metadata_file, false, null, 0, 1024);
+    if ($metadata === false) return null;
+
+    $fields = explode("\t", rtrim($metadata) . "\t");
+    $image_extension = strtolower((string)($fields[3] ?? ''));
+    if (preg_match('/\A\.(?:png|jpe?g|gif|webp|avif)\z/D', $image_extension) !== 1) {
+      return null;
+    }
+    $start_time = (int)($fields[6] ?? 0);
+    $posted_time = (int)($fields[7] ?? 0);
+    $paint_seconds = max(0, $posted_time - $start_time);
+
+    return [
+      'ip' => (string)($fields[0] ?? ''), 'host' => (string)($fields[1] ?? ''),
+      'user_agent' => (string)($fields[2] ?? ''), 'image_extension' => $image_extension,
+      'user_code' => (string)($fields[4] ?? ''), 'replacement_code' => (string)($fields[5] ?? ''),
+      'start_time' => $start_time, 'posted_time' => $posted_time,
+      'resto' => (string)($fields[8] ?? ''), 'tool' => (string)($fields[9] ?? ''),
+      'hide_animation' => (string)($fields[10] ?? ''), 'base_name' => $base_name,
+      'filename' => $base_name . $image_extension, 'paint_seconds' => $paint_seconds,
+      'paint_time' => $paint_seconds > 0 ? calcPtime($paint_seconds) : '',
+    ];
+  }
+
+  public static function listTemporaryImages(string $temp_dir): array {
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $files = @scandir($temp_dir);
+    if ($files === false) return [];
+
+    $images = [];
+    foreach ($files as $file) {
+      if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) !== 'dat') continue;
+      $metadata = self::parseTemporaryMetadata($temp_dir . $file);
+      if ($metadata === null || !is_file($temp_dir . $metadata['filename'])) continue;
+      $images[] = $metadata;
+    }
+    usort($images, static fn(array $a, array $b): int => strcmp($a['filename'], $b['filename']));
+    return $images;
+  }
+
+  public static function findTemporaryImageByReplacementCode(string $temp_dir, string $replacement_code): ?array {
+    if ($replacement_code === '') return null;
+    foreach (self::listTemporaryImages($temp_dir) as $image) {
+      if (hash_equals($image['replacement_code'], $replacement_code)) return $image;
+    }
+    return null;
+  }
+
+  public static function cleanupTemporaryFiles(string $temp_dir, int $limit_days, ?int $now = null): int {
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $files = @scandir($temp_dir);
+    if ($files === false) return 0;
+    $now ??= time();
+    $deleted = 0;
+    foreach ($files as $file) {
+      $path = $temp_dir . $file;
+      if (!is_file($path)) continue;
+      $modified = filemtime($path);
+      if ($modified === false) continue;
+      $age = $now - $modified;
+      $expired = $age > max(0, $limit_days) * 86400;
+      $expired_upload = preg_match('/\Apchup-.*-tmp\.s?pch\z/iD', $file) === 1 && $age > 300;
+      if (($expired || $expired_upload) && safe_unlink($path)) $deleted++;
+    }
+    return $deleted;
+  }
+
   public static function validateUpload(string $file_path, array $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
     if (!is_file($file_path) || !is_readable($file_path)) return false;
     $file_size = filesize($file_path);
