@@ -6,6 +6,7 @@ const POST_INC_VER = 20260716;
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
 final class PostAuthorizationException extends RuntimeException {}
+final class DuplicatePostException extends RuntimeException {}
 
 final class PostService {
   public function __construct(
@@ -41,6 +42,71 @@ final class PostService {
     ImageService::deleteRelatedFiles($this->image_dir, (string)$authorization['post']['picfile']);
     $this->repository->deletePost($post_id, $authorization['role'] === 'admin');
     return 'deleted';
+  }
+
+  public function prepareNewPost(array $input, string $host, array $settings): array {
+    $comment_was_present = (string)($input['com'] ?? '') !== '';
+    $name = generate_trip((string)($input['name'] ?? ''));
+    $name = $name !== '' ? $name : (string)$settings['default_name'];
+    $comment = (string)($input['com'] ?? '');
+    $comment = $comment !== '' ? $comment : (string)$settings['default_comment'];
+    $subject = (string)($input['sub'] ?? '');
+    $subject = $subject !== '' ? $subject : (string)$settings['default_subject'];
+
+    $latest = $this->repository->latestThread();
+    if (!empty($latest)) {
+      $same_text = $comment_was_present && $comment === (string)$latest['com']
+        && $host === (string)$latest['host'] && $subject === (string)$latest['sub'];
+      $same_image = (string)($input['modid'] ?? '') !== '' && (string)$latest['picfile'] !== ''
+        && (string)($input['picfile'] ?? '') === (string)$latest['picfile'];
+      if ($same_text || $same_image) throw new DuplicatePostException('Duplicate post.');
+    }
+
+    $password = (string)($input['pwd'] ?? '');
+    $admin_name = (string)$settings['admin_name'];
+    if ($name === $admin_name && $password !== $this->admin_pass) {
+      $name .= (string)$settings['admin_cap'];
+    }
+    return array_merge($input, [
+      'name' => $name, 'com' => $comment, 'sub' => $subject, 'host' => $host,
+      'pwdh' => password_hash($password, PASSWORD_DEFAULT),
+      'admins' => ($password === $this->admin_pass && $name === $admin_name) ? 1 : 0,
+    ]);
+  }
+
+  public function createPreparedPost(array $post, array $image): int {
+    $now = time();
+    $resto = (string)($post['resto'] ?? '');
+    $thread = $resto === '' ? 1 : 0;
+    $parent = $thread === 1 ? null : (int)$resto;
+    $tree = $now * 100000000;
+    $comid = null;
+    $age = 0;
+
+    if ($parent !== null) {
+      $parent_post = $this->repository->findPost($parent);
+      if (empty($parent_post)) throw new PostNotFoundException('Parent post was not found.');
+      $tree = $now - $parent - (int)$parent_post['tid'];
+      $comid = $tree + $now;
+      $age = (int)$parent_post['age'];
+      if (!str_contains((string)($post['mail'] ?? ''), 'sage')) {
+        $age++;
+        $this->repository->bumpThread($parent, $age, $age + ($now * 100000000));
+      }
+    }
+
+    return $this->repository->insertPost([
+      'thread' => $thread, 'parent' => $parent, 'comid' => $comid, 'tree' => $tree,
+      'a_name' => $post['name'], 'sub' => $post['sub'],
+      'com' => preg_replace('/(\n|\r|\r\n){3,}/us', "\n\n", (string)$post['com']),
+      'mail' => $post['mail'], 'a_url' => $post['url'], 'picfile' => $post['picfile'],
+      'pchfile' => $image['pchfile'], 'img_w' => $image['img_w'], 'img_h' => $image['img_h'],
+      'psec' => $image['psec'], 'utime' => $image['utime'], 'pwd' => $post['pwdh'],
+      'id' => gen_id((string)$post['host'], (string)$now), 'sodane' => $post['sodane'],
+      'age' => $age, 'invz' => $post['invz'], 'host' => $post['host'], 'tool' => $image['tool'],
+      'admins' => $post['admins'], 'shd' => 0, 'nsfw' => $image['nsfw'], 'ctype' => $image['ctype'],
+      'uuid' => generate_uuid(), 'thumbnail' => $image['thumbnail'],
+    ]);
   }
 }
 

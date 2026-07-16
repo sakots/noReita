@@ -394,14 +394,9 @@ function regist(): void {
   $url = $input['url'];
   $com = $input['com'];
   $picfile = $input['picfile'];
-  $invz = $input['invz'];
   $pwd = $input['pwd'];
-  $pwdh = password_hash($pwd, PASSWORD_DEFAULT);
-  $sodane = $input['sodane'];
   $pal = $input['pal'];
   $nsfw_flag = $input['nsfw_flag'];
-  $modid = $input['modid'];
-  $resto = $input['resto'];
 
   // クッキー保存用
   $original_name = $name;
@@ -420,131 +415,30 @@ function regist(): void {
   try {
     $repository = new BoardRepository();
     if (isset($_POST["send"])) {
-
-      $strlen_com = strlen($com);
-
-      // トリップ生成
-      $name = generate_trip($name);
-
-      if ($name   === "") $name = DEF_NAME;
-      if ($com  === "") $com  = DEF_COM;
-      if ($sub  === "") $sub  = DEF_SUB;
-
-      // 二重投稿チェック
-      //最新コメント取得
-      $msg_wc = $repository->latestThread();
-      if (!empty($msg_wc)) {
-        $msg_sub = $msg_wc["sub"]; //最新タイトル
-        $msg_com = $msg_wc["com"]; //最新コメント取得できた
-        $msg_host = $msg_wc["host"]; //最新ホスト取得できた
-        //どれも一致すれば二重投稿だと思う
-        if ($strlen_com > 0 && $com == $msg_com && $host == $msg_host && $sub == $msg_sub) {
-          $msg_w = null;
-          $db = null; //db切断
-          error($en ? 'Duplicate post?' : '二重投稿ですか ?');
-        }
-        //画像番号が一致の場合(投稿してブラウザバック、また投稿とか)
-        //二重投稿と判別(画像がない場合は処理しない)
-        if ($modid !== '') {
-          if ($msg_wc["picfile"] !== "" && $picfile == $msg_wc["picfile"]) {
-            $db = null; //db切断
-            error($en ? 'Duplicate post?' : '二重投稿ですか ?');
-          }
-        }
+      $service = new PostService($repository, $admin_pass, IMG_DIR);
+      try {
+        $prepared_post = $service->prepareNewPost($input, $host, [
+          'default_name' => DEF_NAME, 'default_comment' => DEF_COM, 'default_subject' => DEF_SUB,
+          'admin_name' => $admin_name, 'admin_cap' => ADMIN_CAP,
+        ]);
+      } catch (DuplicatePostException $e) {
+        error($en ? 'Duplicate post?' : '二重投稿ですか ?');
+        return;
       }
-      //↑ 二重投稿チェックおわり
 
-      //画像ファイルとか処理
-      $thumbnail = '';
-      $psec = 0;
-      $utime = "";
-      $used_tool = "";
-      $nsfw = false;
-      $ctype = null;
+      $image_result = [
+        'img_w' => 0, 'img_h' => 0, 'pchfile' => '', 'psec' => 0, 'utime' => '',
+        'tool' => '', 'thumbnail' => '', 'nsfw' => false, 'ctype' => null,
+      ];
       if ($picfile) {
         $ctype = PostInput::ctypeFromHttp();
-        
         $image_result = ImageService::finalizeNewPost(
           TEMP_DIR, IMG_DIR, (string)$picfile, $ctype, (bool)DSP_PAINTTIME, PDEF_W,
           USE_NSFW === 1 && $nsfw_flag === '1', PERMISSION_FOR_DEST
         );
-        $img_w = $image_result['img_w'];
-        $img_h = $image_result['img_h'];
-        $pchfile = $image_result['pchfile'];
-        $psec = $image_result['psec'];
-        $utime = $image_result['utime'];
-        $used_tool = $image_result['tool'];
-        $thumbnail = $image_result['thumbnail'];
-        $nsfw = $image_result['nsfw'];
-      } else {
-        $img_w = 0;
-        $img_h = 0;
-        $pchfile = "";
-        $utime = "";
-        $used_tool = "";
-        $psec = 0;
-        $utime = "";
-        $thumbnail = "";
-        $nsfw = false;
+        $image_result['ctype'] = $ctype;
       }
-
-      // 値を追加する
-
-      //不要改行圧縮
-      $com = preg_replace("/(\n|\r|\r\n){3,}/us", "\n\n", $com);
-
-      //id生成
-      $id = gen_id($host, $utime ?? time());
-
-      //UUID生成
-      $uuid = generate_uuid();
-
-      //管理者名は管理パスじゃないと使えない
-      if ($name === $admin_name && $pwd !== $admin_pass) {
-        $name = $name . ADMIN_CAP;
-      }
-
-      //管理者名の投稿でパスワードが管理パスなら管理者バッジつける
-      $admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0;
-
-      $tree = time() * 100000000;
-
-      //スレ建てorお絵かきリプ
-      if (!isset($resto) || $resto === "") {
-        $thread = 1; //スレ建て
-        $parent = NULL;
-        $comid = NULL;
-        
-        $age = 0;
-      } else {
-        $thread = 0; //お絵かきリプ
-        $parent = $resto;
-        //レスの位置
-        $tree = time() - $parent - (int)$msg_wc["tid"];
-        $comid = $tree + time();
-
-        //メール欄にsageが含まれるならageない
-        $age = (int)$msg_wc["age"];
-        if (strpos($mail, 'sage') !== false) {
-          //sage
-          $age = $age;
-        } else {
-          //age
-          $age++;
-          $age_tree = $age + (time() * 100000000);
-          $repository->bumpThread((int)$parent, $age, $age_tree);
-        }
-      }
-      $shd = 0;
-      
-      $repository->insertPost([
-        'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,
-        'sub'=>$sub, 'com'=>$com, 'mail'=>$mail, 'a_url'=>$url, 'picfile'=>$picfile,
-        'pchfile'=>$pchfile, 'img_w'=>$img_w, 'img_h'=>$img_h, 'psec'=>$psec, 'utime'=>$utime,
-        'pwd'=>$pwdh, 'id'=>$id, 'sodane'=>$sodane, 'age'=>$age, 'invz'=>$invz, 'host'=>$host,
-        'tool'=>$used_tool, 'admins'=>$admins, 'shd'=>$shd, 'nsfw'=>$nsfw, 'ctype'=>$ctype,
-        'uuid'=>$uuid, 'thumbnail'=>$thumbnail,
-      ]);
+      $service->createPreparedPost($prepared_post, $image_result);
 
       $c_pass = $pwd;
       //-- クッキー保存 --
@@ -564,7 +458,7 @@ function regist(): void {
   } catch (Throwable $e) {
     error(($en ? 'Posting failed. ' : '投稿処理に失敗しました。') . h($e->getMessage()));
   }
-  unset($name, $mail, $sub, $com, $url, $pwd, $pwdh, $resto, $pictmp, $picfile, $mode);
+  unset($name, $mail, $sub, $com, $url, $pwd, $pictmp, $picfile, $mode);
   //header('Location:'.PHP_SELF);
   //ログ行数オーバー処理
   //スレ数カウント

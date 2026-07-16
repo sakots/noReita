@@ -9,6 +9,8 @@ const PTIME_D = '日';
 const PTIME_H = '時間';
 const PTIME_M = '分';
 const PTIME_S = '秒';
+const ID_CYCLE = '0';
+const ID_SEED = 'smoke-test-seed';
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
@@ -224,6 +226,39 @@ smoke_test('post service centralizes edit and delete authorization', static func
     if ($service->delete($delete_id, 'delete-pass', false) !== 'deleted'
       || $repository->findPost($delete_id) !== false
       || is_file($image_dir . DIRECTORY_SEPARATOR . 'owner.png')) return false;
+
+    $new_input = [
+      'name' => '投稿者', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
+      'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,
+      'resto' => '', 'modid' => '',
+    ];
+    $settings = [
+      'default_name' => '名無し', 'default_comment' => '本文なし', 'default_subject' => '無題',
+      'admin_name' => '管理者', 'admin_cap' => '(ではない)',
+    ];
+    $prepared = $service->prepareNewPost($new_input, 'new.example.com', $settings);
+    $new_id = $service->createPreparedPost($prepared, [
+      'pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0, 'utime' => '',
+      'tool' => '', 'nsfw' => false, 'ctype' => null, 'thumbnail' => '',
+    ]);
+    if (($repository->findPost($new_id)['sub'] ?? '') !== '新規題名') return false;
+    try {
+      $service->prepareNewPost($new_input, 'new.example.com', $settings);
+      return false;
+    } catch (DuplicatePostException $e) {
+    }
+    $reply_input = array_merge($new_input, [
+      'sub' => '返信題名', 'com' => '返信本文', 'resto' => (string)$new_id,
+    ]);
+    $reply = $service->prepareNewPost($reply_input, 'reply.example.com', $settings);
+    $reply_id = $service->createPreparedPost($reply, [
+      'pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0, 'utime' => '',
+      'tool' => '', 'nsfw' => false, 'ctype' => null, 'thumbnail' => '',
+    ]);
+    $reply_row = $repository->findPost($reply_id);
+    $parent_row = $repository->findPost($new_id);
+    if ((int)($reply_row['thread'] ?? 1) !== 0 || (int)($reply_row['parent'] ?? 0) !== $new_id
+      || (int)($parent_row['age'] ?? 0) !== 1) return false;
     return true;
   } finally {
     foreach (glob($image_dir . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
