@@ -41,6 +41,13 @@ if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260716) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
+// initialization.inc
+check_file(__DIR__.'/initialization.inc.php');
+require_once(__DIR__.'/initialization.inc.php');
+if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260716) {
+  die($en ? 'Please update initialization.inc.php to the latest version.' : 'initialization.inc.phpを最新版に更新してください。');
+}
+
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
@@ -342,33 +349,22 @@ switch ($mode) {
 
 function init(): void {
   global $en;
-  // セキュリティヘッダーの設定
-  header('X-Content-Type-Options: nosniff');
-  header('X-Frame-Options: DENY');
-  header('X-XSS-Protection: 1; mode=block');
-  header('Referrer-Policy: strict-origin-when-cross-origin');
-  header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+  $initializer = new ApplicationInitializer(
+    DB_PDO, DB_FILE, __DIR__ . '/backup', __DIR__,
+    [
+      __DIR__ . '/' . IMG_DIR, __DIR__ . '/' . TEMP_DIR, __DIR__ . '/' . THUMB_DIR,
+      __DIR__ . '/thumbnail', __DIR__ . '/session',
+    ],
+    PERMISSION_FOR_DIR
+  );
+  $initializer->sendSecurityHeaders();
   try {
-    $db = new PDO(DB_PDO);
-    $migrator = new DatabaseMigrator($db, DB_FILE, __DIR__ . '/backup');
-    $migrator->migrate();
-    $db = null;
+    $initializer->prepareDirectories();
+    $initializer->migrateDatabase();
+    $initializer->secureDatabaseFile();
   } catch (Throwable $e) {
-    error(($en ? 'Database migration failed. ' : 'データベースの移行に失敗しました。') . h($e->getMessage()));
-  }
-  $err = '';
-  if (!is_writable(realpath("./"))) error($en ? "Current directory is not writable.<br>" : "カレントディレクトリに書けません<br>");
-
-  check_dir(__DIR__.'/'.IMG_DIR);
-  check_dir(__DIR__.'/'.TEMP_DIR);
-  check_dir(__DIR__.'/'.THUMB_DIR);
-  check_dir(__DIR__.'/thumbnail/');
-  check_dir(__DIR__.'/session/');
-
-  if ($err) error($err);
-  if (is_file(DB_FILE)) {
-    // データベースファイルのパーミッションを明示的に設定
-    chmod(DB_FILE, 0600);
+    error(($en ? 'Application initialization failed. ' : 'アプリケーションの初期化に失敗しました。') . h($e->getMessage()));
+    return;
   }
 }
 

@@ -15,6 +15,7 @@ const ID_SEED = 'smoke-test-seed';
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
+require_once dirname(__DIR__) . '/noreita/initialization.inc.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 
@@ -85,6 +86,42 @@ smoke_test('database migration and backup', static function (): bool {
     if (is_file($database_file)) unlink($database_file);
     if (is_dir($backup_dir)) rmdir($backup_dir);
     if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('application initialization prepares runtime state', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_init_' . bin2hex(random_bytes(8));
+  if (!mkdir($root, 0700)) return false;
+  $database_file = $root . DIRECTORY_SEPARATOR . 'board.db';
+  $backup_dir = $root . DIRECTORY_SEPARATOR . 'backup';
+  $directories = [
+    $root . DIRECTORY_SEPARATOR . 'img',
+    $root . DIRECTORY_SEPARATOR . 'temp',
+    $root . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'session',
+  ];
+  try {
+    $initializer = new ApplicationInitializer(
+      'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories, 0700
+    );
+    $initializer->prepareDirectories();
+    $initializer->migrateDatabase();
+    $initializer->secureDatabaseFile();
+    $database = new PDO('sqlite:' . $database_file);
+    $schema_version = (int)$database->query('PRAGMA user_version')->fetchColumn();
+    $database = null;
+    return count(ApplicationInitializer::securityHeaders()) === 5
+      && $schema_version === DatabaseMigrator::SCHEMA_VERSION
+      && !array_filter($directories, static fn(string $directory): bool => !is_dir($directory))
+      && (fileperms($database_file) & 0777) === 0600;
+  } finally {
+    foreach ([$database_file, $database_file . '-wal', $database_file . '-shm'] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($backup_dir)) rmdir($backup_dir);
+    if (is_dir($directories[2])) rmdir($directories[2]);
+    if (is_dir($root . DIRECTORY_SEPARATOR . 'nested')) rmdir($root . DIRECTORY_SEPARATOR . 'nested');
+    foreach (array_slice($directories, 0, 2) as $directory) if (is_dir($directory)) rmdir($directory);
+    if (is_dir($root)) rmdir($root);
   }
 });
 
