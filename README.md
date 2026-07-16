@@ -1,6 +1,5 @@
 # noReita
 
-![php](https://img.shields.io/badge/php-7.4-green.svg)
 ![php](https://img.shields.io/badge/php-8.x-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
@@ -76,6 +75,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ### [2026/07/15] v3.4.1
 
 - TLS検証と外部URL取得の安全化
+- phpの最低バージョンが正しくなかったので8.0に引き上げ
 
 ### [2026/07/14] v3.4.0
 
