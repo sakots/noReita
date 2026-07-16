@@ -34,6 +34,13 @@ if (!defined('CONF_VER') || CONF_VER < 20260405) {
   die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
+// database.inc
+check_file(__DIR__.'/database.inc.php');
+require_once(__DIR__.'/database.inc.php');
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260716) {
+  die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
+}
+
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
@@ -183,7 +190,8 @@ defined('USE_NSFW') or define('USE_NSFW', 1);
 $dat['use_nsfw'] = USE_NSFW;
 
 //データベース接続PDO
-const DB_PDO = 'sqlite:' . DB_NAME . '.db';
+const DB_FILE = __DIR__ . '/' . DB_NAME . '.db';
+const DB_PDO = 'sqlite:' . DB_FILE;
 
 defined("SNS_WINDOW_WIDTH") or define("SNS_WINDOW_WIDTH","600");
 defined("SNS_WINDOW_HEIGHT") or define("SNS_WINDOW_HEIGHT","600");
@@ -327,48 +335,12 @@ function init(): void {
   header('Referrer-Policy: strict-origin-when-cross-origin');
   header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
   try {
-    if (!is_file(DB_NAME . '.db')) {
-      // はじめての実行なら、テーブルを作成
-      $db = new PDO(DB_PDO);
-      $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-      $sql = "CREATE TABLE IF NOT EXISTS board_log (
-        tid integer primary key autoincrement, --ID
-        created TIMESTAMP, --描いた日時
-        modified TIMESTAMP, --修正日時
-        thread VARCHAR(1), --スレ親orレス
-        parent INT, --親スレ
-        comid BIGINT, --コメントID
-        tree BIGINT, --スレ構造ID
-        a_name TEXT, --名前
-        mail TEXT, --メール
-        sub TEXT, --タイトル
-        com TEXT, --本文
-        a_url TEXT, --url
-        host TEXT, --ホスト
-        sodane TEXT, --そうだね
-        id TEXT, --投稿者ID
-        pwd TEXT, --パスワード
-        psec INT, --絵の時間(内部)
-        utime TEXT, --絵の時間
-        picfile TEXT, --絵のurl
-        pchfile TEXT, --pchのurl
-        img_w INT, --絵の幅
-        img_h INT, --絵の高さ
-        age INT, --age/sage記憶
-        invz VARCHAR(1), --表示/非表示（管理者削除）
-        tool TEXT, --絵のツール
-        admins VARCHAR(1), --認証マーク
-        shd VARCHAR(1), --そろそろ消える
-        nsfw TEXT, --nsfw
-        ctype TEXT, --?
-        uuid TEXT, --uuid(v7)
-        thumbnail TEXT --サムネイル
-      )";
-      $db = $db->query($sql);
-      $db = null; //db切断
-    }
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    $db = new PDO(DB_PDO);
+    $migrator = new DatabaseMigrator($db, DB_FILE, __DIR__ . '/backup');
+    $migrator->migrate();
+    $db = null;
+  } catch (Throwable $e) {
+    error(($en ? 'Database migration failed. ' : 'データベースの移行に失敗しました。') . h($e->getMessage()));
   }
   $err = '';
   if (!is_writable(realpath("./"))) error($en ? "Current directory is not writable.<br>" : "カレントディレクトリに書けません<br>");
@@ -380,9 +352,9 @@ function init(): void {
   check_dir(__DIR__.'/session/');
 
   if ($err) error($err);
-  if (is_file(DB_NAME . '.db')) {
+  if (is_file(DB_FILE)) {
     // データベースファイルのパーミッションを明示的に設定
-    chmod(DB_NAME . '.db', 0600);
+    chmod(DB_FILE, 0600);
   }
 }
 

@@ -6,6 +6,7 @@ const PHP_SELF = 'index.php';
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
+require_once dirname(__DIR__) . '/noreita/database.inc.php';
 
 $passed = 0;
 $failed = 0;
@@ -41,6 +42,83 @@ smoke_test('SQLite read and write', static function (): bool {
   $statement = $db->prepare('INSERT INTO smoke (value) VALUES (:value)');
   $statement->execute(['value' => 'noReita']);
   return $db->query('SELECT value FROM smoke')->fetchColumn() === 'noReita';
+});
+
+smoke_test('database migration and backup', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_db_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) {
+    throw new RuntimeException('could not create temporary directory');
+  }
+  $database_file = $directory . DIRECTORY_SEPARATOR . 'smoke.db';
+  $backup_dir = $directory . DIRECTORY_SEPARATOR . 'backup';
+
+  try {
+    $db = new PDO('sqlite:' . $database_file);
+    $migrator = new DatabaseMigrator($db, $database_file, $backup_dir);
+    if ($migrator->migrate() !== null || $migrator->schemaVersion() !== DatabaseMigrator::SCHEMA_VERSION) {
+      return false;
+    }
+
+    $db->exec("INSERT INTO board_log (com) VALUES ('preserved')");
+    $db->exec('PRAGMA user_version = 0');
+    $backup = $migrator->migrate();
+    if ($backup === null || !is_file($backup) || $migrator->schemaVersion() !== DatabaseMigrator::SCHEMA_VERSION) {
+      return false;
+    }
+
+    $backup_db = new PDO('sqlite:' . $backup);
+    return $backup_db->query('SELECT com FROM board_log')->fetchColumn() === 'preserved';
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . '*.db') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_file($database_file)) unlink($database_file);
+    if (is_dir($backup_dir)) rmdir($backup_dir);
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('version 2 database is not modified automatically', static function (): bool {
+  $database_file = tempnam(sys_get_temp_dir(), 'noreita_v2_');
+  if ($database_file === false) {
+    throw new RuntimeException('could not create temporary database');
+  }
+  $backup_dir = $database_file . '_backup';
+
+  try {
+    $db = new PDO('sqlite:' . $database_file);
+    $db->exec('CREATE TABLE tlog (tid INTEGER PRIMARY KEY)');
+    $migrator = new DatabaseMigrator($db, $database_file, $backup_dir);
+    try {
+      $migrator->migrate();
+    } catch (RuntimeException $e) {
+      return str_contains($e->getMessage(), 'Version 2')
+        && (int)$db->query('SELECT COUNT(*) FROM tlog')->fetchColumn() === 0
+        && !is_dir($backup_dir);
+    }
+    return false;
+  } finally {
+    if (is_file($database_file)) unlink($database_file);
+    if (is_dir($backup_dir)) rmdir($backup_dir);
+  }
+});
+
+smoke_test('failed database operation is rolled back', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  $migrator = new DatabaseMigrator($db, ':memory:', sys_get_temp_dir());
+  $transaction = new ReflectionMethod($migrator, 'transaction');
+  $transaction->setAccessible(true);
+
+  try {
+    $transaction->invoke($migrator, static function () use ($db): void {
+      $db->exec('CREATE TABLE should_rollback (id INTEGER)');
+      throw new RuntimeException('expected failure');
+    });
+  } catch (RuntimeException $e) {
+    $exists = (int)$db->query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'should_rollback'")->fetchColumn();
+    return $e->getMessage() === 'expected failure' && $exists === 0 && !$db->inTransaction();
+  }
+  return false;
 });
 
 smoke_test('UUIDv7 format and uniqueness', static function (): bool {
@@ -103,4 +181,3 @@ smoke_test('GD thumbnail generation', static function (): bool {
 
 echo "\nSmoke tests: {$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);
-
