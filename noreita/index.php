@@ -30,7 +30,7 @@ if(!isset($functions_ver) || $functions_ver < 20260504) {
 check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 20260405 || !defined('CONF_VER')) {
+if (!defined('CONF_VER') || CONF_VER < 20260405) {
   die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
