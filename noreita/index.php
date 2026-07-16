@@ -409,15 +409,8 @@ function regist(): void {
   //ホスト取得
   $host = gethostbyaddr(get_uip());
   try {
-    PostValidator::validate($input, [
-      'en' => $en, 'request_method' => $req_method, 'host' => $host, 'blocked_hosts' => $badip,
-      'require_name' => USE_NAME, 'require_comment' => USE_COM, 'require_subject' => USE_SUB,
-      'max_comment' => MAX_COM, 'max_name' => MAX_NAME, 'max_email' => MAX_EMAIL,
-      'max_subject' => MAX_SUB, 'max_url' => MAX_URL, 'japanese_filter' => USE_JAPANESEFILTER,
-      'deny_comment_urls' => DENY_COMMENTS_URL, 'admin_pass' => $admin_pass,
-      'bad_strings' => $GLOBALS['badstring'] ?? [], 'bad_names' => $GLOBALS['badname'] ?? [],
-      'bad_strings_a' => $GLOBALS['badstr_A'] ?? [], 'bad_strings_b' => $GLOBALS['badstr_B'] ?? [],
-    ]);
+    $rules = PostValidator::configuredRules($en, $req_method, $host, $badip, $admin_pass, (bool)USE_COM);
+    PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
     error($e->getMessage());
     return;
@@ -1765,15 +1758,8 @@ function editexec(): void {
   //ホスト取得
   $host = gethostbyaddr(get_uip());
   try {
-    PostValidator::validate($input, [
-      'en' => $en, 'request_method' => $req_method, 'host' => $host, 'blocked_hosts' => $badip,
-      'require_name' => USE_NAME, 'require_comment' => true, 'require_subject' => USE_SUB,
-      'max_comment' => MAX_COM, 'max_name' => MAX_NAME, 'max_email' => MAX_EMAIL,
-      'max_subject' => MAX_SUB, 'max_url' => MAX_URL, 'japanese_filter' => USE_JAPANESEFILTER,
-      'deny_comment_urls' => DENY_COMMENTS_URL, 'admin_pass' => $GLOBALS['admin_pass'] ?? '',
-      'bad_strings' => $GLOBALS['badstring'] ?? [], 'bad_names' => $GLOBALS['badname'] ?? [],
-      'bad_strings_a' => $GLOBALS['badstr_A'] ?? [], 'bad_strings_b' => $GLOBALS['badstr_B'] ?? [],
-    ]);
+    $rules = PostValidator::configuredRules($en, $req_method, $host, $badip, $admin_pass, true);
+    PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
     error($e->getMessage());
     return;

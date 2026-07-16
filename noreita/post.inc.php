@@ -6,6 +6,37 @@ const POST_INC_VER = 20260716;
 final class PostValidationException extends DomainException {}
 
 final class PostValidator {
+  public static function configuredRules(
+    bool $en,
+    string $request_method,
+    string $host,
+    array $blocked_hosts,
+    string $admin_pass,
+    bool $require_comment
+  ): array {
+    return [
+      'en' => $en,
+      'request_method' => $request_method,
+      'host' => $host,
+      'blocked_hosts' => $blocked_hosts,
+      'require_name' => (bool)USE_NAME,
+      'require_comment' => $require_comment,
+      'require_subject' => (bool)USE_SUB,
+      'max_comment' => (int)MAX_COM,
+      'max_name' => (int)MAX_NAME,
+      'max_email' => (int)MAX_EMAIL,
+      'max_subject' => (int)MAX_SUB,
+      'max_url' => (int)MAX_URL,
+      'japanese_filter' => (bool)USE_JAPANESEFILTER,
+      'deny_comment_urls' => (bool)DENY_COMMENTS_URL,
+      'admin_pass' => $admin_pass,
+      'bad_strings' => $GLOBALS['badstring'] ?? [],
+      'bad_names' => $GLOBALS['badname'] ?? [],
+      'bad_strings_a' => $GLOBALS['badstr_A'] ?? [],
+      'bad_strings_b' => $GLOBALS['badstr_B'] ?? [],
+    ];
+  }
+
   public static function inputFromHttp(): array {
     return [
       'sub' => (string)filter_input(INPUT_POST, 'sub'),
