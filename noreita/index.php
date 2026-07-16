@@ -1740,6 +1740,7 @@ function editform(): void {
 //編集モードくん本体
 function editexec(): void {
   global $badip;
+  global $admin_pass;
   global $req_method;
   global $dat;
   global $en;
@@ -1759,7 +1760,6 @@ function editexec(): void {
   $com = $input['com'];
   $picfile = (string)$input['picfile'];
   $pwd = $input['pwd'];
-  $pwdh = password_hash($pwd, PASSWORD_DEFAULT);
   $sodane = $input['sodane'];
 
   //ホスト取得
@@ -1789,15 +1789,28 @@ function editexec(): void {
   $host = str_replace("'", "''", $host);
 
   try {
-    (new BoardRepository())->updateContent((int)$e_no, [
+    $repository = new BoardRepository();
+    $existing_post = $repository->findPost((int)$e_no);
+    if (empty($existing_post)) {
+      error($en ? 'That post does not exist.' : 'そんな記事ないです。');
+      return;
+    }
+    $owner_authorized = password_verify($pwd, (string)$existing_post['pwd']);
+    $admin_authorized = $admin_pass !== '' && hash_equals($admin_pass, $pwd);
+    if (!$owner_authorized && !$admin_authorized) {
+      error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+      return;
+    }
+    $repository->updateContent((int)$e_no, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
-      'host' => $host, 'sodane' => $sodane, 'pwdh' => $pwdh,
+      'host' => $host, 'sodane' => $sodane, 'pwdh' => (string)$existing_post['pwd'],
     ]);
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+  } catch (Throwable $e) {
+    error(($en ? 'Editing failed. ' : '編集に失敗しました。') . h($e->getMessage()));
+    return;
   }
-  unset($name, $mail, $sub, $com, $url, $pwd, $pwdh, $resto, $pictmp, $picfile, $mode);
+  unset($name, $mail, $sub, $com, $url, $pwd, $resto, $pictmp, $picfile, $mode);
   //header('Location:'.PHP_SELF);
   ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }

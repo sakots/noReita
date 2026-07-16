@@ -169,15 +169,28 @@ try {
   });
 
   $post_id = (int)($row['tid'] ?? 0);
+  $password_hash_before_edit = (string)$db->query('SELECT pwd FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  [$rejected_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Attacker', 'mail' => '', 'url' => '',
+    'sub' => 'Unauthorized edit', 'com' => "不正な編集 {$marker}", 'pwd' => 'wrong-pass',
+    'sodane' => '0', 'token' => $token,
+  ]);
+  $after_rejected_edit = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
+  integration_test('edit rejects an invalid password without changing the post', static function () use ($rejected_edit_status, $after_rejected_edit, $password_hash_before_edit): bool {
+    return $rejected_edit_status === 200 && is_array($after_rejected_edit)
+      && $after_rejected_edit['sub'] === 'Integration subject'
+      && $after_rejected_edit['pwd'] === $password_hash_before_edit;
+  });
+
   [$edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'EditedUser', 'mail' => '', 'url' => '',
     'sub' => 'Edited subject', 'com' => "編集後の結合テスト {$marker}", 'pwd' => 'delete-pass',
     'sodane' => '0', 'token' => $token,
   ]);
-  $edited = $db->query('SELECT sub, com FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
-  integration_test('edit is validated and stored through HTTP', static function () use ($edit_status, $edited, $marker): bool {
+  $edited = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
+  integration_test('authorized edit is validated and stored through HTTP', static function () use ($edit_status, $edited, $marker, $password_hash_before_edit): bool {
     return $edit_status === 200 && is_array($edited) && $edited['sub'] === 'Edited subject'
-      && str_contains($edited['com'], $marker);
+      && str_contains($edited['com'], $marker) && $edited['pwd'] === $password_hash_before_edit;
   });
 
   [$delete_status, $delete_body] = http_request($base_url, $cookie_jar, [
