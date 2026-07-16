@@ -14,6 +14,7 @@ require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
+require_once dirname(__DIR__) . '/noreita/post.inc.php';
 
 $passed = 0;
 $failed = 0;
@@ -141,6 +142,39 @@ smoke_test('escaping and NG-word helpers', static function (): bool {
     && s('<b>text</b>') === 'text'
     && is_ngword(['spam'], ['safe', 'contains spam'])
     && !is_ngword(['spam'], 'safe');
+});
+
+smoke_test('post validation is independent from HTTP rendering', static function (): bool {
+  $input = [
+    'sub' => '題名', 'name' => '名前', 'mail' => '', 'url' => '', 'com' => '本文です',
+    'pwd' => 'secret', 'resto' => '',
+  ];
+  $rules = [
+    'en' => false, 'request_method' => 'POST', 'host' => 'client.example.com',
+    'blocked_hosts' => [], 'require_name' => true, 'require_comment' => true,
+    'require_subject' => true, 'max_comment' => 100, 'max_name' => 100,
+    'max_email' => 100, 'max_subject' => 100, 'max_url' => 100,
+    'japanese_filter' => true, 'deny_comment_urls' => true, 'admin_pass' => 'admin',
+    'bad_strings' => ['禁止語'], 'bad_names' => ['使用禁止名'],
+    'bad_strings_a' => ['激安'], 'bad_strings_b' => ['ブランド'],
+  ];
+  PostValidator::validate($input, $rules);
+
+  $invalid_cases = [
+    [array_merge($input, ['com' => '']), $rules, '本文は必須です。'],
+    [array_merge($input, ['com' => 'https://example.com']), array_merge($rules, ['japanese_filter' => false]), 'コメントにはURLを含めることはできません。'],
+    [array_merge($input, ['name' => '使用禁止名']), $rules, '無効な名前が使用されています。'],
+    [$input, array_merge($rules, ['host' => 'blocked.example.com', 'blocked_hosts' => ['blocked\\.example\\.com']]), 'あなたのホストは拒絶されています。'],
+  ];
+  foreach ($invalid_cases as [$invalid_input, $invalid_rules, $expected]) {
+    try {
+      PostValidator::validate($invalid_input, $invalid_rules);
+      return false;
+    } catch (PostValidationException $e) {
+      if ($e->getMessage() !== $expected) return false;
+    }
+  }
+  return true;
 });
 
 smoke_test('image MIME mapping', static function (): bool {

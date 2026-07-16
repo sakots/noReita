@@ -48,6 +48,13 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260716) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
+// post.inc
+check_file(__DIR__.'/post.inc.php');
+require_once(__DIR__.'/post.inc.php');
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260716) {
+  die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
+}
+
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
@@ -380,75 +387,40 @@ function regist(): void {
     check_csrf_token();
   }
 
-  $sub = (string)filter_input(INPUT_POST, 'sub');
-  $name = (string)filter_input(INPUT_POST, 'name');
-  $mail = (string)filter_input(INPUT_POST, 'mail');
-  $url = (string)filter_input(INPUT_POST, 'url');
-  $com = (string)filter_input(INPUT_POST, 'com');
-  $picfile = filter_input(INPUT_POST, 'picfile');
-  $invz = trim(filter_input(INPUT_POST, 'invz'));
-  $img_w = trim(filter_input(INPUT_POST, 'img_w', FILTER_VALIDATE_INT));
-  $img_h = trim(filter_input(INPUT_POST, 'img_h', FILTER_VALIDATE_INT));
-  $pwd = (string)trim(filter_input(INPUT_POST, 'pwd'));
+  $input = PostValidator::inputFromHttp();
+  $sub = $input['sub'];
+  $name = $input['name'];
+  $mail = $input['mail'];
+  $url = $input['url'];
+  $com = $input['com'];
+  $picfile = $input['picfile'];
+  $invz = $input['invz'];
+  $pwd = $input['pwd'];
   $pwdh = password_hash($pwd, PASSWORD_DEFAULT);
-  $sodane = trim(filter_input(INPUT_POST, 'sodane', FILTER_VALIDATE_INT));
-  $pal = filter_input(INPUT_POST, 'palettes');
-  $nsfw_flag = (string)filter_input(INPUT_POST, 'nsfw', FILTER_VALIDATE_INT);
-  $rep = (string)filter_input(INPUT_POST, 'rep');
-
-  $repcode = (string)filter_input(INPUT_POST, 'repcode');
-  $id = (string)filter_input(INPUT_POST, 'id');
-  $no = (string)filter_input(INPUT_POST, 'no');
-  $enc_pwd = (string)filter_input(INPUT_POST, 'enc_pwd');
-  $modid = (string)filter_input(INPUT_POST, 'modid');
-
-  $resto = (string)filter_input(INPUT_POST, 'resto');
+  $sodane = $input['sodane'];
+  $pal = $input['pal'];
+  $nsfw_flag = $input['nsfw_flag'];
+  $modid = $input['modid'];
+  $resto = $input['resto'];
 
   // クッキー保存用
   $original_name = $name;
 
-  if ($req_method !== "POST") {
-    error($en ? "Invalid request method." : "不正なリクエスト方法です。");
-  }
-
-  // NGワードがあれば拒絶
-  Reject_if_NGword_exists_in_the_post($com, $name, $mail, $url, $sub);
-
-  // 名前がない場合は拒絶
-  if (USE_NAME && !$name) {
-    error($en ? "Name is required." : "名前は必須です。");
-  }
-  // 本文必須 リプライのときは必ず必要、スレ立てのときは設定次第
-  if (($resto || USE_COM) && !$com) {
-    error($en ? "Comment is required." : "本文は必須です。");
-  }
-  if (USE_SUB && !$sub) {
-    error($en ? "Subject is required." : "タイトルは必須です。");
-  }
-
-  if (strlen($com) > MAX_COM) {
-    error($en ? "Comment is too long." : "本文が長すぎます。");
-  }
-  if (strlen($name) > MAX_NAME) {
-    error($en ? "Name is too long." : "名前が長すぎます。");
-  }
-  if (strlen($mail) > MAX_EMAIL) {
-    error($en ? "Email is too long." : "メールアドレスが長すぎます。");
-  }
-  if (strlen($sub) > MAX_SUB) {
-    error($en ? "Subject is too long." : "タイトルが長すぎます。");
-  }
-  if (strlen($url) > MAX_URL) {
-    error($en ? "URL is too long." : "URLが長すぎます。");
-  }
-
   //ホスト取得
   $host = gethostbyaddr(get_uip());
-
-  foreach ($badip as $value) { //拒絶host
-    if (preg_match("/$value$/i", $host)) {
-      error($en ? "Your host is blocked." : "あなたのホストは拒絶されています。");
-    }
+  try {
+    PostValidator::validate($input, [
+      'en' => $en, 'request_method' => $req_method, 'host' => $host, 'blocked_hosts' => $badip,
+      'require_name' => USE_NAME, 'require_comment' => USE_COM, 'require_subject' => USE_SUB,
+      'max_comment' => MAX_COM, 'max_name' => MAX_NAME, 'max_email' => MAX_EMAIL,
+      'max_subject' => MAX_SUB, 'max_url' => MAX_URL, 'japanese_filter' => USE_JAPANESEFILTER,
+      'deny_comment_urls' => DENY_COMMENTS_URL, 'admin_pass' => $admin_pass,
+      'bad_strings' => $GLOBALS['badstring'] ?? [], 'bad_names' => $GLOBALS['badname'] ?? [],
+      'bad_strings_a' => $GLOBALS['badstr_A'] ?? [], 'bad_strings_b' => $GLOBALS['badstr_B'] ?? [],
+    ]);
+  } catch (PostValidationException $e) {
+    error($e->getMessage());
+    return;
   }
   //セキュリティ関連ここまで
 
@@ -480,7 +452,7 @@ function regist(): void {
         }
         //画像番号が一致の場合(投稿してブラウザバック、また投稿とか)
         //二重投稿と判別(画像がない場合は処理しない)
-        if (!empty($_POST["modid"])) {
+        if ($modid !== '') {
           if ($msg_wc["picfile"] !== "" && $picfile == $msg_wc["picfile"]) {
             $db = null; //db切断
             error($en ? 'Duplicate post?' : '二重投稿ですか ?');
