@@ -64,7 +64,7 @@ function remove_tree(string $path): void {
   rmdir($path);
 }
 
-function http_request(string $url, string $cookie_jar, ?array $post = null): array {
+function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1'): array {
   $curl = curl_init($url);
   curl_setopt_array($curl, [
     CURLOPT_RETURNTRANSFER => true,
@@ -72,7 +72,10 @@ function http_request(string $url, string $cookie_jar, ?array $post = null): arr
     CURLOPT_TIMEOUT => 10,
     CURLOPT_COOKIEJAR => $cookie_jar,
     CURLOPT_COOKIEFILE => $cookie_jar,
-    CURLOPT_HTTPHEADER => ['Host: localhost', 'Origin: http://localhost', 'X-Forwarded-For: 127.0.0.1'],
+    CURLOPT_HTTPHEADER => [
+      'Host: localhost', 'Origin: http://localhost',
+      'Client-IP: ' . $forwarded_for, 'X-Forwarded-For: ' . $forwarded_for,
+    ],
   ]);
   if ($post !== null) {
     curl_setopt($curl, CURLOPT_POST, true);
@@ -194,6 +197,90 @@ try {
     return $edit_status === 200 && is_array($edited) && $edited['sub'] === "Edited user's subject"
       && $edited['com'] === "編集後 user's 結合テスト {$marker}"
       && $edited['pwd'] === $password_hash_before_edit;
+  });
+
+  [$admin_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Administrator', 'mail' => '', 'url' => '',
+    'sub' => "Administrator's edit", 'com' => "管理者編集 user's {$marker}", 'pwd' => 'integration-admin-pass',
+    'sodane' => '0', 'token' => $token,
+  ]);
+  $admin_edited = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
+  integration_test('administrator can edit without replacing the post password', static function () use ($admin_edit_status, $admin_edited, $marker, $password_hash_before_edit): bool {
+    return $admin_edit_status === 200 && is_array($admin_edited)
+      && $admin_edited['sub'] === "Administrator's edit"
+      && $admin_edited['com'] === "管理者編集 user's {$marker}"
+      && $admin_edited['pwd'] === $password_hash_before_edit;
+  });
+
+  $count_before_rejections = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+  [$ng_status, $ng_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'NG test', 'mail' => '', 'url' => '',
+    'sub' => 'NG subject', 'com' => '著作権の侵害を含む本文です', 'pwd' => 'ng-pass',
+    'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  $count_after_ng = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+  integration_test('NG word is rejected through HTTP', static function () use ($ng_status, $ng_body, $count_before_rejections, $count_after_ng): bool {
+    return $ng_status === 200 && $count_after_ng === $count_before_rejections
+      && str_contains($ng_body, 'Invalid characters');
+  });
+
+  [$blocked_status, $blocked_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'Blocked host', 'mail' => '', 'url' => '',
+    'sub' => 'Blocked subject', 'com' => '拒否ホストからの本文です', 'pwd' => 'blocked-pass',
+    'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ], '198.51.100.0');
+  $count_after_blocked = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+  integration_test('blocked host is rejected through HTTP', static function () use ($blocked_status, $blocked_body, $count_before_rejections, $count_after_blocked): bool {
+    return $blocked_status === 200 && $count_after_blocked === $count_before_rejections
+      && str_contains($blocked_body, 'host is blocked');
+  });
+
+  [$duplicate_status, $duplicate_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'Duplicate test', 'mail' => '', 'url' => '',
+    'sub' => "Administrator's edit", 'com' => "管理者編集 user's {$marker}", 'pwd' => 'duplicate-pass',
+    'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  $count_after_duplicate = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+  integration_test('duplicate post is rejected through HTTP', static function () use ($duplicate_status, $duplicate_body, $count_before_rejections, $count_after_duplicate): bool {
+    return $duplicate_status === 200 && $count_after_duplicate === $count_before_rejections
+      && str_contains($duplicate_body, 'Duplicate post');
+  });
+
+  $image_base = 'image-' . bin2hex(random_bytes(6));
+  $image_name = $image_base . '.png';
+  $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+  if ($png === false) throw new RuntimeException('Could not decode integration PNG');
+  file_put_contents($webroot . '/tmp/' . $image_name, $png);
+  file_put_contents($webroot . '/tmp/' . $image_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
+  file_put_contents($webroot . '/tmp/' . $image_base . '.pch', 'NEO animation');
+  [$image_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'sub' => 'Image subject', 'com' => '画像付き投稿の本文です', 'pwd' => 'image-pass',
+    'picfile' => $image_name, 'ctype' => 'new', 'invz' => '0', 'sodane' => '0', 'nsfw' => '0',
+    'token' => $token,
+  ]);
+  $image_row = $db->query("SELECT tid, picfile, pchfile, img_w, img_h, psec, tool FROM board_log WHERE sub = 'Image subject' ORDER BY tid DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+  integration_test('image and animation post is stored through HTTP', static function () use ($image_status, $image_row, $webroot, $image_name, $image_base): bool {
+    return $image_status === 200 && is_array($image_row)
+      && $image_row['picfile'] === $image_name && $image_row['pchfile'] === $image_base . '.pch'
+      && (int)$image_row['img_w'] === 1 && (int)$image_row['img_h'] === 1
+      && (int)$image_row['psec'] === 60 && $image_row['tool'] === 'PaintBBS NEO'
+      && is_file($webroot . '/img/' . $image_name)
+      && is_file($webroot . '/img/' . $image_base . '.pch')
+      && !is_file($webroot . '/tmp/' . $image_base . '.dat');
+  });
+
+  $image_post_id = (int)($image_row['tid'] ?? 0);
+  [$image_delete_status] = http_request($base_url, $cookie_jar, [
+    'mode' => 'del', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
+  ]);
+  clearstatcache(true, $webroot . '/img/' . $image_name);
+  clearstatcache(true, $webroot . '/img/' . $image_base . '.pch');
+  integration_test('deleting image post removes related files', static function () use ($image_delete_status, $db, $image_post_id, $webroot, $image_name, $image_base): bool {
+    return $image_delete_status === 200
+      && (int)$db->query('SELECT COUNT(*) FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn() === 0
+      && !is_file($webroot . '/img/' . $image_name)
+      && !is_file($webroot . '/img/' . $image_base . '.pch');
   });
 
   [$delete_status, $delete_body] = http_request($base_url, $cookie_jar, [

@@ -247,15 +247,15 @@ $req_method = isset($_SERVER["REQUEST_METHOD"]) ? $_SERVER["REQUEST_METHOD"] : "
 
 //ユーザーip
 function get_uip():  string {
-  if ($userip = getenv("HTTP_CLIENT_IP")) {
-    return $userip;
-  } elseif ($userip = getenv("HTTP_X_FORWARDED_FOR")) {
-    return $userip;
-  } elseif ($userip = getenv("REMOTE_ADDR")) {
-    return $userip;
-  } else {
-    return $userip;
+  foreach (['HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $source) {
+    $value = $_SERVER[$source] ?? getenv($source);
+    if (!is_string($value) || $value === '') continue;
+    foreach (explode(',', $value) as $candidate) {
+      $candidate = trim($candidate);
+      if (filter_var($candidate, FILTER_VALIDATE_IP) !== false) return $candidate;
+    }
   }
+  return '';
 }
 
 $https_only = (bool)($_SERVER['HTTPS'] ?? '');
