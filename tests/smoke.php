@@ -200,6 +200,28 @@ smoke_test('temporary images are parsed, found, and cleaned up', static function
   }
 });
 
+smoke_test('animation playback data is built by the image service', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_playback_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $image = imagecreatetruecolor(120, 80);
+    imagepng($image, $directory . DIRECTORY_SEPARATOR . 'drawing.png');
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'drawing.pch', 'NEO animation');
+
+    $data = ImageService::animationPlaybackData($directory, 'drawing.pch', 12);
+    return $data['tool'] === 'neo' && $data['template_type'] === 'standard'
+      && $data['picw'] === 120 && $data['pich'] === 80
+      && $data['w'] === 300 && $data['h'] === 326
+      && $data['pchfile'] === './drawing.pch'
+      && $data['datasize'] === strlen('NEO animation') && $data['speed'] === 12;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('external URL security boundaries', static function (): bool {
   return resolve_public_ip('127.0.0.1') === false
     && resolve_public_ip('192.168.1.1') === false

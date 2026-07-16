@@ -1416,67 +1416,17 @@ function paint_form(string $rep, int|null $reply_to): void {
 
 function open_pch(string $sp = ""): void {
   global $blade, $dat;
-  $message = "";
 
   $pch = (string)filter_input(INPUT_GET, 'pch');
-  if (!ImageService::isSafeAnimationFilename($pch)) {
-    error(LANG === 'English' ? 'Invalid animation filename.' : '動画ファイル名が不正です。');
+  try {
+    $playback = ImageService::animationPlaybackData(IMG_DIR, $pch, (int)($sp ?: PCH_SPEED));
+  } catch (Throwable $e) {
+    error((LANG === 'English' ? 'Failed to open animation. ' : '動画を開けませんでした。') . h($e->getMessage()));
+    return;
   }
-  $pch_h = pathinfo($pch, PATHINFO_FILENAME);
-  $extension = strtolower(pathinfo($pch, PATHINFO_EXTENSION));
-
-  $picfile = IMG_DIR . $pch_h . ".png";
-
-  if ($extension == 'spch') {
-    $pchfile = IMG_DIR . $pch;
-    $dat['tool'] = 'shi'; //拡張子がspchのときはしぃペインター
-    $template = ANIMEFILE;
-  } elseif ($extension == 'pch') {
-    $pchfile = IMG_DIR . $pch;
-    $dat['tool'] = 'neo'; //拡張子がpchのときはNEO
-    $template = ANIMEFILE;
-  } elseif ($extension=='tgkr'){
-    $pchfile = IMG_DIR . $pch;
-    $dat['tool'] = 'tegaki'; //拡張子がtgkrのときはTegaki
-    $template = ANIMEFILE_TEGAKI;
-  } else {
-    $w = $h = $picw = $pich = $datasize = ""; //動画が無い時は処理しない
-    $dat['tool'] = 'neo';
-    $pchfile = null; // pchfileを明示的にnullに設定
-    $template = ANIMEFILE; // 念のため
-  }
-  
-  // pchfileが定義されている場合のみfilesizeを実行
-  if ($pchfile !== null && is_file($pchfile)) {
-    $datasize = filesize($pchfile);
-  } else {
-    $datasize = 0;
-  }
-
-  $size = getimagesize($picfile);
-  if (!$sp) $sp = PCH_SPEED;
-  $picw = $size[0];
-  $pich = $size[1];
-  $w = $picw;
-  $h = $pich + 26;
-  if ($w < 300) {
-    $w = 300;
-  }
-  if ($h < 326) {
-    $h = 326;
-  }
-
-  $dat['picw'] = $picw;
-  $dat['pich'] = $pich;
-  $dat['w'] = $w;
-  $dat['h'] = $h;
-  $dat['pchfile'] = './' . $pch;
-  $dat['datasize'] = $datasize;
-
-  $dat['speed'] = PCH_SPEED;
-
-  $dat['path'] = IMG_DIR;
-  $dat['a_stime'] = time();
+  $template = $playback['template_type'] === 'tegaki' ? ANIMEFILE_TEGAKI : ANIMEFILE;
+  unset($playback['template_type']);
+  $dat = array_merge($dat, $playback);
 
   echo $blade->run($template, $dat);
 }

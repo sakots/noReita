@@ -93,6 +93,47 @@ final class ImageService {
     return $deleted;
   }
 
+  public static function animationPlaybackData(string $image_dir, string $animation_name, int $speed): array {
+    if (!self::isSafeAnimationFilename($animation_name)) {
+      throw new InvalidArgumentException('Invalid animation filename.');
+    }
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $base_name = pathinfo($animation_name, PATHINFO_FILENAME);
+    $extension = strtolower(pathinfo($animation_name, PATHINFO_EXTENSION));
+    $animation_file = $image_dir . $animation_name;
+    $image_file = $image_dir . $base_name . '.png';
+
+    if (!is_file($animation_file) || !is_readable($animation_file)) {
+      throw new RuntimeException('Animation file was not found.');
+    }
+    $image_size = @getimagesize($image_file);
+    if ($image_size === false) {
+      throw new RuntimeException('Animation image was not found.');
+    }
+    $data_size = filesize($animation_file);
+    if ($data_size === false) {
+      throw new RuntimeException('Failed to read animation file size.');
+    }
+
+    $picture_width = (int)$image_size[0];
+    $picture_height = (int)$image_size[1];
+    $tools = ['pch' => 'neo', 'spch' => 'shi', 'tgkr' => 'tegaki'];
+
+    return [
+      'tool' => $tools[$extension],
+      'template_type' => $extension === 'tgkr' ? 'tegaki' : 'standard',
+      'picw' => $picture_width,
+      'pich' => $picture_height,
+      'w' => max(300, $picture_width),
+      'h' => max(326, $picture_height + 26),
+      'pchfile' => './' . $animation_name,
+      'datasize' => $data_size,
+      'speed' => $speed,
+      'path' => $image_dir,
+      'a_stime' => time(),
+    ];
+  }
+
   public static function validateUpload(string $file_path, array $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
     if (!is_file($file_path) || !is_readable($file_path)) return false;
     $file_size = filesize($file_path);
