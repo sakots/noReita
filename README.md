@@ -81,6 +81,7 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 - `SESSION_NAME`のフォールバックが機能しないの修正
 - 各モジュールのバージョン情報数値を定数化
 - ドキュメント整理
+- github workflows作成
 
 ### [2026/07/14] v3.4.0
 
