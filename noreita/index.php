@@ -104,7 +104,6 @@ $dat['path'] = IMG_DIR;
 
 $dat['neo_dir'] = NEO_DIR;
 $dat['chicken_dir'] = CHICKEN_DIR;
-$dat['shi_painter_dir'] = SHI_PAINTER_DIR;
 $dat['klecks_dir'] = KLECKS_DIR;
 $dat['tegaki_dir'] = TEGAKI_DIR;
 $dat['axnos_dir'] = AXNOS_DIR;
@@ -1428,13 +1427,10 @@ function paint_form(string $rep, int|null $reply_to): void {
   $dat['picw'] = $picw;
   $dat['pich'] = $pich;
 
-  if ($tool == "shi") { //しぃペインターの時の幅と高さ
-    $ww = $picw + 510;
-    $hh = $pich + 172;
-  } else { //NEOのときの幅と高さ
-    $ww = $picw + 150;
-    $hh = $pich + 172;
-  }
+  //NEOのときの幅と高さ
+  $ww = $picw + 150;
+  $hh = $pich + 172;
+
   if ($hh < 560) {
     $hh = 560;
   } //共通の最低高
