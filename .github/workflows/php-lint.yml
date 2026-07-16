@@ -1,4 +1,4 @@
-name: PHP syntax check
+name: PHP checks
 
 on:
   push:
@@ -27,7 +27,11 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
+          extensions: curl, gd, mbstring, pdo_sqlite
           coverage: none
 
       - name: Check PHP syntax
         run: bash scripts/lint-php.sh
+
+      - name: Run smoke tests
+        run: bash scripts/smoke-test.sh
