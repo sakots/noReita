@@ -453,7 +453,7 @@ function regist(): void {
   //セキュリティ関連ここまで
 
   try {
-    $db = Database::connect();
+    $repository = new BoardRepository();
     if (isset($_POST["send"])) {
 
       $strlen_com = strlen($com);
@@ -467,10 +467,7 @@ function regist(): void {
 
       // 二重投稿チェック
       //最新コメント取得
-      $sql_w = "SELECT * FROM board_log WHERE thread=1 ORDER BY tid DESC LIMIT 1";
-      $msg_w = $db->prepare($sql_w);
-      $msg_w->execute();
-      $msg_wc = $msg_w->fetch();
+      $msg_wc = $repository->latestThread();
       if (!empty($msg_wc)) {
         $msg_sub = $msg_wc["sub"]; //最新タイトル
         $msg_com = $msg_wc["com"]; //最新コメント取得できた
@@ -712,9 +709,6 @@ function regist(): void {
       $host = str_replace("'", "''", $host);
       $id = str_replace("'", "''", $id);
 
-      //age値取得
-      $sql_age = "SELECT MAX(age) FROM board_log";
-      $age = $db->exec("$sql_age");
       $tree = time() * 100000000;
 
       //スレ建てorお絵かきリプ
@@ -740,21 +734,19 @@ function regist(): void {
           //age
           $age++;
           $age_tree = $age + (time() * 100000000);
-          $sql_age = "UPDATE board_log SET age = $age, tree = $age_tree WHERE tid = $parent";
-          $db->exec($sql_age);
+          $repository->bumpThread((int)$parent, $age, $age_tree);
         }
       }
       $shd = 0;
       
-      $sql = "INSERT INTO board_log (created, modified, thread, parent, comid, tree, a_name, sub, com, mail, a_url, picfile, pchfile, img_w, img_h, psec, utime, pwd, id, sodane, age, invz, host, tool, admins, shd, nsfw, ctype, uuid, thumbnail) VALUES (datetime('now', 'localtime'), datetime('now', 'localtime'), :thread, :parent, :comid, :tree, :a_name, :sub, :com, :mail, :a_url, :picfile, :pchfile, :img_w, :img_h, :psec, :utime, :pwdh, :id, :sodane, :age, :invz, :host, :used_tool, :admins, :shd, :nsfw, :ctype, :uuid, :thumbnail)";
-
-      $stmt = $db->prepare($sql);
-      $stmt->execute(
-        [
-          'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,'sub'=>$sub,'com'=>$com,'mail'=>$mail,'a_url'=>$url,'picfile'=> $picfile,'pchfile'=> $pchfile, 'img_w'=>$img_w,'img_h'=> $img_h, 'psec'=>$psec,'utime'=> $utime,'pwdh'=> $pwdh,'id'=> $id,'sodane'=> $sodane,'age'=> $age,'invz'=> $invz,'host'=> $host,'used_tool'=> $used_tool,'admins'=> $admins,'shd'=> $shd,'nsfw'=> $nsfw,'ctype'=> $ctype, 'uuid'=> $uuid, 'thumbnail'=>$thumbnail,
-        ]
-      );
-      //$db->exec($sql);
+      $repository->insertPost([
+        'thread'=>$thread, 'parent'=>$parent, 'comid'=>$comid, 'tree'=>$tree, 'a_name'=>$name,
+        'sub'=>$sub, 'com'=>$com, 'mail'=>$mail, 'a_url'=>$url, 'picfile'=>$picfile,
+        'pchfile'=>$pchfile, 'img_w'=>$img_w, 'img_h'=>$img_h, 'psec'=>$psec, 'utime'=>$utime,
+        'pwd'=>$pwdh, 'id'=>$id, 'sodane'=>$sodane, 'age'=>$age, 'invz'=>$invz, 'host'=>$host,
+        'tool'=>$used_tool, 'admins'=>$admins, 'shd'=>$shd, 'nsfw'=>$nsfw, 'ctype'=>$ctype,
+        'uuid'=>$uuid, 'thumbnail'=>$thumbnail,
+      ]);
 
       $c_pass = $pwd;
       //-- クッキー保存 --
@@ -770,8 +762,6 @@ function regist(): void {
       }
 
       $dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
-      $msg_w = null;
-      $db = null; //db切断
     }
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
@@ -780,14 +770,13 @@ function regist(): void {
   //header('Location:'.PHP_SELF);
   //ログ行数オーバー処理
   //スレ数カウント
+  $th_cnt = 0;
   try {
-    $db = Database::connect();
-    $sql_th = "SELECT SUM(thread) as cnt FROM board_log";
-    $th_cnt_sql = $db->query("$sql_th");
-    $th_cnt_sql = $th_cnt_sql->fetch();
-    $th_cnt = $th_cnt_sql["cnt"];
+    $repository = new BoardRepository();
+    $th_cnt = $repository->countThreads();
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
+    return;
   }
   if ($th_cnt > MAX_THREAD) {
     logdel();
@@ -798,13 +787,7 @@ function regist(): void {
   if ($th_cnt > $th_id) {
     // そろそろ消えるスレッドにshdフラグを設定
     try {
-      $db = Database::connect();
-      // 古いスレッドから順番にshdフラグを設定
-      $sql = "UPDATE board_log SET shd = '1' WHERE thread = 1 AND shd = '0' ORDER BY tid ASC LIMIT ?";
-      $stmt = $db->prepare($sql);
-      $stmt->bindValue(1, $th_cnt - $th_id, PDO::PARAM_INT);
-      $stmt->execute();
-      $db = null; //db切断
+      (new BoardRepository())->markOldThreads($th_cnt - $th_id);
     } catch (PDOException $e) {
       echo "DB接続エラー:" . $e->getMessage();
     }
@@ -830,14 +813,13 @@ function def(): void {
 
   //ログ行数オーバー処理
   //スレ数カウント
+  $th_cnt = 0;
   try {
-    $db = Database::connect();
-    $sql_th = "SELECT SUM(thread) as cnt FROM board_log";
-    $th_cnt_sql = $db->query("$sql_th");
-    $th_cnt_sql = $th_cnt_sql->fetch();
-    $th_cnt = $th_cnt_sql["cnt"];
+    $repository = new BoardRepository();
+    $th_cnt = $repository->countThreads();
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
+    return;
   }
   if ($th_cnt > MAX_THREAD) {
     logdel();
@@ -852,11 +834,7 @@ function def(): void {
 
   //ページング
   try {
-    $db = Database::connect();
-    $sql_cnt = "SELECT SUM(thread) as cnt FROM board_log WHERE invz=0";
-    $th_cnt_sql = $db->query("$sql_cnt");
-    $th_cnt_sql = $th_cnt_sql->fetch();
-    $count = $th_cnt_sql["cnt"];
+    $count = $repository->countThreads(true);
     if (isset($_GET['page']) && is_numeric($_GET['page'])) {
       $page = $_GET['page'];
       $page = max($page, 1);
@@ -891,34 +869,26 @@ function def(): void {
     $dat['back'] = ($page - 1);
     $dat['next'] = ($page + 1);
 
-    $db = null; //db切断
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
   }
 
   //読み込み
   try {
-    $db = Database::connect();
-    //1ページの全スレッド取得
-    $sql = "SELECT * FROM board_log WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?";
-    $posts = $db->prepare($sql);
-    $posts->bindValue(1, $start, PDO::PARAM_INT);
-    $posts->bindValue(2, $page_def, PDO::PARAM_INT);
-    $posts->execute();
+    $posts = $repository->listThreads($start, $page_def);
 
     $i = 0;
     $j = 0;
     while ($i < PAGE_DEF) {
-      $bbsline = $posts->fetch();
+      $bbsline = $posts[$i] ?? false;
       if (empty($bbsline)) {
         break;
       } //スレがなくなったら抜ける
       $bbsline['thumb'] = $bbsline['thumbnail'] ?? '';
       $bbsline['thumb_avif'] = '';
       $oya_id = $bbsline["tid"]; //スレのid(親番号)を取得
-      $sql_i = "SELECT * FROM board_log WHERE parent = $oya_id AND invz=0 AND thread=0 ORDER BY comid ASC";
-      //レス取得
-      $posts_i = $db->query($sql_i);
+      $posts_i = $repository->findReplies((int)$oya_id);
+      $reply_index = 0;
       $j = 0;
       $flag = true;
       while ($flag == true) {
@@ -930,7 +900,8 @@ function def(): void {
         if ($_pchext === '' || $bbsline['pchfile'] === '' || (isset($bbsline['ctype']) && $bbsline['ctype'] === 'img')) {
           $bbsline['pchfile'] = '';
         }
-        $res = $posts_i->fetch();
+        $res = $posts_i[$reply_index] ?? false;
+        $reply_index++;
         if ($res) {
           $res['thumb'] = $res['thumbnail'] ?? '';
           $res['thumb_avif'] = '';
@@ -1011,7 +982,6 @@ function def(): void {
     $dat['path'] = IMG_DIR;
 
     echo $blade->run(MAINFILE, $dat);
-    $db = null; //db切断
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
   }
@@ -1026,7 +996,7 @@ function catalog(): void {
 
   //ページング
   try {
-    $db = Database::connect();
+    $repository = new BoardRepository();
     if (isset($_GET['page']) && is_numeric($_GET['page'])) {
       $page = $_GET['page'];
       $page = max($page, 1);
@@ -1036,10 +1006,7 @@ function catalog(): void {
     $start = $page_def * ($page - 1);
 
     //最大何ページあるのか
-    $sql_th = "SELECT COUNT(*) as cnt FROM board_log WHERE picfile > 0 AND invz=0";
-    $th_cnt_sql = $db->query("$sql_th");
-    $th_cnt_sql = $th_cnt_sql->fetch();
-    $th_cnt = $th_cnt_sql["cnt"];
+    $th_cnt = $repository->countVisibleImages();
     $max_page = floor($th_cnt / $page_def) + 1;
     //最後にスレ数0のページができたら表示しない処理
     if (($th_cnt % $page_def) == 0) {
@@ -1066,26 +1033,20 @@ function catalog(): void {
 
     $dat['next'] = ($page + 1);
 
-    $db = null; //db切断
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
+    return;
   }
   //読み込み
 
   try {
-    $db = Database::connect();
-    //1ページの全スレッド取得
-    $sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, sodane, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime, thumbnail FROM board_log WHERE picfile > 0 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
-    $posts = $db->prepare($sql);
-    $posts->bindValue(':start', $start, PDO::PARAM_INT);
-    $posts->bindValue(':page_def', $page_def, PDO::PARAM_INT);
-    $posts->execute();
+    $posts = $repository->listCatalog($start, $page_def);
 
     $oya = array();
 
     $i = 0;
     while ($i < CATALOG_N) {
-      $bbsline = $posts->fetch();
+      $bbsline = $posts[$i] ?? false;
       if (empty($bbsline)) {
         break;
       } //スレがなくなったら抜ける
@@ -1101,7 +1062,6 @@ function catalog(): void {
     //$smarty->debugging = true;
     $dat['catalogmode'] = 'catalog';
     echo $blade->run(CATALOGFILE, $dat);
-    $db = null; //db切断
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
   }
@@ -1741,12 +1701,9 @@ function in_continue(): void {
   if (!CONTINUE_PASS) $dat['newpost_nopassword'] = true;
 
   try {
-    $db = Database::connect();
-    $sql = "SELECT *, ctype as ctype FROM board_log WHERE picfile=? ORDER BY tree DESC";
-    $posts = $db->prepare($sql);
-    $posts->execute([$no]);
+    $repository = new BoardRepository();
     $oya = array();
-    while ($bbsline = $posts->fetch()) {
+    foreach ($repository->findPostsByImage((string)$no) as $bbsline) {
       $bbsline['com'] = nl2br(htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
       $oya[] = $bbsline;
       $dat['oya'] = $oya; //配列に格納
@@ -2112,15 +2069,12 @@ function admin(): void {
   //最大何ページあるのか
   //記事呼び出しから
   try {
-    $db = Database::connect();
+    $repository = new BoardRepository();
     //読み込み
     $adminpass = filter_input(INPUT_POST, 'adminpass');
     if ($adminpass === $admin_pass) {
-      $sql = "SELECT * FROM board_log WHERE thread=1 ORDER BY age DESC,tree DESC";
       $oya = array();
-      $posts = $db->prepare($sql);
-      $posts->execute();
-      while ($bbsline = $posts->fetch()) {
+      foreach ($repository->listForAdmin(true) as $bbsline) {
         if (empty($bbsline)) {
           break;
         } //スレがなくなったら抜ける
@@ -2131,20 +2085,16 @@ function admin(): void {
       $dat['oya'] = $oya;
 
       //スレッドの記事を取得
-      $sql_i = "SELECT * FROM board_log WHERE thread=0 ORDER BY tree ASC";
       $ko = array();
-      $posts_i = $db->query($sql_i);
-      while ($res = $posts_i->fetch()) {
+      foreach ($repository->listForAdmin(false) as $res) {
         $res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
         $ko[] = $res;
       }
       $dat['ko'] = $ko;
       echo $blade->run(ADMINFILE, $dat);
     } else {
-      $db = null; //db切断
       error($en ? 'Please enter the admin password.' : '管理パスを入力してください');
     }
-    $db = null; //db切断
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
   }
@@ -2158,18 +2108,12 @@ function usrchk(): void {
   $pwd_f = filter_input(INPUT_POST, 'pwd');
   $flag = FALSE;
   try {
-    $db = Database::connect();
-    //パスワードを取り出す
-    $sql = "SELECT pwd FROM board_log WHERE tid = ?";
-    $msgs = $db->prepare($sql);
-    $msgs->execute([$no]);
-    $msg = $msgs->fetch();
+    $msg = (new BoardRepository())->findPost((int)$no);
     if (password_verify($pwd_f, $msg['pwd'])) {
       $flag = true;
     } else {
       $flag = false;
     }
-    $db = null; //切断
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
   }
@@ -2273,51 +2217,15 @@ function save_image(): void {
 function logdel(): void {
   //オーバーした行の画像とスレ番号を取得
   try {
-    $db = Database::connect();
-    $sql_img = "SELECT * FROM board_log ORDER BY tid LIMIT 1";
-    $msgs = $db->prepare($sql_img);
-    $msgs->execute();
-    $msg = $msgs->fetch();
+    $repository = new BoardRepository();
+    $msg = $repository->oldestPost();
+    if (!$msg) return;
 
     $del_id = (int)$msg["tid"]; //消す行のスレ番号
     $msg_pic = $msg["picfile"]; //画像の名前取得できた
     ImageService::deleteRelatedFiles(IMG_DIR, (string)$msg_pic);
 
-    //レスあれば削除
-    //カウント
-    $sql_c = "SELECT COUNT(*) as cnt_i FROM board_log WHERE parent = $del_id";
-    $count_res = $db->query("$sql_c");
-    $count_res = $count_res->fetch();
-    $log_count = $count_res["cnt_i"];
-    //削除
-    if ($log_count !== 0) {
-      $del_res = "DELETE FROM board_log WHERE parent = $del_id";
-      $db->exec($del_res);
-    }
-    //スレ削除
-    $del_ths = "DELETE FROM board_log WHERE tid = $del_id";
-    $db->exec($del_ths);
-
-    $sql_img = null;
-    $del_ths = null;
-    $msg = null;
-    $del_id = null;
-    $db = null; //db切断
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
-  }
-}
-
-//misskeyにノート
-function misskey_note(): void {
-  global $blade, $dat;
-  //スレの画像取得
-  $no = filter_input(INPUT_GET, 'no',FILTER_VALIDATE_INT);
-  try {
-    $db = Database::connect();
-    $sql = "SELECT * FROM board_log WHERE id=? ORDER BY tree DESC";
-    $posts = $db->prepare($sql);
-    $posts->execute([$no]);
+    $repository->deletePost($del_id, true);
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
   }

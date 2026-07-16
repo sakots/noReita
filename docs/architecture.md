@@ -12,7 +12,7 @@
 - `BoardRepository`：投稿の取得、検索、削除、非表示化
 - `DatabaseMigrator`：スキーマ作成、バックアップ、マイグレーション
 
-新しい投稿クエリは原則として`BoardRepository`へ追加します。
+新規投稿、一覧、カタログ、返信、編集、管理一覧、ログ上限削除を含む投稿クエリは`BoardRepository`へ集約しています。新しい投稿クエリも`index.php`へ直接SQLを書かず、`BoardRepository`へ追加します。
 
 ## 画像
 

@@ -93,6 +93,74 @@ final class BoardRepository {
       'nsfw' => $values['nsfw'], 'id' => $id,
     ]);
   }
+
+  public function latestThread(): array|false {
+    return $this->db->query('SELECT * FROM board_log WHERE thread=1 ORDER BY tid DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+  }
+
+  public function insertPost(array $post): int {
+    $columns = ['thread','parent','comid','tree','a_name','sub','com','mail','a_url','picfile','pchfile','img_w','img_h','psec','utime','pwd','id','sodane','age','invz','host','tool','admins','shd','nsfw','ctype','uuid','thumbnail'];
+    $sql = "INSERT INTO board_log (created, modified, " . implode(',', $columns) . ") VALUES (datetime('now','localtime'), datetime('now','localtime'), :" . implode(',:', $columns) . ')';
+    $statement = $this->db->prepare($sql);
+    $values = [];
+    foreach ($columns as $column) $values[$column] = $post[$column] ?? null;
+    $statement->execute($values);
+    return (int)$this->db->lastInsertId();
+  }
+
+  public function bumpThread(int $id, int $age, int $tree): void {
+    $statement = $this->db->prepare('UPDATE board_log SET age = ?, tree = ? WHERE tid = ?');
+    $statement->execute([$age, $tree, $id]);
+  }
+
+  public function countThreads(bool $visible_only = false): int {
+    $where = $visible_only ? ' WHERE invz=0' : '';
+    return (int)$this->db->query('SELECT COALESCE(SUM(thread), 0) FROM board_log' . $where)->fetchColumn();
+  }
+
+  public function markOldThreads(int $count): void {
+    if ($count <= 0) return;
+    $statement = $this->db->prepare("UPDATE board_log SET shd='1' WHERE thread=1 AND shd='0' ORDER BY tid ASC LIMIT ?");
+    $statement->bindValue(1, $count, PDO::PARAM_INT);
+    $statement->execute();
+  }
+
+  public function listThreads(int $offset, int $limit): array {
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?');
+    $statement->bindValue(1, $offset, PDO::PARAM_INT);
+    $statement->bindValue(2, $limit, PDO::PARAM_INT);
+    $statement->execute();
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  public function countVisibleImages(): int {
+    return (int)$this->db->query("SELECT COUNT(*) FROM board_log WHERE picfile != '' AND invz=0")->fetchColumn();
+  }
+
+  public function listCatalog(int $offset, int $limit): array {
+    $statement = $this->db->prepare("SELECT * FROM board_log WHERE picfile != '' AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :limit");
+    $statement->bindValue(':start', $offset, PDO::PARAM_INT);
+    $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $statement->execute();
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  public function listForAdmin(bool $threads): array {
+    $sql = $threads
+      ? 'SELECT * FROM board_log WHERE thread=1 ORDER BY age DESC, tree DESC'
+      : 'SELECT * FROM board_log WHERE thread=0 ORDER BY tree ASC';
+    return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  public function oldestPost(): array|false {
+    return $this->db->query('SELECT * FROM board_log ORDER BY tid LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+  }
+
+  public function findPostsByImage(string $image_name): array {
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE picfile = ? ORDER BY tree DESC');
+    $statement->execute([$image_name]);
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
 }
 
 final class DatabaseMigrator {
