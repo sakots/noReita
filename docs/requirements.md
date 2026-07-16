@@ -9,6 +9,7 @@ noReitaが動作するサーバー条件
 ## 必須拡張
 
 - curl、gd、mbstring、pdo_sqlite
+- （おそらく多くのレンタルサーバーには入っています）
 
 ## Apacheで必要な設定
 
