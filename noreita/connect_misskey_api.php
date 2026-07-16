@@ -9,7 +9,7 @@
 require_once(__DIR__.'/config.php');
 require_once(__DIR__.'/functions.php');
 
-$connect_misskey_api_ver = 20260610;
+const CONNECT_MISSKEY_API_VER = 20260716;
 
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 ? explode( ',', $http_langs )[0] : '';
@@ -222,7 +222,7 @@ class connect_misskey_api{
 function connect_misskey_api_dispatch(): void {
 	global $en, $baseUrl;
 
-	session_sta();
+	noreita_session_start();
 
 	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
 		die("Error: セッションがありません。Misskey投稿フローが正しく動作していません。");
