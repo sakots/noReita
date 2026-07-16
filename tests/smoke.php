@@ -177,6 +177,17 @@ smoke_test('post validation is independent from HTTP rendering', static function
   return true;
 });
 
+smoke_test('ctype input sources are resolved in priority order', static function (): bool {
+  return PostInput::resolveCtype([
+      'direct' => 'img', 'usercode' => 'ctype=pch', 'http_usercode' => 'ctype=spch',
+    ]) === 'img'
+    && PostInput::resolveCtype(['usercode' => 'foo=bar&ctype=pch']) === 'pch'
+    && PostInput::resolveCtype(['send_header' => 'usercode=' . rawurlencode('foo=bar&ctype=spch')]) === 'spch'
+    && PostInput::resolveCtype(['http_usercode' => 'ctype=img']) === 'img'
+    && PostInput::resolveCtype(['session_usercode' => 'ctype=pch']) === 'pch'
+    && PostInput::resolveCtype(['direct' => '../invalid', 'usercode' => 'ctype=invalid']) === 'new';
+});
+
 smoke_test('post service centralizes edit and delete authorization', static function (): bool {
   $image_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_post_service_' . bin2hex(random_bytes(8));
   if (!mkdir($image_dir, 0700)) return false;

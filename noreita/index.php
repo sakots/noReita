@@ -462,64 +462,7 @@ function regist(): void {
       $nsfw = false;
       $ctype = null;
       if ($picfile) {
-        // ctypeを取得して画像から続きを描いたかどうかを判定
-        $ctype = filter_input(INPUT_POST, 'ctype');
-        
-        // usercodeからctypeを取得（POSTデータにない場合）
-        if ($ctype === null) {
-          $usercode = filter_input(INPUT_POST, 'usercode');
-          if ($usercode) {
-            parse_str($usercode, $usercode_params);
-            if (isset($usercode_params['ctype'])) {
-              $ctype = $usercode_params['ctype'];
-            }
-          }
-        }
-        
-        // send_headerパラメータからusercodeを取得（POSTデータにない場合）
-        if ($ctype === null) {
-          $send_header = filter_input(INPUT_POST, 'send_header');
-          if ($send_header) {
-            parse_str($send_header, $header_params);
-            if (isset($header_params['usercode'])) {
-              $usercode = $header_params['usercode'];
-              parse_str($usercode, $usercode_params);
-              if (isset($usercode_params['ctype'])) {
-                $ctype = $usercode_params['ctype'];
-              }
-            }
-          }
-        }
-        
-        // HTTPヘッダーからusercodeを取得（POSTデータにない場合）
-        if ($ctype === null) {
-          $http_usercode = filter_input(INPUT_SERVER, 'HTTP_X_USERCODE');
-          if ($http_usercode) {
-            parse_str($http_usercode, $usercode_params);
-            if (isset($usercode_params['ctype'])) {
-              $ctype = $usercode_params['ctype'];
-            }
-          }
-        }
-        
-        // セッション変数からusercodeを取得（POSTデータにない場合）
-        if ($ctype === null) {
-          if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-          }
-          if (isset($_SESSION['usercode'])) {
-            $usercode = $_SESSION['usercode'];
-            parse_str($usercode, $usercode_params);
-            if (isset($usercode_params['ctype'])) {
-              $ctype = $usercode_params['ctype'];
-            }
-          }
-        }
-        
-        // ctypeがnullの場合は新規投稿として扱う（動画ファイルを処理する）
-        if ($ctype === null) {
-          $ctype = 'new';
-        }
+        $ctype = PostInput::ctypeFromHttp();
         
         $image_result = ImageService::finalizeNewPost(
           TEMP_DIR, IMG_DIR, (string)$picfile, $ctype, (bool)DSP_PAINTTIME, PDEF_W,

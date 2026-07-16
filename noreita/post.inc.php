@@ -44,6 +44,60 @@ final class PostService {
   }
 }
 
+final class PostInput {
+  private const CTYPES = ['new', 'img', 'pch', 'spch'];
+
+  public static function ctypeFromHttp(): string {
+    $sources = [
+      'direct' => filter_input(INPUT_POST, 'ctype'),
+      'usercode' => filter_input(INPUT_POST, 'usercode'),
+      'send_header' => filter_input(INPUT_POST, 'send_header'),
+      'http_usercode' => filter_input(INPUT_SERVER, 'HTTP_X_USERCODE'),
+    ];
+    $ctype = self::firstCtype($sources);
+    if ($ctype !== null) return $ctype;
+
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+      session_start();
+    }
+    return self::resolveCtype(['session_usercode' => $_SESSION['usercode'] ?? null]);
+  }
+
+  public static function resolveCtype(array $sources): string {
+    return self::firstCtype($sources) ?? 'new';
+  }
+
+  private static function firstCtype(array $sources): ?string {
+    $direct = self::validCtype($sources['direct'] ?? null);
+    if ($direct !== null) return $direct;
+
+    $usercode = self::ctypeFromQuery($sources['usercode'] ?? null);
+    if ($usercode !== null) return $usercode;
+
+    $send_header = $sources['send_header'] ?? null;
+    if (is_string($send_header) && $send_header !== '') {
+      parse_str($send_header, $header_values);
+      $header_usercode = $header_values['usercode'] ?? null;
+      $ctype = self::ctypeFromQuery(is_string($header_usercode) ? $header_usercode : null);
+      if ($ctype !== null) return $ctype;
+    }
+
+    $http_ctype = self::ctypeFromQuery($sources['http_usercode'] ?? null);
+    if ($http_ctype !== null) return $http_ctype;
+    return self::ctypeFromQuery($sources['session_usercode'] ?? null);
+  }
+
+  private static function ctypeFromQuery(mixed $query): ?string {
+    if (!is_string($query) || $query === '') return null;
+    parse_str($query, $values);
+    return self::validCtype($values['ctype'] ?? null);
+  }
+
+  private static function validCtype(mixed $ctype): ?string {
+    return is_string($ctype) && in_array($ctype, self::CTYPES, true) ? $ctype : null;
+  }
+}
+
 final class PostValidator {
   public static function configuredRules(
     bool $en,
