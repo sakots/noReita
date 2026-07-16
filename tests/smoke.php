@@ -89,6 +89,33 @@ smoke_test('database migration and backup', static function (): bool {
   }
 });
 
+smoke_test('legacy SQLite database backup', static function (): bool {
+  if (!class_exists('SQLite3')) return true;
+
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_legacy_db_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $database_file = $directory . DIRECTORY_SEPARATOR . 'source.db';
+  $backup_file = $directory . DIRECTORY_SEPARATOR . 'backup.db';
+
+  try {
+    $db = new PDO('sqlite:' . $database_file);
+    $db->exec('CREATE TABLE backup_test (value TEXT NOT NULL)');
+    $db->exec("INSERT INTO backup_test VALUES ('preserved')");
+    $migrator = new DatabaseMigrator($db, $database_file, $directory);
+    $method = new ReflectionMethod($migrator, 'createLegacyBackup');
+    $method->setAccessible(true);
+    $method->invoke($migrator, $backup_file);
+
+    $backup = new PDO('sqlite:' . $backup_file);
+    return $backup->query('SELECT value FROM backup_test')->fetchColumn() === 'preserved';
+  } finally {
+    foreach ([$database_file, $database_file . '-wal', $database_file . '-shm', $backup_file] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('application initialization prepares runtime state', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_init_' . bin2hex(random_bytes(8));
   if (!mkdir($root, 0700)) return false;

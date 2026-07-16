@@ -320,8 +320,29 @@ final class DatabaseMigrator {
       $backup_path = $this->backup_dir . DIRECTORY_SEPARATOR . "{$base_name}-schema{$from_version}-{$timestamp}-{$suffix}.db";
     }
 
-    $this->db->exec('VACUUM INTO ' . $this->db->quote($backup_path));
+    if (version_compare((string)$this->db->query('SELECT sqlite_version()')->fetchColumn(), '3.27.0', '>=')) {
+      $this->db->exec('VACUUM INTO ' . $this->db->quote($backup_path));
+    } else {
+      $this->createLegacyBackup($backup_path);
+    }
     chmod($backup_path, 0600);
     return $backup_path;
+  }
+
+  private function createLegacyBackup(string $backup_path): void {
+    if (!class_exists('SQLite3')) {
+      throw new RuntimeException('SQLite 3.27.0 or the PHP sqlite3 extension is required to back up the database.');
+    }
+
+    $source = new SQLite3($this->database_file, SQLITE3_OPEN_READONLY);
+    $backup = new SQLite3($backup_path, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
+    try {
+      if (!$source->backup($backup)) {
+        throw new RuntimeException('Could not back up the database.');
+      }
+    } finally {
+      $backup->close();
+      $source->close();
+    }
   }
 }
