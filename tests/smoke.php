@@ -3,9 +3,21 @@ declare(strict_types=1);
 
 const LANG = 'Japanese';
 const PHP_SELF = 'index.php';
+const PMAX_W = 800;
+const PMAX_H = 800;
+const PTIME_D = '日';
+const PTIME_H = '時間';
+const PTIME_M = '分';
+const PTIME_S = '秒';
+const ID_CYCLE = '0';
+const ID_SEED = 'smoke-test-seed';
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
+require_once dirname(__DIR__) . '/noreita/database.inc.php';
+require_once dirname(__DIR__) . '/noreita/initialization.inc.php';
+require_once dirname(__DIR__) . '/noreita/image.inc.php';
+require_once dirname(__DIR__) . '/noreita/post.inc.php';
 
 $passed = 0;
 $failed = 0;
@@ -43,6 +55,119 @@ smoke_test('SQLite read and write', static function (): bool {
   return $db->query('SELECT value FROM smoke')->fetchColumn() === 'noReita';
 });
 
+smoke_test('database migration and backup', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_db_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) {
+    throw new RuntimeException('could not create temporary directory');
+  }
+  $database_file = $directory . DIRECTORY_SEPARATOR . 'smoke.db';
+  $backup_dir = $directory . DIRECTORY_SEPARATOR . 'backup';
+
+  try {
+    $db = new PDO('sqlite:' . $database_file);
+    $migrator = new DatabaseMigrator($db, $database_file, $backup_dir);
+    if ($migrator->migrate() !== null || $migrator->schemaVersion() !== DatabaseMigrator::SCHEMA_VERSION) {
+      return false;
+    }
+
+    $db->exec("INSERT INTO board_log (com) VALUES ('preserved')");
+    $db->exec('PRAGMA user_version = 0');
+    $backup = $migrator->migrate();
+    if ($backup === null || !is_file($backup) || $migrator->schemaVersion() !== DatabaseMigrator::SCHEMA_VERSION) {
+      return false;
+    }
+
+    $backup_db = new PDO('sqlite:' . $backup);
+    return $backup_db->query('SELECT com FROM board_log')->fetchColumn() === 'preserved';
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . '*.db') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_file($database_file)) unlink($database_file);
+    if (is_dir($backup_dir)) rmdir($backup_dir);
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('application initialization prepares runtime state', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_init_' . bin2hex(random_bytes(8));
+  if (!mkdir($root, 0700)) return false;
+  $database_file = $root . DIRECTORY_SEPARATOR . 'board.db';
+  $backup_dir = $root . DIRECTORY_SEPARATOR . 'backup';
+  $directories = [
+    $root . DIRECTORY_SEPARATOR . 'img',
+    $root . DIRECTORY_SEPARATOR . 'temp',
+    $root . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'session',
+  ];
+  try {
+    $initializer = new ApplicationInitializer(
+      'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories, 0700
+    );
+    $initializer->prepareDirectories();
+    $initializer->migrateDatabase();
+    $initializer->secureDatabaseFile();
+    $database = new PDO('sqlite:' . $database_file);
+    $schema_version = (int)$database->query('PRAGMA user_version')->fetchColumn();
+    $database = null;
+    return count(ApplicationInitializer::securityHeaders()) === 5
+      && $schema_version === DatabaseMigrator::SCHEMA_VERSION
+      && !array_filter($directories, static fn(string $directory): bool => !is_dir($directory))
+      && (fileperms($database_file) & 0777) === 0600;
+  } finally {
+    foreach ([$database_file, $database_file . '-wal', $database_file . '-shm'] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($backup_dir)) rmdir($backup_dir);
+    if (is_dir($directories[2])) rmdir($directories[2]);
+    if (is_dir($root . DIRECTORY_SEPARATOR . 'nested')) rmdir($root . DIRECTORY_SEPARATOR . 'nested');
+    foreach (array_slice($directories, 0, 2) as $directory) if (is_dir($directory)) rmdir($directory);
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
+smoke_test('version 2 database is not modified automatically', static function (): bool {
+  $database_file = tempnam(sys_get_temp_dir(), 'noreita_v2_');
+  if ($database_file === false) {
+    throw new RuntimeException('could not create temporary database');
+  }
+  $backup_dir = $database_file . '_backup';
+
+  try {
+    $db = new PDO('sqlite:' . $database_file);
+    $db->exec('CREATE TABLE tlog (tid INTEGER PRIMARY KEY)');
+    $migrator = new DatabaseMigrator($db, $database_file, $backup_dir);
+    try {
+      $migrator->migrate();
+    } catch (RuntimeException $e) {
+      return str_contains($e->getMessage(), 'Version 2')
+        && (int)$db->query('SELECT COUNT(*) FROM tlog')->fetchColumn() === 0
+        && !is_dir($backup_dir);
+    }
+    return false;
+  } finally {
+    if (is_file($database_file)) unlink($database_file);
+    if (is_dir($backup_dir)) rmdir($backup_dir);
+  }
+});
+
+smoke_test('failed database operation is rolled back', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  $migrator = new DatabaseMigrator($db, ':memory:', sys_get_temp_dir());
+  $transaction = new ReflectionMethod($migrator, 'transaction');
+  $transaction->setAccessible(true);
+
+  try {
+    $transaction->invoke($migrator, static function () use ($db): void {
+      $db->exec('CREATE TABLE should_rollback (id INTEGER)');
+      throw new RuntimeException('expected failure');
+    });
+  } catch (RuntimeException $e) {
+    $exists = (int)$db->query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'should_rollback'")->fetchColumn();
+    return $e->getMessage() === 'expected failure' && $exists === 0 && !$db->inTransaction();
+  }
+  return false;
+});
+
 smoke_test('UUIDv7 format and uniqueness', static function (): bool {
   $first = generate_uuid();
   $second = generate_uuid();
@@ -58,11 +183,205 @@ smoke_test('escaping and NG-word helpers', static function (): bool {
     && !is_ngword(['spam'], 'safe');
 });
 
+smoke_test('post validation is independent from HTTP rendering', static function (): bool {
+  $input = [
+    'sub' => '題名', 'name' => '名前', 'mail' => '', 'url' => '', 'com' => '本文です',
+    'pwd' => 'secret', 'resto' => '',
+  ];
+  $rules = [
+    'en' => false, 'request_method' => 'POST', 'host' => 'client.example.com',
+    'blocked_hosts' => [], 'require_name' => true, 'require_comment' => true,
+    'require_subject' => true, 'max_comment' => 100, 'max_name' => 100,
+    'max_email' => 100, 'max_subject' => 100, 'max_url' => 100,
+    'japanese_filter' => true, 'deny_comment_urls' => true, 'admin_pass' => 'admin',
+    'bad_strings' => ['禁止語'], 'bad_names' => ['使用禁止名'],
+    'bad_strings_a' => ['激安'], 'bad_strings_b' => ['ブランド'],
+  ];
+  PostValidator::validate($input, $rules);
+
+  $invalid_cases = [
+    [array_merge($input, ['com' => '']), $rules, '本文は必須です。'],
+    [array_merge($input, ['com' => 'https://example.com']), array_merge($rules, ['japanese_filter' => false]), 'コメントにはURLを含めることはできません。'],
+    [array_merge($input, ['name' => '使用禁止名']), $rules, '無効な名前が使用されています。'],
+    [$input, array_merge($rules, ['host' => 'blocked.example.com', 'blocked_hosts' => ['blocked\\.example\\.com']]), 'あなたのホストは拒絶されています。'],
+  ];
+  foreach ($invalid_cases as [$invalid_input, $invalid_rules, $expected]) {
+    try {
+      PostValidator::validate($invalid_input, $invalid_rules);
+      return false;
+    } catch (PostValidationException $e) {
+      if ($e->getMessage() !== $expected) return false;
+    }
+  }
+  return true;
+});
+
+smoke_test('ctype input sources are resolved in priority order', static function (): bool {
+  return PostInput::resolveCtype([
+      'direct' => 'img', 'usercode' => 'ctype=pch', 'http_usercode' => 'ctype=spch',
+    ]) === 'img'
+    && PostInput::resolveCtype(['usercode' => 'foo=bar&ctype=pch']) === 'pch'
+    && PostInput::resolveCtype(['send_header' => 'usercode=' . rawurlencode('foo=bar&ctype=spch')]) === 'spch'
+    && PostInput::resolveCtype(['http_usercode' => 'ctype=img']) === 'img'
+    && PostInput::resolveCtype(['session_usercode' => 'ctype=pch']) === 'pch'
+    && PostInput::resolveCtype(['direct' => '../invalid', 'usercode' => 'ctype=invalid']) === 'new';
+});
+
+smoke_test('post service centralizes edit and delete authorization', static function (): bool {
+  $image_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_post_service_' . bin2hex(random_bytes(8));
+  if (!mkdir($image_dir, 0700)) return false;
+  try {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $insert = static function (string $subject, string $password, string $image = '') use ($repository): int {
+      return $repository->insertPost([
+        'thread' => 1, 'sub' => $subject, 'com' => '本文', 'a_name' => '名前',
+        'pwd' => password_hash($password, PASSWORD_DEFAULT), 'picfile' => $image,
+        'invz' => 0, 'age' => 0, 'tree' => time(),
+      ]);
+    };
+    $edit_id = $insert('編集前', 'owner-pass');
+    $hide_id = $insert('非表示対象', 'another-pass');
+    $delete_id = $insert('削除対象', 'delete-pass', 'owner.png');
+    file_put_contents($image_dir . DIRECTORY_SEPARATOR . 'owner.png', 'image');
+    $service = new PostService($repository, 'admin-pass', $image_dir);
+
+    try {
+      $service->edit($edit_id, 'wrong-pass', []);
+      return false;
+    } catch (PostAuthorizationException $e) {
+    }
+    $service->edit($edit_id, 'owner-pass', [
+      'name' => '編集者', 'mail' => '', 'sub' => '編集後', 'com' => '編集本文',
+      'url' => '', 'host' => 'localhost', 'sodane' => 0,
+    ]);
+    if (($repository->findPost($edit_id)['sub'] ?? '') !== '編集後') return false;
+
+    if ($service->delete($hide_id, 'admin-pass', false) !== 'hidden'
+      || (int)($repository->findPost($hide_id)['invz'] ?? 0) !== 1) return false;
+    if ($service->delete($delete_id, 'delete-pass', false) !== 'deleted'
+      || $repository->findPost($delete_id) !== false
+      || is_file($image_dir . DIRECTORY_SEPARATOR . 'owner.png')) return false;
+
+    $new_input = [
+      'name' => '投稿者', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
+      'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,
+      'resto' => '', 'modid' => '',
+    ];
+    $settings = [
+      'default_name' => '名無し', 'default_comment' => '本文なし', 'default_subject' => '無題',
+      'admin_name' => '管理者', 'admin_cap' => '(ではない)',
+    ];
+    $prepared = $service->prepareNewPost($new_input, 'new.example.com', $settings);
+    $new_id = $service->createPreparedPost($prepared, [
+      'pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0, 'utime' => '',
+      'tool' => '', 'nsfw' => false, 'ctype' => null, 'thumbnail' => '',
+    ]);
+    if (($repository->findPost($new_id)['sub'] ?? '') !== '新規題名') return false;
+    try {
+      $service->prepareNewPost($new_input, 'new.example.com', $settings);
+      return false;
+    } catch (DuplicatePostException $e) {
+    }
+    $reply_input = array_merge($new_input, [
+      'sub' => '返信題名', 'com' => '返信本文', 'resto' => (string)$new_id,
+    ]);
+    $reply = $service->prepareNewPost($reply_input, 'reply.example.com', $settings);
+    $reply_id = $service->createPreparedPost($reply, [
+      'pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0, 'utime' => '',
+      'tool' => '', 'nsfw' => false, 'ctype' => null, 'thumbnail' => '',
+    ]);
+    $reply_row = $repository->findPost($reply_id);
+    $parent_row = $repository->findPost($new_id);
+    if ((int)($reply_row['thread'] ?? 1) !== 0 || (int)($reply_row['parent'] ?? 0) !== $new_id
+      || (int)($parent_row['age'] ?? 0) !== 1) return false;
+    return true;
+  } finally {
+    foreach (glob($image_dir . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($image_dir)) rmdir($image_dir);
+  }
+});
+
 smoke_test('image MIME mapping', static function (): bool {
   return get_image_type('image/jpeg') === '.jpg'
     && get_image_type('image/png') === '.png'
     && get_image_type('image/webp') === '.webp'
     && get_image_type('image/avif') === '.avif';
+});
+
+smoke_test('animation filenames reject path traversal', static function (): bool {
+  return ImageService::isSafeAnimationFilename('1712345678901234.pch')
+    && ImageService::isSafeAnimationFilename('legacy-name_01.spch')
+    && ImageService::isSafeAnimationFilename('drawing.tgkr')
+    && !ImageService::isSafeAnimationFilename('../secret.pch')
+    && !ImageService::isSafeAnimationFilename('subdir/secret.pch')
+    && !ImageService::isSafeAnimationFilename('drawing.php')
+    && !ImageService::isSafeAnimationFilename('drawing.chi')
+    && !ImageService::isSafeAnimationFilename('.pch');
+});
+
+smoke_test('temporary images are parsed, found, and cleaned up', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_temp_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $now = 1700000000;
+  try {
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '100.png', 'image');
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '100.dat', "127.0.0.1\thost\tagent\t.png\tuser-a\treplace-a\t100\t160\t0\tneo");
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '200.png', 'image');
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '200.dat', "127.0.0.2\thost\tagent\t.png\tuser-b\treplace-b\t200\t230\t0\tklecks");
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'orphan.dat', "127.0.0.3\thost\tagent\t.png\tuser-c\treplace-c\t0\t0\t0\tneo");
+
+    $images = ImageService::listTemporaryImages($directory);
+    $found = ImageService::findTemporaryImageByReplacementCode($directory, 'replace-b');
+    if (count($images) !== 2 || $images[0]['filename'] !== '100.png'
+      || $images[0]['paint_seconds'] !== 60 || $images[0]['tool'] !== 'neo'
+      || $found === null || $found['base_name'] !== '200'
+      || ImageService::findTemporaryImageByReplacementCode($directory, 'missing') !== null) {
+      return false;
+    }
+
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'expired.tmp', 'old');
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'pchup-test-tmp.pch', 'old upload');
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'recent.tmp', 'recent');
+    touch($directory . DIRECTORY_SEPARATOR . 'expired.tmp', $now - 86401);
+    touch($directory . DIRECTORY_SEPARATOR . 'pchup-test-tmp.pch', $now - 301);
+    touch($directory . DIRECTORY_SEPARATOR . 'recent.tmp', $now - 60);
+
+    return ImageService::cleanupTemporaryFiles($directory, 1, $now) === 2
+      && !is_file($directory . DIRECTORY_SEPARATOR . 'expired.tmp')
+      && !is_file($directory . DIRECTORY_SEPARATOR . 'pchup-test-tmp.pch')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'recent.tmp');
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('animation playback data is built by the image service', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_playback_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $image = imagecreatetruecolor(120, 80);
+    imagepng($image, $directory . DIRECTORY_SEPARATOR . 'drawing.png');
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'drawing.pch', 'NEO animation');
+
+    $data = ImageService::animationPlaybackData($directory, 'drawing.pch', 12);
+    return $data['tool'] === 'neo' && $data['template_type'] === 'standard'
+      && $data['picw'] === 120 && $data['pich'] === 80
+      && $data['w'] === 300 && $data['h'] === 326
+      && $data['pchfile'] === './drawing.pch'
+      && $data['datasize'] === strlen('NEO animation') && $data['speed'] === 12;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('external URL security boundaries', static function (): bool {
@@ -101,6 +420,51 @@ smoke_test('GD thumbnail generation', static function (): bool {
   }
 });
 
+smoke_test('related image files are deleted together', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_images_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    foreach (['png', 'webp', 'pch', 'dat'] as $extension) {
+      file_put_contents($directory . DIRECTORY_SEPARATOR . 'post.' . $extension, 'test');
+    }
+    ImageService::deleteRelatedFiles($directory, 'post.png');
+    return count(glob($directory . DIRECTORY_SEPARATOR . 'post.*') ?: []) === 0;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('new post image and animation are finalized', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_finalize_' . bin2hex(random_bytes(8));
+  $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  mkdir($temp, 0700, true);
+  mkdir($images, 0700, true);
+  try {
+    $source = imagecreatetruecolor(4, 3);
+    imagefill($source, 0, 0, imagecolorallocate($source, 20, 120, 220));
+    imagepng($source, $temp . DIRECTORY_SEPARATOR . 'post.png');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.pch', 'NEO');
+
+    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 100, false, 0600);
+    return $result['img_w'] === 4 && $result['img_h'] === 3
+      && $result['psec'] === 60 && $result['tool'] === 'PaintBBS NEO'
+      && $result['pchfile'] === 'post.pch'
+      && is_file($images . DIRECTORY_SEPARATOR . 'post.png')
+      && is_file($images . DIRECTORY_SEPARATOR . 'post.pch')
+      && !is_file($temp . DIRECTORY_SEPARATOR . 'post.dat');
+  } finally {
+    foreach ([$temp, $images] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) if (is_file($file)) unlink($file);
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 echo "\nSmoke tests: {$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);
-
