@@ -1414,13 +1414,16 @@ function paint_form(string $rep, int|null $reply_to): void {
 
 //アニメ再生
 
-function open_pch(string $pch, $sp = ""): void {
+function open_pch(string $sp = ""): void {
   global $blade, $dat;
   $message = "";
 
-  $pch = filter_input(INPUT_GET, 'pch');
-  $pch_h = str_replace(strrchr($pch, "."), "", $pch); //拡張子除去
-  $extension = substr($pch, strrpos($pch, '.') + 1); //拡張子取得
+  $pch = (string)filter_input(INPUT_GET, 'pch');
+  if (!ImageService::isSafeAnimationFilename($pch)) {
+    error(LANG === 'English' ? 'Invalid animation filename.' : '動画ファイル名が不正です。');
+  }
+  $pch_h = pathinfo($pch, PATHINFO_FILENAME);
+  $extension = strtolower(pathinfo($pch, PATHINFO_EXTENSION));
 
   $picfile = IMG_DIR . $pch_h . ".png";
 

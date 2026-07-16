@@ -150,6 +150,17 @@ smoke_test('image MIME mapping', static function (): bool {
     && get_image_type('image/avif') === '.avif';
 });
 
+smoke_test('animation filenames reject path traversal', static function (): bool {
+  return ImageService::isSafeAnimationFilename('1712345678901234.pch')
+    && ImageService::isSafeAnimationFilename('legacy-name_01.spch')
+    && ImageService::isSafeAnimationFilename('drawing.tgkr')
+    && !ImageService::isSafeAnimationFilename('../secret.pch')
+    && !ImageService::isSafeAnimationFilename('subdir/secret.pch')
+    && !ImageService::isSafeAnimationFilename('drawing.php')
+    && !ImageService::isSafeAnimationFilename('drawing.chi')
+    && !ImageService::isSafeAnimationFilename('.pch');
+});
+
 smoke_test('external URL security boundaries', static function (): bool {
   return resolve_public_ip('127.0.0.1') === false
     && resolve_public_ip('192.168.1.1') === false

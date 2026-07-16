@@ -5,6 +5,17 @@ const IMAGE_INC_VER = 20260716;
 
 final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
+  private const PLAYABLE_ANIMATION_EXTENSIONS = ['pch', 'spch', 'tgkr'];
+
+  public static function isSafeAnimationFilename(string $filename): bool {
+    if ($filename === '' || strlen($filename) > 255 || basename($filename) !== $filename) {
+      return false;
+    }
+    if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_-]{0,127}\.([A-Za-z0-9]+)\z/D', $filename, $matches) !== 1) {
+      return false;
+    }
+    return in_array(strtolower($matches[1]), self::PLAYABLE_ANIMATION_EXTENSIONS, true);
+  }
 
   public static function validateUpload(string $file_path, array $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
     if (!is_file($file_path) || !is_readable($file_path)) return false;
