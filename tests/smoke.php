@@ -3,6 +3,12 @@ declare(strict_types=1);
 
 const LANG = 'Japanese';
 const PHP_SELF = 'index.php';
+const PMAX_W = 800;
+const PMAX_H = 800;
+const PTIME_D = '日';
+const PTIME_H = '時間';
+const PTIME_M = '分';
+const PTIME_S = '秒';
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
@@ -194,6 +200,35 @@ smoke_test('related image files are deleted together', static function (): bool 
       if (is_file($file)) unlink($file);
     }
     if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('new post image and animation are finalized', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_finalize_' . bin2hex(random_bytes(8));
+  $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  mkdir($temp, 0700, true);
+  mkdir($images, 0700, true);
+  try {
+    $source = imagecreatetruecolor(4, 3);
+    imagefill($source, 0, 0, imagecolorallocate($source, 20, 120, 220));
+    imagepng($source, $temp . DIRECTORY_SEPARATOR . 'post.png');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.pch', 'NEO');
+
+    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 100, false, 0600);
+    return $result['img_w'] === 4 && $result['img_h'] === 3
+      && $result['psec'] === 60 && $result['tool'] === 'PaintBBS NEO'
+      && $result['pchfile'] === 'post.pch'
+      && is_file($images . DIRECTORY_SEPARATOR . 'post.png')
+      && is_file($images . DIRECTORY_SEPARATOR . 'post.pch')
+      && !is_file($temp . DIRECTORY_SEPARATOR . 'post.dat');
+  } finally {
+    foreach ([$temp, $images] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) if (is_file($file)) unlink($file);
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
   }
 });
 

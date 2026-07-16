@@ -497,26 +497,6 @@ function regist(): void {
       $nsfw = false;
       $ctype = null;
       if ($picfile) {
-        $path_filename = pathinfo($picfile, PATHINFO_FILENAME);
-        $temp_file = TEMP_DIR . $picfile;
-
-        // アップロードファイルの検証を追加
-        if (!ImageService::validateUpload($temp_file)) {
-          error($en ? 'Invalid file.' : '無効なファイルです。');
-        }
-
-        // ファイルの移動とパーミッション設定
-        if (!rename($temp_file, IMG_DIR . $picfile)) {
-          error($en ? 'Failed to save the file.' : 'ファイルの保存に失敗しました。');
-        }
-        chmod(IMG_DIR . $picfile, PERMISSION_FOR_DEST);
-
-        // 既存の処理を保持
-        $fp = fopen(TEMP_DIR . $path_filename . ".dat", "r");
-        $userdata = fread($fp, 1024);
-        fclose($fp);
-        list($uip, $uhost,,, $ucode,, $starttime, $postedtime, $uresto, $tool) = explode("\t", rtrim($userdata) . "\t");
-
         // ctypeを取得して画像から続きを描いたかどうかを判定
         $ctype = filter_input(INPUT_POST, 'ctype');
         
@@ -576,99 +556,18 @@ function regist(): void {
           $ctype = 'new';
         }
         
-        // 描画時間の計算
-        if ($starttime && DSP_PAINTTIME) {
-          $psec = $postedtime - $starttime; //内部保存用
-          $utime = calcPtime($psec);
-        }
-
-        // ツールの判定
-        if ($tool === 'neo') {
-          $used_tool = 'PaintBBS NEO';
-        } elseif ($tool === 'shi') {
-          $used_tool = 'Shi Painter';
-        } elseif ($tool === 'chicken' || $tool === 'chi') {
-          $used_tool = 'litaChix';
-        } elseif ($tool === 'klecks') {
-          $used_tool = 'Klecks';
-        } elseif ($tool === 'tegaki') {
-          $used_tool = 'Tegaki.js';
-        } elseif ($tool === 'axnos') {
-          $used_tool = 'AxnosPaint';
-        } else {
-          $used_tool = '???';
-        }
-
-        // 画像の縦横サイズを取得
-        list($img_w, $img_h) = getimagesize(IMG_DIR . $picfile);
-
-        $thumbnail = '';
-        // 横幅がPDEF_Wを超えている場合はサムネイルを作成
-        // さらにnsfwフラグが立っている場合はサムネイルにぼかしを入れる
-        $isNsfw = false;
-        if (USE_NSFW && $nsfw_flag) {
-          $isNsfw = true;
-        }
-        if ($img_w > PDEF_W || (USE_NSFW && $nsfw_flag)) {
-          $thumbnail = ImageService::createThumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, $isNsfw);
-        }
-
-        $picdat = $path_filename . '.dat';
-
-        $chifile = $path_filename . '.chi';
-        $spchfile = $path_filename . '.spch';
-        $pchfile = $path_filename . '.pch';
-        $tgkrfile = $path_filename . '.tgkr';
-
-        // 画像から続きを描いた場合のみ動画ファイルを処理しない
-        if ($ctype === 'img') {
-          $pchfile = "";
-        } else {
-          // 新規投稿または動画から続きを描く場合は動画ファイルを処理
-          if (is_file(TEMP_DIR . $pchfile)) {
-            $success = rename(TEMP_DIR . $pchfile, IMG_DIR . $pchfile);
-            if ($success) {
-              chmod(IMG_DIR . $pchfile, PERMISSION_FOR_DEST);
-            } else {
-              $pchfile = "";
-            }
-          } elseif (is_file(TEMP_DIR . $spchfile)) {
-            $success = rename(TEMP_DIR . $spchfile, IMG_DIR . $spchfile);
-            if ($success) {
-              chmod(IMG_DIR . $spchfile, PERMISSION_FOR_DEST);
-              $pchfile = $spchfile;
-            } else {
-              $pchfile = "";
-            }
-          } elseif (is_file(TEMP_DIR . $chifile)) {
-            $success = rename(TEMP_DIR . $chifile, IMG_DIR . $chifile);
-            if ($success) {
-              chmod(IMG_DIR . $chifile, PERMISSION_FOR_DEST);
-              $pchfile = $chifile;
-            } else {
-              $pchfile = "";
-            }
-          } elseif (is_file(TEMP_DIR . $tgkrfile)) {
-            $success = rename(TEMP_DIR . $tgkrfile, IMG_DIR . $tgkrfile);
-            if ($success) {
-              chmod(IMG_DIR . $tgkrfile, PERMISSION_FOR_DEST);
-              $pchfile = $tgkrfile;
-            } else {
-              $pchfile = "";
-            }
-          } else {
-            $pchfile = "";
-          }
-        }
-        chmod(TEMP_DIR . $picdat, PERMISSION_FOR_DEST);
-        unlink(TEMP_DIR . $picdat);
-
-        //nsfw
-        if (USE_NSFW == 1 && $nsfw_flag == 1) {
-          $nsfw = true;
-        } else {
-          $nsfw = false;
-        }
+        $image_result = ImageService::finalizeNewPost(
+          TEMP_DIR, IMG_DIR, (string)$picfile, $ctype, (bool)DSP_PAINTTIME, PDEF_W,
+          USE_NSFW === 1 && $nsfw_flag === '1', PERMISSION_FOR_DEST
+        );
+        $img_w = $image_result['img_w'];
+        $img_h = $image_result['img_h'];
+        $pchfile = $image_result['pchfile'];
+        $psec = $image_result['psec'];
+        $utime = $image_result['utime'];
+        $used_tool = $image_result['tool'];
+        $thumbnail = $image_result['thumbnail'];
+        $nsfw = $image_result['nsfw'];
       } else {
         $img_w = 0;
         $img_h = 0;
@@ -763,8 +662,8 @@ function regist(): void {
 
       $dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
     }
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+  } catch (Throwable $e) {
+    error(($en ? 'Posting failed. ' : '投稿処理に失敗しました。') . h($e->getMessage()));
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $pwdh, $resto, $pictmp, $picfile, $mode);
   //header('Location:'.PHP_SELF);

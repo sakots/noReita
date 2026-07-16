@@ -34,6 +34,78 @@ final class ImageService {
     return $thumbnail->createThumbnail() ? (string)$thumbnail->getOutputName() : '';
   }
 
+  public static function finalizeNewPost(
+    string $temp_dir,
+    string $image_dir,
+    string $image_name,
+    string $ctype,
+    bool $show_paint_time,
+    int $thumbnail_width,
+    bool $nsfw,
+    int $permission
+  ): array {
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $base_name = pathinfo($image_name, PATHINFO_FILENAME);
+    $source = $temp_dir . $image_name;
+    $metadata_file = $temp_dir . $base_name . '.dat';
+
+    if (!self::validateUpload($source)) {
+      throw new RuntimeException('Invalid image file.');
+    }
+    $metadata = @file_get_contents($metadata_file, false, null, 0, 1024);
+    if ($metadata === false) {
+      throw new RuntimeException('Image metadata was not found.');
+    }
+    $fields = explode("\t", rtrim($metadata) . "\t");
+    $start_time = (int)($fields[6] ?? 0);
+    $posted_time = (int)($fields[7] ?? 0);
+    $tool = (string)($fields[9] ?? '');
+
+    $destination = $image_dir . $image_name;
+    if (!rename($source, $destination)) {
+      throw new RuntimeException('Failed to save image file.');
+    }
+    chmod($destination, $permission);
+
+    $size = getimagesize($destination);
+    if ($size === false) {
+      throw new RuntimeException('Failed to read image dimensions.');
+    }
+    $paint_seconds = ($show_paint_time && $start_time > 0) ? max(0, $posted_time - $start_time) : 0;
+    $paint_time = $paint_seconds > 0 ? calcPtime($paint_seconds) : '';
+    $tool_names = [
+      'neo' => 'PaintBBS NEO', 'shi' => 'Shi Painter', 'chicken' => 'litaChix', 'chi' => 'litaChix',
+      'klecks' => 'Klecks', 'tegaki' => 'Tegaki.js', 'axnos' => 'AxnosPaint',
+    ];
+
+    $thumbnail = '';
+    if ((int)$size[0] > $thumbnail_width || $nsfw) {
+      $thumbnail = self::createThumbnail($destination, $image_dir, $thumbnail_width, $nsfw);
+    }
+
+    $animation = '';
+    if ($ctype !== 'img') {
+      foreach (['pch', 'spch', 'chi', 'tgkr'] as $extension) {
+        $candidate = $base_name . '.' . $extension;
+        if (is_file($temp_dir . $candidate)) {
+          if (rename($temp_dir . $candidate, $image_dir . $candidate)) {
+            chmod($image_dir . $candidate, $permission);
+            $animation = $candidate;
+          }
+          break;
+        }
+      }
+    }
+    safe_unlink($metadata_file);
+
+    return [
+      'img_w' => (int)$size[0], 'img_h' => (int)$size[1], 'pchfile' => $animation,
+      'psec' => $paint_seconds, 'utime' => $paint_time, 'tool' => $tool_names[$tool] ?? '???',
+      'thumbnail' => $thumbnail, 'nsfw' => $nsfw,
+    ];
+  }
+
   public static function replacePostedFiles(
     string $temp_dir,
     string $image_dir,
