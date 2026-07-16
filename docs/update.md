@@ -28,6 +28,14 @@ v3以降のデータベースにはスキーマバージョンが記録され、
 
 `scripts/lint-php.sh`、`scripts/smoke-test.sh`を実行してください
 
+配布用ファイルを組み立て、`BladeOne/`を配置した環境では、投稿・検索・削除のHTTP結合テストも実行してください。
+
+```bash
+scripts/integration-test.sh
+```
+
+このテストは一時ディレクトリと一時SQLite DBを使用し、設置済み掲示板の`config.php`やDBは変更しません。
+
 ## 不具合時の元バージョンへの戻し方
 
 githubのリリースより旧バージョンをダウンロードしてください
