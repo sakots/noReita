@@ -1167,17 +1167,7 @@ function sodane(): void {
   $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
   try {
-    $db = Database::connect();
-    $stmt = $db->prepare("UPDATE board_log SET sodane = CAST((CAST(sodane AS INTEGER) + 1) AS TEXT) WHERE tid = ?");
-    $stmt->execute([$resto]);
-
-    // 更新後のそうだね数を取得
-    $stmt = $db->prepare("SELECT CAST(sodane AS INTEGER) as sodane FROM board_log WHERE tid = ?");
-    $stmt->execute([$resto]);
-    $result = $stmt->fetch();
-    $new_sodane = (int)($result['sodane'] ?? 0);
-
-    $db = null;
+    $new_sodane = (new BoardRepository())->incrementSodane((int)$resto);
 
     if ($is_ajax) {
       // Ajaxリクエストの場合はJSONレスポンス
@@ -1230,34 +1220,25 @@ function res(): void {
   $dat['nowtime'] = $nowtime;
 
   try {
-    $db = Database::connect();
+    $repository = new BoardRepository();
 
     if ($uuid !== '') {
-      $sql = "SELECT tid, parent, thread FROM board_log WHERE uuid = ? AND invz = 0 LIMIT 1";
-      $uuid_post = $db->prepare($sql);
-      $uuid_post->execute([$uuid]);
-      $post = $uuid_post->fetch();
-      if ($post) {
-        $resno = ((int)$post['thread'] === 1) ? (int)$post['tid'] : (int)$post['parent'];
-      }
+      $resno = $repository->findThreadIdByUuid($uuid) ?? $resno;
     }
     $dat['resno'] = $resno;
 
-    $sql = "SELECT * FROM board_log WHERE tid = ? ORDER BY tree DESC";
-    $posts = $db->prepare($sql);
-    $posts->execute([$resno]);
+    $thread = $repository->findPost((int)$resno);
+    $posts = $thread ? [$thread] : [];
 
     $oya = array();
     $ko = array();
-    while ($bbsline = $posts->fetch()) {
+    foreach ($posts as $bbsline) {
       $bbsline['thumb'] = $bbsline['thumbnail'] ?? '';
       $bbsline['thumb_avif'] = '';
       //スレッドの記事を取得
-      $sql_i = "SELECT * FROM board_log WHERE parent = ? AND invz = 0 ORDER BY comid ASC";
-      $posts_i = $db->prepare($sql_i);
-      $posts_i->execute([$resno]);
+      $posts_i = $repository->findReplies((int)$resno);
       $r_res_name = array();
-      while ($res = $posts_i->fetch()) {
+      foreach ($posts_i as $res) {
         $res['thumb'] = $res['thumbnail'] ?? '';
         $res['thumb_avif'] = '';
         $res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
@@ -1931,67 +1912,17 @@ function picreplace(): void {
 
   // ログ読み込み
   try {
-    $db = Database::connect();
-    //記事を取り出す
-    $sql = "SELECT * FROM board_log WHERE tid = ?";
-    $msgs = $db->prepare($sql);
-    $msgs->execute([$no]);
-    $msg_d = $msgs->fetch();
+    $repository = new BoardRepository();
+    $msg_d = $repository->findPost((int)$no);
     //パスワード照合
     // $flag = false;
     if (password_verify($pwd_f, $msg_d["pwd"])) {
-      //パスワードがあってたら画像アップロード処理
-      $up_picfile = TEMP_DIR . $filename . $imgext;
-      $dest = IMG_DIR . $stime . '.tmp';
-      copy($up_picfile, $dest);
-
-      if (!is_file($dest)) {
-        error($en ? 'Failed to upload image.' : '画像のアップロードに失敗しました。');
-      }
-      chmod($dest, PERMISSION_FOR_DEST);
-      //元ファイル削除
-      safe_unlink(IMG_DIR . $msg_d["picfile"]);
-
-      $img_type = mime_content_type($dest);
-      $imgext = get_image_type($img_type, $dest);
-
-      //新しい画像の名前(DB保存用)
-      $new_picfile = $filename . $imgext;
-
-      chmod($dest, PERMISSION_FOR_DEST);
-      rename($dest, IMG_DIR . $new_picfile);
-
-      //ワークファイル削除
-      safe_unlink($up_picfile);
-      safe_unlink(TEMP_DIR . $filename . ".dat");
-
-      //動画ファイルアップロード
-      //拡張子チェック
-      $pchext = '';
-      if (is_file(TEMP_DIR . $filename . '.chi')) {
-        $pchext = '.chi';
-      } elseif (is_file(TEMP_DIR . $filename . '.spch')) {
-        $pchext = '.spch';
-      } elseif (is_file(TEMP_DIR . $filename . '.pch')) {
-        $pchext = '.pch';
-      } elseif (is_file(TEMP_DIR . $filename . '.tgkr')) {
-        $pchext = '.tgkr';
-      }
-      //元ファイル削除
-      safe_unlink(IMG_DIR . $msg_d["pchfile"]);
-
-      //新しい動画ファイルの名前(DB保存用)
-      $new_pchfile = $filename . $pchext;
-
-      //動画ファイルアップロード本編
-      if (is_file(TEMP_DIR . $filename . $pchext)) {
-        $pch_src = TEMP_DIR . $filename . $pchext;
-        $dst = IMG_DIR . $new_pchfile;
-        if (copy($pch_src, $dst)) {
-          chmod($dst, PERMISSION_FOR_DEST);
-          safe_unlink($pch_src);
-        }
-      }
+      $replacement = ImageService::replacePostedFiles(
+        TEMP_DIR, IMG_DIR, $filename, $imgext, (int)$stime,
+        (string)$msg_d['picfile'], (string)$msg_d['pchfile'], PERMISSION_FOR_DEST
+      );
+      $new_picfile = $replacement['picfile'];
+      $new_pchfile = $replacement['pchfile'];
 
       //描画時間を$userdataをもとに計算
       $psec = (int)$msg_d['psec'] + ((int)$postedtime - (int)$starttime);
@@ -2013,26 +1944,15 @@ function picreplace(): void {
         $nsfw = false;
       }
 
-      //db上書き
-      $sql_rep = "UPDATE board_log set modified = datetime('now', 'localtime'), host = :host, picfile = :new_picfile, pchfile = :new_pchfile, id = :id, psec = :psec, utime = :utime, nsfw = :nsfw WHERE tid = :no";
-      // プレースホルダ
-      try {
-        $stmt = $db->prepare($sql_rep);
-        $stmt->execute(
-          [
-            ':host'=>$host, ':new_picfile'=>$new_picfile, ':new_pchfile'=>$new_pchfile, ':id'=>$id,':psec'=>$psec,':utime'=>$utime,':nsfw'=>$nsfw,':no'=>$no,
-          ]
-        );
-      } catch(PDOException $e) {
-        echo "DB接続エラー:" . $e->getMessage();
-      }
-      $db = $db->exec($sql_rep);
+      $repository->updateImage((int)$no, [
+        'host' => $host, 'picfile' => $new_picfile, 'pchfile' => $new_pchfile, 'author_id' => $id,
+        'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw,
+      ]);
     } else {
       error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
     }
-    $db = null; //db切断
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+  } catch (Throwable $e) {
+    error(($en ? 'Image replacement failed. ' : '画像差し替えに失敗しました。') . h($e->getMessage()));
   }
   ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }
@@ -2061,48 +1981,19 @@ function editform(): void {
 
   //記事呼び出し
   try {
-    $db = Database::connect();
-
-    //パスワードを取り出す
-    $sql = "SELECT pwd FROM board_log WHERE tid = ?";
-    $stmt = $db->prepare($sql);
-    $stmt->execute([$edit_no]);
-    $msg = $stmt->fetch();
+    $msg = (new BoardRepository())->findPost((int)$edit_no);
     if (empty($msg)) {
       error($en ? 'That post does not exist.' : 'そんな記事ないです。');
     }
     if (password_verify($post_pwd, $msg['pwd'])) {
-      //パスワードがあってたら
-      $sql_i = "SELECT * FROM board_log WHERE tid = $edit_no";
-      $posts = $db->query($sql_i);
-      $oya = array();
-      while ($bbsline = $posts->fetch()) {
-        $bbsline['com'] = nl2br(htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
-        $oya[] = $bbsline;
-        $dat['oya'] = $oya;
-      }
       $dat['message'] = $en ? 'Editing mode...' : '編集モード...';
     } elseif ($admin_pass == $post_pwd) {
-      //管理者編集モード
-      $sql_i = "SELECT * FROM board_log WHERE tid = $edit_no";
-      $posts = $db->query($sql_i);
-      $oya = array();
-      while ($bbsline = $posts->fetch()) {
-        $bbsline['com'] = nl2br(htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
-        $oya[] = $bbsline;
-        $dat['oya'] = $oya;
-      }
       $dat['message'] = $en ? 'Administrator editing mode...' : '管理者編集モード...';
     } else {
-      $db = null;
-      $msgs = null;
-      $db = null; //db切断
       error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
     }
-    $db = null;
-    $msgs = null;
-    $posts = null;
-    $db = null; //db切断
+    $msg['com'] = nl2br(htmlentities($msg['com'], ENT_QUOTES | ENT_HTML5), false);
+    $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
     echo $blade->run(OTHERFILE, $dat);
@@ -2189,23 +2080,10 @@ function editexec(): void {
   $host = str_replace("'", "''", $host);
 
   try {
-    $db = Database::connect();
-    $sql = "UPDATE board_log set modified = datetime('now', 'localtime'), a_name = :name, mail = :mail, sub = :sub, com = :com, a_url = :url, host = :host, sodane = :sodane, pwd = :pwdh where tid = :e_no";
-
-    // プレースホルダ
-    try {
-      $stmt = $db->prepare($sql);
-      $stmt->execute(
-        [
-          ':name'=>$name, ':mail'=>$mail, ':sub'=>$sub, ':com'=>$com,':url'=>$url,':host'=>$host,':sodane'=> $sodane,':pwdh'=> $pwdh, ':e_no'=>$e_no,
-          ]
-      );
-      } catch(PDOException $e) {
-        echo "DB接続エラー:" . $e->getMessage();
-      }
-
-    $db = $db->exec($sql);
-    $db = null;
+    (new BoardRepository())->updateContent((int)$e_no, [
+      'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
+      'host' => $host, 'sodane' => $sodane, 'pwdh' => $pwdh,
+    ]);
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();

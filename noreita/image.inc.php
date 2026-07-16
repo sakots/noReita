@@ -33,4 +33,55 @@ final class ImageService {
     $thumbnail = new Thumbnail($source, $destination, $width, $nsfw);
     return $thumbnail->createThumbnail() ? (string)$thumbnail->getOutputName() : '';
   }
+
+  public static function replacePostedFiles(
+    string $temp_dir,
+    string $image_dir,
+    string $filename,
+    string $image_extension,
+    int $temporary_name,
+    string $old_image,
+    string $old_animation,
+    int $permission
+  ): array {
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $source = $temp_dir . $filename . $image_extension;
+    $work_file = $image_dir . $temporary_name . '.tmp';
+    if (!copy($source, $work_file) || !is_file($work_file)) {
+      throw new RuntimeException('Failed to copy replacement image.');
+    }
+    chmod($work_file, $permission);
+    safe_unlink($image_dir . $old_image);
+
+    $extension = get_image_type((string)mime_content_type($work_file), $work_file);
+    $new_image = $filename . $extension;
+    if (!rename($work_file, $image_dir . $new_image)) {
+      safe_unlink($work_file);
+      throw new RuntimeException('Failed to move replacement image.');
+    }
+    chmod($image_dir . $new_image, $permission);
+    safe_unlink($source);
+    safe_unlink($temp_dir . $filename . '.dat');
+
+    $animation_extension = '';
+    foreach (['chi', 'spch', 'pch', 'tgkr'] as $candidate) {
+      if (is_file($temp_dir . $filename . '.' . $candidate)) {
+        $animation_extension = '.' . $candidate;
+        break;
+      }
+    }
+    safe_unlink($image_dir . $old_animation);
+    $new_animation = $filename . $animation_extension;
+    if ($animation_extension !== '') {
+      $animation_source = $temp_dir . $new_animation;
+      $animation_destination = $image_dir . $new_animation;
+      if (!copy($animation_source, $animation_destination)) {
+        throw new RuntimeException('Failed to copy replacement animation.');
+      }
+      chmod($animation_destination, $permission);
+      safe_unlink($animation_source);
+    }
+    return ['picfile' => $new_image, 'pchfile' => $new_animation];
+  }
 }

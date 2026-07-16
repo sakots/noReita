@@ -49,6 +49,50 @@ final class BoardRepository {
     $statement = $this->db->prepare('UPDATE board_log SET invz=1 WHERE tid = ?');
     $statement->execute([$id]);
   }
+
+  public function findThreadIdByUuid(string $uuid): ?int {
+    $statement = $this->db->prepare('SELECT tid, parent, thread FROM board_log WHERE uuid = ? AND invz = 0 LIMIT 1');
+    $statement->execute([$uuid]);
+    $post = $statement->fetch(PDO::FETCH_ASSOC);
+    if (!$post) return null;
+    return (int)$post['thread'] === 1 ? (int)$post['tid'] : (int)$post['parent'];
+  }
+
+  public function findReplies(int $parent): array {
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE parent = ? AND invz = 0 ORDER BY comid ASC');
+    $statement->execute([$parent]);
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  public function incrementSodane(int $id): int {
+    $statement = $this->db->prepare('UPDATE board_log SET sodane = CAST((CAST(sodane AS INTEGER) + 1) AS TEXT) WHERE tid = ?');
+    $statement->execute([$id]);
+    $statement = $this->db->prepare('SELECT CAST(sodane AS INTEGER) FROM board_log WHERE tid = ?');
+    $statement->execute([$id]);
+    return (int)$statement->fetchColumn();
+  }
+
+  public function updateContent(int $id, array $values): void {
+    $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), a_name = :name, mail = :mail,
+      sub = :sub, com = :com, a_url = :url, host = :host, sodane = :sodane, pwd = :pwdh WHERE tid = :id";
+    $statement = $this->db->prepare($sql);
+    $statement->execute([
+      'name' => $values['name'], 'mail' => $values['mail'], 'sub' => $values['sub'], 'com' => $values['com'],
+      'url' => $values['url'], 'host' => $values['host'], 'sodane' => $values['sodane'],
+      'pwdh' => $values['pwdh'], 'id' => $id,
+    ]);
+  }
+
+  public function updateImage(int $id, array $values): void {
+    $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), host = :host, picfile = :picfile,
+      pchfile = :pchfile, id = :author_id, psec = :psec, utime = :utime, nsfw = :nsfw WHERE tid = :id";
+    $statement = $this->db->prepare($sql);
+    $statement->execute([
+      'host' => $values['host'], 'picfile' => $values['picfile'], 'pchfile' => $values['pchfile'],
+      'author_id' => $values['author_id'], 'psec' => $values['psec'], 'utime' => $values['utime'],
+      'nsfw' => $values['nsfw'], 'id' => $id,
+    ]);
+  }
 }
 
 final class DatabaseMigrator {
