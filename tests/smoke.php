@@ -177,6 +177,51 @@ smoke_test('post validation is independent from HTTP rendering', static function
   return true;
 });
 
+smoke_test('post service centralizes edit and delete authorization', static function (): bool {
+  $image_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_post_service_' . bin2hex(random_bytes(8));
+  if (!mkdir($image_dir, 0700)) return false;
+  try {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $insert = static function (string $subject, string $password, string $image = '') use ($repository): int {
+      return $repository->insertPost([
+        'thread' => 1, 'sub' => $subject, 'com' => '本文', 'a_name' => '名前',
+        'pwd' => password_hash($password, PASSWORD_DEFAULT), 'picfile' => $image,
+        'invz' => 0, 'age' => 0, 'tree' => time(),
+      ]);
+    };
+    $edit_id = $insert('編集前', 'owner-pass');
+    $hide_id = $insert('非表示対象', 'another-pass');
+    $delete_id = $insert('削除対象', 'delete-pass', 'owner.png');
+    file_put_contents($image_dir . DIRECTORY_SEPARATOR . 'owner.png', 'image');
+    $service = new PostService($repository, 'admin-pass', $image_dir);
+
+    try {
+      $service->edit($edit_id, 'wrong-pass', []);
+      return false;
+    } catch (PostAuthorizationException $e) {
+    }
+    $service->edit($edit_id, 'owner-pass', [
+      'name' => '編集者', 'mail' => '', 'sub' => '編集後', 'com' => '編集本文',
+      'url' => '', 'host' => 'localhost', 'sodane' => 0,
+    ]);
+    if (($repository->findPost($edit_id)['sub'] ?? '') !== '編集後') return false;
+
+    if ($service->delete($hide_id, 'admin-pass', false) !== 'hidden'
+      || (int)($repository->findPost($hide_id)['invz'] ?? 0) !== 1) return false;
+    if ($service->delete($delete_id, 'delete-pass', false) !== 'deleted'
+      || $repository->findPost($delete_id) !== false
+      || is_file($image_dir . DIRECTORY_SEPARATOR . 'owner.png')) return false;
+    return true;
+  } finally {
+    foreach (glob($image_dir . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($image_dir)) rmdir($image_dir);
+  }
+});
+
 smoke_test('image MIME mapping', static function (): bool {
   return get_image_type('image/jpeg') === '.jpg'
     && get_image_type('image/png') === '.png'

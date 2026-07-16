@@ -1559,38 +1559,21 @@ function delmode(): void {
 
   $p_pwd = filter_input(INPUT_POST, 'pwd');
 
-  //記事呼び出し
   try {
-    $repository = new BoardRepository();
-    $msg = $repository->findPost((int)$delno);
-    if (empty($msg)) {
-      error($en ? 'That post does not exist.' : 'そんな記事ない気がします。');
-    }
-    $msg_pic = (string)$msg['picfile'];
-
-    if (isset($_POST["admindel"])) {
-      $admindel_mode = 1;
-    } else {
-      $admindel_mode = 0;
-    }
-
-    if (password_verify($p_pwd, $msg['pwd'])) {
-      ImageService::deleteRelatedFiles(IMG_DIR, $msg_pic);
-      $repository->deletePost((int)$delno);
-      $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
-    } elseif ($admin_pass == $p_pwd && $admindel_mode == 1) {
-      ImageService::deleteRelatedFiles(IMG_DIR, $msg_pic);
-      $repository->deletePost((int)$delno, true);
-      $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
-    } elseif ($admin_pass == $p_pwd && $admindel_mode != 1) {
-      $repository->hidePost((int)$delno);
-      $dat['message'] = $en ? 'Post hidden.' : '非表示にしました。';
-    } else {
-      error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
-    }
-    $msg = null;
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
+    $result = $service->delete((int)$delno, (string)$p_pwd, isset($_POST['admindel']));
+    $dat['message'] = $result === 'hidden'
+      ? ($en ? 'Post hidden.' : '非表示にしました。')
+      : ($en ? 'Successfully deleted.' : '削除しました。');
+  } catch (PostNotFoundException $e) {
+    error($en ? 'That post does not exist.' : 'そんな記事ない気がします。');
+    return;
+  } catch (PostAuthorizationException $e) {
+    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+    return;
+  } catch (Throwable $e) {
+    error(($en ? 'Deletion failed. ' : '削除に失敗しました。') . h($e->getMessage()));
+    return;
   }
   //変数クリア
   unset($delno, $delt);
@@ -1709,24 +1692,25 @@ function editform(): void {
 
   //記事呼び出し
   try {
-    $msg = (new BoardRepository())->findPost((int)$edit_no);
-    if (empty($msg)) {
-      error($en ? 'That post does not exist.' : 'そんな記事ないです。');
-    }
-    if (password_verify($post_pwd, $msg['pwd'])) {
+    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
+    $authorization = $service->authorize((int)$edit_no, (string)$post_pwd);
+    $msg = $authorization['post'];
+    if ($authorization['role'] === 'owner') {
       $dat['message'] = $en ? 'Editing mode...' : '編集モード...';
-    } elseif ($admin_pass == $post_pwd) {
-      $dat['message'] = $en ? 'Administrator editing mode...' : '管理者編集モード...';
     } else {
-      error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+      $dat['message'] = $en ? 'Administrator editing mode...' : '管理者編集モード...';
     }
     $msg['com'] = nl2br(htmlentities($msg['com'], ENT_QUOTES | ENT_HTML5), false);
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
     echo $blade->run(OTHERFILE, $dat);
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+  } catch (PostNotFoundException $e) {
+    error($en ? 'That post does not exist.' : 'そんな記事ないです。');
+  } catch (PostAuthorizationException $e) {
+    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+  } catch (Throwable $e) {
+    error(($en ? 'Failed to open edit mode. ' : '編集画面を開けませんでした。') . h($e->getMessage()));
   }
 }
 
@@ -1775,23 +1759,18 @@ function editexec(): void {
   $host = str_replace("'", "''", $host);
 
   try {
-    $repository = new BoardRepository();
-    $existing_post = $repository->findPost((int)$e_no);
-    if (empty($existing_post)) {
-      error($en ? 'That post does not exist.' : 'そんな記事ないです。');
-      return;
-    }
-    $owner_authorized = password_verify($pwd, (string)$existing_post['pwd']);
-    $admin_authorized = $admin_pass !== '' && hash_equals($admin_pass, $pwd);
-    if (!$owner_authorized && !$admin_authorized) {
-      error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
-      return;
-    }
-    $repository->updateContent((int)$e_no, [
+    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
+    $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
-      'host' => $host, 'sodane' => $sodane, 'pwdh' => (string)$existing_post['pwd'],
+      'host' => $host, 'sodane' => $sodane,
     ]);
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
+  } catch (PostNotFoundException $e) {
+    error($en ? 'That post does not exist.' : 'そんな記事ないです。');
+    return;
+  } catch (PostAuthorizationException $e) {
+    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+    return;
   } catch (Throwable $e) {
     error(($en ? 'Editing failed. ' : '編集に失敗しました。') . h($e->getMessage()));
     return;

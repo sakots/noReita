@@ -4,6 +4,45 @@
 const POST_INC_VER = 20260716;
 
 final class PostValidationException extends DomainException {}
+final class PostNotFoundException extends RuntimeException {}
+final class PostAuthorizationException extends RuntimeException {}
+
+final class PostService {
+  public function __construct(
+    private BoardRepository $repository,
+    private string $admin_pass,
+    private string $image_dir
+  ) {}
+
+  public function authorize(int $post_id, string $password): array {
+    $post = $this->repository->findPost($post_id);
+    if (empty($post)) throw new PostNotFoundException('Post was not found.');
+    if (password_verify($password, (string)$post['pwd'])) {
+      return ['post' => $post, 'role' => 'owner'];
+    }
+    if ($this->admin_pass !== '' && hash_equals($this->admin_pass, $password)) {
+      return ['post' => $post, 'role' => 'admin'];
+    }
+    throw new PostAuthorizationException('Invalid password.');
+  }
+
+  public function edit(int $post_id, string $password, array $values): void {
+    $authorization = $this->authorize($post_id, $password);
+    $values['pwdh'] = (string)$authorization['post']['pwd'];
+    $this->repository->updateContent($post_id, $values);
+  }
+
+  public function delete(int $post_id, string $password, bool $delete_as_admin): string {
+    $authorization = $this->authorize($post_id, $password);
+    if ($authorization['role'] === 'admin' && !$delete_as_admin) {
+      $this->repository->hidePost($post_id);
+      return 'hidden';
+    }
+    ImageService::deleteRelatedFiles($this->image_dir, (string)$authorization['post']['picfile']);
+    $this->repository->deletePost($post_id, $authorization['role'] === 'admin');
+    return 'deleted';
+  }
+}
 
 final class PostValidator {
   public static function configuredRules(
