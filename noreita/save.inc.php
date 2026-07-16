@@ -2,7 +2,8 @@
 //Petit Note (c)さとぴあ @satopian 2021-2025 MIT License
 //https://paintbbs.sakura.ne.jp/
 
-$save_inc_ver=20260504;
+const SAVE_INC_VER = 20260716; //save.inc.phpのバージョン
+
 class image_save{
 
   private int|string $security_timer,$imgfile,$en,$count,$errtext,$session_usercode; // プロパティとして宣言
@@ -113,7 +114,7 @@ class image_save{
 
     $this->check_async_request();
 
-    session_sta();
+    noreita_session_start();
     $this->session_usercode = $_SESSION['usercode'] ?? "";
     $cookie_usercode = t(filter_input_data('COOKIE', 'usercode'));
     if ($this->session_usercode && $cookie_usercode) {

@@ -234,9 +234,6 @@ const SESSION_NAME = 'noreita_session';
 // neoのディレクトリ。index.phpから見て
 const NEO_DIR = 'app/neo/';
 
-// しぃペインターのディレクトリ。index.phpから見て
-const SHI_PAINTER_DIR = 'app/shi_painter/';
-
 // litaChitのディレクトリ。index.phpから見て
 const CHICKEN_DIR = 'app/chickenpaint/';
 

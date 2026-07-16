@@ -1,6 +1,5 @@
 # noReita
 
-![php](https://img.shields.io/badge/php-7.4-green.svg)
 ![php](https://img.shields.io/badge/php-8.x-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
@@ -72,6 +71,17 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ## 履歴
 
 [すべての履歴はこちら](changelog.md)
+
+### [2026/07/15] v3.4.1
+
+- TLS検証と外部URL取得の安全化
+- phpの最低バージョンが正しくなかったので8.0に引き上げ
+- `CONF_VER`が未定義の場合エラーで落ちるの修正
+- しぃペインターの設定が残っていたの削除
+- `SESSION_NAME`のフォールバックが機能しないの修正
+- 各モジュールのバージョン情報数値を定数化
+- ドキュメント整理
+- github workflows作成
 
 ### [2026/07/14] v3.4.0
 

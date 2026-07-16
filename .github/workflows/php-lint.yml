@@ -1,0 +1,37 @@
+name: PHP checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  php-lint:
+    name: PHP ${{ matrix.php-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version:
+          - '8.0'
+          - '8.3'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: curl, gd, mbstring, pdo_sqlite
+          coverage: none
+
+      - name: Check PHP syntax
+        run: bash scripts/lint-php.sh
+
+      - name: Run smoke tests
+        run: bash scripts/smoke-test.sh

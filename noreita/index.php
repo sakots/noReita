@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.4.0 lot.260714.0';
+const REITA_VER = 'v3.4.1 lot.260716.0';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -13,8 +13,8 @@ $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 $en = (stripos($lang,'ja')!== 0);
 
 // phpのバージョンが古い場合動かさせない
-if (version_compare($php_ver = phpversion(),'7.4.0', '<')) {
-  die($en ? "PHP version 7.4 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.4以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
+if (version_compare($php_ver = phpversion(),'8.0.0', '<')) {
+  die($en ? "PHP version 8.0 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン8.0以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
 }
 
 // functions.phpの存在とバージョンを確認
@@ -22,7 +22,7 @@ if (!is_file(__DIR__.'/functions.php')) {
   die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
 require_once(__DIR__.'/functions.php');
-if(!isset($functions_ver) || $functions_ver < 20260504) {
+if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260716) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
@@ -30,35 +30,35 @@ if(!isset($functions_ver) || $functions_ver < 20260504) {
 check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (CONF_VER < 20260405 || !defined('CONF_VER')) {
+if (!defined('CONF_VER') || CONF_VER < 20260405) {
   die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!isset($misskey_note_ver) || $misskey_note_ver < 20260610) {
+if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260716) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
 check_file(__DIR__.'/connect_misskey_api.php');
 require_once(__DIR__.'/connect_misskey_api.php');
-if(!isset($connect_misskey_api_ver) || $connect_misskey_api_ver < 20260610) {
+if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260716) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
 // save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
-if(!isset($save_inc_ver)||$save_inc_ver < 20260504) {
+if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260716) {
   die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!isset($thumbnail_ver)||$thumbnail_ver < 20260415) {
+if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260716) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。');
 }
 
@@ -104,7 +104,6 @@ $dat['path'] = IMG_DIR;
 
 $dat['neo_dir'] = NEO_DIR;
 $dat['chicken_dir'] = CHICKEN_DIR;
-$dat['shi_painter_dir'] = SHI_PAINTER_DIR;
 $dat['klecks_dir'] = KLECKS_DIR;
 $dat['tegaki_dir'] = TEGAKI_DIR;
 $dat['axnos_dir'] = AXNOS_DIR;
@@ -234,7 +233,7 @@ $https_only = (bool)($_SERVER['HTTPS'] ?? '');
 //user-codeの発行
 $usercode = t(filter_input_data('COOKIE', 'usercode')); //user-codeを取得
 
-session_sta();
+noreita_session_start();
 $session_usercode = $_SESSION['usercode'] ?? "";
 $session_usercode = t($session_usercode);
 
@@ -1428,13 +1427,10 @@ function paint_form(string $rep, int|null $reply_to): void {
   $dat['picw'] = $picw;
   $dat['pich'] = $pich;
 
-  if ($tool == "shi") { //しぃペインターの時の幅と高さ
-    $ww = $picw + 510;
-    $hh = $pich + 172;
-  } else { //NEOのときの幅と高さ
-    $ww = $picw + 150;
-    $hh = $pich + 172;
-  }
+  //NEOのときの幅と高さ
+  $ww = $picw + 150;
+  $hh = $pich + 172;
+
   if ($hh < 560) {
     $hh = 560;
   } //共通の最低高
@@ -1473,7 +1469,7 @@ function paint_form(string $rep, int|null $reply_to): void {
       }
     }
 
-    session_sta();
+    noreita_session_start();
 
     // 続きから描く場合は一時画像を除外するフラグを設定
     $dat['exclude_temp_images'] = true;
@@ -1582,7 +1578,7 @@ function paint_form(string $rep, int|null $reply_to): void {
     $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
     $userip = get_uip();
 
-    session_sta();
+    noreita_session_start();
     $time = time();
     $repcode = substr(crypt(md5($no . $userip . $pwd_f . date("Ymd", $time)), $time), -8);
     //念の為にエスケープ文字があればアルファベットに変換
