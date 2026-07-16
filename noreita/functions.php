@@ -360,7 +360,7 @@ function check_csrf_token(): void {
 function session_sta(): void {
   global $session_name;
   if (session_status() === PHP_SESSION_NONE) {
-    $session_name = SESSION_NAME ?? 'noreita_session';
+    $session_name = defined('SESSION_NAME') ? SESSION_NAME : 'noreita_session';
     session_name($session_name);
     session_save_path(__DIR__ . '/session/');
     $https_only = (bool)($_SERVER['HTTPS'] ?? '');
