@@ -41,6 +41,13 @@ if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260716) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
+// image.inc
+check_file(__DIR__.'/image.inc.php');
+require_once(__DIR__.'/image.inc.php');
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260716) {
+  die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
+}
+
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
@@ -446,8 +453,7 @@ function regist(): void {
   //セキュリティ関連ここまで
 
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     if (isset($_POST["send"])) {
 
       $strlen_com = strlen($com);
@@ -498,7 +504,7 @@ function regist(): void {
         $temp_file = TEMP_DIR . $picfile;
 
         // アップロードファイルの検証を追加
-        if (!validate_upload_file($temp_file)) {
+        if (!ImageService::validateUpload($temp_file)) {
           error($en ? 'Invalid file.' : '無効なファイルです。');
         }
 
@@ -607,9 +613,7 @@ function regist(): void {
           $isNsfw = true;
         }
         if ($img_w > PDEF_W || (USE_NSFW && $nsfw_flag)) {
-          $thumb = new Thumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, $isNsfw);
-          $thumb->createThumbnail();
-          $thumbnail = $thumb->getOutputName();
+          $thumbnail = ImageService::createThumbnail(IMG_DIR . $picfile, IMG_DIR, PDEF_W, $isNsfw);
         }
 
         $picdat = $path_filename . '.dat';
@@ -777,8 +781,7 @@ function regist(): void {
   //ログ行数オーバー処理
   //スレ数カウント
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     $sql_th = "SELECT SUM(thread) as cnt FROM board_log";
     $th_cnt_sql = $db->query("$sql_th");
     $th_cnt_sql = $th_cnt_sql->fetch();
@@ -795,8 +798,7 @@ function regist(): void {
   if ($th_cnt > $th_id) {
     // そろそろ消えるスレッドにshdフラグを設定
     try {
-      $db = new PDO(DB_PDO);
-      $db->exec("PRAGMA journal_mode=WAL;");
+      $db = Database::connect();
       // 古いスレッドから順番にshdフラグを設定
       $sql = "UPDATE board_log SET shd = '1' WHERE thread = 1 AND shd = '0' ORDER BY tid ASC LIMIT ?";
       $stmt = $db->prepare($sql);
@@ -829,8 +831,7 @@ function def(): void {
   //ログ行数オーバー処理
   //スレ数カウント
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     $sql_th = "SELECT SUM(thread) as cnt FROM board_log";
     $th_cnt_sql = $db->query("$sql_th");
     $th_cnt_sql = $th_cnt_sql->fetch();
@@ -851,8 +852,7 @@ function def(): void {
 
   //ページング
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     $sql_cnt = "SELECT SUM(thread) as cnt FROM board_log WHERE invz=0";
     $th_cnt_sql = $db->query("$sql_cnt");
     $th_cnt_sql = $th_cnt_sql->fetch();
@@ -898,8 +898,7 @@ function def(): void {
 
   //読み込み
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     //1ページの全スレッド取得
     $sql = "SELECT * FROM board_log WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?";
     $posts = $db->prepare($sql);
@@ -1027,8 +1026,7 @@ function catalog(): void {
 
   //ページング
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     if (isset($_GET['page']) && is_numeric($_GET['page'])) {
       $page = $_GET['page'];
       $page = max($page, 1);
@@ -1075,8 +1073,7 @@ function catalog(): void {
   //読み込み
 
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     //1ページの全スレッド取得
     $sql = "SELECT tid, created, modified, a_name, mail, sub, com, a_url, host, sodane, id, pwd, utime, picfile, pchfile, img_w, img_h, utime, tree, parent, age, utime, thumbnail FROM board_log WHERE picfile > 0 AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :page_def";
     $posts = $db->prepare($sql);
@@ -1123,28 +1120,15 @@ function search(): void {
 
   //読み込み
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $repository = new BoardRepository();
     //全スレッド取得
     //まずtagがあれば全文検索
     if ($tag == 'tag') {
-      $sql = "SELECT * FROM board_log WHERE com LIKE ? AND invz=0 ORDER BY age DESC, tree DESC";
-      $posts = $db->prepare($sql);
-      $posts->execute(["%$search%"]);
+      $posts = $repository->searchComments($search);
       $dat['catalogmode'] = 'hashsearch';
       $dat['tag'] = $search_f;
     } else {
-      //tagがなければ作者名検索
-      if ($similar == "similar") {
-        $sql = "SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND picfile > 0 ORDER BY age DESC, tree DESC";
-        $posts = $db->prepare($sql);
-        $posts->execute(["%$search%"]);
-      } else {
-        //完全一致
-        $sql = "SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND picfile > 0 ORDER BY age DESC, tree DESC";
-        $posts = $db->prepare($sql);
-        $posts->execute([$search]);
-      }
+      $posts = $repository->searchAuthors($search, $similar === 'similar');
       $dat['catalogmode'] = 'search';
       $dat['author'] = $search_f;
     }
@@ -1153,7 +1137,7 @@ function search(): void {
     $ko = array();
 
     $i = 0;
-    while ($bbsline = $posts->fetch()) {
+    foreach ($posts as $bbsline) {
       $bbsline['thumb'] = $bbsline['thumbnail'] ?? '';
       $bbsline['com'] = nl2br(htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
       if ($bbsline['thread'] == 1) {
@@ -1170,7 +1154,6 @@ function search(): void {
 
     $dat['s_result'] = $i;
     echo $blade->run(CATALOGFILE, $dat);
-    $db = null; //db切断
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
   }
@@ -1184,8 +1167,7 @@ function sodane(): void {
   $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     $stmt = $db->prepare("UPDATE board_log SET sodane = CAST((CAST(sodane AS INTEGER) + 1) AS TEXT) WHERE tid = ?");
     $stmt->execute([$resto]);
 
@@ -1248,8 +1230,7 @@ function res(): void {
   $dat['nowtime'] = $nowtime;
 
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
 
     if ($uuid !== '') {
       $sql = "SELECT tid, parent, thread FROM board_log WHERE uuid = ? AND invz = 0 LIMIT 1";
@@ -1779,8 +1760,7 @@ function in_continue(): void {
   if (!CONTINUE_PASS) $dat['newpost_nopassword'] = true;
 
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     $sql = "SELECT *, ctype as ctype FROM board_log WHERE picfile=? ORDER BY tree DESC";
     $posts = $db->prepare($sql);
     $posts->execute([$no]);
@@ -1854,31 +1834,12 @@ function delmode(): void {
 
   //記事呼び出し
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
-
-    //パスワードを取り出す
-    $sql = "SELECT pwd FROM board_log WHERE tid = ?";
-    $msgs = $db->prepare($sql);
-    if ($msgs == false) {
-      error($en ? 'That post does not exist.' : 'そんな記事ない気がします。');
-    }
-    $msgs->execute([$delno]);
-    $msg = $msgs->fetch();
+    $repository = new BoardRepository();
+    $msg = $repository->findPost((int)$delno);
     if (empty($msg)) {
       error($en ? 'That post does not exist.' : 'そんな記事ない気がします。');
     }
-
-    //削除記事の画像を取り出す
-    $sql_p = "SELECT picfile FROM board_log WHERE tid = ?";
-    $msg_sp = $db->prepare($sql_p);
-    $msg_sp->execute([$delno]);
-    $msg_sp->execute();
-    $msg_p = $msg_sp->fetch();
-    if (empty($msg_p)) {
-      error($en ? 'Image not found.' : '画像が見当たりません。');
-    }
-    $msg_pic = $msg_p['picfile']; //画像の名前取得できた
+    $msg_pic = (string)$msg['picfile'];
 
     if (isset($_POST["admindel"])) {
       $admindel_mode = 1;
@@ -1887,58 +1848,20 @@ function delmode(): void {
     }
 
     if (password_verify($p_pwd, $msg['pwd'])) {
-      //画像とかファイル削除
-      if (is_file(IMG_DIR . $msg_pic)) {
-        $msg_dat = str_replace(strrchr($msg_pic, "."), "", $msg_pic); //拡張子除去
-        safe_unlink(IMG_DIR . $msg_dat . '.png');
-        safe_unlink(IMG_DIR . $msg_dat . '.jpg'); //一応jpgも
-        safe_unlink(IMG_DIR . $msg_dat . '.webp');
-        safe_unlink(IMG_DIR . $msg_dat . '.avif');
-        safe_unlink(IMG_DIR . $msg_dat . '.pch');
-        safe_unlink(IMG_DIR . $msg_dat . '.spch');
-        safe_unlink(IMG_DIR . $msg_dat . '.dat');
-        safe_unlink(IMG_DIR . $msg_dat . '.chi');
-        safe_unlink(IMG_DIR . $msg_dat . '.tgkr');
-      }
-      //↑画像とか削除処理完了
-      //データベースから削除
-      $sql = "DELETE FROM board_log WHERE tid = ?";
-      $stmt = $db->prepare($sql);
-      $stmt->execute([$delno]);
+      ImageService::deleteRelatedFiles(IMG_DIR, $msg_pic);
+      $repository->deletePost((int)$delno);
       $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
     } elseif ($admin_pass == $p_pwd && $admindel_mode == 1) {
-      //画像とかファイル削除
-      if (is_file(IMG_DIR . $msg_pic)) {
-        $msg_dat = str_replace(strrchr($msg_pic, "."), "", $msg_pic); //拡張子除去
-        safe_unlink(IMG_DIR . $msg_dat . '.png');
-        safe_unlink(IMG_DIR . $msg_dat . '.jpg'); //一応jpgも
-        safe_unlink(IMG_DIR . $msg_dat . '.webp');
-        safe_unlink(IMG_DIR . $msg_dat . '.avif');
-        safe_unlink(IMG_DIR . $msg_dat . '.pch');
-        safe_unlink(IMG_DIR . $msg_dat . '.spch');
-        safe_unlink(IMG_DIR . $msg_dat . '.dat');
-        safe_unlink(IMG_DIR . $msg_dat . '.chi');
-        safe_unlink(IMG_DIR . $msg_dat . '.tgkr');
-      }
-      //↑画像とか削除処理完了
-      //データベースから削除
-      $sql = "DELETE FROM board_log WHERE tid = ? OR parent = ?";
-      $stmt = $db->prepare($sql);
-      $stmt->execute([$delno, $delno]);
+      ImageService::deleteRelatedFiles(IMG_DIR, $msg_pic);
+      $repository->deletePost((int)$delno, true);
       $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
     } elseif ($admin_pass == $p_pwd && $admindel_mode != 1) {
-      //管理モード以外での管理者削除は
-      //データベースから削除はせずに非表示
-      $sql = "UPDATE board_log SET invz=1 WHERE tid = ?";
-      $stmt = $db->prepare($sql);
-      $stmt->execute([$delno]);
+      $repository->hidePost((int)$delno);
       $dat['message'] = $en ? 'Post hidden.' : '非表示にしました。';
     } else {
       error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
     }
-    $msg_p = null;
     $msg = null;
-    $db = null; //db切断
   } catch (PDOException $e) {
     echo "DB接続エラー:" . $e->getMessage();
   }
@@ -2008,8 +1931,7 @@ function picreplace(): void {
 
   // ログ読み込み
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     //記事を取り出す
     $sql = "SELECT * FROM board_log WHERE tid = ?";
     $msgs = $db->prepare($sql);
@@ -2139,8 +2061,7 @@ function editform(): void {
 
   //記事呼び出し
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
 
     //パスワードを取り出す
     $sql = "SELECT pwd FROM board_log WHERE tid = ?";
@@ -2268,8 +2189,7 @@ function editexec(): void {
   $host = str_replace("'", "''", $host);
 
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     $sql = "UPDATE board_log set modified = datetime('now', 'localtime'), a_name = :name, mail = :mail, sub = :sub, com = :com, a_url = :url, host = :host, sodane = :sodane, pwd = :pwdh where tid = :e_no";
 
     // プレースホルダ
@@ -2314,8 +2234,7 @@ function admin(): void {
   //最大何ページあるのか
   //記事呼び出しから
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     //読み込み
     $adminpass = filter_input(INPUT_POST, 'adminpass');
     if ($adminpass === $admin_pass) {
@@ -2361,8 +2280,7 @@ function usrchk(): void {
   $pwd_f = filter_input(INPUT_POST, 'pwd');
   $flag = FALSE;
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     //パスワードを取り出す
     $sql = "SELECT pwd FROM board_log WHERE tid = ?";
     $msgs = $db->prepare($sql);
@@ -2477,8 +2395,7 @@ function save_image(): void {
 function logdel(): void {
   //オーバーした行の画像とスレ番号を取得
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     $sql_img = "SELECT * FROM board_log ORDER BY tid LIMIT 1";
     $msgs = $db->prepare($sql_img);
     $msgs->execute();
@@ -2486,18 +2403,7 @@ function logdel(): void {
 
     $del_id = (int)$msg["tid"]; //消す行のスレ番号
     $msg_pic = $msg["picfile"]; //画像の名前取得できた
-    //画像とかの削除処理
-    if (is_file(IMG_DIR . $msg_pic)) {
-      $msg_dat = pathinfo($msg_pic, PATHINFO_FILENAME); //拡張子除去
-      safe_unlink(IMG_DIR . $msg_dat . '.png');
-      safe_unlink(IMG_DIR . $msg_dat . '.jpg'); //一応jpgも
-      safe_unlink(IMG_DIR . $msg_dat . '.pch');
-      safe_unlink(IMG_DIR . $msg_dat . '.spch');
-      safe_unlink(IMG_DIR . $msg_dat . '.dat');
-      safe_unlink(IMG_DIR . $msg_dat . '.chi');
-      safe_unlink(IMG_DIR . $msg_dat . '.webp');
-      safe_unlink(IMG_DIR . $msg_dat . '.avif');
-    }
+    ImageService::deleteRelatedFiles(IMG_DIR, (string)$msg_pic);
 
     //レスあれば削除
     //カウント
@@ -2530,8 +2436,7 @@ function misskey_note(): void {
   //スレの画像取得
   $no = filter_input(INPUT_GET, 'no',FILTER_VALIDATE_INT);
   try {
-    $db = new PDO(DB_PDO);
-    $db->exec("PRAGMA journal_mode=WAL;");
+    $db = Database::connect();
     $sql = "SELECT * FROM board_log WHERE id=? ORDER BY tree DESC";
     $posts = $db->prepare($sql);
     $posts->execute([$no]);
@@ -2572,39 +2477,4 @@ function error2(): void {
   }
   echo $blade->run(OTHERFILE, $dat);
   exit;
-}
-
-// ファイルアップロードのセキュリティ検証関数
-function validate_upload_file(string $file_path, $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
-    // ファイルの存在確認
-    if (!file_exists($file_path)) {
-        return false;
-    }
-
-    // MIMEタイプの検証
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime_type = finfo_file($finfo, $file_path);
-    //finfo_close($finfo);
-
-    if (!in_array($mime_type, $allowed_types)) {
-        return false;
-    }
-
-    // ファイルサイズの検証（デフォルト10MB）
-    if (filesize($file_path) > 10 * 1024 * 1024) {
-        return false;
-    }
-
-    // 画像の整合性チェック
-    $image_info = getimagesize($file_path);
-    if ($image_info === false) {
-        return false;
-    }
-
-    // 画像の幅と高さの検証
-    if ($image_info[0] > PMAX_W || $image_info[1] > PMAX_H) {
-        return false;
-    }
-
-    return true;
 }

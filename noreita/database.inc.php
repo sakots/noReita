@@ -3,6 +3,54 @@
 
 const DATABASE_INC_VER = 20260716;
 
+final class Database {
+  public static function connect(): PDO {
+    $db = new PDO(DB_PDO);
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db->exec('PRAGMA journal_mode=WAL;');
+    return $db;
+  }
+}
+
+final class BoardRepository {
+  private PDO $db;
+
+  public function __construct(?PDO $db = null) {
+    $this->db = $db ?? Database::connect();
+  }
+
+  public function findPost(int $id): array|false {
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE tid = ?');
+    $statement->execute([$id]);
+    return $statement->fetch(PDO::FETCH_ASSOC);
+  }
+
+  public function searchComments(string $query): array {
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE com LIKE ? AND invz=0 ORDER BY age DESC, tree DESC');
+    $statement->execute(['%' . $query . '%']);
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  public function searchAuthors(string $query, bool $partial = false): array {
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND picfile > 0 ORDER BY age DESC, tree DESC');
+    $statement->execute([$partial ? '%' . $query . '%' : $query]);
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  public function deletePost(int $id, bool $with_replies = false): void {
+    $sql = $with_replies
+      ? 'DELETE FROM board_log WHERE tid = ? OR parent = ?'
+      : 'DELETE FROM board_log WHERE tid = ?';
+    $statement = $this->db->prepare($sql);
+    $statement->execute($with_replies ? [$id, $id] : [$id]);
+  }
+
+  public function hidePost(int $id): void {
+    $statement = $this->db->prepare('UPDATE board_log SET invz=1 WHERE tid = ?');
+    $statement->execute([$id]);
+  }
+}
+
 final class DatabaseMigrator {
   public const SCHEMA_VERSION = 1;
 

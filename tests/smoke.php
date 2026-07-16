@@ -7,6 +7,7 @@ const PHP_SELF = 'index.php';
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
+require_once dirname(__DIR__) . '/noreita/image.inc.php';
 
 $passed = 0;
 $failed = 0;
@@ -176,6 +177,23 @@ smoke_test('GD thumbnail generation', static function (): bool {
   } finally {
     if (is_file($input)) unlink($input);
     if ($output !== null && is_file($output)) unlink($output);
+  }
+});
+
+smoke_test('related image files are deleted together', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_images_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    foreach (['png', 'webp', 'pch', 'dat'] as $extension) {
+      file_put_contents($directory . DIRECTORY_SEPARATOR . 'post.' . $extension, 'test');
+    }
+    ImageService::deleteRelatedFiles($directory, 'post.png');
+    return count(glob($directory . DIRECTORY_SEPARATOR . 'post.*') ?: []) === 0;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
   }
 });
 
