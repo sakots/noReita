@@ -600,7 +600,7 @@ function image_thumbnail_link(string $com): string {
 
       if (!file_exists($temp_thumb_path . '.jpg') && !file_exists($temp_thumb_path . '.png') && !file_exists($temp_thumb_path . '.gif') && !file_exists($temp_thumb_path . '.webp') && !file_exists($temp_thumb_path . '.avif')) {
         $image_data = download_image($url);
-        if ($image_data && strlen($image_data) > 0 && strlen($image_data) < 1024 * 1024) { // 1MB未満
+        if ($image_data && strlen($image_data) <= EXTERNAL_IMAGE_MAX_BYTES) {
           if (!class_exists('Thumbnail')) {
             require_once(__DIR__ . '/thumbnail.inc.php');
           }
@@ -643,36 +643,164 @@ function image_thumbnail_link(string $com): string {
   return $com;
 }
 
-// 画像ダウンロード関数
-function download_image(string $url): string|false {
-  if (function_exists('curl_init')) {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'noReita/1.0');
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-    $data = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    if(PHP_VERSION_ID < 80000) { //PHP8.0未満の時は
-      curl_close($ch);
+// 外部画像取得の上限。サムネイル用なので大きなファイルは取得しない。
+const EXTERNAL_IMAGE_MAX_BYTES = 1024 * 1024;
+
+// URLのホストを公開IPに解決する。全ての解決結果が安全な場合だけ返す。
+function resolve_public_ip(string $host): string|false {
+  if (filter_var($host, FILTER_VALIDATE_IP)) {
+    $addresses = [$host];
+  } else {
+    $addresses = gethostbynamel($host) ?: [];
+    if (function_exists('dns_get_record') && defined('DNS_AAAA')) {
+      $aaaa_records = @dns_get_record($host, DNS_AAAA);
+      if (is_array($aaaa_records)) {
+        foreach ($aaaa_records as $record) {
+          if (!empty($record['ipv6'])) {
+            $addresses[] = $record['ipv6'];
+          }
+        }
+      }
     }
-    if ($http_code == 200 && $data) {
+  }
+
+  $addresses = array_values(array_unique($addresses));
+  if (!$addresses) {
+    return false;
+  }
+
+  foreach ($addresses as $address) {
+    if (!filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+      return false;
+    }
+  }
+  return $addresses[0];
+}
+
+// HTTP Locationを現在のURLを基準に絶対URLへ変換する。
+function resolve_redirect_url(string $base_url, string $location): string|false {
+  $location = trim($location);
+  if ($location === '' || preg_match('/[\x00-\x1F\x7F]/', $location)) {
+    return false;
+  }
+  if (preg_match('|^https?://|i', $location)) {
+    return $location;
+  }
+
+  $base = parse_url($base_url);
+  if (!$base || empty($base['scheme']) || empty($base['host'])) {
+    return false;
+  }
+  if (strpos($location, '//') === 0) {
+    return $base['scheme'] . ':' . $location;
+  }
+
+  $port = isset($base['port']) ? ':' . $base['port'] : '';
+  $origin = $base['scheme'] . '://' . $base['host'] . $port;
+  if (strpos($location, '/') === 0) {
+    return $origin . $location;
+  }
+
+  $path = $base['path'] ?? '/';
+  $path = preg_replace('|/[^/]*$|', '/', $path);
+  $parts = explode('/', $path . $location);
+  $normalized = [];
+  foreach ($parts as $part) {
+    if ($part === '' || $part === '.') continue;
+    if ($part === '..') {
+      array_pop($normalized);
+    } else {
+      $normalized[] = $part;
+    }
+  }
+  return $origin . '/' . implode('/', $normalized);
+}
+
+// 画像ダウンロード関数。TLSと各リダイレクト先を検証する。
+function download_image(string $url): string|false {
+  if (!function_exists('curl_init')) {
+    return false;
+  }
+
+  for ($redirects = 0; $redirects <= 5; $redirects++) {
+    $parts = parse_url($url);
+    if (!$parts || empty($parts['scheme']) || empty($parts['host']) ||
+      !in_array(strtolower($parts['scheme']), ['http', 'https'], true) ||
+      isset($parts['user']) || isset($parts['pass'])) {
+      return false;
+    }
+
+    $scheme = strtolower($parts['scheme']);
+    $port = isset($parts['port']) ? (int)$parts['port'] : ($scheme === 'https' ? 443 : 80);
+    if ($port < 1 || $port > 65535) {
+      return false;
+    }
+    $ip = resolve_public_ip($parts['host']);
+    if ($ip === false) {
+      return false;
+    }
+
+    $data = '';
+    $location = '';
+    $too_large = false;
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+      CURLOPT_URL => $url,
+      CURLOPT_RETURNTRANSFER => false,
+      CURLOPT_FOLLOWLOCATION => false,
+      CURLOPT_CONNECTTIMEOUT => 5,
+      CURLOPT_TIMEOUT => 10,
+      CURLOPT_USERAGENT => 'noReita/1.0',
+      CURLOPT_SSL_VERIFYPEER => true,
+      CURLOPT_SSL_VERIFYHOST => 2,
+      CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+      CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+      // 環境変数のプロキシにDNS解決を委ねず、下で検査したIPに直接接続する。
+      CURLOPT_PROXY => '',
+      CURLOPT_RESOLVE => [$parts['host'] . ':' . $port . ':' . $ip],
+      CURLOPT_HEADERFUNCTION => function ($curl, string $header) use (&$location, &$too_large): int {
+        if (stripos($header, 'Location:') === 0) {
+          $location = trim(substr($header, 9));
+        } elseif (stripos($header, 'Content-Length:') === 0 && (int)trim(substr($header, 15)) > EXTERNAL_IMAGE_MAX_BYTES) {
+          $too_large = true;
+          return 0;
+        }
+        return strlen($header);
+      },
+      CURLOPT_WRITEFUNCTION => function ($curl, string $chunk) use (&$data, &$too_large): int {
+        if (strlen($data) + strlen($chunk) > EXTERNAL_IMAGE_MAX_BYTES) {
+          $too_large = true;
+          return 0;
+        }
+        $data .= $chunk;
+        return strlen($chunk);
+      },
+    ]);
+    $success = curl_exec($ch);
+    $http_code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    if(PHP_VERSION_ID < 80000) curl_close($ch);
+
+    if ($success && $http_code === 200 && !$too_large && $data !== '') {
+      $info = @getimagesizefromstring($data);
+      $allowed_mimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
+      if (!$info || !isset($info['mime']) || !in_array($info['mime'], $allowed_mimes, true)) {
+        return false;
+      }
+      // 小さく圧縮された巨大画像によるGDのメモリ消費を防ぐ。
+      $width = (int)$info[0];
+      $height = (int)$info[1];
+      if ($width < 1 || $height < 1 || $width > 16384 || $height > 16384 || $width * $height > 20000000) {
+        return false;
+      }
       return $data;
     }
-  } elseif (ini_get('allow_url_fopen')) {
-    $context = stream_context_create([
-      'http' => [
-        'timeout' => 10,
-        'user_agent' => 'noReita/1.0',
-        'follow_location' => 1,
-        'max_redirects' => 5,
-      ]
-    ]);
-    return @file_get_contents($url, false, $context);
+    if ($too_large || !in_array($http_code, [301, 302, 303, 307, 308], true) || $location === '') {
+      return false;
+    }
+    $url = resolve_redirect_url($url, $location);
+    if ($url === false) {
+      return false;
+    }
   }
   return false;
 }
