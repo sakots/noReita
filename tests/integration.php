@@ -151,19 +151,21 @@ try {
 
   $marker = 'integration-' . bin2hex(random_bytes(6));
   [$post_status, $post_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
-    'mode' => 'regist', 'send' => '1', 'name' => 'IntegrationUser', 'mail' => '', 'url' => '',
-    'sub' => 'Integration subject', 'com' => "結合テスト {$marker}", 'pwd' => 'delete-pass',
+    'mode' => 'regist', 'send' => '1', 'name' => "Integration O'Brien", 'mail' => '', 'url' => '',
+    'sub' => "Integration's subject", 'com' => "結合テスト user's {$marker}", 'pwd' => 'delete-pass',
     'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
   ]);
 
   $db = new PDO('sqlite:' . $webroot . '/reita.db');
-  $row = $db->query('SELECT tid, sub, com FROM board_log ORDER BY tid DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+  $row = $db->query('SELECT tid, a_name, sub, com FROM board_log ORDER BY tid DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
   integration_test('post is stored through HTTP', static function () use ($status, $post_status, $row, $marker): bool {
     return $status === 200 && $post_status === 200 && is_array($row)
-      && $row['sub'] === 'Integration subject' && str_contains($row['com'], $marker);
+      && $row['a_name'] === "Integration O'Brien" && $row['sub'] === "Integration's subject"
+      && $row['com'] === "結合テスト user's {$marker}";
   });
 
-  [$search_status, $search_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($marker), $cookie_jar);
+  $search_term = "user's {$marker}";
+  [$search_status, $search_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
   integration_test('search finds the posted comment', static function () use ($search_status, $search_body, $marker): bool {
     return $search_status === 200 && str_contains($search_body, $marker) && str_contains($search_body, '1件');
   });
@@ -178,19 +180,20 @@ try {
   $after_rejected_edit = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
   integration_test('edit rejects an invalid password without changing the post', static function () use ($rejected_edit_status, $after_rejected_edit, $password_hash_before_edit): bool {
     return $rejected_edit_status === 200 && is_array($after_rejected_edit)
-      && $after_rejected_edit['sub'] === 'Integration subject'
+      && $after_rejected_edit['sub'] === "Integration's subject"
       && $after_rejected_edit['pwd'] === $password_hash_before_edit;
   });
 
   [$edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
-    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'EditedUser', 'mail' => '', 'url' => '',
-    'sub' => 'Edited subject', 'com' => "編集後の結合テスト {$marker}", 'pwd' => 'delete-pass',
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => "Edited O'Brien", 'mail' => '', 'url' => '',
+    'sub' => "Edited user's subject", 'com' => "編集後 user's 結合テスト {$marker}", 'pwd' => 'delete-pass',
     'sodane' => '0', 'token' => $token,
   ]);
   $edited = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
   integration_test('authorized edit is validated and stored through HTTP', static function () use ($edit_status, $edited, $marker, $password_hash_before_edit): bool {
-    return $edit_status === 200 && is_array($edited) && $edited['sub'] === 'Edited subject'
-      && str_contains($edited['com'], $marker) && $edited['pwd'] === $password_hash_before_edit;
+    return $edit_status === 200 && is_array($edited) && $edited['sub'] === "Edited user's subject"
+      && $edited['com'] === "編集後 user's 結合テスト {$marker}"
+      && $edited['pwd'] === $password_hash_before_edit;
   });
 
   [$delete_status, $delete_body] = http_request($base_url, $cookie_jar, [
@@ -201,7 +204,7 @@ try {
     return $delete_status === 200 && $remaining === 0;
   });
 
-  [$empty_status, $empty_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($marker), $cookie_jar);
+  [$empty_status, $empty_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
   integration_test('deleted post disappears from search', static function () use ($empty_status, $empty_body): bool {
     return $empty_status === 200 && str_contains($empty_body, '0件');
   });

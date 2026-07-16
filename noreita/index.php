@@ -564,15 +564,6 @@ function regist(): void {
       //管理者名の投稿でパスワードが管理パスなら管理者バッジつける
       $admins = ($pwd === $admin_pass && $name === $admin_name) ? 1 : 0;
 
-      // 'のエスケープ(入りうるところがありそうなとこだけにしといた)
-      $name = str_replace("'", "''", $name);
-      $sub = str_replace("'", "''", $sub);
-      $com = str_replace("'", "''", $com);
-      $mail = str_replace("'", "''", $mail);
-      $url = str_replace("'", "''", $url);
-      $host = str_replace("'", "''", $host);
-      $id = str_replace("'", "''", $id);
-
       $tree = time() * 100000000;
 
       //スレ建てorお絵かきリプ
@@ -935,8 +926,8 @@ function catalog(): void {
 function search(): void {
   global $blade, $dat;
 
-  $search_f = filter_input(INPUT_GET, 'search');
-  $search = str_replace("'", "''", $search_f); //SQL
+  $search_f = (string)filter_input(INPUT_GET, 'search');
+  $search = $search_f;
   //部分一致検索
   $similar =  filter_input(INPUT_GET, 'similar');
   //本文検索
@@ -1645,9 +1636,6 @@ function picreplace(): void {
       //id生成
       $id = gen_id($host, $utime ?? time());
 
-      // 念のため'のエスケープ
-      $host = str_replace("'", "''", $host);
-
       //nsfw
       if (USE_NSFW == 1 && $nsfw_flag == 1) {
         $nsfw = true;
@@ -1749,14 +1737,6 @@ function editexec(): void {
     return;
   }
   //↑セキュリティ関連ここまで
-
-  // 'のエスケープ(入りうるところがありそうなとこだけにしといた)
-  $name = str_replace("'", "''", $name);
-  $sub = str_replace("'", "''", $sub);
-  $com = str_replace("'", "''", $com);
-  $mail = str_replace("'", "''", $mail);
-  $url = str_replace("'", "''", $url);
-  $host = str_replace("'", "''", $host);
 
   try {
     $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
