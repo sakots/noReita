@@ -3,7 +3,8 @@
 //https://paintbbs.sakura.ne.jp/
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
-$misskey_note_ver = 20260610;
+
+const MISSKEY_NOTE_VER = 20260716; //misskey_note.inc.phpのバージョン
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -193,7 +194,7 @@ class misskey_note {
     global $home, $set_nsfw, $en, $deny_all_posts;
     global $blade, $dat;
     //管理者判定処理
-    session_sta();
+    noreita_session_start();
     $admin_post = admin_post_valid();
     $admin_del = admin_del_valid();
 
@@ -335,7 +336,7 @@ class misskey_note {
     }
     $painttime_to_session = $show_painttime ? $painttime_str : '';
 
-    session_sta();
+    noreita_session_start();
 
     // 投稿データをセッションに保存
     $_SESSION['misskey_note_data'] = [
@@ -406,7 +407,7 @@ class misskey_note {
     setcookie("misskey_server_radio_cookie", $misskey_server_radio_for_cookie, time() + (86400 * 30), "", "", false, true);
     setcookie("misskey_server_direct_input_cookie", $misskey_server_direct_input_value, time() + (86400 * 30), "", "", false, true);
 
-    session_sta();
+    noreita_session_start();
     // セッションIDとユニークIDを結合
     $sns_api_session_id = session_id() . random_bytes(16);
 
@@ -463,7 +464,7 @@ class misskey_note {
     global $en, $blade, $dat;
     $no = (string)filter_input_data('GET', 'no', FILTER_VALIDATE_INT);
 
-    session_sta();
+    noreita_session_start();
 
     $misskey_server_url = $_SESSION['misskey_server_radio'] ?? "";
     if (!$misskey_server_url || !filter_var($misskey_server_url, FILTER_VALIDATE_URL) || !$no) {

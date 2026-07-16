@@ -14,7 +14,7 @@
 // nsfwスイッチを1またはtrueにすると、サムネイル画像をぼかします。
 // 省略またはfalse、0ならぼかしません。
 
-$thumbnail_ver = 20260415;
+const THUMBNAIL_VER = 20260716; //thumbnail.inc.phpのバージョン
 
 class Thumbnail {
   private string $image_url; // 入力画像URL

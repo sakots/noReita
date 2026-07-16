@@ -1,9 +1,9 @@
 <?php
-$functions_ver = 20260504;
+const FUNCTIONS_VER = 20260716;
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {
-  session_sta();
+  noreita_session_start();
   // セッションに保存
   $_SESSION['current_page_context'] = [
     'page' => (int)filter_input_data('GET', 'page', FILTER_VALIDATE_INT),
@@ -329,7 +329,7 @@ function filter_input_data(string $input, string $key, int|string $filter=0): mi
 //csrfトークンを作成
 function get_csrf_token(): string {
   if (!isset($_SESSION)) {
-    session_sta();
+    noreita_session_start();
   }
   header('Expires:');
   header('Cache-Control:');
@@ -347,7 +347,7 @@ function check_csrf_token(): void {
   }
   check_same_origin();
 
-  session_sta();
+  noreita_session_start();
   $token = (string)filter_input_data('POST','token');
   $session_token = isset($_SESSION['token']) ? (string)$_SESSION['token'] : '';
   if(!$token || !$session_token || !hash_equals($session_token,$token)) {
@@ -357,7 +357,7 @@ function check_csrf_token(): void {
 
 //session開始
 
-function session_sta(): void {
+function noreita_session_start(): void {
   global $session_name;
   if (session_status() === PHP_SESSION_NONE) {
     $session_name = defined('SESSION_NAME') ? SESSION_NAME : 'noreita_session';
@@ -470,7 +470,7 @@ return $msg;
 function check_same_origin(): void {
   global $en,$usercode;
 
-  session_sta();
+  noreita_session_start();
   $c_usercode = t(filter_input_data('COOKIE', 'usercode'));//user-codeを取得
   $session_usercode = isset($_SESSION['usercode']) ? t($_SESSION['usercode']) : "";
   if(!$c_usercode){
@@ -514,16 +514,16 @@ function switch_tool(string $tool): string {
 //sessionの確認
 function admin_post_valid(): bool {
   global $second_pass;
-  session_sta();
+  noreita_session_start();
   return isset($_SESSION['admin_post']) && ($second_pass && $_SESSION['admin_post'] === $second_pass);
 }
 function admin_del_valid(): bool {
   global $second_pass;
-  session_sta();
+  noreita_session_start();
   return isset($_SESSION['admin_del']) && ($second_pass && $_SESSION['admin_del'] === $second_pass);
 }
 function user_del_valid(): bool {
-  session_sta();
+  noreita_session_start();
   return isset($_SESSION['user_del']) && ($_SESSION['user_del'] === 'user_del_mode');
 }
 
