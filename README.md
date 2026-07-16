@@ -73,6 +73,10 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/07/15] v3.4.1
+
+- TLS検証と外部URL取得の安全化
+
 ### [2026/07/14] v3.4.0
 
 - バージョン情報をもとに戻した
