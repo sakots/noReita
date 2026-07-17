@@ -13,7 +13,8 @@ $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 $en = (stripos($lang,'ja')!== 0);
 
 // phpのバージョンが古い場合動かさせない
-if (version_compare($php_ver = phpversion(),'8.0.0', '<')) {
+$php_ver = PHP_VERSION;
+if (version_compare($php_ver, '8.0.0', '<')) {
   die($en ? "PHP version 8.0 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン8.0以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
 }
 
