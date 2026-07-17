@@ -72,6 +72,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/07/18] v3.5.1
+
+- 使われなくなった関数の削除
+- theme
+  - theme verは混乱を招くのでlotのみに
+
 ### [2026/07/15] v3.5.0
 
 - index.phpから各機能を分離してモジュール化
