@@ -22,7 +22,7 @@ if (!is_file(__DIR__.'/functions.php')) {
   die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
 require_once(__DIR__.'/functions.php');
-if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260716) {
+if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260718) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
