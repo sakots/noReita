@@ -63,6 +63,13 @@ if(!defined('POST_INC_VER') || POST_INC_VER < 20260716) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
+// share.inc
+check_file(__DIR__.'/share.inc.php');
+require_once(__DIR__.'/share.inc.php');
+if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260718) {
+  die($en ? 'Please update share.inc.php to the latest version.' : 'share.inc.phpを最新版に更新してください。');
+}
+
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
@@ -89,6 +96,13 @@ check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
 if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260716) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。');
+}
+
+// external_image.inc
+check_file(__DIR__.'/external_image.inc.php');
+require_once(__DIR__.'/external_image.inc.php');
+if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260718) {
+  error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。');
 }
 
 // テーマ
@@ -329,9 +343,9 @@ switch ($mode) {
   case 'admin': // 管理モード
     return admin();
   case 'set_share_server':
-    return set_share_server();
+    return show_share_server_form();
   case 'post_share_server':
-    return post_share_server();
+    return submit_share_server();
   case 'before_misskey_note':
     return misskey_note::before_misskey_note();
   case 'misskey_note_edit_form':
@@ -367,6 +381,46 @@ function init(): void {
     error(($en ? 'Application initialization failed. ' : 'アプリケーションの初期化に失敗しました。') . h($e->getMessage()));
     return;
   }
+}
+
+function show_share_server_form(): void {
+  global $servers, $blade, $dat;
+
+  $configured_servers = isset($servers) && is_array($servers) ? $servers : null;
+  $dat['servers'] = ShareService::servers($configured_servers);
+  $dat['encoded_t'] = (string)filter_input_data('GET', 'encoded_t');
+  $dat['encoded_u'] = (string)filter_input_data('GET', 'encoded_u');
+  $dat['sns_server_radio_cookie'] = (string)filter_input_data('COOKIE', 'sns_server_radio_cookie');
+  $dat['sns_server_direct_input_cookie'] = (string)filter_input_data('COOKIE', 'sns_server_direct_input_cookie');
+  $dat['admin_pass'] = null;
+  $dat['token'] = get_csrf_token();
+  echo $blade->run(SET_SHARE_SERVER, $dat);
+}
+
+function submit_share_server(): void {
+  global $en;
+
+  if (CHECK_CSRF_TOKEN) check_csrf_token();
+  $selected_server = (string)filter_input_data('POST', 'sns_server_radio');
+  $direct_server = (string)filter_input_data('POST', 'sns_server_direct_input');
+  try {
+    $share_url = ShareService::buildShareUrl(
+      $selected_server,
+      $direct_server,
+      (string)filter_input_data('POST', 'encoded_t'),
+      (string)filter_input_data('POST', 'encoded_u')
+    );
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Please select a sharing destination for SNS.' : 'SNSの共有先を選択してください。');
+    return;
+  }
+
+  $https_only = (bool)($_SERVER['HTTPS'] ?? '');
+  $server_cookie = $selected_server === 'direct' ? 'direct' : rtrim($selected_server, '/');
+  $direct_cookie = filter_var($direct_server, FILTER_VALIDATE_URL) ? rtrim($direct_server, '/') : '';
+  setcookie('sns_server_radio_cookie', $server_cookie, time() + 86400 * 30, '', '', $https_only, true);
+  setcookie('sns_server_direct_input_cookie', $direct_cookie, time() + 86400 * 30, '', '', $https_only, true);
+  redirect($share_url);
 }
 
 
@@ -617,7 +671,7 @@ function def(): void {
         if (AUTOLINK) $res['com'] = auto_link($res['com']);
         //画像URLにサムネイルを追加
         if (EXTERNAL_IMAGE_THUMB) {
-          $res['com'] = image_thumbnail_link($res['com']);
+          $res['com'] = external_image_service()->addThumbnailLinks($res['com']);
         }
         //ハッシュタグ
         if (USE_HASHTAG) $res['com'] = hashtag_link($res['com']);
@@ -643,7 +697,7 @@ function def(): void {
       if (AUTOLINK) $bbsline['com'] = auto_link($bbsline['com']);
       //画像URLにサムネイルを追加
       if (EXTERNAL_IMAGE_THUMB) {
-        $bbsline['com'] = image_thumbnail_link($bbsline['com']);
+        $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
       }
       //ハッシュタグ
       if (USE_HASHTAG) $bbsline['com'] = hashtag_link($bbsline['com']);
@@ -925,7 +979,7 @@ function res(): void {
         $bbsline['com'] = auto_link($bbsline['com']);
       }
       //画像URLにサムネイルを追加
-      $bbsline['com'] = image_thumbnail_link($bbsline['com']);
+      $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
       //ハッシュタグ
       if (USE_HASHTAG) {
         $bbsline['com'] = hashtag_link($bbsline['com']);

@@ -14,10 +14,12 @@ const ID_SEED = 'smoke-test-seed';
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
+require_once dirname(__DIR__) . '/noreita/external_image.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
 require_once dirname(__DIR__) . '/noreita/initialization.inc.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
+require_once dirname(__DIR__) . '/noreita/share.inc.php';
 
 $passed = 0;
 $failed = 0;
@@ -332,6 +334,23 @@ smoke_test('post service centralizes edit and delete authorization', static func
   }
 });
 
+smoke_test('share service builds validated destination URLs', static function (): bool {
+  $servers = ShareService::servers();
+  if (end($servers) !== ['直接入力', 'direct']) return false;
+  if (ShareService::buildShareUrl('https://x.com', '', '題名', 'https://example.com/post')
+    !== 'https://twitter.com/intent/tweet?text=' . rawurlencode('題名 https://example.com/post')) return false;
+  if (ShareService::buildShareUrl('direct', 'https://social.example/', 'title', 'https://example.com')
+    !== 'https://social.example/share?text=' . rawurlencode('title https://example.com')) return false;
+  foreach (['javascript:alert(1)', 'https://user:pass@example.com', 'https://example.com/?redirect=evil'] as $invalid) {
+    try {
+      ShareService::buildShareUrl('direct', $invalid, 'title', 'url');
+      return false;
+    } catch (InvalidArgumentException $e) {
+    }
+  }
+  return true;
+});
+
 smoke_test('image MIME mapping', static function (): bool {
   return get_image_type('image/jpeg') === '.jpg'
     && get_image_type('image/png') === '.png'
@@ -412,12 +431,29 @@ smoke_test('animation playback data is built by the image service', static funct
 });
 
 smoke_test('external URL security boundaries', static function (): bool {
-  return resolve_public_ip('127.0.0.1') === false
-    && resolve_public_ip('192.168.1.1') === false
-    && resolve_public_ip('169.254.169.254') === false
-    && resolve_public_ip('::1') === false
-    && resolve_redirect_url('https://example.com/a/b.png', '../c.png') === 'https://example.com/c.png'
-    && resolve_redirect_url('https://example.com/a/b.png', "https://example.com/x\nInjected: yes") === false;
+  return ExternalImageService::resolvePublicIp('127.0.0.1') === false
+    && ExternalImageService::resolvePublicIp('192.168.1.1') === false
+    && ExternalImageService::resolvePublicIp('169.254.169.254') === false
+    && ExternalImageService::resolvePublicIp('::1') === false
+    && ExternalImageService::resolveRedirectUrl('https://example.com/a/b.png', '../c.png') === 'https://example.com/c.png'
+    && ExternalImageService::resolveRedirectUrl('https://example.com/a/b.png', "https://example.com/x\nInjected: yes") === false;
+});
+
+smoke_test('cached external image thumbnail link', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $url = 'https://example.com/picture.png';
+  $thumbnail = $directory . DIRECTORY_SEPARATOR . md5($url) . '_thumb.jpg';
+  try {
+    file_put_contents($thumbnail, 'cached thumbnail');
+    $service = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700);
+    $html = $service->addThumbnailLinks('image: ' . $url);
+    return str_contains($html, 'href="' . $url . '"')
+      && str_contains($html, 'src="thumbnail/' . basename($thumbnail) . '"');
+  } finally {
+    if (is_file($thumbnail)) unlink($thumbnail);
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('GD thumbnail generation', static function (): bool {
