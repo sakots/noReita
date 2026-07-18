@@ -83,11 +83,12 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
   }
   $body = curl_exec($curl);
   $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+  $redirect_url = (string)curl_getinfo($curl, CURLINFO_REDIRECT_URL);
   $error = curl_error($curl);
   if ($body === false) {
     throw new RuntimeException("HTTP request failed: {$error}");
   }
-  return [$status, $body];
+  return [$status, $body, $redirect_url];
 }
 
 function cookie_value(string $cookie_jar, string $name): ?string {
@@ -151,6 +152,36 @@ try {
   [$status] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
+
+  $share_title = '共有テスト';
+  $share_target = 'https://example.com/post/1';
+  [$share_form_status, $share_form_body] = http_request(
+    $base_url . '?mode=set_share_server&encoded_t=' . rawurlencode($share_title) . '&encoded_u=' . rawurlencode($share_target),
+    $cookie_jar
+  );
+  integration_test('share destination form is rendered through HTTP', static function () use ($share_form_status, $share_form_body, $token): bool {
+    return $share_form_status === 200 && str_contains($share_form_body, 'sns_server_radio')
+      && str_contains($share_form_body, 'name="token" value="' . $token . '"');
+  });
+
+  [$share_status, , $share_redirect] = http_request($base_url, $cookie_jar, [
+    'mode' => 'post_share_server', 'sns_server_radio' => 'https://bsky.app',
+    'sns_server_direct_input' => '', 'encoded_t' => $share_title, 'encoded_u' => $share_target,
+    'token' => $token,
+  ]);
+  integration_test('share destination redirects with CSRF validation', static function () use ($share_status, $share_redirect, $share_title, $share_target): bool {
+    return $share_status === 302
+      && $share_redirect === 'https://bsky.app/intent/compose?text=' . rawurlencode($share_title . ' ' . $share_target);
+  });
+
+  [, $invalid_csrf_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'post_share_server', 'sns_server_radio' => 'https://bsky.app',
+    'sns_server_direct_input' => '', 'encoded_t' => $share_title, 'encoded_u' => $share_target,
+    'token' => 'invalid-token',
+  ]);
+  integration_test('invalid CSRF token is rejected through HTTP', static function () use ($invalid_csrf_body): bool {
+    return str_contains($invalid_csrf_body, 'CSRF token mismatch');
+  });
 
   $marker = 'integration-' . bin2hex(random_bytes(6));
   [$post_status, $post_body] = http_request($base_url . '?mode=regist', $cookie_jar, [

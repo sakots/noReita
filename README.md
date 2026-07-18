@@ -74,9 +74,15 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 
 ### [2026/07/18] v3.5.1
 
-- 使われなくなった関数の削除
+- functions.php
+  - 使われなくなった関数の削除
+  - 共有機能を`share.inc.php`へ分離
+  - 外部画像取得、公開IP検証、リダイレクト検証等を`external_image.inc.php`へ分離
+  - セッション開始・Cookie属性設定等を`request_security.inc.php`へ分離
+  - IP取得処理を`request_info.inc.php`へ分離
 - theme
   - theme verは混乱を招くのでlotのみに
+  - SNSシェア時のトークンを追加
 
 ### [2026/07/15] v3.5.0
 
