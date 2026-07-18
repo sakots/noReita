@@ -14,6 +14,7 @@ const ID_SEED = 'smoke-test-seed';
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/request_security.inc.php';
+require_once dirname(__DIR__) . '/noreita/request_info.inc.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/external_image.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
@@ -47,6 +48,15 @@ smoke_test('required PHP extensions', static function (): bool {
     }
   }
   return true;
+});
+
+smoke_test('request client IP is resolved from supported sources', static function (): bool {
+  return RequestInfo::clientIp(['REMOTE_ADDR' => '203.0.113.10']) === '203.0.113.10'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => 'invalid, 198.51.100.20, 203.0.113.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ]) === '198.51.100.20'
+    && RequestInfo::clientIp(['HTTP_CLIENT_IP' => 'not-an-ip']) === '';
 });
 
 smoke_test('SQLite read and write', static function (): bool {

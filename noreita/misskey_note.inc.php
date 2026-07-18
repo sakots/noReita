@@ -314,7 +314,7 @@ class misskey_note {
       error($e->getMessage());
     }
 
-    $userip = t(get_uip());
+    $userip = t(RequestInfo::clientIp());
     $no = t(filter_input_data('POST', 'no', FILTER_VALIDATE_INT));
     $src_image = t(filter_input_data('POST', 'src_image'));
     $com = t(filter_input_data('POST', 'com'));

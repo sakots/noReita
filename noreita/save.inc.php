@@ -156,7 +156,7 @@ class image_save{
   private function put_user_dat(): void {
 
     $time=time();
-    $u_ip = get_uip();
+    $u_ip = RequestInfo::clientIp();
     $u_host = $u_ip ? gethostbyaddr($u_ip) : '';
     $u_agent = trim($_SERVER["HTTP_USER_AGENT"]);
     $u_agent = t($u_agent);
