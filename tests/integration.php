@@ -384,7 +384,7 @@ try {
       && $replaced_image_row['pchfile'] === $replacement_base . '.pch'
       && (int)$replaced_image_row['nsfw'] === 0
       && $replacement_thumbnail !== ''
-      && str_starts_with($replacement_thumbnail, $replacement_base . '.')
+      && str_starts_with($replacement_thumbnail, $replacement_base . '_thumb_safe_')
       && is_file($webroot . '/img/' . $replacement_thumbnail)
       && !is_file($webroot . '/img/' . $continued_from_thumbnail)
       && str_contains($replacement_body, 'action="index.php?mode=editexec"')

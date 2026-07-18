@@ -152,8 +152,12 @@ final class ImageService {
   public static function deleteRelatedFiles(string $image_dir, string $image_name): void {
     if ($image_name === '') return;
     $base_name = pathinfo(basename($image_name), PATHINFO_FILENAME);
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
     foreach (self::RELATED_EXTENSIONS as $extension) {
-      safe_unlink(rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR . $base_name . '.' . $extension);
+      safe_unlink($image_dir . $base_name . '.' . $extension);
+    }
+    foreach (glob($image_dir . $base_name . '_thumb_*') ?: [] as $thumbnail) {
+      if (is_file($thumbnail)) safe_unlink($thumbnail);
     }
   }
 
@@ -181,9 +185,30 @@ final class ImageService {
 
     $new_thumbnail = '';
     if ($always_create || $nsfw || (int)$size[0] > $thumbnail_width) {
-      $new_thumbnail = self::createThumbnail($source, $image_dir, $thumbnail_width, $nsfw);
-      if ($new_thumbnail === '') throw new RuntimeException('Failed to update thumbnail.');
-      @chmod($image_dir . $new_thumbnail, $permission);
+      $temporary_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_thumbnail_' . bin2hex(random_bytes(8));
+      if (!mkdir($temporary_dir, 0700)) throw new RuntimeException('Failed to prepare thumbnail directory.');
+      try {
+        $temporary_thumbnail = self::createThumbnail($source, $temporary_dir, $thumbnail_width, $nsfw);
+        $temporary_path = $temporary_dir . DIRECTORY_SEPARATOR . $temporary_thumbnail;
+        if ($temporary_thumbnail === '' || !is_file($temporary_path)) {
+          throw new RuntimeException('Failed to update thumbnail.');
+        }
+        $extension = strtolower(pathinfo($temporary_thumbnail, PATHINFO_EXTENSION));
+        $content_hash = substr((string)hash_file('sha256', $temporary_path), 0, 12);
+        $state = $nsfw ? 'nsfw' : 'safe';
+        $new_thumbnail = pathinfo($image_name, PATHINFO_FILENAME)
+          . '_thumb_' . $state . '_' . $content_hash . '.' . $extension;
+        $destination = $image_dir . $new_thumbnail;
+        if (!rename($temporary_path, $destination)) {
+          throw new RuntimeException('Failed to save updated thumbnail.');
+        }
+        @chmod($destination, $permission);
+      } finally {
+        foreach (glob($temporary_dir . DIRECTORY_SEPARATOR . '*') ?: [] as $temporary_file) {
+          if (is_file($temporary_file)) @unlink($temporary_file);
+        }
+        @rmdir($temporary_dir);
+      }
     }
 
     $current_thumbnail = basename($current_thumbnail);
