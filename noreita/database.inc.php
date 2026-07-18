@@ -1,7 +1,7 @@
 <?php
 // database.inc.php for noReita (C) sakots 2026 MIT License
 
-const DATABASE_INC_VER = 20260716;
+const DATABASE_INC_VER = 20260718;
 
 final class Database {
   public static function connect(): PDO {
@@ -74,12 +74,13 @@ final class BoardRepository {
 
   public function updateContent(int $id, array $values): void {
     $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), a_name = :name, mail = :mail,
-      sub = :sub, com = :com, a_url = :url, host = :host, sodane = :sodane, pwd = :pwdh WHERE tid = :id";
+      sub = :sub, com = :com, a_url = :url, host = :host, sodane = :sodane, pwd = :pwdh,
+      nsfw = :nsfw, thumbnail = :thumbnail WHERE tid = :id";
     $statement = $this->db->prepare($sql);
     $statement->execute([
       'name' => $values['name'], 'mail' => $values['mail'], 'sub' => $values['sub'], 'com' => $values['com'],
       'url' => $values['url'], 'host' => $values['host'], 'sodane' => $values['sodane'],
-      'pwdh' => $values['pwdh'], 'id' => $id,
+      'pwdh' => $values['pwdh'], 'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'], 'id' => $id,
     ]);
   }
 

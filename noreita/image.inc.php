@@ -1,7 +1,7 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260716;
+const IMAGE_INC_VER = 20260718;
 
 final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
@@ -160,6 +160,36 @@ final class ImageService {
   public static function createThumbnail(string $source, string $destination, int $width, bool $nsfw = false): string {
     $thumbnail = new Thumbnail($source, $destination, $width, $nsfw);
     return $thumbnail->createThumbnail() ? (string)$thumbnail->getOutputName() : '';
+  }
+
+  public static function refreshNsfwThumbnail(
+    string $image_dir,
+    string $image_name,
+    string $current_thumbnail,
+    bool $nsfw,
+    int $thumbnail_width,
+    int $permission
+  ): string {
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $image_name = basename($image_name);
+    $source = $image_dir . $image_name;
+    $size = @getimagesize($source);
+    if ($image_name === '' || $size === false) {
+      throw new RuntimeException('Posted image was not found.');
+    }
+
+    $new_thumbnail = '';
+    if ($nsfw || (int)$size[0] > $thumbnail_width) {
+      $new_thumbnail = self::createThumbnail($source, $image_dir, $thumbnail_width, $nsfw);
+      if ($new_thumbnail === '') throw new RuntimeException('Failed to update thumbnail.');
+      @chmod($image_dir . $new_thumbnail, $permission);
+    }
+
+    $current_thumbnail = basename($current_thumbnail);
+    if ($current_thumbnail !== '' && $current_thumbnail !== $image_name && $current_thumbnail !== $new_thumbnail) {
+      safe_unlink($image_dir . $current_thumbnail);
+    }
+    return $new_thumbnail;
   }
 
   public static function finalizeNewPost(

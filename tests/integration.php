@@ -290,7 +290,7 @@ try {
     'picfile' => $image_name, 'ctype' => 'new', 'invz' => '0', 'sodane' => '0', 'nsfw' => '0',
     'token' => $token,
   ]);
-  $image_row = $db->query("SELECT tid, picfile, pchfile, img_w, img_h, psec, tool FROM board_log WHERE sub = 'Image subject' ORDER BY tid DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+  $image_row = $db->query("SELECT tid, picfile, pchfile, img_w, img_h, psec, tool, nsfw, thumbnail FROM board_log WHERE sub = 'Image subject' ORDER BY tid DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
   integration_test('image and animation post is stored through HTTP', static function () use ($image_status, $image_row, $webroot, $image_name, $image_base): bool {
     return $image_status === 200 && is_array($image_row)
       && $image_row['picfile'] === $image_name && $image_row['pchfile'] === $image_base . '.pch'
@@ -302,6 +302,47 @@ try {
   });
 
   $image_post_id = (int)($image_row['tid'] ?? 0);
+  [$image_edit_form_status, $image_edit_form_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
+  ]);
+  integration_test('image edit form includes the current NSFW setting', static function () use ($image_edit_form_status, $image_edit_form_body): bool {
+    return $image_edit_form_status === 200
+      && str_contains($image_edit_form_body, 'id="edit_nsfw"')
+      && !str_contains($image_edit_form_body, 'id="edit_nsfw" checked');
+  });
+
+  [$image_nsfw_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'sub' => 'Image subject', 'com' => '画像付き投稿の本文です', 'pwd' => 'image-pass',
+    'sodane' => '0', 'nsfw' => '1', 'token' => $token,
+  ]);
+  $nsfw_image_row = $db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $nsfw_thumbnail = (string)($nsfw_image_row['thumbnail'] ?? '');
+  integration_test('comment edit can enable NSFW and refresh the thumbnail', static function () use ($image_nsfw_status, $nsfw_image_row, $nsfw_thumbnail, $webroot): bool {
+    return $image_nsfw_status === 200 && (int)$nsfw_image_row['nsfw'] === 1
+      && $nsfw_thumbnail !== '' && is_file($webroot . '/img/' . $nsfw_thumbnail);
+  });
+
+  [, $checked_edit_form_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
+  ]);
+  integration_test('image edit form shows an enabled NSFW setting', static function () use ($checked_edit_form_body): bool {
+    return preg_match('/id="edit_nsfw"[^>]*checked/', $checked_edit_form_body) === 1;
+  });
+
+  [$image_safe_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'sub' => 'Image subject', 'com' => '画像付き投稿の本文です', 'pwd' => 'image-pass',
+    'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  $safe_image_row = $db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  clearstatcache(true, $webroot . '/img/' . $nsfw_thumbnail);
+  integration_test('comment edit can disable NSFW and remove an obsolete thumbnail', static function () use ($image_safe_status, $safe_image_row, $webroot, $nsfw_thumbnail): bool {
+    return $image_safe_status === 200 && (int)$safe_image_row['nsfw'] === 0
+      && (string)$safe_image_row['thumbnail'] === ''
+      && !is_file($webroot . '/img/' . $nsfw_thumbnail);
+  });
+
   [$image_delete_status] = http_request($base_url, $cookie_jar, [
     'mode' => 'del', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);

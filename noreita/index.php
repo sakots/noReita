@@ -66,14 +66,14 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260716) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260716) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260718) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260716) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260718) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -1448,7 +1448,7 @@ function delmode(): void {
   $p_pwd = filter_input(INPUT_POST, 'pwd');
 
   try {
-    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
+    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST);
     $result = $service->delete((int)$delno, (string)$p_pwd, isset($_POST['admindel']));
     $dat['message'] = $result === 'hidden'
       ? ($en ? 'Post hidden.' : '非表示にしました。')
@@ -1627,6 +1627,7 @@ function editexec(): void {
   $picfile = (string)$input['picfile'];
   $pwd = $input['pwd'];
   $sodane = $input['sodane'];
+  $edit_nsfw = USE_NSFW === 1 && $input['nsfw_flag'] === '1';
 
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
@@ -1640,10 +1641,10 @@ function editexec(): void {
   //↑セキュリティ関連ここまで
 
   try {
-    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
+    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST);
     $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
-      'host' => $host, 'sodane' => $sodane,
+      'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
     ]);
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
   } catch (PostNotFoundException $e) {

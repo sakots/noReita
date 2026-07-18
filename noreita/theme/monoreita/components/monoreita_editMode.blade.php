@@ -22,6 +22,7 @@
             <input type="text" name="sub" size="35" autocomplete="section-sub" value="{{$bbsline['sub']}}" maxlength="{{$max_sub}}">
             <input type="hidden" name="invz" value="0">
             <input type="hidden" name="sodane" value="0">
+            <input type="hidden" name="nsfw" value="0">
             <input type="hidden" name="e_no" value="{{$bbsline['tid']}}">
             @if ($token != null)
             <input type="hidden" name="token" value="{{$token}}">
@@ -34,6 +35,15 @@
             <td>comment</td>
             <td><textarea name="com" cols="48" rows="4" wrap="soft" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};" maxlength="{{$max_com}}" required>{{$bbsline['com']}}</textarea></td>
           </tr>
+          @if ($use_nsfw === 1 && $bbsline['picfile'] !== '')
+          <tr>
+            <td>NSFW</td>
+            <td>
+              <input type="checkbox" name="nsfw" value="1" id="edit_nsfw" @if ((int)$bbsline['nsfw'] === 1) checked @endif>
+              <label for="edit_nsfw">画像をNSFWとして表示する</label>
+            </td>
+          </tr>
+          @endif
           <tr>
             <td>pass</td>
             <td><input type="password" name="pwd" size="8" value="{{$pwd_cookie}}" autocomplete="section-edit current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};"></td>
