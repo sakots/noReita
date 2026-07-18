@@ -18,6 +18,8 @@
 
 `request_security.inc.php`の`RequestSecurity`がセッションの安全な開始、CSRFトークン生成、POST・同一オリジン・ユーザーコード・CSRFトークンの検証を担当します。検証失敗は`RequestSecurityException`として画面制御側へ返します。
 
+`request_info.inc.php`の`RequestInfo`がクライアントIPなど、HTTPリクエスト由来の情報の取得と正規化を担当します。
+
 ## アプリケーション初期化
 
 `initialization.inc.php`の`ApplicationInitializer`がセキュリティヘッダー、実行時ディレクトリの準備、DBマイグレーション、DBファイルの権限設定を担当します。起動時のファイル環境処理は`index.php`へ直接追加せず、このクラスへ追加してください。
