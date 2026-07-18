@@ -174,6 +174,15 @@ try {
       && $share_redirect === 'https://bsky.app/intent/compose?text=' . rawurlencode($share_title . ' ' . $share_target);
   });
 
+  [, $invalid_csrf_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'post_share_server', 'sns_server_radio' => 'https://bsky.app',
+    'sns_server_direct_input' => '', 'encoded_t' => $share_title, 'encoded_u' => $share_target,
+    'token' => 'invalid-token',
+  ]);
+  integration_test('invalid CSRF token is rejected through HTTP', static function () use ($invalid_csrf_body): bool {
+    return str_contains($invalid_csrf_body, 'CSRF token mismatch');
+  });
+
   $marker = 'integration-' . bin2hex(random_bytes(6));
   [$post_status, $post_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => "Integration O'Brien", 'mail' => '', 'url' => '',

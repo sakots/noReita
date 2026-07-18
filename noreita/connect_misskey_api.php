@@ -222,7 +222,7 @@ class connect_misskey_api{
 function connect_misskey_api_dispatch(): void {
 	global $en, $baseUrl;
 
-	noreita_session_start();
+	RequestSecurity::startSession();
 
 	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
 		die("Error: セッションがありません。Misskey投稿フローが正しく動作していません。");

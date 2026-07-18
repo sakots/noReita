@@ -194,7 +194,7 @@ class misskey_note {
     global $home, $set_nsfw, $en, $deny_all_posts;
     global $blade, $dat;
     //管理者判定処理
-    noreita_session_start();
+    RequestSecurity::startSession();
     $admin_post = admin_post_valid();
     $admin_del = admin_del_valid();
 
@@ -217,7 +217,7 @@ class misskey_note {
     $dat['post'] = $post;
 
     $dat['path'] = IMG_DIR;
-    $dat['token'] = get_csrf_token();
+    $dat['token'] = RequestSecurity::csrfToken();
 
     // nsfw
     $dat['nsfw_c'] = (bool)filter_input_data('COOKIE', 'nsfw_c', FILTER_VALIDATE_BOOLEAN);
@@ -238,9 +238,13 @@ class misskey_note {
     global $home, $set_nsfw, $en, $max_kb, $use_upload, $admin, $misskey_servers;
     global $blade, $dat;
 
-    check_same_origin();
+    try {
+      RequestSecurity::assertCurrentSameOriginRequest($en);
+    } catch (RequestSecurityException $e) {
+      error($e->getMessage());
+    }
 
-    $dat['token'] = get_csrf_token();
+    $dat['token'] = RequestSecurity::csrfToken();
 
     $dat['admin_del'] = admin_del_valid();
     $dat['admin_post'] = admin_post_valid();
@@ -304,7 +308,11 @@ class misskey_note {
   public static function create_misskey_note_sessiondata(): void {
     global $en, $usercode, $misskey_servers;
 
-    check_csrf_token();
+    try {
+      RequestSecurity::assertCurrentCsrfRequest($en);
+    } catch (RequestSecurityException $e) {
+      error($e->getMessage());
+    }
 
     $userip = t(get_uip());
     $no = t(filter_input_data('POST', 'no', FILTER_VALIDATE_INT));
@@ -336,7 +344,7 @@ class misskey_note {
     }
     $painttime_to_session = $show_painttime ? $painttime_str : '';
 
-    noreita_session_start();
+    RequestSecurity::startSession();
 
     // 投稿データをセッションに保存
     $_SESSION['misskey_note_data'] = [
@@ -370,7 +378,11 @@ class misskey_note {
   public static function create_misskey_authrequesturl(): void {
     global $en;
 
-    check_same_origin();
+    try {
+      RequestSecurity::assertCurrentSameOriginRequest($en);
+    } catch (RequestSecurityException $e) {
+      error($e->getMessage());
+    }
 
     // ラジオボタンの値
     $misskey_server_radio_value = filter_input_data('POST', "misskey_server_radio"); // フィルタリングしない生の値を取得
@@ -407,7 +419,7 @@ class misskey_note {
     setcookie("misskey_server_radio_cookie", $misskey_server_radio_for_cookie, time() + (86400 * 30), "", "", false, true);
     setcookie("misskey_server_direct_input_cookie", $misskey_server_direct_input_value, time() + (86400 * 30), "", "", false, true);
 
-    noreita_session_start();
+    RequestSecurity::startSession();
     // セッションIDとユニークIDを結合
     $sns_api_session_id = session_id() . random_bytes(16);
 
@@ -464,7 +476,7 @@ class misskey_note {
     global $en, $blade, $dat;
     $no = (string)filter_input_data('GET', 'no', FILTER_VALIDATE_INT);
 
-    noreita_session_start();
+    RequestSecurity::startSession();
 
     $misskey_server_url = $_SESSION['misskey_server_radio'] ?? "";
     if (!$misskey_server_url || !filter_var($misskey_server_url, FILTER_VALIDATE_URL) || !$no) {
@@ -477,4 +489,3 @@ class misskey_note {
     exit();
   }
 }
-

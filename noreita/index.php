@@ -35,6 +35,13 @@ if (!defined('CONF_VER') || CONF_VER < 20260405) {
   die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
+// request_security.inc
+check_file(__DIR__.'/request_security.inc.php');
+require_once(__DIR__.'/request_security.inc.php');
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260718) {
+  die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
+}
+
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
@@ -277,7 +284,7 @@ $https_only = (bool)($_SERVER['HTTPS'] ?? '');
 //user-codeの発行
 $usercode = t(filter_input_data('COOKIE', 'usercode')); //user-codeを取得
 
-noreita_session_start();
+RequestSecurity::startSession();
 $session_usercode = $_SESSION['usercode'] ?? "";
 $session_usercode = t($session_usercode);
 
@@ -393,14 +400,20 @@ function show_share_server_form(): void {
   $dat['sns_server_radio_cookie'] = (string)filter_input_data('COOKIE', 'sns_server_radio_cookie');
   $dat['sns_server_direct_input_cookie'] = (string)filter_input_data('COOKIE', 'sns_server_direct_input_cookie');
   $dat['admin_pass'] = null;
-  $dat['token'] = get_csrf_token();
+  $dat['token'] = RequestSecurity::csrfToken();
   echo $blade->run(SET_SHARE_SERVER, $dat);
 }
 
 function submit_share_server(): void {
   global $en;
 
-  if (CHECK_CSRF_TOKEN) check_csrf_token();
+  if (CHECK_CSRF_TOKEN) {
+    try {
+      RequestSecurity::assertCurrentCsrfRequest($en);
+    } catch (RequestSecurityException $e) {
+      error($e->getMessage());
+    }
+  }
   $selected_server = (string)filter_input_data('POST', 'sns_server_radio');
   $direct_server = (string)filter_input_data('POST', 'sns_server_direct_input');
   try {
@@ -435,7 +448,11 @@ function regist(): void {
 
   // CSRFトークンをチェック
   if (CHECK_CSRF_TOKEN) {
-    check_csrf_token();
+    try {
+      RequestSecurity::assertCurrentCsrfRequest($en);
+    } catch (RequestSecurityException $e) {
+      error($e->getMessage());
+    }
   }
 
   $input = PostValidator::inputFromHttp();
@@ -910,7 +927,7 @@ function res(): void {
   //csrfトークンをセット
   $dat['token'] = '';
   if (CHECK_CSRF_TOKEN) {
-    $token = get_csrf_token();
+    $token = RequestSecurity::csrfToken();
     $_SESSION['token'] = $token;
     $dat['token'] = $token;
   }
@@ -1106,7 +1123,7 @@ function paint_form(string $rep, int|null $reply_to): void {
       }
     }
 
-    noreita_session_start();
+    RequestSecurity::startSession();
 
     // 続きから描く場合は一時画像を除外するフラグを設定
     $dat['exclude_temp_images'] = true;
@@ -1215,7 +1232,7 @@ function paint_form(string $rep, int|null $reply_to): void {
     $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
     $userip = get_uip();
 
-    noreita_session_start();
+    RequestSecurity::startSession();
     $time = time();
     $repcode = substr(crypt(md5($no . $userip . $pwd_f . date("Ymd", $time)), $time), -8);
     //念の為にエスケープ文字があればアルファベットに変換
@@ -1233,9 +1250,7 @@ function paint_form(string $rep, int|null $reply_to): void {
   // error_log("paintform関数 - usercode: " . $usercode);
 
   // usercodeをセッション変数に保存
-  if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-  }
+  RequestSecurity::startSession();
   $_SESSION['usercode'] = $usercode;
 
   //出口
@@ -1295,7 +1310,7 @@ function paint_com(string $tmpmode): void {
   //csrfトークンをセット
   $dat['token'] = '';
   if (CHECK_CSRF_TOKEN) {
-    $token = get_csrf_token();
+    $token = RequestSecurity::csrfToken();
     $_SESSION['token'] = $token;
     $dat['token'] = $token;
   }
@@ -1553,7 +1568,7 @@ function editform(): void {
   //csrfトークンをセット
   $dat['token'] = '';
   if (CHECK_CSRF_TOKEN) {
-    $token = get_csrf_token();
+    $token = RequestSecurity::csrfToken();
     $_SESSION['token'] = $token;
     $dat['token'] = $token;
   }
@@ -1600,7 +1615,11 @@ function editexec(): void {
 
   //CSRFトークンをチェック
   if (CHECK_CSRF_TOKEN) {
-    check_csrf_token();
+    try {
+      RequestSecurity::assertCurrentCsrfRequest($en);
+    } catch (RequestSecurityException $e) {
+      error($e->getMessage());
+    }
   }
 
   $input = PostValidator::inputFromHttp();

@@ -3,7 +3,7 @@ const FUNCTIONS_VER = 20260718;
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {
-  noreita_session_start();
+  RequestSecurity::startSession();
   // セッションに保存
   $_SESSION['current_page_context'] = [
     'page' => (int)filter_input_data('GET', 'page', FILTER_VALIDATE_INT),
@@ -212,55 +212,6 @@ function filter_input_data(string $input, string $key, int|string $filter=0): mi
   }
 }
 
-//csrfトークンを作成
-function get_csrf_token(): string {
-  if (!isset($_SESSION)) {
-    noreita_session_start();
-  }
-  header('Expires:');
-  header('Cache-Control:');
-  header('Pragma:');
-  if (!isset($_SESSION['token'])) {
-    $_SESSION['token'] = hash('sha256', session_id(), false);
-  }
-  return $_SESSION['token'];
-}
-//csrfトークンをチェック
-function check_csrf_token(): void {
-  global $en;
-  if(($_SERVER["REQUEST_METHOD"]) !== "POST"){
-    error($en ? "This operation has failed." : "この操作は失敗しました。");
-  }
-  check_same_origin();
-
-  noreita_session_start();
-  $token = (string)filter_input_data('POST','token');
-  $session_token = isset($_SESSION['token']) ? (string)$_SESSION['token'] : '';
-  if(!$token || !$session_token || !hash_equals($session_token,$token)) {
-    error($en ? "CSRF token mismatch.\nPlease reload." : "CSRFトークンが一致しません。\nリロードしてください。");
-  }
-}
-
-//session開始
-
-function noreita_session_start(): void {
-  global $session_name;
-  if (session_status() === PHP_SESSION_NONE) {
-    $session_name = defined('SESSION_NAME') ? SESSION_NAME : 'noreita_session';
-    session_name($session_name);
-    session_save_path(__DIR__ . '/session/');
-    $https_only = (bool)($_SERVER['HTTPS'] ?? '');
-    ini_set('session.use_strict_mode', 1);
-    session_set_cookie_params(
-      0,"","",$https_only,true
-    );
-    session_start();
-    header('Expires:');
-    header('Cache-Control:');
-    header('Pragma:');
-  }
-}
-
 //エスケープ
 function h(string|null $str): string {
   if(zero_check($str)){
@@ -353,29 +304,6 @@ function initial_error_message(): array {
 return $msg;
 }
 
-function check_same_origin(): void {
-  global $en,$usercode;
-
-  noreita_session_start();
-  $c_usercode = t(filter_input_data('COOKIE', 'usercode'));//user-codeを取得
-  $session_usercode = isset($_SESSION['usercode']) ? t($_SESSION['usercode']) : "";
-  if(!$c_usercode){
-    error( $en ? 'Cookie check failed.':'Cookieが確認できません。');
-  }
-  if(!$usercode || ($usercode !== $c_usercode) && ($usercode !== $session_usercode)){
-    error( $en ? "User code mismatch.":"ユーザーコードが一致しません。");
-  }
-  // POSTリクエストの場合のみHTTP_ORIGINをチェックする
-  if(($_SERVER["REQUEST_METHOD"]) === "POST"){
-    if(!isset($_SERVER['HTTP_ORIGIN']) || !isset($_SERVER['HTTP_HOST'])){
-        error( $en ? 'Your browser is not supported. ':'お使いのブラウザはサポートされていません。');
-    }
-    if(parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST) !== $_SERVER['HTTP_HOST']){
-        error( $en ? "The post has been rejected.":'拒絶されました。');
-    }
-}
-}
-
 function switch_tool(string $tool): string {
   switch($tool){
   case 'neo':
@@ -400,16 +328,16 @@ function switch_tool(string $tool): string {
 //sessionの確認
 function admin_post_valid(): bool {
   global $second_pass;
-  noreita_session_start();
+  RequestSecurity::startSession();
   return isset($_SESSION['admin_post']) && ($second_pass && $_SESSION['admin_post'] === $second_pass);
 }
 function admin_del_valid(): bool {
   global $second_pass;
-  noreita_session_start();
+  RequestSecurity::startSession();
   return isset($_SESSION['admin_del']) && ($second_pass && $_SESSION['admin_del'] === $second_pass);
 }
 function user_del_valid(): bool {
-  noreita_session_start();
+  RequestSecurity::startSession();
   return isset($_SESSION['user_del']) && ($_SESSION['user_del'] === 'user_del_mode');
 }
 

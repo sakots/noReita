@@ -114,7 +114,7 @@ class image_save{
 
     $this->check_async_request();
 
-    noreita_session_start();
+    RequestSecurity::startSession();
     $this->session_usercode = $_SESSION['usercode'] ?? "";
     $cookie_usercode = t(filter_input_data('COOKIE', 'usercode'));
     if ($this->session_usercode && $cookie_usercode) {

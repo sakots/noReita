@@ -123,9 +123,7 @@ final class PostInput {
     $ctype = self::firstCtype($sources);
     if ($ctype !== null) return $ctype;
 
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-      session_start();
-    }
+    RequestSecurity::startSession();
     return self::resolveCtype(['session_usercode' => $_SESSION['usercode'] ?? null]);
   }
 
