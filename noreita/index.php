@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.5.1 lot.260718.0';
+const REITA_VER = 'v3.6.0 lot.260718.0';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -52,7 +52,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260716) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260718) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -66,14 +66,14 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260716) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260716) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260718) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260716) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260718) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -1448,7 +1448,7 @@ function delmode(): void {
   $p_pwd = filter_input(INPUT_POST, 'pwd');
 
   try {
-    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
+    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST);
     $result = $service->delete((int)$delno, (string)$p_pwd, isset($_POST['admindel']));
     $dat['message'] = $result === 'hidden'
       ? ($en ? 'Post hidden.' : '非表示にしました。')
@@ -1540,9 +1540,15 @@ function picreplace(): void {
         $nsfw = false;
       }
 
+      // 続き描きでは新しい画像から必ずサムネイルを作り直す。
+      $thumbnail = ImageService::refreshNsfwThumbnail(
+        IMG_DIR, $new_picfile, (string)($msg_d['thumbnail'] ?? ''), $nsfw,
+        PDEF_W, PERMISSION_FOR_DEST, true
+      );
+
       $repository->updateImage((int)$no, [
         'host' => $host, 'picfile' => $new_picfile, 'pchfile' => $new_pchfile, 'author_id' => $id,
-        'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw,
+        'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw, 'thumbnail' => $thumbnail,
       ]);
     } else {
       error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
@@ -1550,11 +1556,11 @@ function picreplace(): void {
   } catch (Throwable $e) {
     error(($en ? 'Image replacement failed. ' : '画像差し替えに失敗しました。') . h($e->getMessage()));
   }
-  ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
+  editform((int)$no, (string)$pwd_f);
 }
 
 //編集モードくん入口
-function editform(): void {
+function editform(?int $authorized_post_id = null, ?string $authorized_password = null): void {
   global $admin_pass;
   global $blade, $dat;
   global $en;
@@ -1568,9 +1574,9 @@ function editform(): void {
   }
 
   //入力されたパスワード
-  $post_pwd = filter_input(INPUT_POST, 'pwd');
+  $post_pwd = $authorized_password ?? filter_input(INPUT_POST, 'pwd');
 
-  $edit_no = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
+  $edit_no = $authorized_post_id ?? filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
   if ($edit_no == "") {
     error($en ? 'Please enter the post number.' : '記事番号を入力してください');
   }
@@ -1585,7 +1591,6 @@ function editform(): void {
     } else {
       $dat['message'] = $en ? 'Administrator editing mode...' : '管理者編集モード...';
     }
-    $msg['com'] = nl2br(htmlentities($msg['com'], ENT_QUOTES | ENT_HTML5), false);
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
@@ -1627,6 +1632,7 @@ function editexec(): void {
   $picfile = (string)$input['picfile'];
   $pwd = $input['pwd'];
   $sodane = $input['sodane'];
+  $edit_nsfw = USE_NSFW === 1 && $input['nsfw_flag'] === '1';
 
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
@@ -1640,10 +1646,10 @@ function editexec(): void {
   //↑セキュリティ関連ここまで
 
   try {
-    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
+    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST);
     $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
-      'host' => $host, 'sodane' => $sodane,
+      'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
     ]);
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
   } catch (PostNotFoundException $e) {

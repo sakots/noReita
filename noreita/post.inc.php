@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260716;
+const POST_INC_VER = 20260718;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -12,7 +12,9 @@ final class PostService {
   public function __construct(
     private BoardRepository $repository,
     private string $admin_pass,
-    private string $image_dir
+    private string $image_dir,
+    private int $thumbnail_width = 0,
+    private int $file_permission = 0600,
   ) {}
 
   public function authorize(int $post_id, string $password): array {
@@ -29,7 +31,20 @@ final class PostService {
 
   public function edit(int $post_id, string $password, array $values): void {
     $authorization = $this->authorize($post_id, $password);
-    $values['pwdh'] = (string)$authorization['post']['pwd'];
+    $post = $authorization['post'];
+    $values['pwdh'] = (string)$post['pwd'];
+    $values['nsfw'] = (int)$post['nsfw'];
+    $values['thumbnail'] = (string)($post['thumbnail'] ?? '');
+    if (array_key_exists('edit_nsfw', $values) && (string)$post['picfile'] !== '') {
+      $nsfw = (bool)$values['edit_nsfw'];
+      if ($nsfw !== (bool)$post['nsfw']) {
+        $values['thumbnail'] = ImageService::refreshNsfwThumbnail(
+          $this->image_dir, (string)$post['picfile'], $values['thumbnail'], $nsfw,
+          $this->thumbnail_width, $this->file_permission
+        );
+      }
+      $values['nsfw'] = (int)$nsfw;
+    }
     $this->repository->updateContent($post_id, $values);
   }
 
