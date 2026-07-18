@@ -55,7 +55,7 @@
           <tr>
             <td>NSFW</td>
             <td>
-              <input type="checkbox" name="nsfw" value="1" id="edit_nsfw" @if ((int)$bbsline['nsfw'] === 1) checked @endif>
+              <input type="checkbox" name="nsfw" value="1" id="edit_nsfw" @if ((int)$bbsline['nsfw'] === 1) checked="checked" @endif>
               <label for="edit_nsfw">画像をNSFWとして表示する</label>
             </td>
           </tr>

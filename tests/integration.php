@@ -309,7 +309,7 @@ try {
     return $image_edit_form_status === 200
       && str_contains($image_edit_form_body, 'id="edit_nsfw"')
       && str_contains($image_edit_form_body, 'src="img/')
-      && !str_contains($image_edit_form_body, 'id="edit_nsfw" checked');
+      && !str_contains($image_edit_form_body, 'checked="checked"');
   });
 
   [$image_nsfw_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
@@ -328,7 +328,7 @@ try {
     'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);
   integration_test('image edit form shows an enabled NSFW setting', static function () use ($checked_edit_form_body): bool {
-    return preg_match('/id="edit_nsfw"[^>]*checked/', $checked_edit_form_body) === 1;
+    return preg_match('/id="edit_nsfw"[^>]*checked="checked"/', $checked_edit_form_body) === 1;
   });
 
   [$image_safe_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
