@@ -12,7 +12,11 @@
 
 ## SNS共有
 
-`share.inc.php`の`ShareService`が共有先一覧、直接入力URLの検証、SNS別エンドポイント、共有URL生成を担当します。フォーム描画、Cookie、CSRF、リダイレクトは`index.php`が担当します。
+`share.inc.php`の`ShareService`が共有先一覧、直接入力URLの検証、SNS別エンドポイント、共有URL生成を担当します。フォーム描画、Cookie、リダイレクトは`index.php`が担当します。
+
+## リクエストセキュリティ
+
+`request_security.inc.php`の`RequestSecurity`がセッションの安全な開始、CSRFトークン生成、POST・同一オリジン・ユーザーコード・CSRFトークンの検証を担当します。検証失敗は`RequestSecurityException`として画面制御側へ返します。
 
 ## アプリケーション初期化
 
