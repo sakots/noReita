@@ -343,6 +343,33 @@ try {
       && !is_file($webroot . '/img/' . $nsfw_thumbnail);
   });
 
+  $replacement_base = 'replacement-' . bin2hex(random_bytes(6));
+  $replacement_code = 'replace-code-' . bin2hex(random_bytes(4));
+  file_put_contents($webroot . '/tmp/' . $replacement_base . '.png', $png);
+  file_put_contents(
+    $webroot . '/tmp/' . $replacement_base . '.dat',
+    "127.0.0.1\tlocalhost\tagent\t.png\tcode\t{$replacement_code}\t200\t260\t0\tneo"
+  );
+  file_put_contents($webroot . '/tmp/' . $replacement_base . '.pch', 'replacement animation');
+  $encrypted_password = openssl_encrypt(
+    'image-pass', 'aes-128-cbc', '0qYzf1x6nyN4gS1', OPENSSL_RAW_DATA, 'T3pkYxNyjN7Wz3pu'
+  );
+  if ($encrypted_password === false) throw new RuntimeException('Could not encrypt replacement password');
+  [$replacement_status, $replacement_body] = http_request(
+    $base_url . '?mode=picrep&no=' . $image_post_id . '&repcode=' . rawurlencode($replacement_code)
+      . '&pwd=' . bin2hex($encrypted_password) . '&stime=300',
+    $cookie_jar,
+    ['nsfw' => '0']
+  );
+  $replaced_image_row = $db->query('SELECT picfile, pchfile FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  integration_test('continued drawing opens its comment edit form', static function () use ($replacement_status, $replacement_body, $replaced_image_row, $replacement_base): bool {
+    return $replacement_status === 200 && is_array($replaced_image_row)
+      && $replaced_image_row['picfile'] === $replacement_base . '.png'
+      && $replaced_image_row['pchfile'] === $replacement_base . '.pch'
+      && str_contains($replacement_body, 'action="index.php?mode=editexec"')
+      && str_contains($replacement_body, 'id="edit_nsfw"');
+  });
+
   [$image_delete_status] = http_request($base_url, $cookie_jar, [
     'mode' => 'del', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);

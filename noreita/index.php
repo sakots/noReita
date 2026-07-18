@@ -52,7 +52,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260716) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260718) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -1550,11 +1550,11 @@ function picreplace(): void {
   } catch (Throwable $e) {
     error(($en ? 'Image replacement failed. ' : '画像差し替えに失敗しました。') . h($e->getMessage()));
   }
-  ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
+  editform((int)$no, (string)$pwd_f);
 }
 
 //編集モードくん入口
-function editform(): void {
+function editform(?int $authorized_post_id = null, ?string $authorized_password = null): void {
   global $admin_pass;
   global $blade, $dat;
   global $en;
@@ -1568,9 +1568,9 @@ function editform(): void {
   }
 
   //入力されたパスワード
-  $post_pwd = filter_input(INPUT_POST, 'pwd');
+  $post_pwd = $authorized_password ?? filter_input(INPUT_POST, 'pwd');
 
-  $edit_no = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
+  $edit_no = $authorized_post_id ?? filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
   if ($edit_no == "") {
     error($en ? 'Please enter the post number.' : '記事番号を入力してください');
   }
