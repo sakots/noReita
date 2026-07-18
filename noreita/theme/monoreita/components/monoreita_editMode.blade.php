@@ -35,6 +35,22 @@
             <td>comment</td>
             <td><textarea name="com" cols="48" rows="4" wrap="soft" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};" maxlength="{{$max_com}}" required>{{$bbsline['com']}}</textarea></td>
           </tr>
+          @if ($bbsline['picfile'] !== '')
+          <tr>
+            <td>image</td>
+            <td>
+              <a class="luminous" href="{{$path}}{{$bbsline['picfile']}}" target="_blank">
+                <span @if ((int)$bbsline['nsfw'] === 1) class="nsfw" @endif>
+                  <img
+                    src="{{$path}}{{$bbsline['thumbnail'] !== '' ? $bbsline['thumbnail'] : $bbsline['picfile']}}"
+                    alt="{{$bbsline['picfile']}}"
+                    loading="lazy"
+                    class="image">
+                </span>
+              </a>
+            </td>
+          </tr>
+          @endif
           @if ($use_nsfw === 1 && $bbsline['picfile'] !== '')
           <tr>
             <td>NSFW</td>

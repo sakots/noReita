@@ -308,6 +308,7 @@ try {
   integration_test('image edit form includes the current NSFW setting', static function () use ($image_edit_form_status, $image_edit_form_body): bool {
     return $image_edit_form_status === 200
       && str_contains($image_edit_form_body, 'id="edit_nsfw"')
+      && str_contains($image_edit_form_body, 'src="img/')
       && !str_contains($image_edit_form_body, 'id="edit_nsfw" checked');
   });
 
@@ -367,6 +368,7 @@ try {
       && $replaced_image_row['picfile'] === $replacement_base . '.png'
       && $replaced_image_row['pchfile'] === $replacement_base . '.pch'
       && str_contains($replacement_body, 'action="index.php?mode=editexec"')
+      && str_contains($replacement_body, 'src="img/' . $replacement_base . '.png"')
       && str_contains($replacement_body, 'id="edit_nsfw"');
   });
 
