@@ -86,12 +86,13 @@ final class BoardRepository {
 
   public function updateImage(int $id, array $values): void {
     $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), host = :host, picfile = :picfile,
-      pchfile = :pchfile, id = :author_id, psec = :psec, utime = :utime, nsfw = :nsfw WHERE tid = :id";
+      pchfile = :pchfile, id = :author_id, psec = :psec, utime = :utime, nsfw = :nsfw,
+      thumbnail = :thumbnail WHERE tid = :id";
     $statement = $this->db->prepare($sql);
     $statement->execute([
       'host' => $values['host'], 'picfile' => $values['picfile'], 'pchfile' => $values['pchfile'],
       'author_id' => $values['author_id'], 'psec' => $values['psec'], 'utime' => $values['utime'],
-      'nsfw' => $values['nsfw'], 'id' => $id,
+      'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'], 'id' => $id,
     ]);
   }
 

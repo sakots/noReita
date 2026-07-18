@@ -344,6 +344,13 @@ try {
       && !is_file($webroot . '/img/' . $nsfw_thumbnail);
   });
 
+  http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'sub' => 'Image subject', 'com' => '画像付き投稿の本文です', 'pwd' => 'image-pass',
+    'sodane' => '0', 'nsfw' => '1', 'token' => $token,
+  ]);
+  $continued_from_thumbnail = (string)$db->query('SELECT thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+
   $replacement_base = 'replacement-' . bin2hex(random_bytes(6));
   $replacement_code = 'replace-code-' . bin2hex(random_bytes(4));
   file_put_contents($webroot . '/tmp/' . $replacement_base . '.png', $png);
@@ -362,13 +369,23 @@ try {
     $cookie_jar,
     ['nsfw' => '0']
   );
-  $replaced_image_row = $db->query('SELECT picfile, pchfile FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
-  integration_test('continued drawing opens its comment edit form', static function () use ($replacement_status, $replacement_body, $replaced_image_row, $replacement_base): bool {
+  $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $replacement_thumbnail = (string)($replaced_image_row['thumbnail'] ?? '');
+  clearstatcache(true, $webroot . '/img/' . $continued_from_thumbnail);
+  integration_test('continued NSFW drawing can become safe with a fresh thumbnail', static function () use (
+    $replacement_status, $replacement_body, $replaced_image_row, $replacement_base,
+    $replacement_thumbnail, $continued_from_thumbnail, $webroot
+  ): bool {
     return $replacement_status === 200 && is_array($replaced_image_row)
       && $replaced_image_row['picfile'] === $replacement_base . '.png'
       && $replaced_image_row['pchfile'] === $replacement_base . '.pch'
+      && (int)$replaced_image_row['nsfw'] === 0
+      && $replacement_thumbnail !== ''
+      && str_starts_with($replacement_thumbnail, $replacement_base . '.')
+      && is_file($webroot . '/img/' . $replacement_thumbnail)
+      && !is_file($webroot . '/img/' . $continued_from_thumbnail)
       && str_contains($replacement_body, 'action="index.php?mode=editexec"')
-      && str_contains($replacement_body, 'src="img/' . $replacement_base . '.png"')
+      && str_contains($replacement_body, 'src="img/' . $replacement_thumbnail . '"')
       && str_contains($replacement_body, 'id="edit_nsfw"');
   });
 

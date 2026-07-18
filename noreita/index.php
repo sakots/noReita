@@ -1540,9 +1540,15 @@ function picreplace(): void {
         $nsfw = false;
       }
 
+      // 続き描きでは新しい画像から必ずサムネイルを作り直す。
+      $thumbnail = ImageService::refreshNsfwThumbnail(
+        IMG_DIR, $new_picfile, (string)($msg_d['thumbnail'] ?? ''), $nsfw,
+        PDEF_W, PERMISSION_FOR_DEST, true
+      );
+
       $repository->updateImage((int)$no, [
         'host' => $host, 'picfile' => $new_picfile, 'pchfile' => $new_pchfile, 'author_id' => $id,
-        'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw,
+        'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw, 'thumbnail' => $thumbnail,
       ]);
     } else {
       error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');

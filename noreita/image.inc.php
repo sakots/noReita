@@ -168,7 +168,8 @@ final class ImageService {
     string $current_thumbnail,
     bool $nsfw,
     int $thumbnail_width,
-    int $permission
+    int $permission,
+    bool $always_create = false
   ): string {
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
     $image_name = basename($image_name);
@@ -179,7 +180,7 @@ final class ImageService {
     }
 
     $new_thumbnail = '';
-    if ($nsfw || (int)$size[0] > $thumbnail_width) {
+    if ($always_create || $nsfw || (int)$size[0] > $thumbnail_width) {
       $new_thumbnail = self::createThumbnail($source, $image_dir, $thumbnail_width, $nsfw);
       if ($new_thumbnail === '') throw new RuntimeException('Failed to update thumbnail.');
       @chmod($image_dir . $new_thumbnail, $permission);
