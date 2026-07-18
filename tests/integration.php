@@ -286,7 +286,7 @@ try {
   file_put_contents($webroot . '/tmp/' . $image_base . '.pch', 'NEO animation');
   [$image_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'Image test', 'mail' => '', 'url' => '',
-    'sub' => 'Image subject', 'com' => '画像付き投稿の本文です', 'pwd' => 'image-pass',
+    'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
     'picfile' => $image_name, 'ctype' => 'new', 'invz' => '0', 'sodane' => '0', 'nsfw' => '0',
     'token' => $token,
   ]);
@@ -309,12 +309,15 @@ try {
     return $image_edit_form_status === 200
       && str_contains($image_edit_form_body, 'id="edit_nsfw"')
       && str_contains($image_edit_form_body, 'src="img/')
+      && str_contains($image_edit_form_body, "画像付き投稿の本文です\n二行目です")
+      && !str_contains($image_edit_form_body, '&lt;br')
+      && !str_contains($image_edit_form_body, '&NewLine;')
       && !str_contains($image_edit_form_body, 'checked="checked"');
   });
 
   [$image_nsfw_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
-    'sub' => 'Image subject', 'com' => '画像付き投稿の本文です', 'pwd' => 'image-pass',
+    'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
     'sodane' => '0', 'nsfw' => '1', 'token' => $token,
   ]);
   $nsfw_image_row = $db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
@@ -333,7 +336,7 @@ try {
 
   [$image_safe_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
-    'sub' => 'Image subject', 'com' => '画像付き投稿の本文です', 'pwd' => 'image-pass',
+    'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
     'sodane' => '0', 'nsfw' => '0', 'token' => $token,
   ]);
   $safe_image_row = $db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
@@ -346,7 +349,7 @@ try {
 
   http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
-    'sub' => 'Image subject', 'com' => '画像付き投稿の本文です', 'pwd' => 'image-pass',
+    'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
     'sodane' => '0', 'nsfw' => '1', 'token' => $token,
   ]);
   $continued_from_thumbnail = (string)$db->query('SELECT thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();

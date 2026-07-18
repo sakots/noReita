@@ -1591,7 +1591,6 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     } else {
       $dat['message'] = $en ? 'Administrator editing mode...' : '管理者編集モード...';
     }
-    $msg['com'] = nl2br(htmlentities($msg['com'], ENT_QUOTES | ENT_HTML5), false);
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
