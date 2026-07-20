@@ -131,7 +131,7 @@ if ($admin_pass === 'admin_pass') {
   die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
 }
 
-// BladeOne v4.19.19
+// BladeOne v4.19.1
 include(__DIR__ . '/BladeOne/lib/BladeOne.php');
 use eftec\bladeone\BladeOne;
 

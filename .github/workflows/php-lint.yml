@@ -60,7 +60,7 @@ jobs:
 
       - name: Install BladeOne for tests
         env:
-          BLADEONE_VERSION: 4.19.19
+          BLADEONE_VERSION: 4.19.1
         run: |
           mkdir -p "${RUNNER_TEMP}/bladeone" noreita/BladeOne/lib
           composer --working-dir="${RUNNER_TEMP}/bladeone" require --no-interaction --no-progress --prefer-dist "eftec/bladeone:${BLADEONE_VERSION}"
