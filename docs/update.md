@@ -36,6 +36,8 @@ scripts/integration-test.sh
 
 このテストは一時ディレクトリと一時SQLite DBを使用し、設置済み掲示板の`config.php`やDBは変更しません。
 
+GitHub Actionsでは、PHP 8.0と8.3の各環境にBladeOne v4.19.19をテスト用として配置し、このHTTP結合テストを自動実行します。
+
 ## 不具合時の元バージョンへの戻し方
 
 githubのリリースより旧バージョンをダウンロードしてください
