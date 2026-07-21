@@ -380,6 +380,14 @@ smoke_test('animation filenames reject path traversal', static function (): bool
     && !ImageService::isSafeAnimationFilename('.pch');
 });
 
+smoke_test('posted image filenames reject invalid continuation targets', static function (): bool {
+  return ImageService::isSafePostedImageFilename('1784.png')
+    && ImageService::isSafePostedImageFilename('drawing-name.webp')
+    && !ImageService::isSafePostedImageFilename('1784')
+    && !ImageService::isSafePostedImageFilename('../1784.png')
+    && !ImageService::isSafePostedImageFilename('drawing.php');
+});
+
 smoke_test('temporary images are parsed, found, and cleaned up', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_temp_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;

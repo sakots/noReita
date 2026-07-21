@@ -66,7 +66,7 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260716) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260718) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260721) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
@@ -1360,8 +1360,27 @@ function paint_com(string $tmpmode): void {
 //コンティニュー画面in
 function in_continue(): void {
   global $blade, $dat;
+  global $en;
 
-  $no = filter_input(INPUT_GET, 'no'); // 画像ファイル名なので文字列として取得
+  $no = trim((string)filter_input(INPUT_GET, 'no')); // 画像ファイル名なので文字列として取得
+  if (!ImageService::isSafePostedImageFilename($no)) {
+    error($en ? 'The image does not exist.' : '画像が存在しません。');
+    return;
+  }
+
+  $oya = [];
+  try {
+    $repository = new BoardRepository();
+    $oya = $repository->findPostsByImage($no);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to find the image.' : '画像の検索に失敗しました。');
+    return;
+  }
+  if (empty($oya) || !is_file(IMG_DIR . $no) || !is_readable(IMG_DIR . $no)) {
+    error($en ? 'The image does not exist.' : '画像が存在しません。');
+    return;
+  }
+
   $dat['othermode'] = 'incontinue';
   $dat['continue_mode'] = true;
 
@@ -1378,18 +1397,17 @@ function in_continue(): void {
   if (!CONTINUE_PASS) $dat['newpost_nopassword'] = true;
 
   try {
-    $repository = new BoardRepository();
-    $oya = array();
-    foreach ($repository->findPostsByImage((string)$no) as $bbsline) {
+    $continue_posts = [];
+    foreach ($oya as $bbsline) {
       $bbsline['com'] = nl2br(htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5), false);
-      $oya[] = $bbsline;
-      $dat['oya'] = $oya; //配列に格納
+      $continue_posts[] = $bbsline;
     }
+    $dat['oya'] = $continue_posts;
     $hist_ope = pathinfo($no, PATHINFO_FILENAME); //拡張子除去
     $hist_filename = IMG_DIR . $hist_ope;
     
     // データベースからctypeを取得
-    $db_ctype = $oya[0]['ctype'] ?? null;
+    $db_ctype = $continue_posts[0]['ctype'] ?? null;
     
     if (is_file($hist_filename . '.pch')) {
       //$pchfile = IMG_DIR.$pch;
@@ -1429,8 +1447,8 @@ function in_continue(): void {
     }
 
     $db = null; //db切断
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+  } catch (Throwable $e) {
+    error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。');
   }
 
   echo $blade->run(OTHERFILE, $dat);

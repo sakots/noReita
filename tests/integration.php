@@ -148,6 +148,14 @@ try {
       && (int)$db->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='board_log'")->fetchColumn() === 1;
   });
 
+  [$missing_continue_status, $missing_continue_body] = http_request($base_url . '?mode=continue&no=1784', $cookie_jar);
+  integration_test('missing continuation image shows a normal error page', static function () use ($missing_continue_status, $missing_continue_body): bool {
+    return $missing_continue_status === 200
+      && str_contains($missing_continue_body, 'The image does not exist.')
+      && !str_contains($missing_continue_body, 'Undefined variable')
+      && !str_contains($missing_continue_body, 'foreach() argument must be of type');
+  });
+
   // pictmp initializes the CSRF token in the same session used for posting.
   [$status] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');

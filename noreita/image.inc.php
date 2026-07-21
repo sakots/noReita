@@ -1,11 +1,18 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260718;
+const IMAGE_INC_VER = 20260721;
 
 final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
   private const PLAYABLE_ANIMATION_EXTENSIONS = ['pch', 'spch', 'tgkr'];
+
+  public static function isSafePostedImageFilename(string $filename): bool {
+    if ($filename === '' || strlen($filename) > 255 || basename($filename) !== $filename) {
+      return false;
+    }
+    return preg_match('/\A[A-Za-z0-9][A-Za-z0-9_-]{0,127}\.(?:png|jpe?g|gif|webp|avif)\z/iD', $filename) === 1;
+  }
 
   public static function isSafeAnimationFilename(string $filename): bool {
     if ($filename === '' || strlen($filename) > 255 || basename($filename) !== $filename) {
