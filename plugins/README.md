@@ -33,6 +33,14 @@ noReita3のindex.phpと同じディレクトリにアップロードして
 
 ## 更新履歴
 
+### [2026/07/22]
+
+- ディレクトリ名変更
+
+### [2026/07/22] noreita3_newimg.php noreita3_rndimg.php
+
+- 文法エラー修正
+
 ### [2026/04/05]
 
 - noReita3対応

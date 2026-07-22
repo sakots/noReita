@@ -56,38 +56,39 @@ if (!is_file(DB_NAME.'.db')) {
       $filename = IMG_DIR.$msg["picfile"];
     }
     $db = null;// db切断
+
+    // 画像を出力
+    $img_type = mime_content_type($filename);
+
+    switch ($img_type):
+      case 'image/png':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/png');
+      break;
+      case 'image/webp':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/webp');
+      break;
+      case 'image/avif':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/avif');
+      break;
+      case 'image/jpeg':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/jpeg');
+      break;
+      case 'image/gif':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/gif');
+      break;
+      default :
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/png');
+    endswitch;
+
+    readfile($filename);
+
   } catch (PDOException $e) {
     echo "DB接続エラー:" .$e->getMessage();
   }
 }
-
-// 画像を出力
-$img_type = mime_content_type($filename);
-
-switch ($img_type):
-  case 'image/png':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/png');
-  break;
-  case 'image/webp':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/webp');
-  break;
-  case 'image/avif':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/avif');
-  break;
-  case 'image/jpeg':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/jpeg');
-  break;
-  case 'image/gif':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/gif');
-  break;
-  default :
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/png');
-endswitch;
-
-readfile($filename);
