@@ -614,7 +614,7 @@ smoke_test('new post image and animation are finalized', static function (): boo
   }
 });
 
-smoke_test('image consistency checker reports missing and orphan files without changing them', static function (): bool {
+smoke_test('image consistency repair backs up data and fixes recoverable issues', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_consistency_' . bin2hex(random_bytes(8));
   $images = $root . DIRECTORY_SEPARATOR . 'img';
   mkdir($images, 0700, true);
@@ -629,22 +629,60 @@ smoke_test('image consistency checker reports missing and orphan files without c
     imagepng($image, $images . DIRECTORY_SEPARATOR . 'valid.png');
     imagepng($image, $images . DIRECTORY_SEPARATOR . 'orphan.png');
     $insert = $db->prepare('INSERT INTO board_log VALUES (?, ?, ?, ?, ?, ?, ?)');
-    $insert->execute([1, 'valid.png', '', '', 4, 3, 0]);
+    $insert->execute([1, 'valid.png', 'valid.pch', '', 40, 30, 1]);
     $insert->execute([2, 'missing.png', '', '', 8, 6, 0]);
     unset($db);
 
     $report = checker_scan($database, $images);
     $types = array_column($report['issues'], 'type');
-    return $report['summary']['posts_checked'] === 2
+    $repair = checker_repair([
+      'root' => $root,
+      'database' => $database,
+      'image_dir' => $images,
+      'thumbnail_file' => dirname(__DIR__) . '/noreita/thumbnail.inc.php',
+      'thumbnail_width' => 20,
+      'file_permission' => 0600,
+    ], $report);
+    $after = checker_scan($database, $images);
+    $repaired = (new PDO('sqlite:' . $database))->query(
+      'SELECT pchfile, thumbnail, img_w, img_h FROM board_log WHERE tid = 1'
+    )->fetch(PDO::FETCH_ASSOC);
+    $action_types = array_column($repair['actions'], 'type');
+    $ok = $report['summary']['posts_checked'] === 2
       && $report['summary']['errors'] === 1
-      && $report['summary']['warnings'] === 1
+      && $report['summary']['warnings'] === 4
       && in_array('missing_image', $types, true)
       && in_array('orphan_file', $types, true)
-      && is_file($images . DIRECTORY_SEPARATOR . 'orphan.png');
+      && $repair['failed'] === 0 && is_file($repair['backup'])
+      && in_array('update_dimensions', $action_types, true)
+      && in_array('clear_missing_pch', $action_types, true)
+      && in_array('regenerate_thumbnail', $action_types, true)
+      && in_array('quarantine_file', $action_types, true)
+      && is_array($repaired) && $repaired['pchfile'] === ''
+      && (int)$repaired['img_w'] === 4 && (int)$repaired['img_h'] === 3
+      && is_file($images . DIRECTORY_SEPARATOR . $repaired['thumbnail'])
+      && !is_file($images . DIRECTORY_SEPARATOR . 'orphan.png')
+      && $after['summary']['errors'] === 1 && $after['summary']['warnings'] === 0;
+    if (!$ok) {
+      throw new RuntimeException(json_encode([
+        'before' => $report, 'repair' => $repair, 'after' => $after, 'row' => $repaired,
+      ], JSON_UNESCAPED_SLASHES));
+    }
+    return true;
   } finally {
     foreach (glob($images . DIRECTORY_SEPARATOR . '*') ?: [] as $file) if (is_file($file)) unlink($file);
     if (is_dir($images)) rmdir($images);
     if (is_file($database)) unlink($database);
+    foreach (['backup', 'orphan'] as $subdirectory) {
+      foreach (glob($root . DIRECTORY_SEPARATOR . $subdirectory . DIRECTORY_SEPARATOR . '*') ?: [] as $entry) {
+        if (is_file($entry)) unlink($entry);
+        if (is_dir($entry)) {
+          foreach (glob($entry . DIRECTORY_SEPARATOR . '*') ?: [] as $file) if (is_file($file)) unlink($file);
+          rmdir($entry);
+        }
+      }
+      if (is_dir($root . DIRECTORY_SEPARATOR . $subdirectory)) rmdir($root . DIRECTORY_SEPARATOR . $subdirectory);
+    }
     if (is_dir($root)) rmdir($root);
   }
 });

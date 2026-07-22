@@ -20,6 +20,21 @@ php plugins/check-image-consistency.php --root=/path/to/noreita
 
 問題なしなら終了コード`0`、不整合ありなら`1`、設定や実行上のエラーなら`2`を返します。機械処理用の出力は`--json`で取得できます。
 
+検査結果のうち安全に復旧できる項目は、`--repair`を明示して修復できます。
+
+```console
+php plugins/check-image-consistency.php --root=/path/to/noreita --repair
+```
+
+修復前に`backup/`へSQLiteデータベースのバックアップを作成し、次の処理を行います。
+
+- 実画像に合わせてDBの縦横サイズを修正
+- 存在しない動画ファイルのDB参照を解除
+- 欠損・破損したサムネイルを再生成
+- 孤立ファイルと置き換えられた破損サムネイルを`orphan/`へ隔離
+
+元画像の欠損、読み取り不能な画像、危険なファイル名は自動変更せず、検査結果に残します。復旧処理は排他ロックされ、DB更新はトランザクション内で行われます。
+
 ## noreita3_newimg.php
 
 データベースの最新画像を表示します。
@@ -54,6 +69,7 @@ noReita3のindex.phpと同じディレクトリにアップロードして
 ### [2026/07/22]
 
 - ディレクトリ名変更
+- `check-image-consistency.php`作成
 
 ### [2026/07/22] noreita3_newimg.php noreita3_rndimg.php
 
