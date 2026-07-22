@@ -22,6 +22,7 @@ require_once dirname(__DIR__) . '/noreita/initialization.inc.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 require_once dirname(__DIR__) . '/noreita/share.inc.php';
+require_once dirname(__DIR__) . '/plugins/check-image-consistency.php';
 
 $passed = 0;
 $failed = 0;
@@ -609,6 +610,41 @@ smoke_test('new post image and animation are finalized', static function (): boo
       foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) if (is_file($file)) unlink($file);
       if (is_dir($directory)) rmdir($directory);
     }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
+smoke_test('image consistency checker reports missing and orphan files without changing them', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_consistency_' . bin2hex(random_bytes(8));
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  mkdir($images, 0700, true);
+  $database = $root . DIRECTORY_SEPARATOR . 'reita.db';
+  try {
+    $db = new PDO('sqlite:' . $database);
+    $db->exec('CREATE TABLE board_log (
+      tid INTEGER PRIMARY KEY, picfile TEXT, pchfile TEXT, thumbnail TEXT,
+      img_w INTEGER, img_h INTEGER, nsfw INTEGER
+    )');
+    $image = imagecreatetruecolor(4, 3);
+    imagepng($image, $images . DIRECTORY_SEPARATOR . 'valid.png');
+    imagepng($image, $images . DIRECTORY_SEPARATOR . 'orphan.png');
+    $insert = $db->prepare('INSERT INTO board_log VALUES (?, ?, ?, ?, ?, ?, ?)');
+    $insert->execute([1, 'valid.png', '', '', 4, 3, 0]);
+    $insert->execute([2, 'missing.png', '', '', 8, 6, 0]);
+    unset($db);
+
+    $report = checker_scan($database, $images);
+    $types = array_column($report['issues'], 'type');
+    return $report['summary']['posts_checked'] === 2
+      && $report['summary']['errors'] === 1
+      && $report['summary']['warnings'] === 1
+      && in_array('missing_image', $types, true)
+      && in_array('orphan_file', $types, true)
+      && is_file($images . DIRECTORY_SEPARATOR . 'orphan.png');
+  } finally {
+    foreach (glob($images . DIRECTORY_SEPARATOR . '*') ?: [] as $file) if (is_file($file)) unlink($file);
+    if (is_dir($images)) rmdir($images);
+    if (is_file($database)) unlink($database);
     if (is_dir($root)) rmdir($root);
   }
 });

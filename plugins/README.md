@@ -2,6 +2,24 @@
 
 お絵かき掲示板noReitaのためのプラグインです。
 
+## check-image-consistency.php
+
+DBに記録された画像・動画・サムネイルと、画像ディレクトリ内のファイルを照合するCLI専用の検査ツールです。ファイルやDBの変更・削除は行いません。
+
+リポジトリのルートでは次のように実行します。
+
+```console
+php plugins/check-image-consistency.php
+```
+
+別の場所に設置したnoReitaを調べる場合は、`config.php`があるディレクトリを指定します。
+
+```console
+php plugins/check-image-consistency.php --root=/path/to/noreita
+```
+
+問題なしなら終了コード`0`、不整合ありなら`1`、設定や実行上のエラーなら`2`を返します。機械処理用の出力は`--json`で取得できます。
+
 ## noreita3_newimg.php
 
 データベースの最新画像を表示します。
