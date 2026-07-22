@@ -17,4 +17,9 @@
 */session/
 */app/
 
+# セッション本体は除外し、HTTPアクセス拒否設定だけを配布する
+!noreita/session/
+noreita/session/*
+!noreita/session/.htaccess
+
 config.php

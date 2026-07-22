@@ -1,0 +1,11 @@
+# noReitaのセッションファイルへのHTTPアクセスを拒否する。
+# Apache 2.4以降
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+
+# Apache 2.2および互換サーバー
+<IfModule !mod_authz_core.c>
+  Order Allow,Deny
+  Deny from all
+</IfModule>

@@ -50,6 +50,13 @@ smoke_test('required PHP extensions', static function (): bool {
   return true;
 });
 
+smoke_test('session directory ships an Apache access denial rule', static function (): bool {
+  $rule = file_get_contents(dirname(__DIR__) . '/noreita/session/.htaccess');
+  return is_string($rule)
+    && str_contains($rule, 'Require all denied')
+    && str_contains($rule, 'Deny from all');
+});
+
 smoke_test('request client IP is resolved from supported sources', static function (): bool {
   return RequestInfo::clientIp(['REMOTE_ADDR' => '203.0.113.10']) === '203.0.113.10'
     && RequestInfo::clientIp([
