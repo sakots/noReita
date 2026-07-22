@@ -4,7 +4,7 @@
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
 
-const MISSKEY_NOTE_VER = 20260716; //misskey_note.inc.phpのバージョン
+const MISSKEY_NOTE_VER = 20260722; //misskey_note.inc.phpのバージョン
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -50,7 +50,7 @@ function get_post_from_db(int $no): ?array {
       'pwd'      => $post['pwd'],
     ];
   } catch (PDOException $e) {
-    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage());
+    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage(), 500);
   }
   return null;
 }
@@ -69,7 +69,7 @@ function check_post_exists(int $no): bool {
 
     return $result['count'] > 0;
   } catch (PDOException $e) {
-    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage());
+    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage(), 500);
   }
   return false;
 }
@@ -92,7 +92,7 @@ function verify_post_password(int $no, string $id, string $pwd): bool {
 
     return password_verify($pwd, $post['pwd']);
   } catch (PDOException $e) {
-    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage());
+    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage(), 500);
   }
   return false;
 }
@@ -123,7 +123,7 @@ function check_edit_permission(int $no, string $id, string $pwd, bool $admin): b
 
     return verify_post_password($no, $id, $pwd);
   } catch (PDOException $e) {
-    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage());
+    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage(), 500);
   }
   return false;
 }
@@ -182,7 +182,7 @@ function create_res(array $post): array {
 
     return $res;
   } catch (Exception $e) {
-    error($en ? "Error processing post data: " . $e->getMessage() : "投稿データの処理中にエラーが発生しました: " . $e->getMessage());
+    error($en ? "Error processing post data: " . $e->getMessage() : "投稿データの処理中にエラーが発生しました: " . $e->getMessage(), 500);
   }
   return [];
 }
@@ -207,12 +207,12 @@ class misskey_note {
     }
 
     if (!check_post_exists($dat['no'])) {
-      error($en ? 'The article does not exist.' : '記事がありません。');
+      error($en ? 'The article does not exist.' : '記事がありません。', 404);
     }
 
     $post = get_post_from_db($dat['no']);
     if (!$post) {
-        error($en ? 'The article was not found.' : '記事が見つかりません。');
+        error($en ? 'The article was not found.' : '記事が見つかりません。', 404);
     }
     $dat['post'] = $post;
 
@@ -241,7 +241,7 @@ class misskey_note {
     try {
       RequestSecurity::assertCurrentSameOriginRequest($en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage());
+      error($e->getMessage(), $e->getCode() ?: 403);
     }
 
     $dat['token'] = RequestSecurity::csrfToken();
@@ -263,18 +263,18 @@ class misskey_note {
     }
 
     if (!check_post_exists($no)) {
-      error($en ? 'The article does not exist.' : '記事がありません。');
+      error($en ? 'The article does not exist.' : '記事がありません。', 404);
     }
 
     if (!check_edit_permission($no, $id, $pwd, $dat['admin'])) {
-      error($en ? 'Password is incorrect.' : 'パスワードが違います。');
+      error($en ? 'Password is incorrect.' : 'パスワードが違います。', 403);
     }
 
     check_AsyncRequest();
 
     $post = get_post_from_db($no);
     if (!$post) {
-      error($en ? 'The article was not found.' : '記事が見つかりません。');
+      error($en ? 'The article was not found.' : '記事が見つかりません。', 404);
     }
     $dat['path'] = IMG_DIR;
     $dat['post'] = $post;
@@ -311,7 +311,7 @@ class misskey_note {
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage());
+      error($e->getMessage(), $e->getCode() ?: 403);
     }
 
     $userip = t(RequestInfo::clientIp());
@@ -381,7 +381,7 @@ class misskey_note {
     try {
       RequestSecurity::assertCurrentSameOriginRequest($en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage());
+      error($e->getMessage(), $e->getCode() ?: 403);
     }
 
     // ラジオボタンの値

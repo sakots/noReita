@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260718;
+const POST_INC_VER = 20260722;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -297,7 +297,10 @@ final class PostValidator {
     $host = (string)($rules['host'] ?? '');
     foreach (($rules['blocked_hosts'] ?? []) as $pattern) {
       if ($pattern !== '' && @preg_match('/' . $pattern . '$/i', $host) === 1) {
-        throw new PostValidationException(self::message($en, 'Your host is blocked.', 'あなたのホストは拒絶されています。'));
+        throw new PostValidationException(
+          self::message($en, 'Your host is blocked.', 'あなたのホストは拒絶されています。'),
+          403
+        );
       }
     }
   }

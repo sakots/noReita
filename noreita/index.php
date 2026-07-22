@@ -23,7 +23,7 @@ if (!is_file(__DIR__.'/functions.php')) {
   die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
 require_once(__DIR__.'/functions.php');
-if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260718) {
+if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260722) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
@@ -38,7 +38,7 @@ if (!defined('CONF_VER') || CONF_VER < 20260405) {
 // request_security.inc
 check_file(__DIR__.'/request_security.inc.php');
 require_once(__DIR__.'/request_security.inc.php');
-if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260718) {
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260722) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
@@ -73,7 +73,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260721) {
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260718) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260722) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -87,7 +87,7 @@ if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260718) {
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260716) {
+if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260722) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
@@ -109,14 +109,14 @@ if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260716) {
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
 if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260716) {
-  error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。');
+  error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
 // external_image.inc
 check_file(__DIR__.'/external_image.inc.php');
 require_once(__DIR__.'/external_image.inc.php');
 if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260718) {
-  error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。');
+  error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
 }
 
 // テーマ
@@ -379,7 +379,7 @@ function init(): void {
     $initializer->migrateDatabase();
     $initializer->secureDatabaseFile();
   } catch (Throwable $e) {
-    error(($en ? 'Application initialization failed. ' : 'アプリケーションの初期化に失敗しました。') . h($e->getMessage()));
+    error(($en ? 'Application initialization failed. ' : 'アプリケーションの初期化に失敗しました。') . h($e->getMessage()), 500);
     return;
   }
 }
@@ -405,7 +405,7 @@ function submit_share_server(): void {
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage());
+      error($e->getMessage(), $e->getCode() ?: 403);
     }
   }
   $selected_server = (string)filter_input_data('POST', 'sns_server_radio');
@@ -445,7 +445,7 @@ function regist(): void {
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage());
+      error($e->getMessage(), $e->getCode() ?: 403);
     }
   }
 
@@ -469,7 +469,7 @@ function regist(): void {
     $rules = PostValidator::configuredRules($en, $req_method, $host, $badip, $admin_pass, (bool)USE_COM);
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
-    error($e->getMessage());
+    error($e->getMessage(), $e->getCode() ?: 400);
     return;
   }
   //セキュリティ関連ここまで
@@ -484,7 +484,7 @@ function regist(): void {
           'admin_name' => $admin_name, 'admin_cap' => ADMIN_CAP,
         ]);
       } catch (DuplicatePostException $e) {
-        error($en ? 'Duplicate post?' : '二重投稿ですか ?');
+        error($en ? 'Duplicate post?' : '二重投稿ですか ?', 409);
         return;
       }
 
@@ -518,7 +518,7 @@ function regist(): void {
       $dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
     }
   } catch (Throwable $e) {
-    error(($en ? 'Posting failed. ' : '投稿処理に失敗しました。') . h($e->getMessage()));
+    error(($en ? 'Posting failed. ' : '投稿処理に失敗しました。') . h($e->getMessage()), 500);
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $pictmp, $picfile, $mode);
   //header('Location:'.PHP_SELF);
@@ -1274,7 +1274,7 @@ function open_pch(string $sp = ""): void {
   try {
     $playback = ImageService::animationPlaybackData(IMG_DIR, $pch, (int)($sp ?: PCH_SPEED));
   } catch (Throwable $e) {
-    error((LANG === 'English' ? 'Failed to open animation. ' : '動画を開けませんでした。') . h($e->getMessage()));
+    error((LANG === 'English' ? 'Failed to open animation. ' : '動画を開けませんでした。') . h($e->getMessage()), 404);
     return;
   }
   $template = $playback['template_type'] === 'tegaki' ? ANIMEFILE_TEGAKI : ANIMEFILE;
@@ -1364,7 +1364,7 @@ function in_continue(): void {
 
   $no = trim((string)filter_input(INPUT_GET, 'no')); // 画像ファイル名なので文字列として取得
   if (!ImageService::isSafePostedImageFilename($no)) {
-    error($en ? 'The image does not exist.' : '画像が存在しません。');
+    error($en ? 'The image does not exist.' : '画像が存在しません。', 404);
     return;
   }
 
@@ -1373,11 +1373,11 @@ function in_continue(): void {
     $repository = new BoardRepository();
     $oya = $repository->findPostsByImage($no);
   } catch (Throwable $e) {
-    error($en ? 'Failed to find the image.' : '画像の検索に失敗しました。');
+    error($en ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500);
     return;
   }
   if (empty($oya) || !is_file(IMG_DIR . $no) || !is_readable(IMG_DIR . $no)) {
-    error($en ? 'The image does not exist.' : '画像が存在しません。');
+    error($en ? 'The image does not exist.' : '画像が存在しません。', 404);
     return;
   }
 
@@ -1448,7 +1448,7 @@ function in_continue(): void {
 
     $db = null; //db切断
   } catch (Throwable $e) {
-    error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。');
+    error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500);
   }
 
   echo $blade->run(OTHERFILE, $dat);
@@ -1472,13 +1472,13 @@ function delmode(): void {
       ? ($en ? 'Post hidden.' : '非表示にしました。')
       : ($en ? 'Successfully deleted.' : '削除しました。');
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ない気がします。');
+    error($en ? 'That post does not exist.' : 'そんな記事ない気がします。', 404);
     return;
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     return;
   } catch (Throwable $e) {
-    error(($en ? 'Deletion failed. ' : '削除に失敗しました。') . h($e->getMessage()));
+    error(($en ? 'Deletion failed. ' : '削除に失敗しました。') . h($e->getMessage()), 500);
     return;
   }
   //変数クリア
@@ -1515,12 +1515,12 @@ function picreplace(): void {
   $host = gethostbyaddr(RequestInfo::clientIp());
 
   foreach ($badip as $value) { //拒絶host
-    if (preg_match("/$value$/i", $host)) error($en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。');
+    if (preg_match("/$value$/i", $host)) error($en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。', 403);
   }
 
   $temporary_image = ImageService::findTemporaryImageByReplacementCode(TEMP_DIR, (string)$repcode);
   if ($temporary_image === null) {
-    error($en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。');
+    error($en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。', 404);
   }
   $filename = $temporary_image['base_name'];
   $imgext = $temporary_image['image_extension'];
@@ -1580,11 +1580,11 @@ function picreplace(): void {
       ]);
       ImageService::completePostedReplacement($replacement);
     } else {
-      error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+      error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     }
   } catch (Throwable $e) {
     if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
-    error(($en ? 'Image replacement failed. ' : '画像差し替えに失敗しました。') . h($e->getMessage()));
+    error(($en ? 'Image replacement failed. ' : '画像差し替えに失敗しました。') . h($e->getMessage()), 500);
   }
   editform((int)$no, (string)$pwd_f);
 }
@@ -1626,11 +1626,11 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     $dat['othermode'] = 'edit'; //編集モード
     echo $blade->run(OTHERFILE, $dat);
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ないです。');
+    error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
   } catch (Throwable $e) {
-    error(($en ? 'Failed to open edit mode. ' : '編集画面を開けませんでした。') . h($e->getMessage()));
+    error(($en ? 'Failed to open edit mode. ' : '編集画面を開けませんでした。') . h($e->getMessage()), 500);
   }
 }
 
@@ -1647,7 +1647,7 @@ function editexec(): void {
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage());
+      error($e->getMessage(), $e->getCode() ?: 403);
     }
   }
 
@@ -1670,7 +1670,7 @@ function editexec(): void {
     $rules = PostValidator::configuredRules($en, $req_method, $host, $badip, $admin_pass, true);
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
-    error($e->getMessage());
+    error($e->getMessage(), $e->getCode() ?: 400);
     return;
   }
   //↑セキュリティ関連ここまで
@@ -1683,13 +1683,13 @@ function editexec(): void {
     ]);
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ないです。');
+    error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
     return;
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
+    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     return;
   } catch (Throwable $e) {
-    error(($en ? 'Editing failed. ' : '編集に失敗しました。') . h($e->getMessage()));
+    error(($en ? 'Editing failed. ' : '編集に失敗しました。') . h($e->getMessage()), 500);
     return;
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $resto, $pictmp, $picfile, $mode);
@@ -1765,7 +1765,7 @@ function usrchk(): void {
     echo "DB接続エラー:" . $e->getMessage();
   }
   if (!$flag) {
-    error($en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています");
+    error($en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています", 403);
   }
 }
 
@@ -1863,9 +1863,11 @@ function logdel(): void {
 }
 
 //エラー画面
-function error(string $mes): void {
+function error(string $mes, int $status = 400): void {
   global $db;
   global $blade, $dat;
+  if ($status < 400 || $status > 599) $status = 500;
+  http_response_code($status);
   $db = null; //db切断
   $dat['errmes'] = $mes;
   $dat['othermode'] = 'err';
@@ -1874,6 +1876,7 @@ function error(string $mes): void {
   if($http_x_requested_with || $async_flag){
     die("error\n$mes");
   }
+  if (!isset($blade)) die($mes);
   echo $blade->run(OTHERFILE, $dat);
   exit;
 }
@@ -1884,6 +1887,7 @@ function error2(): void {
   global $blade, $dat;
   global $self;
   global $en;
+  http_response_code(500);
 
   $db = null; //db切断
   $dat['othermode'] = 'err2';

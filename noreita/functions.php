@@ -1,5 +1,5 @@
 <?php
-const FUNCTIONS_VER = 20260718;
+const FUNCTIONS_VER = 20260722;
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {
@@ -54,7 +54,7 @@ function get_image_type(string $img_type, ?string $dest = null): string {
   if (isset($map[$mime_type])) {
     return $map[$mime_type];
   }
-  error($en ? "Invalid image type." : "無効な画像タイプです。");
+  error($en ? "Invalid image type." : "無効な画像タイプです。", 415);
   return ''; // この行は実際には実行されないが、リンターを満足させるために必要
 }
 

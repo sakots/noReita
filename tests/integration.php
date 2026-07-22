@@ -150,7 +150,7 @@ try {
 
   [$missing_continue_status, $missing_continue_body] = http_request($base_url . '?mode=continue&no=1784', $cookie_jar);
   integration_test('missing continuation image shows a normal error page', static function () use ($missing_continue_status, $missing_continue_body): bool {
-    return $missing_continue_status === 200
+    return $missing_continue_status === 404
       && str_contains($missing_continue_body, 'The image does not exist.')
       && !str_contains($missing_continue_body, 'Undefined variable')
       && !str_contains($missing_continue_body, 'foreach() argument must be of type');
@@ -182,13 +182,13 @@ try {
       && $share_redirect === 'https://bsky.app/intent/compose?text=' . rawurlencode($share_title . ' ' . $share_target);
   });
 
-  [, $invalid_csrf_body] = http_request($base_url, $cookie_jar, [
+  [$invalid_csrf_status, $invalid_csrf_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'post_share_server', 'sns_server_radio' => 'https://bsky.app',
     'sns_server_direct_input' => '', 'encoded_t' => $share_title, 'encoded_u' => $share_target,
     'token' => 'invalid-token',
   ]);
-  integration_test('invalid CSRF token is rejected through HTTP', static function () use ($invalid_csrf_body): bool {
-    return str_contains($invalid_csrf_body, 'CSRF token mismatch');
+  integration_test('invalid CSRF token is rejected through HTTP', static function () use ($invalid_csrf_status, $invalid_csrf_body): bool {
+    return $invalid_csrf_status === 403 && str_contains($invalid_csrf_body, 'CSRF token mismatch');
   });
 
   $marker = 'integration-' . bin2hex(random_bytes(6));
@@ -221,7 +221,7 @@ try {
   ]);
   $after_rejected_edit = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
   integration_test('edit rejects an invalid password without changing the post', static function () use ($rejected_edit_status, $after_rejected_edit, $password_hash_before_edit): bool {
-    return $rejected_edit_status === 200 && is_array($after_rejected_edit)
+    return $rejected_edit_status === 403 && is_array($after_rejected_edit)
       && $after_rejected_edit['sub'] === "Integration's subject"
       && $after_rejected_edit['pwd'] === $password_hash_before_edit;
   });
@@ -259,7 +259,7 @@ try {
   ]);
   $count_after_ng = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
   integration_test('NG word is rejected through HTTP', static function () use ($ng_status, $ng_body, $count_before_rejections, $count_after_ng): bool {
-    return $ng_status === 200 && $count_after_ng === $count_before_rejections
+    return $ng_status === 400 && $count_after_ng === $count_before_rejections
       && str_contains($ng_body, 'Invalid characters');
   });
 
@@ -270,7 +270,7 @@ try {
   ], '198.51.100.0');
   $count_after_blocked = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
   integration_test('blocked host is rejected through HTTP', static function () use ($blocked_status, $blocked_body, $count_before_rejections, $count_after_blocked): bool {
-    return $blocked_status === 200 && $count_after_blocked === $count_before_rejections
+    return $blocked_status === 403 && $count_after_blocked === $count_before_rejections
       && str_contains($blocked_body, 'host is blocked');
   });
 
@@ -281,7 +281,7 @@ try {
   ]);
   $count_after_duplicate = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
   integration_test('duplicate post is rejected through HTTP', static function () use ($duplicate_status, $duplicate_body, $count_before_rejections, $count_after_duplicate): bool {
-    return $duplicate_status === 200 && $count_after_duplicate === $count_before_rejections
+    return $duplicate_status === 409 && $count_after_duplicate === $count_before_rejections
       && str_contains($duplicate_body, 'Duplicate post');
   });
 

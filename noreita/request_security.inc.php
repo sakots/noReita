@@ -1,7 +1,7 @@
 <?php
 // request_security.inc.php for noReita (C) sakots 2026 MIT License
 
-const REQUEST_SECURITY_INC_VER = 20260718;
+const REQUEST_SECURITY_INC_VER = 20260722;
 
 final class RequestSecurityException extends RuntimeException {
 }
@@ -36,7 +36,7 @@ final class RequestSecurity {
 
   public static function assertCsrfRequest(string $usercode, bool $english): void {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-      throw new RequestSecurityException($english ? 'This operation has failed.' : 'この操作は失敗しました。');
+      throw new RequestSecurityException($english ? 'This operation has failed.' : 'この操作は失敗しました。', 400);
     }
 
     self::assertSameOriginRequest($usercode, $english);
@@ -45,7 +45,7 @@ final class RequestSecurity {
     if ($token === '' || $session_token === '' || !hash_equals($session_token, $token)) {
       throw new RequestSecurityException($english
         ? "CSRF token mismatch.\nPlease reload."
-        : "CSRFトークンが一致しません。\nリロードしてください。");
+        : "CSRFトークンが一致しません。\nリロードしてください。", 403);
     }
   }
 
@@ -54,19 +54,19 @@ final class RequestSecurity {
     $cookie_usercode = t(filter_input_data('COOKIE', 'usercode'));
     $session_usercode = t(isset($_SESSION['usercode']) ? (string)$_SESSION['usercode'] : '');
     if ($cookie_usercode === '') {
-      throw new RequestSecurityException($english ? 'Cookie check failed.' : 'Cookieが確認できません。');
+      throw new RequestSecurityException($english ? 'Cookie check failed.' : 'Cookieが確認できません。', 403);
     }
     if ($usercode === '' || ($usercode !== $cookie_usercode && $usercode !== $session_usercode)) {
-      throw new RequestSecurityException($english ? 'User code mismatch.' : 'ユーザーコードが一致しません。');
+      throw new RequestSecurityException($english ? 'User code mismatch.' : 'ユーザーコードが一致しません。', 403);
     }
 
     $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
     $host = $_SERVER['HTTP_HOST'] ?? null;
     if (!is_string($origin) || !is_string($host)) {
-      throw new RequestSecurityException($english ? 'Your browser is not supported.' : 'お使いのブラウザはサポートされていません。');
+      throw new RequestSecurityException($english ? 'Your browser is not supported.' : 'お使いのブラウザはサポートされていません。', 403);
     }
     if (parse_url($origin, PHP_URL_HOST) !== $host) {
-      throw new RequestSecurityException($english ? 'The post has been rejected.' : '拒絶されました。');
+      throw new RequestSecurityException($english ? 'The post has been rejected.' : '拒絶されました。', 403);
     }
 
   }
