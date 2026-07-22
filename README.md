@@ -86,6 +86,9 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
   - 500 Internal Server Error：DB、初期化、投稿処理などの内部エラー
 - 画像・DB整合性検査ツール追加
   - `plugins/check-image-consistency.php`です
+- app
+  - neo更新
+  - litachix更新
 
 ### [2026/07/18] v3.6.0
 
