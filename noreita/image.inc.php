@@ -180,7 +180,8 @@ final class ImageService {
     bool $nsfw,
     int $thumbnail_width,
     int $permission,
-    bool $always_create = false
+    bool $always_create = false,
+    bool $delete_current = true
   ): string {
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
     $image_name = basename($image_name);
@@ -219,7 +220,7 @@ final class ImageService {
     }
 
     $current_thumbnail = basename($current_thumbnail);
-    if ($current_thumbnail !== '' && $current_thumbnail !== $image_name && $current_thumbnail !== $new_thumbnail) {
+    if ($delete_current && $current_thumbnail !== '' && $current_thumbnail !== $image_name && $current_thumbnail !== $new_thumbnail) {
       safe_unlink($image_dir . $current_thumbnail);
     }
     return $new_thumbnail;
@@ -241,7 +242,7 @@ final class ImageService {
     $source = $temp_dir . $image_name;
     $metadata_file = $temp_dir . $base_name . '.dat';
 
-    if (!self::validateUpload($source)) {
+    if (!self::validateUpload($source, ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'])) {
       throw new RuntimeException('Invalid image file.');
     }
     $metadata = @file_get_contents($metadata_file, false, null, 0, 1024);
@@ -302,7 +303,7 @@ final class ImageService {
     string $image_dir,
     string $filename,
     string $image_extension,
-    int $temporary_name,
+    int $_temporary_name,
     string $old_image,
     string $old_animation,
     int $permission
@@ -310,22 +311,25 @@ final class ImageService {
     $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
     $source = $temp_dir . $filename . $image_extension;
-    $work_file = $image_dir . $temporary_name . '.tmp';
-    if (!copy($source, $work_file) || !is_file($work_file)) {
+    if (!self::validateUpload($source, ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'])) {
+      throw new RuntimeException('Invalid replacement image.');
+    }
+
+    $work_file = tempnam($image_dir, '.noreita_replace_');
+    if ($work_file === false || !copy($source, $work_file) || !is_file($work_file)) {
+      if (is_string($work_file)) safe_unlink($work_file);
       throw new RuntimeException('Failed to copy replacement image.');
     }
     chmod($work_file, $permission);
-    safe_unlink($image_dir . $old_image);
 
     $extension = get_image_type((string)mime_content_type($work_file), $work_file);
     $new_image = $filename . $extension;
-    if (!rename($work_file, $image_dir . $new_image)) {
+    $new_image_path = $image_dir . $new_image;
+    $old_image_path = $image_dir . basename($old_image);
+    if ($new_image === basename($old_image) || is_file($new_image_path)) {
       safe_unlink($work_file);
-      throw new RuntimeException('Failed to move replacement image.');
+      throw new RuntimeException('Replacement image filename already exists.');
     }
-    chmod($image_dir . $new_image, $permission);
-    safe_unlink($source);
-    safe_unlink($temp_dir . $filename . '.dat');
 
     $animation_extension = '';
     foreach (['chi', 'spch', 'pch', 'tgkr'] as $candidate) {
@@ -334,17 +338,73 @@ final class ImageService {
         break;
       }
     }
-    safe_unlink($image_dir . $old_animation);
-    $new_animation = $filename . $animation_extension;
+    $new_animation = $animation_extension !== '' ? $filename . $animation_extension : '';
+    $new_animation_path = $animation_extension !== '' ? $image_dir . $new_animation : '';
+    $animation_source = $animation_extension !== '' ? $temp_dir . $new_animation : '';
+    $animation_work_file = '';
     if ($animation_extension !== '') {
-      $animation_source = $temp_dir . $new_animation;
-      $animation_destination = $image_dir . $new_animation;
-      if (!copy($animation_source, $animation_destination)) {
-        throw new RuntimeException('Failed to copy replacement animation.');
+      if ($new_animation === basename($old_animation) || is_file($new_animation_path)) {
+        safe_unlink($work_file);
+        throw new RuntimeException('Replacement animation filename already exists.');
       }
-      chmod($animation_destination, $permission);
-      safe_unlink($animation_source);
+      $animation_work_file = tempnam($image_dir, '.noreita_animation_');
+      if ($animation_work_file === false || !copy($animation_source, $animation_work_file)) {
+        safe_unlink($work_file);
+        if (is_string($animation_work_file)) safe_unlink($animation_work_file);
+        throw new RuntimeException('Failed to stage replacement animation.');
+      }
+      chmod($animation_work_file, $permission);
     }
-    return ['picfile' => $new_image, 'pchfile' => $new_animation];
+
+    $created_files = [];
+    try {
+      if (!rename($work_file, $new_image_path)) {
+        throw new RuntimeException('Failed to publish replacement image.');
+      }
+      $created_files[] = $new_image_path;
+      chmod($new_image_path, $permission);
+      if ($animation_extension !== '') {
+        if (!rename($animation_work_file, $new_animation_path)) {
+          throw new RuntimeException('Failed to publish replacement animation.');
+        }
+        $created_files[] = $new_animation_path;
+        chmod($new_animation_path, $permission);
+      }
+    } catch (Throwable $e) {
+      safe_unlink($work_file);
+      if ($animation_work_file !== '') safe_unlink($animation_work_file);
+      foreach ($created_files as $created_file) safe_unlink($created_file);
+      throw $e;
+    }
+
+    $old_files = [];
+    if ($old_image !== '' && is_file($old_image_path)) $old_files[] = $old_image_path;
+    $old_animation_path = $image_dir . basename($old_animation);
+    if ($old_animation !== '' && is_file($old_animation_path)) $old_files[] = $old_animation_path;
+    $temporary_files = [$source, $temp_dir . $filename . '.dat'];
+    if ($animation_source !== '') $temporary_files[] = $animation_source;
+
+    return [
+      'picfile' => $new_image,
+      'pchfile' => $new_animation,
+      'created_files' => $created_files,
+      'old_files' => $old_files,
+      'temporary_files' => $temporary_files,
+    ];
+  }
+
+  public static function rollbackPostedReplacement(array $replacement): void {
+    foreach ($replacement['created_files'] ?? [] as $created_file) {
+      safe_unlink((string)$created_file);
+    }
+  }
+
+  public static function completePostedReplacement(array $replacement): void {
+    foreach ($replacement['old_files'] ?? [] as $old_file) {
+      safe_unlink((string)$old_file);
+    }
+    foreach ($replacement['temporary_files'] ?? [] as $temporary_file) {
+      safe_unlink((string)$temporary_file);
+    }
   }
 }

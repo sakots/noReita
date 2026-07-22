@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.6.0 lot.260718.0';
+const REITA_VER = 'v3.6.1 lot.260722.0';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -52,7 +52,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260718) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260722) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -1527,6 +1527,7 @@ function picreplace(): void {
   $starttime = $temporary_image['start_time'];
   $postedtime = $temporary_image['posted_time'];
 
+  $replacement = null;
   // ログ読み込み
   try {
     $repository = new BoardRepository();
@@ -1561,17 +1562,28 @@ function picreplace(): void {
       // 続き描きでは新しい画像から必ずサムネイルを作り直す。
       $thumbnail = ImageService::refreshNsfwThumbnail(
         IMG_DIR, $new_picfile, (string)($msg_d['thumbnail'] ?? ''), $nsfw,
-        PDEF_W, PERMISSION_FOR_DEST, true
+        PDEF_W, PERMISSION_FOR_DEST, true, false
       );
+      if ($thumbnail !== '') {
+        $replacement['created_files'][] = rtrim(IMG_DIR, '/\\') . DIRECTORY_SEPARATOR . $thumbnail;
+      }
+      $old_thumbnail = basename((string)($msg_d['thumbnail'] ?? ''));
+      if ($old_thumbnail !== '' && $old_thumbnail !== $thumbnail) {
+        $old_thumbnail_path = rtrim(IMG_DIR, '/\\') . DIRECTORY_SEPARATOR . $old_thumbnail;
+        if (is_file($old_thumbnail_path)) $replacement['old_files'][] = $old_thumbnail_path;
+      }
 
       $repository->updateImage((int)$no, [
         'host' => $host, 'picfile' => $new_picfile, 'pchfile' => $new_pchfile, 'author_id' => $id,
         'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw, 'thumbnail' => $thumbnail,
+        'expected_picfile' => (string)$msg_d['picfile'],
       ]);
+      ImageService::completePostedReplacement($replacement);
     } else {
       error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。');
     }
   } catch (Throwable $e) {
+    if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
     error(($en ? 'Image replacement failed. ' : '画像差し替えに失敗しました。') . h($e->getMessage()));
   }
   editform((int)$no, (string)$pwd_f);

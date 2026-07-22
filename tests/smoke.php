@@ -519,6 +519,64 @@ smoke_test('related image files are deleted together', static function (): bool 
   }
 });
 
+smoke_test('posted image replacement can roll back or complete atomically', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_replace_' . bin2hex(random_bytes(8));
+  $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  mkdir($temp, 0700, true);
+  mkdir($images, 0700, true);
+  $write_source = static function () use ($temp): void {
+    $image = imagecreatetruecolor(4, 3);
+    imagefill($image, 0, 0, imagecolorallocate($image, 20, 120, 220));
+    imagepng($image, $temp . DIRECTORY_SEPARATOR . 'new.png');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'new.dat', 'metadata');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'new.pch', 'new animation');
+  };
+
+  try {
+    $old_image = imagecreatetruecolor(4, 3);
+    imagefill($old_image, 0, 0, imagecolorallocate($old_image, 220, 20, 20));
+    imagepng($old_image, $images . DIRECTORY_SEPARATOR . 'old.png');
+    file_put_contents($images . DIRECTORY_SEPARATOR . 'old.pch', 'old animation');
+    $write_source();
+
+    $replacement = ImageService::replacePostedFiles(
+      $temp, $images, 'new', '.png', 100, 'old.png', 'old.pch', 0600
+    );
+    if (!is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+      || !is_file($images . DIRECTORY_SEPARATOR . 'old.pch')
+      || !is_file($images . DIRECTORY_SEPARATOR . 'new.png')
+      || !is_file($temp . DIRECTORY_SEPARATOR . 'new.png')) return false;
+
+    ImageService::rollbackPostedReplacement($replacement);
+    if (!is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+      || !is_file($images . DIRECTORY_SEPARATOR . 'old.pch')
+      || is_file($images . DIRECTORY_SEPARATOR . 'new.png')
+      || is_file($images . DIRECTORY_SEPARATOR . 'new.pch')
+      || !is_file($temp . DIRECTORY_SEPARATOR . 'new.png')) return false;
+
+    $replacement = ImageService::replacePostedFiles(
+      $temp, $images, 'new', '.png', 101, 'old.png', 'old.pch', 0600
+    );
+    ImageService::completePostedReplacement($replacement);
+    return !is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+      && !is_file($images . DIRECTORY_SEPARATOR . 'old.pch')
+      && is_file($images . DIRECTORY_SEPARATOR . 'new.png')
+      && is_file($images . DIRECTORY_SEPARATOR . 'new.pch')
+      && !is_file($temp . DIRECTORY_SEPARATOR . 'new.png')
+      && !is_file($temp . DIRECTORY_SEPARATOR . 'new.pch')
+      && !is_file($temp . DIRECTORY_SEPARATOR . 'new.dat');
+  } finally {
+    foreach ([$temp, $images] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+        if (is_file($file)) unlink($file);
+      }
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 smoke_test('new post image and animation are finalized', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_finalize_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
