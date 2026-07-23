@@ -8,7 +8,12 @@ final class PostNotFoundException extends RuntimeException {}
 final class PostAuthorizationException extends RuntimeException {}
 final class DuplicatePostException extends RuntimeException {}
 
-final class PostService {
+interface AdminPostManagementService {
+  public function deleteManyAsAdmin(array $post_ids): int;
+  public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int;
+}
+
+final class PostService implements AdminPostManagementService {
   public function __construct(
     private BoardRepository $repository,
     private string $admin_pass,

@@ -1793,6 +1793,7 @@ function admin_manage(?string $forced_operation = null): void {
     error($en ? 'Invalid administration operation.' : '管理操作が不正です。', 400);
   }
   try {
+    /** @var AdminPostManagementService $service */
     $service = new PostService(
       new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST
     );
