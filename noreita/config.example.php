@@ -227,6 +227,9 @@ const USER_DEL = 1;
 // セッションの名前
 const SESSION_NAME = 'noreita_session';
 
+// 管理者ログインの無操作タイムアウト（秒）
+const ADMIN_SESSION_LIFETIME = 1800;
+
 /* ---------- お絵かきディレクトリ設定 ---------- */
 
 // 複数のお絵描き掲示板を管理する際に便利です。

@@ -2,9 +2,9 @@
   <div class="thread">
     <h1 class="oekaki">管理モードin</h1>
     <hr>
-    <form action="{{$self}}?mode=admin" method="post">
-      <input type="hidden" name="admin" value="admin">
-      <label>ADMIN PASS <input class="form" type="password" name="adminpass" size="8"></label>
+    <form action="{{$self}}?mode=admin_login" method="post">
+      <input type="hidden" name="token" value="{{$token}}">
+      <label>ADMIN PASS <input class="form" type="password" name="adminpass" size="8" autocomplete="current-password" required></label>
       <input class="button" type="submit" value="SUBMIT">
     </form>
     <hr>

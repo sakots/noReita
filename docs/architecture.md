@@ -18,6 +18,8 @@
 
 `request_security.inc.php`の`RequestSecurity`がセッションの安全な開始、CSRFトークン生成、POST・同一オリジン・ユーザーコード・CSRFトークンの検証を担当します。検証失敗は`RequestSecurityException`として画面制御側へ返します。
 
+同ファイルの`AdminAuth`が管理者ログイン状態、管理パス変更時の失効、無操作タイムアウト、ログアウトを担当します。管理操作では管理パスをフォームで持ち回らず、`AdminAuth::isAuthenticated()`とCSRF検証を使用してください。
+
 `request_info.inc.php`の`RequestInfo`がクライアントIPなど、HTTPリクエスト由来の情報の取得と正規化を担当します。
 
 ## アプリケーション初期化

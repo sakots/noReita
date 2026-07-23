@@ -1,7 +1,7 @@
 <?php
 // request_security.inc.php for noReita (C) sakots 2026 MIT License
 
-const REQUEST_SECURITY_INC_VER = 20260722;
+const REQUEST_SECURITY_INC_VER = 20260723;
 
 final class RequestSecurityException extends RuntimeException {
 }
@@ -93,5 +93,60 @@ final class RequestSecurity {
     header('Expires:');
     header('Cache-Control:');
     header('Pragma:');
+  }
+}
+
+final class AdminAuth {
+  private const SESSION_FINGERPRINT = 'admin_auth_fingerprint';
+  private const SESSION_LAST_ACTIVITY = 'admin_auth_last_activity';
+
+  public static function login(string $provided_password, string $admin_password): bool {
+    RequestSecurity::startSession();
+    if ($provided_password === '' || !hash_equals($admin_password, $provided_password)) {
+      self::clear();
+      return false;
+    }
+    session_regenerate_id(true);
+    unset($_SESSION['token']);
+    $_SESSION[self::SESSION_FINGERPRINT] = self::fingerprint($admin_password);
+    $_SESSION[self::SESSION_LAST_ACTIVITY] = time();
+    return true;
+  }
+
+  public static function isAuthenticated(string $admin_password, int $lifetime): bool {
+    RequestSecurity::startSession();
+    if (!self::hasValidSession($_SESSION, $admin_password, $lifetime, time())) {
+      self::clear();
+      return false;
+    }
+    $_SESSION[self::SESSION_LAST_ACTIVITY] = time();
+    return true;
+  }
+
+  public static function logout(): void {
+    RequestSecurity::startSession();
+    self::clear();
+    session_regenerate_id(true);
+    unset($_SESSION['token']);
+  }
+
+  public static function hasValidSession(array $session, string $admin_password, int $lifetime, int $now): bool {
+    $fingerprint = $session[self::SESSION_FINGERPRINT] ?? null;
+    $last_activity = $session[self::SESSION_LAST_ACTIVITY] ?? null;
+    if (!is_string($fingerprint) || !is_int($last_activity) || $lifetime <= 0) return false;
+    if ($last_activity > $now || ($now - $last_activity) > $lifetime) return false;
+    return hash_equals(self::fingerprint($admin_password), $fingerprint);
+  }
+
+  public static function sessionFingerprint(string $admin_password): string {
+    return self::fingerprint($admin_password);
+  }
+
+  private static function fingerprint(string $admin_password): string {
+    return hash('sha256', "noReita-admin-session\0" . $admin_password);
+  }
+
+  private static function clear(): void {
+    unset($_SESSION[self::SESSION_FINGERPRINT], $_SESSION[self::SESSION_LAST_ACTIVITY]);
   }
 }

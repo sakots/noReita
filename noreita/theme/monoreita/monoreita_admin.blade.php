@@ -34,6 +34,10 @@
     <div>
       <section class="epost">
       <p>ADMIN MODE</p>
+      <form action="{{$self}}?mode=admin_logout" method="post">
+        <input type="hidden" name="token" value="{{$token}}">
+        <input class="button" type="submit" value="ログアウト">
+      </form>
       </section>
       <hr>
     </div>

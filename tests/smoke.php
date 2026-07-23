@@ -67,6 +67,18 @@ smoke_test('request client IP is resolved from supported sources', static functi
     && RequestInfo::clientIp(['HTTP_CLIENT_IP' => 'not-an-ip']) === '';
 });
 
+smoke_test('administrator session validates password changes and idle timeout', static function (): bool {
+  $now = 1_700_000_000;
+  $session = [
+    'admin_auth_fingerprint' => AdminAuth::sessionFingerprint('admin-secret'),
+    'admin_auth_last_activity' => $now - 60,
+  ];
+  return AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now)
+    && !AdminAuth::hasValidSession($session, 'changed-secret', 1800, $now)
+    && !AdminAuth::hasValidSession($session, 'admin-secret', 30, $now)
+    && !AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now - 120);
+});
+
 smoke_test('SQLite read and write', static function (): bool {
   $db = new PDO('sqlite::memory:');
   $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

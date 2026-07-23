@@ -161,6 +161,37 @@ try {
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
 
+  [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
+  integration_test('administration screen requires a login session', static function () use ($admin_unauthorized_status): bool {
+    return $admin_unauthorized_status === 403;
+  });
+
+  [$admin_login_form_status, $admin_login_form_body] = http_request($base_url . '?mode=admin_in', $cookie_jar);
+  integration_test('administrator login form contains a CSRF token', static function () use ($admin_login_form_status, $admin_login_form_body, $token): bool {
+    return $admin_login_form_status === 200
+      && str_contains($admin_login_form_body, 'mode=admin_login')
+      && str_contains($admin_login_form_body, 'name="token" value="' . $token . '"');
+  });
+
+  [$admin_wrong_password_status] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+    'adminpass' => 'wrong-admin-pass', 'token' => $token,
+  ]);
+  integration_test('administrator login rejects a wrong password', static function () use ($admin_wrong_password_status): bool {
+    return $admin_wrong_password_status === 403;
+  });
+
+  [$admin_login_status] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+    'adminpass' => 'integration-admin-pass', 'token' => $token,
+  ]);
+  $admin_session_id = cookie_value($cookie_jar, 'noreita_session');
+  $token = $admin_session_id === null ? '' : hash('sha256', $admin_session_id);
+  [$admin_status, $admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  integration_test('administrator login persists in the session', static function () use ($admin_login_status, $admin_status, $admin_body): bool {
+    return $admin_login_status === 302 && $admin_status === 200
+      && str_contains($admin_body, 'ADMIN MODE')
+      && str_contains($admin_body, 'mode=admin_logout');
+  });
+
   $share_title = '共有テスト';
   $share_target = 'https://example.com/post/1';
   [$share_form_status, $share_form_body] = http_request(
@@ -413,16 +444,22 @@ try {
   });
 
   [$delete_status, $delete_body] = http_request($base_url, $cookie_jar, [
-    'mode' => 'del', 'delno' => (string)$post_id, 'pwd' => 'delete-pass',
+    'mode' => 'del', 'delno' => (string)$post_id, 'admindel' => 'admindel', 'token' => $token,
   ]);
   $remaining = (int)$db->query('SELECT COUNT(*) FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
-  integration_test('delete removes the post through HTTP', static function () use ($delete_status, $remaining): bool {
+  integration_test('administrator session can delete without resending the password', static function () use ($delete_status, $remaining): bool {
     return $delete_status === 200 && $remaining === 0;
   });
 
   [$empty_status, $empty_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
   integration_test('deleted post disappears from search', static function () use ($empty_status, $empty_body): bool {
     return $empty_status === 200 && str_contains($empty_body, '0件');
+  });
+
+  [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
+  [$admin_after_logout_status] = http_request($base_url . '?mode=admin', $cookie_jar);
+  integration_test('administrator logout destroys the login session', static function () use ($admin_logout_status, $admin_after_logout_status): bool {
+    return $admin_logout_status === 302 && $admin_after_logout_status === 403;
   });
 } catch (Throwable $e) {
   echo "FAIL: integration setup ({$e->getMessage()})\n";

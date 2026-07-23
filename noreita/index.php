@@ -38,7 +38,7 @@ if (!defined('CONF_VER') || CONF_VER < 20260405) {
 // request_security.inc
 check_file(__DIR__.'/request_security.inc.php');
 require_once(__DIR__.'/request_security.inc.php');
-if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260722) {
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260723) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
@@ -218,6 +218,8 @@ $dat['share_button'] = SHARE_BUTTON;
 $dat['use_hashtag'] = USE_HASHTAG;
 
 defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
+defined('ADMIN_SESSION_LIFETIME') or define('ADMIN_SESSION_LIFETIME', 1800);
+
 
 $dat['sodane'] = SODANE;
 
@@ -341,6 +343,10 @@ switch ($mode) {
     return save_image();
   case 'admin_in': // 管理モードin
     return admin_in();
+  case 'admin_login':
+    return admin_login();
+  case 'admin_logout':
+    return admin_logout();
   case 'admin': // 管理モード
     return admin();
   case 'set_share_server':
@@ -1464,10 +1470,22 @@ function delmode(): void {
   $delno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 
   $p_pwd = filter_input(INPUT_POST, 'pwd');
+  $admin_delete = isset($_POST['admindel']);
+  if ($admin_delete) {
+    try {
+      RequestSecurity::assertCurrentCsrfRequest($en);
+    } catch (RequestSecurityException $e) {
+      error($e->getMessage(), $e->getCode() ?: 403);
+    }
+    if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+      error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    }
+    $p_pwd = $admin_pass;
+  }
 
   try {
     $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST);
-    $result = $service->delete((int)$delno, (string)$p_pwd, isset($_POST['admindel']));
+    $result = $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
     $dat['message'] = $result === 'hidden'
       ? ($en ? 'Post hidden.' : '非表示にしました。')
       : ($en ? 'Successfully deleted.' : '削除しました。');
@@ -1699,10 +1717,49 @@ function editexec(): void {
 
 //管理モードin
 function admin_in(): void {
-  global $blade, $dat;
+  global $admin_pass, $blade, $dat;
+  admin_no_store();
+  if (AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    redirect(PHP_SELF . '?mode=admin');
+  }
   $dat['othermode'] = 'admin_in';
+  $dat['token'] = RequestSecurity::csrfToken();
 
   echo $blade->run(OTHERFILE, $dat);
+}
+
+function admin_login(): void {
+  global $admin_pass, $en;
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  $password = (string)filter_input_data('POST', 'adminpass');
+  if (!AdminAuth::login($password, $admin_pass)) {
+    error($en ? 'Administrator password is incorrect.' : '管理パスが違います。', 403);
+  }
+  redirect(PHP_SELF . '?mode=admin');
+}
+
+function admin_logout(): void {
+  global $en;
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  AdminAuth::logout();
+  redirect(PHP_SELF . '?mode=admin_in');
+}
+
+function admin_no_store(): void {
+  if (!headers_sent()) {
+    header('Cache-Control: no-store, private');
+    header('Pragma: no-cache');
+  }
 }
 
 //管理モード
@@ -1711,39 +1768,35 @@ function admin(): void {
   global $blade, $dat;
   global $en;
 
+  admin_no_store();
+  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
   $dat['path'] = IMG_DIR;
+  $dat['token'] = RequestSecurity::csrfToken();
 
   //最大何ページあるのか
   //記事呼び出しから
   try {
     $repository = new BoardRepository();
     //読み込み
-    $adminpass = filter_input(INPUT_POST, 'adminpass');
-    if ($adminpass === $admin_pass) {
-      $oya = array();
-      foreach ($repository->listForAdmin(true) as $bbsline) {
-        if (empty($bbsline)) {
-          break;
-        } //スレがなくなったら抜ける
-        //$oya_id = $bbsline["tid"]; //スレのtid(親番号)を取得
-        $bbsline['com'] = htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5);
-        $oya[] = $bbsline;
-      }
-      $dat['oya'] = $oya;
-
-      //スレッドの記事を取得
-      $ko = array();
-      foreach ($repository->listForAdmin(false) as $res) {
-        $res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
-        $ko[] = $res;
-      }
-      $dat['ko'] = $ko;
-      echo $blade->run(ADMINFILE, $dat);
-    } else {
-      error($en ? 'Please enter the admin password.' : '管理パスを入力してください');
+    $oya = array();
+    foreach ($repository->listForAdmin(true) as $bbsline) {
+      if (empty($bbsline)) break;
+      $bbsline['com'] = htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5);
+      $oya[] = $bbsline;
     }
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    $dat['oya'] = $oya;
+
+    $ko = array();
+    foreach ($repository->listForAdmin(false) as $res) {
+      $res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
+      $ko[] = $res;
+    }
+    $dat['ko'] = $ko;
+    echo $blade->run(ADMINFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500);
   }
 }
 
