@@ -28,7 +28,13 @@ v3以降のデータベースにはスキーマバージョンが記録され、
 
 `scripts/lint-php.sh`、`scripts/smoke-test.sh`を実行してください
 
-配布用ファイルを組み立て、`BladeOne/`を配置した環境では、投稿・検索・削除のHTTP結合テストも実行してください。
+最初にComposer依存ライブラリをインストールしてください。BladeOne v4.19.1は`composer.lock`で固定されています。
+
+```bash
+composer install --working-dir=noreita --no-dev --prefer-dist
+```
+
+依存ライブラリを配置した環境では、投稿・検索・削除のHTTP結合テストも実行してください。
 
 ```bash
 scripts/integration-test.sh
@@ -36,7 +42,7 @@ scripts/integration-test.sh
 
 このテストは一時ディレクトリと一時SQLite DBを使用し、設置済み掲示板の`config.php`やDBは変更しません。
 
-GitHub Actionsでは、PHP 8.0と8.3の各環境にBladeOne v4.19.1をテスト用として配置し、このHTTP結合テストを自動実行します。
+GitHub Actionsでは、PHP 8.0と8.3の各環境で`composer.lock`から依存ライブラリを配置し、このHTTP結合テストを自動実行します。
 
 ## 不具合時の元バージョンへの戻し方
 

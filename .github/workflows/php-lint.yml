@@ -58,13 +58,8 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Install BladeOne for tests
-        env:
-          BLADEONE_VERSION: 4.19.1
-        run: |
-          mkdir -p "${RUNNER_TEMP}/bladeone" noreita/BladeOne/lib
-          composer --working-dir="${RUNNER_TEMP}/bladeone" require --no-interaction --no-progress --prefer-dist "eftec/bladeone:${BLADEONE_VERSION}"
-          cp "${RUNNER_TEMP}/bladeone/vendor/eftec/bladeone/lib/BladeOne.php" noreita/BladeOne/lib/BladeOne.php
+      - name: Install Composer dependencies
+        run: composer install --working-dir=noreita --no-interaction --no-progress --prefer-dist
 
       - name: Run HTTP integration tests
         run: bash scripts/integration-test.sh

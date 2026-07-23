@@ -11,6 +11,16 @@ noReitaが動作するサーバー条件
 - curl、gd、mbstring、pdo_sqlite
 - （おそらく多くのレンタルサーバーには入っています）
 
+## Composer依存ライブラリ
+
+BladeOne v4.19.1をComposerで管理しています。ソースコードから設置・開発する場合は、事前に次を実行してください。
+
+```bash
+composer install --working-dir=noreita --no-dev --prefer-dist
+```
+
+`vendor/`を含む配布用パッケージを利用する場合、レンタルサーバー上でComposerを実行する必要はありません。
+
 ## Apacheで必要な設定
 
 `.htaccess`が有効なApacheまたはApache互換サーバーを想定しています。

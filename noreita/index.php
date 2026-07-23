@@ -131,8 +131,14 @@ if ($admin_pass === 'admin_pass') {
   die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
 }
 
-// BladeOne v4.19.1
-include(__DIR__ . '/BladeOne/lib/BladeOne.php');
+// Composer dependencies (BladeOne v4.19.1)
+$autoload = __DIR__ . '/vendor/autoload.php';
+if (!is_file($autoload)) {
+  die($en
+    ? 'Composer dependencies are missing. Run composer install in the noReita directory.'
+    : 'Composer依存ライブラリがありません。noReitaディレクトリでcomposer installを実行してください。');
+}
+require_once $autoload;
 use eftec\bladeone\BladeOne;
 
 $views = __DIR__ . '/theme/' . THEME_DIR; // テンプレートフォルダ

@@ -4,6 +4,8 @@
 
 `index.php`はリクエストの受け取りと画面遷移を担当します。投稿入力の取得と検証は`post.inc.php`の`PostValidator`へ追加してください。DB接続や画像ファイル操作を追加する場合は、直接実装せず以下の層へ追加してください。
 
+外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定しています。
+
 `PostValidator`は必須項目、文字数、NGワード、日本語フィルター、コメントURL、拒否ホストを画面描画から独立して検証します。
 
 `PostService`は新規投稿の準備、二重投稿判定、スレッド・返信作成、age更新、投稿者・管理者パスワードの認証、投稿編集、削除、管理者による非表示化を担当します。投稿に関するDB更新を`index.php`へ直接追加しないでください。

@@ -7,8 +7,8 @@ if (!extension_loaded('curl') || !extension_loaded('pdo_sqlite')) {
 }
 
 $source = dirname(__DIR__) . '/noreita';
-if (!is_file($source . '/BladeOne/lib/BladeOne.php')) {
-  fwrite(STDERR, "BladeOne is not installed. Run this test against an assembled release tree.\n");
+if (!is_file($source . '/vendor/autoload.php')) {
+  fwrite(STDERR, "Composer dependencies are not installed. Run composer install --working-dir=noreita.\n");
   exit(1);
 }
 
