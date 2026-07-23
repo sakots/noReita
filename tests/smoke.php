@@ -246,6 +246,35 @@ smoke_test('failed database operation is rolled back', static function (): bool 
   return false;
 });
 
+smoke_test('administrator pagination keeps replies with their parent thread', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $insert = static function (int $thread, ?int $parent, int $tree, string $subject) use ($repository): int {
+    return $repository->insertPost([
+      'thread' => $thread, 'parent' => $parent, 'tree' => $tree,
+      'sub' => $subject, 'com' => '本文', 'a_name' => '名前',
+      'pwd' => password_hash('pass', PASSWORD_DEFAULT), 'picfile' => '',
+      'invz' => 0, 'age' => $tree,
+    ]);
+  };
+  $old = $insert(1, null, 100, '古い親');
+  $middle = $insert(1, null, 200, '中間の親');
+  $new = $insert(1, null, 300, '新しい親');
+  $reply_one = $insert(0, $middle, 201, '中間のレス1');
+  $reply_two = $insert(0, $middle, 202, '中間のレス2');
+
+  $page = $repository->listAdminThreads(1, 1);
+  $replies = $repository->listAdminReplies(array_column($page, 'tid'));
+  $page_ids = array_map(static fn(array $row): int => (int)$row['tid'], $page);
+  return $repository->countAdminPosts() === 5
+    && $repository->countAdminThreads() === 3
+    && count($page) === 1 && (int)$page[0]['tid'] === $middle
+    && array_map(static fn(array $row): int => (int)$row['tid'], $replies) === [$reply_one, $reply_two]
+    && !in_array($old, $page_ids, true)
+    && !in_array($new, $page_ids, true);
+});
+
 smoke_test('UUIDv7 format and uniqueness', static function (): bool {
   $first = generate_uuid();
   $second = generate_uuid();

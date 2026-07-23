@@ -112,6 +112,7 @@ try {
   $config = str_replace("const BASE = 'https://example.com/noreita/';", "const BASE = 'http://localhost/';", $config);
   $config = str_replace('const EXTERNAL_IMAGE_THUMB = 1;', 'const EXTERNAL_IMAGE_THUMB = 0;', $config);
   $config = str_replace('const USE_MISSKEY_NOTE = 1;', 'const USE_MISSKEY_NOTE = 0;', $config);
+  $config = str_replace('const ADMIN_THREADS_PER_PAGE = 50;', 'const ADMIN_THREADS_PER_PAGE = 1;', $config);
   if (file_put_contents($webroot . '/config.php', $config) === false) {
     throw new RuntimeException('Could not create test config.php');
   }
@@ -435,6 +436,24 @@ try {
       && str_contains($replacement_body, 'action="index.php?mode=editexec"')
       && str_contains($replacement_body, 'src="img/' . $replacement_thumbnail . '"')
       && str_contains($replacement_body, 'id="edit_nsfw"');
+  });
+
+  [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);
+  [$admin_page_two_status, $admin_page_two_body] = http_request($base_url . '?mode=admin&page=2', $cookie_jar);
+  [$admin_invalid_page_status] = http_request($base_url . '?mode=admin&page=invalid', $cookie_jar);
+  [$admin_missing_page_status] = http_request($base_url . '?mode=admin&page=99', $cookie_jar);
+  integration_test('administration pagination keeps thread pages separate and validates page numbers', static function () use (
+    $admin_page_one_status, $admin_page_one_body, $admin_page_two_status, $admin_page_two_body,
+    $admin_invalid_page_status, $admin_missing_page_status, $image_post_id, $post_id
+  ): bool {
+    return $admin_page_one_status === 200 && $admin_page_two_status === 200
+      && str_contains($admin_page_one_body, 'name="delno[]" value="' . $image_post_id . '"')
+      && !str_contains($admin_page_one_body, 'name="delno[]" value="' . $post_id . '"')
+      && str_contains($admin_page_one_body, 'page=2')
+      && str_contains($admin_page_two_body, 'name="delno[]" value="' . $post_id . '"')
+      && !str_contains($admin_page_two_body, 'name="delno[]" value="' . $image_post_id . '"')
+      && str_contains($admin_page_two_body, 'page=1')
+      && $admin_invalid_page_status === 400 && $admin_missing_page_status === 404;
   });
 
   [$image_delete_status] = http_request($base_url, $cookie_jar, [

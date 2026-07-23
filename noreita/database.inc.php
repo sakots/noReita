@@ -160,11 +160,36 @@ final class BoardRepository {
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
-  public function listForAdmin(bool $threads): array {
-    $sql = $threads
-      ? 'SELECT * FROM board_log WHERE thread=1 ORDER BY age DESC, tree DESC'
-      : 'SELECT * FROM board_log WHERE thread=0 ORDER BY tree ASC';
-    return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+  public function countAdminPosts(): int {
+    return (int)$this->db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+  }
+
+  public function countAdminThreads(): int {
+    return (int)$this->db->query('SELECT COUNT(*) FROM board_log WHERE thread=1')->fetchColumn();
+  }
+
+  public function listAdminThreads(int $offset, int $limit): array {
+    $statement = $this->db->prepare(
+      'SELECT * FROM board_log WHERE thread=1 ORDER BY age DESC, tree DESC, tid DESC LIMIT :limit OFFSET :offset'
+    );
+    $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $statement->execute();
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  public function listAdminReplies(array $parent_ids): array {
+    $ids = array_values(array_unique(array_filter(
+      array_map('intval', $parent_ids),
+      static fn(int $id): bool => $id > 0
+    )));
+    if ($ids === []) return [];
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $statement = $this->db->prepare(
+      "SELECT * FROM board_log WHERE thread=0 AND parent IN ({$placeholders}) ORDER BY parent ASC, tree ASC, tid ASC"
+    );
+    $statement->execute($ids);
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
   public function oldestPost(): array|false {

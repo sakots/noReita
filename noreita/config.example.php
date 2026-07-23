@@ -230,6 +230,9 @@ const SESSION_NAME = 'noreita_session';
 // 管理者ログインの無操作タイムアウト（秒）
 const ADMIN_SESSION_LIFETIME = 1800;
 
+// 管理画面で1ページに表示する親スレッド数（推奨: 50～100、最大: 100）
+const ADMIN_THREADS_PER_PAGE = 50;
+
 /* ---------- お絵かきディレクトリ設定 ---------- */
 
 // 複数のお絵描き掲示板を管理する際に便利です。

@@ -225,6 +225,7 @@ $dat['use_hashtag'] = USE_HASHTAG;
 
 defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
 defined('ADMIN_SESSION_LIFETIME') or define('ADMIN_SESSION_LIFETIME', 1800);
+defined('ADMIN_THREADS_PER_PAGE') or define('ADMIN_THREADS_PER_PAGE', 50);
 
 
 $dat['sodane'] = SODANE;
@@ -1816,13 +1817,29 @@ function admin(): void {
   $dat['message'] = isset($_SESSION['admin_message']) ? (string)$_SESSION['admin_message'] : '';
   unset($_SESSION['admin_message']);
 
-  //最大何ページあるのか
-  //記事呼び出しから
+  $page_input = filter_input_data('GET', 'page');
+  $page = 1;
+  if ($page_input !== null && $page_input !== '') {
+    $validated_page = filter_var($page_input, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if ($validated_page === false) {
+      error($en ? 'Invalid administration page number.' : '管理画面のページ番号が不正です。', 400);
+    }
+    $page = (int)$validated_page;
+  }
+  $per_page = max(1, min(100, (int)ADMIN_THREADS_PER_PAGE));
+
   try {
     $repository = new BoardRepository();
-    //読み込み
+    $total_posts = $repository->countAdminPosts();
+    $total_threads = $repository->countAdminThreads();
+    $total_pages = max(1, (int)ceil($total_threads / $per_page));
+    if ($page > $total_pages) {
+      error($en ? 'The administration page does not exist.' : '指定された管理画面のページはありません。', 404);
+    }
+    $offset = ($page - 1) * $per_page;
+
     $oya = array();
-    foreach ($repository->listForAdmin(true) as $bbsline) {
+    foreach ($repository->listAdminThreads($offset, $per_page) as $bbsline) {
       if (empty($bbsline)) break;
       $bbsline['com'] = htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5);
       $oya[] = $bbsline;
@@ -1830,11 +1847,19 @@ function admin(): void {
     $dat['oya'] = $oya;
 
     $ko = array();
-    foreach ($repository->listForAdmin(false) as $res) {
+    $parent_ids = array_column($oya, 'tid');
+    foreach ($repository->listAdminReplies($parent_ids) as $res) {
       $res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
-      $ko[] = $res;
+      $ko[(int)$res['parent']][] = $res;
     }
     $dat['ko'] = $ko;
+    $dat['admin_page'] = $page;
+    $dat['admin_total_pages'] = $total_pages;
+    $dat['admin_total_posts'] = $total_posts;
+    $dat['admin_total_threads'] = $total_threads;
+    $dat['admin_range_start'] = $total_threads === 0 ? 0 : $offset + 1;
+    $dat['admin_range_end'] = $offset + count($oya);
+    $dat['admin_page_posts'] = count($oya) + array_sum(array_map('count', $ko));
     echo $blade->run(ADMINFILE, $dat);
   } catch (Throwable $e) {
     error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500);

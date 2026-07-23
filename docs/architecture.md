@@ -38,6 +38,8 @@
 
 新規投稿、一覧、カタログ、返信、編集、管理一覧、ログ上限削除を含む投稿クエリは`BoardRepository`へ集約しています。新しい投稿クエリも`index.php`へ直接SQLを書かず、`BoardRepository`へ追加します。
 
+管理一覧は`listAdminThreads()`で親スレッドをページ分割し、表示対象の親IDだけを`listAdminReplies()`へ渡します。レスを親と同じページに保つため、ページ境界は投稿単位ではなく親スレッド単位です。
+
 ## 画像
 
 `image.inc.php`の`ImageService`が画像を扱います。

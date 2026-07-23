@@ -43,6 +43,22 @@
     </div>
   </header>
   <main>
+    <nav class="thread" aria-label="管理画面ページ">
+      <p>
+        全投稿 {{$admin_total_posts}}件 /
+        スレッド {{$admin_range_start}}～{{$admin_range_end}}件（全{{$admin_total_threads}}件）/
+        このページ {{$admin_page_posts}}件
+      </p>
+      <p>
+        @if ($admin_page > 1)
+          <a href="{{$self}}?mode=admin&amp;page={{$admin_page - 1}}">[前へ]</a>
+        @endif
+        {{$admin_page}} / {{$admin_total_pages}}
+        @if ($admin_page < $admin_total_pages)
+          <a href="{{$self}}?mode=admin&amp;page={{$admin_page + 1}}">[次へ]</a>
+        @endif
+      </p>
+    </nav>
     <form action="{{$self}}?mode=admin_delete" method="post" onsubmit="return confirm('選択した記事を削除します。よろしいですか？');">
       <input type="hidden" name="token" value="{{$token}}">
     <div>
@@ -81,9 +97,8 @@
                 <td>{{$bbsline['host']}}</td>
                 <td>@if ($bbsline['invz']) invz @endif</td>
               </tr>
-              @if (!empty($ko))
-                @foreach ($ko as $res)
-                  @if ($bbsline['tid'] == $res['parent'])
+              @if (!empty($ko[$bbsline['tid']]))
+                @foreach ($ko[$bbsline['tid']] as $res)
                   <tr>
                     <td><input type="checkbox" name="delno[]" value="{{$res['tid']}}" aria-label="記事{{$res['tid']}}を選択"></td>
                     <td>└{{$res['tid']}}</td>
@@ -99,7 +114,6 @@
                     <td>{{$res['host']}}</td>
                     <td>@if ($res['invz']) invz @endif</td>
                   </tr>
-                  @endif
                 @endforeach
               @endif
             @endforeach
@@ -113,6 +127,17 @@
       </section>
     </div>
     </form>
+    <nav class="thread" aria-label="管理画面ページ">
+      <p>
+        @if ($admin_page > 1)
+          <a href="{{$self}}?mode=admin&amp;page={{$admin_page - 1}}">[前へ]</a>
+        @endif
+        {{$admin_page}} / {{$admin_total_pages}}
+        @if ($admin_page < $admin_total_pages)
+          <a href="{{$self}}?mode=admin&amp;page={{$admin_page + 1}}">[次へ]</a>
+        @endif
+      </p>
+    </nav>
   </main>
   <footer id="footer">
     @include('components.monoreita_footerCopy') <!-- コピーライト -->
