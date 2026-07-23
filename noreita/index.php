@@ -31,7 +31,7 @@ if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260722) {
 check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (!defined('CONF_VER') || CONF_VER < 20260405) {
+if (!defined('CONF_VER') || CONF_VER < 20260723) {
   die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
@@ -59,7 +59,7 @@ if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260723) {
 // initialization.inc
 check_file(__DIR__.'/initialization.inc.php');
 require_once(__DIR__.'/initialization.inc.php');
-if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260716) {
+if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260723) {
   die($en ? 'Please update initialization.inc.php to the latest version.' : 'initialization.inc.phpを最新版に更新してください。');
 }
 
@@ -146,7 +146,7 @@ $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
 // キャッシュフォルダがなかったら作成
 if (!file_exists($cache)) {
-  mkdir($cache, PERMISSION_FOR_DIR);
+  mkdir($cache, PERMISSION_FOR_PRIVATE_DIR);
 }
 
 $blade = new BladeOne($views, $cache, BladeOne::MODE_AUTO); // MODE_DEBUGだと開発モード MODE_AUTOが速い。
@@ -389,10 +389,14 @@ function init(): void {
   $initializer = new ApplicationInitializer(
     DB_PDO, DB_FILE, __DIR__ . '/backup', __DIR__,
     [
-      __DIR__ . '/' . IMG_DIR, __DIR__ . '/' . TEMP_DIR, __DIR__ . '/' . THUMB_DIR,
-      __DIR__ . '/thumbnail', __DIR__ . '/session',
+      __DIR__ . '/' . IMG_DIR => PERMISSION_FOR_DIR,
+      __DIR__ . '/' . TEMP_DIR => PERMISSION_FOR_DIR,
+      __DIR__ . '/' . THUMB_DIR => PERMISSION_FOR_DIR,
+      __DIR__ . '/thumbnail' => PERMISSION_FOR_DIR,
+      __DIR__ . '/session' => PERMISSION_FOR_PRIVATE_DIR,
+      __DIR__ . '/cache' => PERMISSION_FOR_PRIVATE_DIR,
+      __DIR__ . '/backup' => PERMISSION_FOR_PRIVATE_DIR,
     ],
-    PERMISSION_FOR_DIR
   );
   $initializer->sendSecurityHeaders();
   try {

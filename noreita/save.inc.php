@@ -21,7 +21,7 @@ class image_save{
   defined('PICTURE_MAX_KB') or define('PICTURE_MAX_KB', '40960');//40MBまで
   defined('PSD_MAX_KB') or define('PSD_MAX_KB', '40960');//40MBまで。ただしサーバのPHPの設定によって2MB以下に制限される可能性があります。
   defined('PERMISSION_FOR_LOG') or define('PERMISSION_FOR_LOG', 0600); //config.phpで未定義なら0600
-  defined('PERMISSION_FOR_DEST') or define('PERMISSION_FOR_DEST', 0606); //config.phpで未定義なら0606
+  defined('PERMISSION_FOR_DEST') or define('PERMISSION_FOR_DEST', 0644); //config.phpで未定義なら0644
 
   if(($_SERVER["REQUEST_METHOD"]) !== "POST"){
     redirect("./");

@@ -172,14 +172,17 @@ smoke_test('application initialization prepares runtime state', static function 
   if (!mkdir($root, 0700)) return false;
   $database_file = $root . DIRECTORY_SEPARATOR . 'board.db';
   $backup_dir = $root . DIRECTORY_SEPARATOR . 'backup';
+  $public_image = $root . DIRECTORY_SEPARATOR . 'img';
+  $public_temp = $root . DIRECTORY_SEPARATOR . 'temp';
+  $private_session = $root . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'session';
   $directories = [
-    $root . DIRECTORY_SEPARATOR . 'img',
-    $root . DIRECTORY_SEPARATOR . 'temp',
-    $root . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'session',
+    $public_image => 0755,
+    $public_temp => 0755,
+    $private_session => 0700,
   ];
   try {
     $initializer = new ApplicationInitializer(
-      'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories, 0700
+      'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories
     );
     $initializer->prepareDirectories();
     $initializer->migrateDatabase();
@@ -187,18 +190,30 @@ smoke_test('application initialization prepares runtime state', static function 
     $database = new PDO('sqlite:' . $database_file);
     $schema_version = (int)$database->query('PRAGMA user_version')->fetchColumn();
     $database = null;
+    $unsafe_permission_rejected = false;
+    try {
+      (new ApplicationInitializer(
+        'sqlite:' . $database_file, $database_file, $backup_dir, $root, [$public_image => 0777]
+      ))->prepareDirectories();
+    } catch (RuntimeException $e) {
+      $unsafe_permission_rejected = $e->getMessage() === 'Invalid directory permission configuration.';
+    }
     return count(ApplicationInitializer::securityHeaders()) === 5
       && $schema_version === DatabaseMigrator::SCHEMA_VERSION
-      && !array_filter($directories, static fn(string $directory): bool => !is_dir($directory))
+      && $unsafe_permission_rejected
+      && !array_filter(array_keys($directories), static fn(string $directory): bool => !is_dir($directory))
+      && (fileperms($public_image) & 0777) === 0755
+      && (fileperms($public_temp) & 0777) === 0755
+      && (fileperms($private_session) & 0777) === 0700
       && (fileperms($database_file) & 0777) === 0600;
   } finally {
     foreach ([$database_file, $database_file . '-wal', $database_file . '-shm'] as $file) {
       if (is_file($file)) unlink($file);
     }
     if (is_dir($backup_dir)) rmdir($backup_dir);
-    if (is_dir($directories[2])) rmdir($directories[2]);
+    if (is_dir($private_session)) rmdir($private_session);
     if (is_dir($root . DIRECTORY_SEPARATOR . 'nested')) rmdir($root . DIRECTORY_SEPARATOR . 'nested');
-    foreach (array_slice($directories, 0, 2) as $directory) if (is_dir($directory)) rmdir($directory);
+    foreach ([$public_image, $public_temp] as $directory) if (is_dir($directory)) rmdir($directory);
     if (is_dir($root)) rmdir($root);
   }
 });

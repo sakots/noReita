@@ -1,7 +1,7 @@
 <?php
 // initialization.inc.php for noReita (C) sakots 2026 MIT License
 
-const INITIALIZATION_INC_VER = 20260716;
+const INITIALIZATION_INC_VER = 20260723;
 
 final class ApplicationInitializer {
   public function __construct(
@@ -10,7 +10,6 @@ final class ApplicationInitializer {
     private string $backup_dir,
     private string $application_root,
     private array $directories,
-    private int $directory_permission,
     private int $database_permission = 0600
   ) {}
 
@@ -38,14 +37,22 @@ final class ApplicationInitializer {
     if ($root === false || !is_dir($root) || !is_writable($root)) {
       throw new RuntimeException('Application directory is not writable.');
     }
-    foreach ($this->directories as $directory) {
+    foreach ($this->directories as $directory => $permission) {
+      if (!is_string($directory) || !is_int($permission)
+        || $permission < 0700 || $permission > 0755 || ($permission & 0022) !== 0) {
+        throw new RuntimeException('Invalid directory permission configuration.');
+      }
       if (!is_dir($directory)
-        && !mkdir($directory, $this->directory_permission, true)
+        && !mkdir($directory, $permission, true)
         && !is_dir($directory)) {
         throw new RuntimeException("Failed to create directory: {$directory}");
       }
-      if (!chmod($directory, $this->directory_permission)
-        || !is_readable($directory) || !is_writable($directory)) {
+      $current_permission = fileperms($directory);
+      if (($current_permission === false || ($current_permission & 0777) !== $permission)
+        && !chmod($directory, $permission)) {
+        throw new RuntimeException("Failed to set directory permissions: {$directory}");
+      }
+      if (!is_readable($directory) || !is_writable($directory)) {
         throw new RuntimeException("Directory is not readable and writable: {$directory}");
       }
     }
