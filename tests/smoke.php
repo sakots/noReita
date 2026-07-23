@@ -79,6 +79,24 @@ smoke_test('administrator session validates password changes and idle timeout', 
     && !AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now - 120);
 });
 
+smoke_test('Blade include names match template filename case', static function (): bool {
+  $theme = dirname(__DIR__) . '/noreita/theme/monoreita';
+  $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($theme));
+  foreach ($iterator as $file) {
+    if (!$file->isFile() || !str_ends_with($file->getFilename(), '.blade.php')) continue;
+    $source = file_get_contents($file->getPathname());
+    if (!is_string($source)) return false;
+    preg_match_all("/@include\\(['\"]([^'\"]+)['\"]/", $source, $matches);
+    foreach ($matches[1] as $include) {
+      $path = $theme . DIRECTORY_SEPARATOR . str_replace('.', DIRECTORY_SEPARATOR, $include) . '.blade.php';
+      if (!is_file($path)) {
+        throw new RuntimeException("missing template {$include} referenced by {$file->getFilename()}");
+      }
+    }
+  }
+  return true;
+});
+
 smoke_test('SQLite read and write', static function (): bool {
   $db = new PDO('sqlite::memory:');
   $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
