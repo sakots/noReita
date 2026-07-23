@@ -43,19 +43,73 @@
     </div>
   </header>
   <main>
+    <section class="thread">
+      <form action="{{$self}}" method="get">
+        <input type="hidden" name="mode" value="admin">
+        <p>
+          <label>記事No. <input class="form" type="number" min="1" name="id" value="{{$admin_filters['id']}}" size="8"></label>
+          <label>件名・本文 <input class="form" type="search" name="q" value="{{$admin_filters['q']}}" maxlength="200"></label>
+          <label>名前 <input class="form" type="search" name="name" value="{{$admin_filters['name']}}" maxlength="200"></label>
+          <label>ホスト <input class="form" type="search" name="host" value="{{$admin_filters['host']}}" maxlength="200"></label>
+        </p>
+        <p>
+          <label>開始日 <input class="form" type="date" name="date_from" value="{{$admin_filters['date_from']}}"></label>
+          <label>終了日 <input class="form" type="date" name="date_to" value="{{$admin_filters['date_to']}}"></label>
+          <label>種類
+            <select class="form" name="type">
+              <option value="all" @if ($admin_filters['type'] === 'all') selected @endif>すべて</option>
+              <option value="thread" @if ($admin_filters['type'] === 'thread') selected @endif>親記事</option>
+              <option value="reply" @if ($admin_filters['type'] === 'reply') selected @endif>レス</option>
+            </select>
+          </label>
+          <label>画像
+            <select class="form" name="image">
+              <option value="all" @if ($admin_filters['image'] === 'all') selected @endif>すべて</option>
+              <option value="with" @if ($admin_filters['image'] === 'with') selected @endif>画像あり</option>
+              <option value="without" @if ($admin_filters['image'] === 'without') selected @endif>画像なし</option>
+            </select>
+          </label>
+          <label>NSFW
+            <select class="form" name="nsfw">
+              <option value="all" @if ($admin_filters['nsfw'] === 'all') selected @endif>すべて</option>
+              <option value="yes" @if ($admin_filters['nsfw'] === 'yes') selected @endif>NSFW</option>
+              <option value="no" @if ($admin_filters['nsfw'] === 'no') selected @endif>非NSFW</option>
+            </select>
+          </label>
+        </p>
+        <p>
+          <label>表示状態
+            <select class="form" name="visibility">
+              <option value="all" @if ($admin_filters['visibility'] === 'all') selected @endif>すべて</option>
+              <option value="visible" @if ($admin_filters['visibility'] === 'visible') selected @endif>表示中</option>
+              <option value="hidden" @if ($admin_filters['visibility'] === 'hidden') selected @endif>非表示</option>
+            </select>
+          </label>
+          <label>投稿者種別
+            <select class="form" name="administrator">
+              <option value="all" @if ($admin_filters['administrator'] === 'all') selected @endif>すべて</option>
+              <option value="yes" @if ($admin_filters['administrator'] === 'yes') selected @endif>管理者投稿</option>
+              <option value="no" @if ($admin_filters['administrator'] === 'no') selected @endif>一般投稿</option>
+            </select>
+          </label>
+          <button class="button" type="submit">検索</button>
+          <a href="{{$self}}?mode=admin">[条件をクリア]</a>
+        </p>
+      </form>
+    </section>
     <nav class="thread" aria-label="管理画面ページ">
       <p>
-        全投稿 {{$admin_total_posts}}件 /
-        スレッド {{$admin_range_start}}～{{$admin_range_end}}件（全{{$admin_total_threads}}件）/
+        @if ($admin_filter_active) 検索結果 @else 全投稿 @endif {{$admin_total_posts}}件 /
+        対象スレッド {{$admin_range_start}}～{{$admin_range_end}}件（全{{$admin_total_threads}}件）/
         このページ {{$admin_page_posts}}件
       </p>
       <p>
         @if ($admin_page > 1)
-          <a href="{{$self}}?mode=admin&amp;page={{$admin_page - 1}}">[前へ]</a>
+          <a href="{{$self}}?mode=admin{{$admin_filter_query}}&amp;page={{$admin_page - 1}}">[前へ]</a>
         @endif
         {{$admin_page}} / {{$admin_total_pages}}
         @if ($admin_page < $admin_total_pages)
-          <a href="{{$self}}?mode=admin&amp;page={{$admin_page + 1}}">[次へ]</a>
+          <a href="{{$self}}?mode=admin{{$admin_filter_query}}&amp;page={{$admin_page + 1}}">[次へ]</a>
         @endif
       </p>
     </nav>
@@ -83,7 +137,13 @@
           @if (!empty($oya))
             @foreach ($oya as $bbsline)
               <tr>
-                <td><input type="checkbox" name="delno[]" value="{{$bbsline['tid']}}" aria-label="記事{{$bbsline['tid']}}を選択"></td>
+                <td>
+                  @if ($bbsline['_admin_matched'])
+                    <input type="checkbox" name="delno[]" value="{{$bbsline['tid']}}" aria-label="記事{{$bbsline['tid']}}を選択">
+                  @else
+                    <span title="検索結果の親記事">－</span>
+                  @endif
+                </td>
                 <td>{{$bbsline['tid']}}</td>
                 <td>{{$bbsline['a_name']}}</td>
                 <td>{{$bbsline['modified']}}</td>
@@ -100,7 +160,13 @@
               @if (!empty($ko[$bbsline['tid']]))
                 @foreach ($ko[$bbsline['tid']] as $res)
                   <tr>
-                    <td><input type="checkbox" name="delno[]" value="{{$res['tid']}}" aria-label="記事{{$res['tid']}}を選択"></td>
+                    <td>
+                      @if ($res['_admin_matched'])
+                        <input type="checkbox" name="delno[]" value="{{$res['tid']}}" aria-label="記事{{$res['tid']}}を選択">
+                      @else
+                        <span title="検索結果の関連レス">－</span>
+                      @endif
+                    </td>
                     <td>└{{$res['tid']}}</td>
                     <td>{{$res['a_name']}}</td>
                     <td>{{$res['modified']}}</td>
@@ -130,11 +196,11 @@
     <nav class="thread" aria-label="管理画面ページ">
       <p>
         @if ($admin_page > 1)
-          <a href="{{$self}}?mode=admin&amp;page={{$admin_page - 1}}">[前へ]</a>
+          <a href="{{$self}}?mode=admin{{$admin_filter_query}}&amp;page={{$admin_page - 1}}">[前へ]</a>
         @endif
         {{$admin_page}} / {{$admin_total_pages}}
         @if ($admin_page < $admin_total_pages)
-          <a href="{{$self}}?mode=admin&amp;page={{$admin_page + 1}}">[次へ]</a>
+          <a href="{{$self}}?mode=admin{{$admin_filter_query}}&amp;page={{$admin_page + 1}}">[次へ]</a>
         @endif
       </p>
     </nav>

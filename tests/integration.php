@@ -440,11 +440,17 @@ try {
 
   [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);
   [$admin_page_two_status, $admin_page_two_body] = http_request($base_url . '?mode=admin&page=2', $cookie_jar);
+  [$admin_filtered_status, $admin_filtered_body] = http_request($base_url . '?mode=admin&administrator=no&page=1', $cookie_jar);
+  [$admin_search_status, $admin_search_body] = http_request(
+    $base_url . '?mode=admin&q=' . rawurlencode("Administrator's edit"), $cookie_jar
+  );
+  [$admin_invalid_filter_status] = http_request($base_url . '?mode=admin&image=invalid', $cookie_jar);
   [$admin_invalid_page_status] = http_request($base_url . '?mode=admin&page=invalid', $cookie_jar);
   [$admin_missing_page_status] = http_request($base_url . '?mode=admin&page=99', $cookie_jar);
   integration_test('administration pagination keeps thread pages separate and validates page numbers', static function () use (
     $admin_page_one_status, $admin_page_one_body, $admin_page_two_status, $admin_page_two_body,
-    $admin_invalid_page_status, $admin_missing_page_status, $image_post_id, $post_id
+    $admin_filtered_status, $admin_filtered_body, $admin_search_status, $admin_search_body,
+    $admin_invalid_filter_status, $admin_invalid_page_status, $admin_missing_page_status, $image_post_id, $post_id
   ): bool {
     return $admin_page_one_status === 200 && $admin_page_two_status === 200
       && str_contains($admin_page_one_body, 'name="delno[]" value="' . $image_post_id . '"')
@@ -453,6 +459,14 @@ try {
       && str_contains($admin_page_two_body, 'name="delno[]" value="' . $post_id . '"')
       && !str_contains($admin_page_two_body, 'name="delno[]" value="' . $image_post_id . '"')
       && str_contains($admin_page_two_body, 'page=1')
+      && $admin_filtered_status === 200
+      && str_contains($admin_filtered_body, 'administrator=no')
+      && str_contains($admin_filtered_body, 'page=2')
+      && $admin_search_status === 200
+      && str_contains($admin_search_body, 'name="delno[]" value="' . $post_id . '"')
+      && !str_contains($admin_search_body, 'name="delno[]" value="' . $image_post_id . '"')
+      && str_contains($admin_search_body, '検索結果')
+      && $admin_invalid_filter_status === 400
       && $admin_invalid_page_status === 400 && $admin_missing_page_status === 404;
   });
 

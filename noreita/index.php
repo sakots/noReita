@@ -1817,6 +1817,28 @@ function admin(): void {
   $dat['message'] = isset($_SESSION['admin_message']) ? (string)$_SESSION['admin_message'] : '';
   unset($_SESSION['admin_message']);
 
+  try {
+    $filters = AdminPostFilter::normalize([
+      'id' => filter_input_data('GET', 'id'),
+      'q' => filter_input_data('GET', 'q'),
+      'name' => filter_input_data('GET', 'name'),
+      'host' => filter_input_data('GET', 'host'),
+      'date_from' => filter_input_data('GET', 'date_from'),
+      'date_to' => filter_input_data('GET', 'date_to'),
+      'type' => filter_input_data('GET', 'type') ?: 'all',
+      'image' => filter_input_data('GET', 'image') ?: 'all',
+      'nsfw' => filter_input_data('GET', 'nsfw') ?: 'all',
+      'visibility' => filter_input_data('GET', 'visibility') ?: 'all',
+      'administrator' => filter_input_data('GET', 'administrator') ?: 'all',
+    ]);
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Invalid administration search criteria.' : '管理画面の検索条件が不正です。', 400);
+  }
+  $dat['admin_filters'] = $filters;
+  $filter_query = AdminPostFilter::query($filters);
+  $dat['admin_filter_query'] = $filter_query === '' ? '' : '&' . $filter_query;
+  $dat['admin_filter_active'] = AdminPostFilter::isActive($filters);
+
   $page_input = filter_input_data('GET', 'page');
   $page = 1;
   if ($page_input !== null && $page_input !== '') {
@@ -1830,8 +1852,8 @@ function admin(): void {
 
   try {
     $repository = new BoardRepository();
-    $total_posts = $repository->countAdminPosts();
-    $total_threads = $repository->countAdminThreads();
+    $total_posts = $repository->countAdminPosts($filters);
+    $total_threads = $repository->countAdminThreads($filters);
     $total_pages = max(1, (int)ceil($total_threads / $per_page));
     if ($page > $total_pages) {
       error($en ? 'The administration page does not exist.' : '指定された管理画面のページはありません。', 404);
@@ -1839,8 +1861,9 @@ function admin(): void {
     $offset = ($page - 1) * $per_page;
 
     $oya = array();
-    foreach ($repository->listAdminThreads($offset, $per_page) as $bbsline) {
+    foreach ($repository->listAdminThreads($offset, $per_page, $filters) as $bbsline) {
       if (empty($bbsline)) break;
+      $bbsline['_admin_matched'] = AdminPostFilter::matches($bbsline, $filters);
       $bbsline['com'] = htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5);
       $oya[] = $bbsline;
     }
@@ -1849,6 +1872,7 @@ function admin(): void {
     $ko = array();
     $parent_ids = array_column($oya, 'tid');
     foreach ($repository->listAdminReplies($parent_ids) as $res) {
+      $res['_admin_matched'] = AdminPostFilter::matches($res, $filters);
       $res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
       $ko[(int)$res['parent']][] = $res;
     }

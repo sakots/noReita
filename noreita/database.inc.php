@@ -3,6 +3,156 @@
 
 const DATABASE_INC_VER = 20260723;
 
+final class AdminPostFilter {
+  private const ENUMS = [
+    'type' => ['all', 'thread', 'reply'],
+    'image' => ['all', 'with', 'without'],
+    'nsfw' => ['all', 'yes', 'no'],
+    'visibility' => ['all', 'visible', 'hidden'],
+    'administrator' => ['all', 'yes', 'no'],
+  ];
+
+  public static function normalize(array $input): array {
+    $filters = [
+      'id' => '', 'q' => '', 'name' => '', 'host' => '', 'date_from' => '', 'date_to' => '',
+      'type' => 'all', 'image' => 'all', 'nsfw' => 'all',
+      'visibility' => 'all', 'administrator' => 'all',
+    ];
+    foreach (['q', 'name', 'host'] as $key) {
+      $value = trim((string)($input[$key] ?? ''));
+      if (mb_strlen($value) > 200) throw new InvalidArgumentException("{$key} is too long.");
+      $filters[$key] = $value;
+    }
+    $id = trim((string)($input['id'] ?? ''));
+    if ($id !== '') {
+      $validated = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+      if ($validated === false) throw new InvalidArgumentException('Invalid post ID.');
+      $filters['id'] = (string)$validated;
+    }
+    foreach (['date_from', 'date_to'] as $key) {
+      $value = trim((string)($input[$key] ?? ''));
+      if ($value !== '') {
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        if (!$date || $date->format('Y-m-d') !== $value) {
+          throw new InvalidArgumentException("Invalid {$key}.");
+        }
+      }
+      $filters[$key] = $value;
+    }
+    if ($filters['date_from'] !== '' && $filters['date_to'] !== ''
+      && $filters['date_from'] > $filters['date_to']) {
+      throw new InvalidArgumentException('Invalid date range.');
+    }
+    foreach (self::ENUMS as $key => $allowed) {
+      $value = (string)($input[$key] ?? 'all');
+      if (!in_array($value, $allowed, true)) throw new InvalidArgumentException("Invalid {$key} filter.");
+      $filters[$key] = $value;
+    }
+    return $filters;
+  }
+
+  public static function isActive(array $filters): bool {
+    foreach ($filters as $key => $value) {
+      if ($value !== '' && (!isset(self::ENUMS[$key]) || $value !== 'all')) return true;
+    }
+    return false;
+  }
+
+  /** @return array{sql:string,params:array<string,mixed>} */
+  public static function rowCondition(array $filters, string $alias, string $prefix, bool $include_type = true): array {
+    $conditions = [];
+    $params = [];
+    if ($filters['id'] !== '') {
+      $conditions[] = "{$alias}.tid = :{$prefix}id";
+      $params["{$prefix}id"] = (int)$filters['id'];
+    }
+    if ($filters['q'] !== '') {
+      $conditions[] = "({$alias}.sub LIKE :{$prefix}q ESCAPE '\\' OR {$alias}.com LIKE :{$prefix}q ESCAPE '\\')";
+      $params["{$prefix}q"] = '%' . self::escapeLike($filters['q']) . '%';
+    }
+    foreach (['name' => 'a_name', 'host' => 'host'] as $key => $column) {
+      if ($filters[$key] === '') continue;
+      $conditions[] = "{$alias}.{$column} LIKE :{$prefix}{$key} ESCAPE '\\'";
+      $params["{$prefix}{$key}"] = '%' . self::escapeLike($filters[$key]) . '%';
+    }
+    if ($filters['date_from'] !== '') {
+      $conditions[] = "date({$alias}.created) >= :{$prefix}date_from";
+      $params["{$prefix}date_from"] = $filters['date_from'];
+    }
+    if ($filters['date_to'] !== '') {
+      $conditions[] = "date({$alias}.created) <= :{$prefix}date_to";
+      $params["{$prefix}date_to"] = $filters['date_to'];
+    }
+    if ($include_type && $filters['type'] !== 'all') {
+      $conditions[] = "{$alias}.thread = :{$prefix}thread";
+      $params["{$prefix}thread"] = $filters['type'] === 'thread' ? 1 : 0;
+    }
+    if ($filters['image'] !== 'all') {
+      $conditions[] = $filters['image'] === 'with'
+        ? "COALESCE({$alias}.picfile, '') != ''"
+        : "COALESCE({$alias}.picfile, '') = ''";
+    }
+    foreach (['nsfw' => 'nsfw', 'visibility' => 'invz', 'administrator' => 'admins'] as $key => $column) {
+      if ($filters[$key] === 'all') continue;
+      $conditions[] = "CAST(COALESCE({$alias}.{$column}, 0) AS INTEGER) = :{$prefix}{$key}";
+      $params["{$prefix}{$key}"] = $filters[$key] === 'yes' || $filters[$key] === 'hidden' ? 1 : 0;
+    }
+    return ['sql' => $conditions === [] ? '1=1' : implode(' AND ', $conditions), 'params' => $params];
+  }
+
+  /** @return array{sql:string,params:array<string,mixed>} */
+  public static function threadCondition(array $filters, string $alias = 't'): array {
+    $thread_filters = self::rowCondition($filters, $alias, 'thread_', false);
+    $reply_filters = self::rowCondition($filters, 'r', 'reply_', false);
+    $exists = "EXISTS (SELECT 1 FROM board_log r WHERE r.thread=0 AND r.parent={$alias}.tid AND {$reply_filters['sql']})";
+    if ($filters['type'] === 'thread') {
+      return ['sql' => "{$alias}.thread=1 AND {$thread_filters['sql']}", 'params' => $thread_filters['params']];
+    }
+    if ($filters['type'] === 'reply') {
+      return ['sql' => "{$alias}.thread=1 AND {$exists}", 'params' => $reply_filters['params']];
+    }
+    return [
+      'sql' => "{$alias}.thread=1 AND (({$thread_filters['sql']}) OR {$exists})",
+      'params' => $thread_filters['params'] + $reply_filters['params'],
+    ];
+  }
+
+  public static function matches(array $post, array $filters): bool {
+    if ($filters['id'] !== '' && (int)$post['tid'] !== (int)$filters['id']) return false;
+    if ($filters['q'] !== '' && !self::contains((string)$post['sub'], $filters['q'])
+      && !self::contains((string)$post['com'], $filters['q'])) return false;
+    if ($filters['name'] !== '' && !self::contains((string)$post['a_name'], $filters['name'])) return false;
+    if ($filters['host'] !== '' && !self::contains((string)$post['host'], $filters['host'])) return false;
+    $created = substr((string)$post['created'], 0, 10);
+    if ($filters['date_from'] !== '' && $created < $filters['date_from']) return false;
+    if ($filters['date_to'] !== '' && $created > $filters['date_to']) return false;
+    if ($filters['type'] === 'thread' && (int)$post['thread'] !== 1) return false;
+    if ($filters['type'] === 'reply' && (int)$post['thread'] !== 0) return false;
+    $has_image = (string)$post['picfile'] !== '';
+    if (($filters['image'] === 'with' && !$has_image)
+      || ($filters['image'] === 'without' && $has_image)) return false;
+    foreach (['nsfw' => 'nsfw', 'visibility' => 'invz', 'administrator' => 'admins'] as $key => $column) {
+      if ($filters[$key] === 'all') continue;
+      $expected = $filters[$key] === 'yes' || $filters[$key] === 'hidden' ? 1 : 0;
+      if ((int)$post[$column] !== $expected) return false;
+    }
+    return true;
+  }
+
+  public static function query(array $filters): string {
+    $values = array_filter($filters, static fn(string $value): bool => $value !== '' && $value !== 'all');
+    return http_build_query($values, '', '&', PHP_QUERY_RFC3986);
+  }
+
+  private static function escapeLike(string $value): string {
+    return strtr($value, ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']);
+  }
+
+  private static function contains(string $haystack, string $needle): bool {
+    return mb_stripos($haystack, $needle, 0, 'UTF-8') !== false;
+  }
+}
+
 final class Database {
   public static function connect(): PDO {
     $db = new PDO(DB_PDO);
@@ -160,18 +310,30 @@ final class BoardRepository {
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
-  public function countAdminPosts(): int {
-    return (int)$this->db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+  public function countAdminPosts(array $filters = []): int {
+    $filters = $filters ?: AdminPostFilter::normalize([]);
+    $condition = AdminPostFilter::rowCondition($filters, 'p', 'post_');
+    $statement = $this->db->prepare("SELECT COUNT(*) FROM board_log p WHERE {$condition['sql']}");
+    $statement->execute($condition['params']);
+    return (int)$statement->fetchColumn();
   }
 
-  public function countAdminThreads(): int {
-    return (int)$this->db->query('SELECT COUNT(*) FROM board_log WHERE thread=1')->fetchColumn();
+  public function countAdminThreads(array $filters = []): int {
+    $filters = $filters ?: AdminPostFilter::normalize([]);
+    $condition = AdminPostFilter::threadCondition($filters);
+    $statement = $this->db->prepare("SELECT COUNT(*) FROM board_log t WHERE {$condition['sql']}");
+    $statement->execute($condition['params']);
+    return (int)$statement->fetchColumn();
   }
 
-  public function listAdminThreads(int $offset, int $limit): array {
+  public function listAdminThreads(int $offset, int $limit, array $filters = []): array {
+    $filters = $filters ?: AdminPostFilter::normalize([]);
+    $condition = AdminPostFilter::threadCondition($filters);
     $statement = $this->db->prepare(
-      'SELECT * FROM board_log WHERE thread=1 ORDER BY age DESC, tree DESC, tid DESC LIMIT :limit OFFSET :offset'
+      "SELECT t.* FROM board_log t WHERE {$condition['sql']}
+        ORDER BY t.age DESC, t.tree DESC, t.tid DESC LIMIT :limit OFFSET :offset"
     );
+    foreach ($condition['params'] as $key => $value) $statement->bindValue(':' . $key, $value);
     $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
     $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
     $statement->execute();
