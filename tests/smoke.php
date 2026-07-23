@@ -381,6 +381,10 @@ smoke_test('post service centralizes edit and delete authorization', static func
 
     if ($service->delete($hide_id, 'admin-pass', false) !== 'hidden'
       || (int)($repository->findPost($hide_id)['invz'] ?? 0) !== 1) return false;
+    if ($service->setVisibilityManyAsAdmin([$hide_id], false) !== 1
+      || (int)($repository->findPost($hide_id)['invz'] ?? 1) !== 0
+      || $service->setVisibilityManyAsAdmin([$hide_id, $hide_id], true) !== 1
+      || (int)($repository->findPost($hide_id)['invz'] ?? 0) !== 1) return false;
     if ($service->delete($delete_id, 'delete-pass', false) !== 'deleted'
       || $repository->findPost($delete_id) !== false
       || is_file($image_dir . DIRECTORY_SEPARATOR . 'owner.png')) return false;

@@ -42,6 +42,8 @@
 
 管理画面の検索条件は`AdminPostFilter`で正規化し、同じ条件からSQL、PHP上の一致判定、ページリンク用クエリを生成します。レスが検索に一致した場合は親記事も文脈として表示しますが、削除チェックボックスは条件に一致した記事だけに表示します。
 
+管理画面の非表示・再表示は`board_log.invz`を更新し、投稿本文と関連画像は保持します。`PostService::setVisibilityManyAsAdmin()`を経由し、完全削除とは別の操作として扱います。
+
 ## 画像
 
 `image.inc.php`の`ImageService`が画像を扱います。

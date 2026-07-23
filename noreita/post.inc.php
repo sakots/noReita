@@ -63,12 +63,7 @@ final class PostService {
   }
 
   public function deleteManyAsAdmin(array $post_ids): int {
-    $ids = [];
-    foreach ($post_ids as $post_id) {
-      $id = filter_var($post_id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-      if ($id !== false) $ids[(int)$id] = (int)$id;
-    }
-    if ($ids === []) throw new InvalidArgumentException('No posts were selected.');
+    $ids = self::normalizePostIds($post_ids);
 
     $deleted_ids = [];
     foreach ($ids as $id) {
@@ -80,6 +75,27 @@ final class PostService {
     }
     if ($deleted_ids === []) throw new PostNotFoundException('Posts were not found.');
     return count($deleted_ids);
+  }
+
+  public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int {
+    $ids = self::normalizePostIds($post_ids);
+    $existing = 0;
+    foreach ($ids as $id) {
+      if ($this->repository->findPost($id) !== false) $existing++;
+    }
+    if ($existing === 0) throw new PostNotFoundException('Posts were not found.');
+    $this->repository->setPostsVisibility(array_values($ids), $hidden);
+    return $existing;
+  }
+
+  private static function normalizePostIds(array $post_ids): array {
+    $ids = [];
+    foreach ($post_ids as $post_id) {
+      $id = filter_var($post_id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+      if ($id !== false) $ids[(int)$id] = (int)$id;
+    }
+    if ($ids === []) throw new InvalidArgumentException('No posts were selected.');
+    return $ids;
   }
 
   public function prepareNewPost(array $input, string $host, array $settings): array {

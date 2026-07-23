@@ -209,6 +209,17 @@ final class BoardRepository {
     $statement->execute([$id]);
   }
 
+  public function setPostsVisibility(array $ids, bool $hidden): int {
+    if ($ids === []) return 0;
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $statement = $this->db->prepare(
+      "UPDATE board_log SET invz = ? WHERE tid IN ({$placeholders}) AND CAST(COALESCE(invz, 0) AS INTEGER) != ?"
+    );
+    $value = $hidden ? 1 : 0;
+    $statement->execute([$value, ...$ids, $value]);
+    return $statement->rowCount();
+  }
+
   public function findThreadIdByUuid(string $uuid): ?int {
     $statement = $this->db->prepare('SELECT tid, parent, thread FROM board_log WHERE uuid = ? AND invz = 0 LIMIT 1');
     $statement->execute([$uuid]);

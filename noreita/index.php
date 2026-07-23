@@ -356,6 +356,8 @@ switch ($mode) {
     return admin_logout();
   case 'admin_delete':
     return admin_delete();
+  case 'admin_manage':
+    return admin_manage();
   case 'admin': // 管理モード
     return admin();
   case 'set_share_server':
@@ -1765,6 +1767,10 @@ function admin_logout(): void {
 }
 
 function admin_delete(): void {
+  admin_manage('delete');
+}
+
+function admin_manage(?string $forced_operation = null): void {
   global $admin_pass, $en;
   admin_no_store();
   try {
@@ -1778,19 +1784,32 @@ function admin_delete(): void {
 
   $selected = filter_input_data('POST', 'delno');
   if (!is_array($selected)) $selected = [];
+  $operation = $forced_operation ?? (string)filter_input_data('POST', 'operation');
+  if (!in_array($operation, ['hide', 'show', 'delete'], true)) {
+    error($en ? 'Invalid administration operation.' : '管理操作が不正です。', 400);
+  }
   try {
-    $count = (new PostService(
+    $service = new PostService(
       new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST
-    ))->deleteManyAsAdmin($selected);
-    $_SESSION['admin_message'] = $en
-      ? "{$count} selected post(s) were deleted."
-      : "選択した{$count}件の記事を削除しました。";
+    );
+    if ($operation === 'delete') {
+      $count = $service->deleteManyAsAdmin($selected);
+      $_SESSION['admin_message'] = $en
+        ? "{$count} selected post(s) were deleted."
+        : "選択した{$count}件の記事を完全削除しました。";
+    } else {
+      $hidden = $operation === 'hide';
+      $count = $service->setVisibilityManyAsAdmin($selected, $hidden);
+      $_SESSION['admin_message'] = $en
+        ? "{$count} selected post(s) were " . ($hidden ? 'hidden.' : 'made visible.')
+        : "選択した{$count}件の記事を" . ($hidden ? '非表示にしました。' : '再表示しました。');
+    }
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Please select at least one post.' : '削除する記事を選択してください。', 400);
+    error($en ? 'Please select at least one post.' : '操作する記事を選択してください。', 400);
   } catch (PostNotFoundException $e) {
     error($en ? 'The selected posts do not exist.' : '選択した記事が見つかりません。', 404);
   } catch (Throwable $e) {
-    error($en ? 'Failed to delete the selected posts.' : '選択した記事の削除に失敗しました。', 500);
+    error($en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500);
   }
   redirect(PHP_SELF . '?mode=admin');
 }
@@ -1817,6 +1836,7 @@ function admin(): void {
   $dat['message'] = isset($_SESSION['admin_message']) ? (string)$_SESSION['admin_message'] : '';
   unset($_SESSION['admin_message']);
 
+  $filters = [];
   try {
     $filters = AdminPostFilter::normalize([
       'id' => filter_input_data('GET', 'id'),

@@ -114,12 +114,15 @@
         @endif
       </p>
     </nav>
-    <form action="{{$self}}?mode=admin_delete" method="post" onsubmit="return confirm('選択した記事を削除します。よろしいですか？');">
+    <form action="{{$self}}?mode=admin_manage" method="post">
       <input type="hidden" name="token" value="{{$token}}">
     <div>
       <div class="thread">
         <section class="delf">
-          <button class="button" type="submit">選択した記事を削除</button>
+          <button class="button" type="submit" name="operation" value="hide">選択した記事を非表示</button>
+          <button class="button" type="submit" name="operation" value="show">選択した記事を再表示</button>
+          <button class="button" type="submit" name="operation" value="delete"
+            onclick="return confirm('選択した記事と関連ファイルを完全に削除します。この操作は元に戻せません。よろしいですか？');">選択した記事を完全削除</button>
         </section>
       </div>
       <section class="thread">
@@ -133,7 +136,7 @@
             <th>pic</th>
             <th>com</th>
             <th>host</th>
-            <th>invz</th>
+            <th>表示状態</th>
           </tr>
           @if (!empty($oya))
             @foreach ($oya as $bbsline)
@@ -156,7 +159,7 @@
                 </td>
                 <td>{!! mb_substr($bbsline['com'], 0, 10) !!}</td>
                 <td>{{$bbsline['host']}}</td>
-                <td>@if ($bbsline['invz']) invz @endif</td>
+                <td>@if ($bbsline['invz']) 非表示 @else 表示中 @endif</td>
               </tr>
               @if (!empty($ko[$bbsline['tid']]))
                 @foreach ($ko[$bbsline['tid']] as $res)
@@ -179,7 +182,7 @@
                     </td>
                     <td>{!! mb_substr($res['com'], 0, 10) !!}</td>
                     <td>{{$res['host']}}</td>
-                    <td>@if ($res['invz']) invz @endif</td>
+                    <td>@if ($res['invz']) 非表示 @else 表示中 @endif</td>
                   </tr>
                 @endforeach
               @endif
@@ -190,7 +193,10 @@
     </div>
     <div class="thread">
       <section class="delf">
-        <button class="button" type="submit">選択した記事を削除</button>
+        <button class="button" type="submit" name="operation" value="hide">選択した記事を非表示</button>
+        <button class="button" type="submit" name="operation" value="show">選択した記事を再表示</button>
+        <button class="button" type="submit" name="operation" value="delete"
+          onclick="return confirm('選択した記事と関連ファイルを完全に削除します。この操作は元に戻せません。よろしいですか？');">選択した記事を完全削除</button>
       </section>
     </div>
     </form>

@@ -191,12 +191,22 @@ try {
     return $admin_login_status === 302 && $admin_status === 200
       && str_contains($admin_body, 'ADMIN MODE')
       && str_contains($admin_body, 'mode=admin_logout')
-      && str_contains($admin_body, 'mode=admin_delete');
+      && str_contains($admin_body, 'mode=admin_manage')
+      && str_contains($admin_body, 'value="hide"')
+      && str_contains($admin_body, 'value="show"')
+      && str_contains($admin_body, 'value="delete"');
   });
 
-  [$admin_empty_delete_status] = http_request($base_url . '?mode=admin_delete', $cookie_jar, ['token' => $token]);
-  integration_test('administrator bulk delete requires a selection', static function () use ($admin_empty_delete_status): bool {
-    return $admin_empty_delete_status === 400;
+  [$admin_empty_operation_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'token' => $token,
+  ]);
+  [$admin_invalid_operation_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'invalid', 'token' => $token,
+  ]);
+  integration_test('administrator bulk operation validates selection and operation', static function () use (
+    $admin_empty_operation_status, $admin_invalid_operation_status
+  ): bool {
+    return $admin_empty_operation_status === 400 && $admin_invalid_operation_status === 400;
   });
 
   $share_title = '共有テスト';
@@ -489,8 +499,43 @@ try {
       && !str_contains($admin_with_posts_body, 'name="adminpass"');
   });
 
-  [$delete_status] = http_request($base_url . '?mode=admin_delete', $cookie_jar, [
-    'delno' => [(string)$post_id], 'token' => $token,
+  [$hide_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => $token,
+  ]);
+  $hidden_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  [$hidden_filter_status, $hidden_filter_body] = http_request(
+    $base_url . '?mode=admin&visibility=hidden', $cookie_jar
+  );
+  [$hidden_search_status, $hidden_search_body] = http_request(
+    $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
+  );
+  integration_test('administrator can hide checked posts and find them with the hidden filter', static function () use (
+    $hide_status, $hidden_value, $hidden_filter_status, $hidden_filter_body,
+    $hidden_search_status, $hidden_search_body, $post_id
+  ): bool {
+    return $hide_status === 302 && $hidden_value === 1
+      && $hidden_filter_status === 200
+      && str_contains($hidden_filter_body, 'name="delno[]" value="' . $post_id . '"')
+      && str_contains($hidden_filter_body, '非表示')
+      && $hidden_search_status === 200 && str_contains($hidden_search_body, '0件');
+  });
+
+  [$show_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'show', 'delno' => [(string)$post_id], 'token' => $token,
+  ]);
+  $visible_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  [$visible_search_status, $visible_search_body] = http_request(
+    $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
+  );
+  integration_test('administrator can make checked posts visible again', static function () use (
+    $show_status, $visible_value, $visible_search_status, $visible_search_body, $marker
+  ): bool {
+    return $show_status === 302 && $visible_value === 0
+      && $visible_search_status === 200 && str_contains($visible_search_body, $marker);
+  });
+
+  [$delete_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'delete', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $remaining = (int)$db->query('SELECT COUNT(*) FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
   integration_test('administrator can delete checked posts without resending the password', static function () use ($delete_status, $remaining): bool {
