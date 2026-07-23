@@ -45,6 +45,7 @@
   <main>
     <section class="thread">
       <form action="{{$self}}" method="get">
+        <p>検索</p>
         <input type="hidden" name="mode" value="admin">
         <p>
           <label>記事No. <input class="form" type="number" min="1" name="id" value="{{$admin_filters['id']}}" size="8"></label>
@@ -86,10 +87,10 @@
             </select>
           </label>
           <label>投稿者種別
-            <select class="form" name="administrator">
-              <option value="all" @if ($admin_filters['administrator'] === 'all') selected @endif>すべて</option>
-              <option value="yes" @if ($admin_filters['administrator'] === 'yes') selected @endif>管理者投稿</option>
-              <option value="no" @if ($admin_filters['administrator'] === 'no') selected @endif>一般投稿</option>
+            <select class="form" name="isAdministrator">
+              <option value="all" @if ($admin_filters['isAdministrator'] === 'all') selected @endif>すべて</option>
+              <option value="yes" @if ($admin_filters['isAdministrator'] === 'yes') selected @endif>管理者投稿</option>
+              <option value="no" @if ($admin_filters['isAdministrator'] === 'no') selected @endif>一般投稿</option>
             </select>
           </label>
           <button class="button" type="submit">検索</button>

@@ -9,14 +9,14 @@ final class AdminPostFilter {
     'image' => ['all', 'with', 'without'],
     'nsfw' => ['all', 'yes', 'no'],
     'visibility' => ['all', 'visible', 'hidden'],
-    'administrator' => ['all', 'yes', 'no'],
+    'isAdministrator' => ['all', 'yes', 'no'],
   ];
 
   public static function normalize(array $input): array {
     $filters = [
       'id' => '', 'q' => '', 'name' => '', 'host' => '', 'date_from' => '', 'date_to' => '',
       'type' => 'all', 'image' => 'all', 'nsfw' => 'all',
-      'visibility' => 'all', 'administrator' => 'all',
+      'visibility' => 'all', 'isAdministrator' => 'all',
     ];
     foreach (['q', 'name', 'host'] as $key) {
       $value = trim((string)($input[$key] ?? ''));
@@ -92,7 +92,7 @@ final class AdminPostFilter {
         ? "COALESCE({$alias}.picfile, '') != ''"
         : "COALESCE({$alias}.picfile, '') = ''";
     }
-    foreach (['nsfw' => 'nsfw', 'visibility' => 'invz', 'administrator' => 'admins'] as $key => $column) {
+    foreach (['nsfw' => 'nsfw', 'visibility' => 'invz', 'isAdministrator' => 'admins'] as $key => $column) {
       if ($filters[$key] === 'all') continue;
       $conditions[] = "CAST(COALESCE({$alias}.{$column}, 0) AS INTEGER) = :{$prefix}{$key}";
       $params["{$prefix}{$key}"] = $filters[$key] === 'yes' || $filters[$key] === 'hidden' ? 1 : 0;
@@ -131,7 +131,7 @@ final class AdminPostFilter {
     $has_image = (string)$post['picfile'] !== '';
     if (($filters['image'] === 'with' && !$has_image)
       || ($filters['image'] === 'without' && $has_image)) return false;
-    foreach (['nsfw' => 'nsfw', 'visibility' => 'invz', 'administrator' => 'admins'] as $key => $column) {
+    foreach (['nsfw' => 'nsfw', 'visibility' => 'invz', 'isAdministrator' => 'admins'] as $key => $column) {
       if ($filters[$key] === 'all') continue;
       $expected = $filters[$key] === 'yes' || $filters[$key] === 'hidden' ? 1 : 0;
       if ((int)$post[$column] !== $expected) return false;

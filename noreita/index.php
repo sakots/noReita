@@ -1829,7 +1829,7 @@ function admin(): void {
       'image' => filter_input_data('GET', 'image') ?: 'all',
       'nsfw' => filter_input_data('GET', 'nsfw') ?: 'all',
       'visibility' => filter_input_data('GET', 'visibility') ?: 'all',
-      'administrator' => filter_input_data('GET', 'administrator') ?: 'all',
+      'isAdministrator' => filter_input_data('GET', 'isAdministrator') ?: 'all',
     ]);
   } catch (InvalidArgumentException $e) {
     error($en ? 'Invalid administration search criteria.' : '管理画面の検索条件が不正です。', 400);

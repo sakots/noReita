@@ -440,7 +440,7 @@ try {
 
   [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);
   [$admin_page_two_status, $admin_page_two_body] = http_request($base_url . '?mode=admin&page=2', $cookie_jar);
-  [$admin_filtered_status, $admin_filtered_body] = http_request($base_url . '?mode=admin&administrator=no&page=1', $cookie_jar);
+  [$admin_filtered_status, $admin_filtered_body] = http_request($base_url . '?mode=admin&isAdministrator=no&page=1', $cookie_jar);
   [$admin_search_status, $admin_search_body] = http_request(
     $base_url . '?mode=admin&q=' . rawurlencode("Administrator's edit"), $cookie_jar
   );
@@ -460,7 +460,7 @@ try {
       && !str_contains($admin_page_two_body, 'name="delno[]" value="' . $image_post_id . '"')
       && str_contains($admin_page_two_body, 'page=1')
       && $admin_filtered_status === 200
-      && str_contains($admin_filtered_body, 'administrator=no')
+      && str_contains($admin_filtered_body, 'isAdministrator=no')
       && str_contains($admin_filtered_body, 'page=2')
       && $admin_search_status === 200
       && str_contains($admin_search_body, 'name="delno[]" value="' . $post_id . '"')
