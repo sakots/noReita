@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.6.1 lot.260722.0';
+const REITA_VER = 'v3.7.0 lot.260723.0';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -38,7 +38,7 @@ if (!defined('CONF_VER') || CONF_VER < 20260405) {
 // request_security.inc
 check_file(__DIR__.'/request_security.inc.php');
 require_once(__DIR__.'/request_security.inc.php');
-if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260722) {
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260723) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
@@ -52,7 +52,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260722) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260723) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -73,7 +73,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260721) {
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260722) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260723) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -131,8 +131,14 @@ if ($admin_pass === 'admin_pass') {
   die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
 }
 
-// BladeOne v4.19.1
-include(__DIR__ . '/BladeOne/lib/BladeOne.php');
+// Composer dependencies (BladeOne v4.19.1)
+$autoload = __DIR__ . '/vendor/autoload.php';
+if (!is_file($autoload)) {
+  die($en
+    ? 'Composer dependencies are missing. Run composer install in the noReita directory.'
+    : 'Composer依存ライブラリがありません。noReitaディレクトリでcomposer installを実行してください。');
+}
+require_once $autoload;
 use eftec\bladeone\BladeOne;
 
 $views = __DIR__ . '/theme/' . THEME_DIR; // テンプレートフォルダ
@@ -218,6 +224,9 @@ $dat['share_button'] = SHARE_BUTTON;
 $dat['use_hashtag'] = USE_HASHTAG;
 
 defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
+defined('ADMIN_SESSION_LIFETIME') or define('ADMIN_SESSION_LIFETIME', 1800);
+defined('ADMIN_THREADS_PER_PAGE') or define('ADMIN_THREADS_PER_PAGE', 50);
+
 
 $dat['sodane'] = SODANE;
 
@@ -341,6 +350,18 @@ switch ($mode) {
     return save_image();
   case 'admin_in': // 管理モードin
     return admin_in();
+  case 'admin_login':
+    return admin_login();
+  case 'admin_logout':
+    return admin_logout();
+  case 'admin_delete':
+    return admin_delete();
+  case 'admin_manage':
+    return admin_manage();
+  case 'admin_post':
+    return admin_post();
+  case 'admin_edit':
+    return admin_edit();
   case 'admin': // 管理モード
     return admin();
   case 'set_share_server':
@@ -1464,10 +1485,22 @@ function delmode(): void {
   $delno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 
   $p_pwd = filter_input(INPUT_POST, 'pwd');
+  $admin_delete = isset($_POST['admindel']);
+  if ($admin_delete) {
+    try {
+      RequestSecurity::assertCurrentCsrfRequest($en);
+    } catch (RequestSecurityException $e) {
+      error($e->getMessage(), $e->getCode() ?: 403);
+    }
+    if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+      error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    }
+    $p_pwd = $admin_pass;
+  }
 
   try {
     $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST);
-    $result = $service->delete((int)$delno, (string)$p_pwd, isset($_POST['admindel']));
+    $result = $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
     $dat['message'] = $result === 'hidden'
       ? ($en ? 'Post hidden.' : '非表示にしました。')
       : ($en ? 'Successfully deleted.' : '削除しました。');
@@ -1699,10 +1732,169 @@ function editexec(): void {
 
 //管理モードin
 function admin_in(): void {
-  global $blade, $dat;
+  global $admin_pass, $blade, $dat;
+  admin_no_store();
+  if (AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    redirect(PHP_SELF . '?mode=admin');
+  }
   $dat['othermode'] = 'admin_in';
+  $dat['token'] = RequestSecurity::csrfToken();
 
   echo $blade->run(OTHERFILE, $dat);
+}
+
+function admin_login(): void {
+  global $admin_pass, $en;
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  $password = (string)filter_input_data('POST', 'adminpass');
+  if (!AdminAuth::login($password, $admin_pass)) {
+    error($en ? 'Administrator password is incorrect.' : '管理パスが違います。', 403);
+  }
+  redirect(PHP_SELF . '?mode=admin');
+}
+
+function admin_logout(): void {
+  global $en;
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  AdminAuth::logout();
+  redirect(PHP_SELF . '?mode=admin_in');
+}
+
+function admin_delete(): void {
+  admin_manage('delete');
+}
+
+function admin_manage(?string $forced_operation = null): void {
+  global $admin_pass, $en;
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
+
+  $selected = filter_input_data('POST', 'delno');
+  if (!is_array($selected)) $selected = [];
+  $operation = $forced_operation ?? (string)filter_input_data('POST', 'operation');
+  if (!in_array($operation, ['hide', 'show', 'delete'], true)) {
+    error($en ? 'Invalid administration operation.' : '管理操作が不正です。', 400);
+  }
+  try {
+    $service = new PostService(
+      new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST
+    );
+    if ($operation === 'delete') {
+      $count = $service->deleteManyAsAdmin($selected);
+      unset($_SESSION['admin_image_usage']);
+      $_SESSION['admin_message'] = $en
+        ? "{$count} selected post(s) were deleted."
+        : "選択した{$count}件の記事を完全削除しました。";
+    } else {
+      $hidden = $operation === 'hide';
+      $count = $service->setVisibilityManyAsAdmin($selected, $hidden);
+      $_SESSION['admin_message'] = $en
+        ? "{$count} selected post(s) were " . ($hidden ? 'hidden.' : 'made visible.')
+        : "選択した{$count}件の記事を" . ($hidden ? '非表示にしました。' : '再表示しました。');
+    }
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Please select at least one post.' : '操作する記事を選択してください。', 400);
+  } catch (PostNotFoundException $e) {
+    error($en ? 'The selected posts do not exist.' : '選択した記事が見つかりません。', 404);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500);
+  }
+  redirect(PHP_SELF . '?mode=admin');
+}
+
+function admin_no_store(): void {
+  if (!headers_sent()) {
+    header('Cache-Control: no-store, private');
+    header('Pragma: no-cache');
+  }
+}
+
+function admin_post_id(): int {
+  global $en;
+
+  $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+  if ($id === false || $id === null) {
+    error($en ? 'Invalid post number.' : '記事番号が不正です。', 400);
+  }
+  return (int)$id;
+}
+
+function require_admin_session(): void {
+  global $admin_pass;
+  global $en;
+
+  admin_no_store();
+  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
+}
+
+function admin_post(): void {
+  global $blade, $dat;
+  global $en;
+
+  require_admin_session();
+  $id = admin_post_id();
+
+  try {
+    $repository = new BoardRepository();
+    $post = $repository->findPost($id);
+    if (!$post) {
+      error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
+    }
+
+    $parent = false;
+    $replies = [];
+    if ((int)$post['thread'] === 1) {
+      $replies = $repository->findRepliesForAdmin($id);
+    } elseif ((int)$post['parent'] > 0) {
+      $parent = $repository->findPost((int)$post['parent']);
+    }
+
+    $picfile = basename((string)$post['picfile']);
+    $thumbnail = basename((string)$post['thumbnail']);
+    $pchfile = basename((string)$post['pchfile']);
+    $post['com_html'] = nl2br(h((string)$post['com']), false);
+    $dat['admin_post'] = $post;
+    $dat['admin_parent'] = $parent;
+    $dat['admin_replies'] = $replies;
+    $dat['admin_pic_url'] = $picfile !== '' && $picfile === (string)$post['picfile']
+      && is_file(IMG_DIR . $picfile) ? IMG_DIR . $picfile : '';
+    $dat['admin_thumbnail_url'] = $thumbnail !== '' && $thumbnail === (string)$post['thumbnail']
+      && is_file(IMG_DIR . $thumbnail) ? IMG_DIR . $thumbnail : '';
+    $dat['admin_pch_playback_url'] = $pchfile !== '' && $pchfile === (string)$post['pchfile']
+      && is_file(IMG_DIR . $pchfile)
+      ? PHP_SELF . '?mode=anime&pch=' . rawurlencode($pchfile)
+      : '';
+    $dat['token'] = RequestSecurity::csrfToken();
+    echo $blade->run(ADMINPOSTFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500);
+  }
+}
+
+function admin_edit(): void {
+  global $admin_pass;
+
+  require_admin_session();
+  editform(admin_post_id(), $admin_pass);
 }
 
 //管理モード
@@ -1711,39 +1903,98 @@ function admin(): void {
   global $blade, $dat;
   global $en;
 
+  admin_no_store();
+  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
   $dat['path'] = IMG_DIR;
+  $dat['token'] = RequestSecurity::csrfToken();
+  $dat['message'] = isset($_SESSION['admin_message']) ? (string)$_SESSION['admin_message'] : '';
+  unset($_SESSION['admin_message']);
 
-  //最大何ページあるのか
-  //記事呼び出しから
+  $filters = [];
+  try {
+    $filters = AdminPostFilter::normalize([
+      'id' => filter_input_data('GET', 'id'),
+      'q' => filter_input_data('GET', 'q'),
+      'name' => filter_input_data('GET', 'name'),
+      'host' => filter_input_data('GET', 'host'),
+      'date_from' => filter_input_data('GET', 'date_from'),
+      'date_to' => filter_input_data('GET', 'date_to'),
+      'type' => filter_input_data('GET', 'type') ?: 'all',
+      'image' => filter_input_data('GET', 'image') ?: 'all',
+      'nsfw' => filter_input_data('GET', 'nsfw') ?: 'all',
+      'visibility' => filter_input_data('GET', 'visibility') ?: 'all',
+      'isAdministrator' => filter_input_data('GET', 'isAdministrator') ?: 'all',
+    ]);
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Invalid administration search criteria.' : '管理画面の検索条件が不正です。', 400);
+  }
+  $dat['admin_filters'] = $filters;
+  $filter_query = AdminPostFilter::query($filters);
+  $dat['admin_filter_query'] = $filter_query === '' ? '' : '&' . $filter_query;
+  $dat['admin_filter_active'] = AdminPostFilter::isActive($filters);
+
+  $page_input = filter_input_data('GET', 'page');
+  $page = 1;
+  if ($page_input !== null && $page_input !== '') {
+    $validated_page = filter_var($page_input, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if ($validated_page === false) {
+      error($en ? 'Invalid administration page number.' : '管理画面のページ番号が不正です。', 400);
+    }
+    $page = (int)$validated_page;
+  }
+  $per_page = max(1, min(100, (int)ADMIN_THREADS_PER_PAGE));
+
   try {
     $repository = new BoardRepository();
-    //読み込み
-    $adminpass = filter_input(INPUT_POST, 'adminpass');
-    if ($adminpass === $admin_pass) {
-      $oya = array();
-      foreach ($repository->listForAdmin(true) as $bbsline) {
-        if (empty($bbsline)) {
-          break;
-        } //スレがなくなったら抜ける
-        //$oya_id = $bbsline["tid"]; //スレのtid(親番号)を取得
-        $bbsline['com'] = htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5);
-        $oya[] = $bbsline;
-      }
-      $dat['oya'] = $oya;
-
-      //スレッドの記事を取得
-      $ko = array();
-      foreach ($repository->listForAdmin(false) as $res) {
-        $res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
-        $ko[] = $res;
-      }
-      $dat['ko'] = $ko;
-      echo $blade->run(ADMINFILE, $dat);
-    } else {
-      error($en ? 'Please enter the admin password.' : '管理パスを入力してください');
+    $dashboard_stats = $repository->adminDashboardStats();
+    $cached_usage = $_SESSION['admin_image_usage'] ?? null;
+    if (!is_array($cached_usage) || !isset($cached_usage['measured_at'], $cached_usage['files'], $cached_usage['bytes'])
+      || (int)$cached_usage['measured_at'] < time() - 300) {
+      $usage = ImageService::directoryUsage(IMG_DIR);
+      $cached_usage = $usage + ['measured_at' => time()];
+      $_SESSION['admin_image_usage'] = $cached_usage;
     }
-  } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    $dashboard_stats['image_files'] = max(0, (int)$cached_usage['files']);
+    $dashboard_stats['image_bytes'] = max(0, (int)$cached_usage['bytes']);
+    $dashboard_stats['image_size'] = ImageService::formatBytes($dashboard_stats['image_bytes']);
+    $dat['admin_stats'] = $dashboard_stats;
+    $total_posts = $repository->countAdminPosts($filters);
+    $total_threads = $repository->countAdminThreads($filters);
+    $total_pages = max(1, (int)ceil($total_threads / $per_page));
+    if ($page > $total_pages) {
+      error($en ? 'The administration page does not exist.' : '指定された管理画面のページはありません。', 404);
+    }
+    $offset = ($page - 1) * $per_page;
+
+    $oya = array();
+    foreach ($repository->listAdminThreads($offset, $per_page, $filters) as $bbsline) {
+      if (empty($bbsline)) break;
+      $bbsline['_admin_matched'] = AdminPostFilter::matches($bbsline, $filters);
+      $bbsline['com'] = htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5);
+      $oya[] = $bbsline;
+    }
+    $dat['oya'] = $oya;
+
+    $ko = array();
+    $parent_ids = array_column($oya, 'tid');
+    foreach ($repository->listAdminReplies($parent_ids) as $res) {
+      $res['_admin_matched'] = AdminPostFilter::matches($res, $filters);
+      $res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
+      $ko[(int)$res['parent']][] = $res;
+    }
+    $dat['ko'] = $ko;
+    $dat['admin_page'] = $page;
+    $dat['admin_total_pages'] = $total_pages;
+    $dat['admin_total_posts'] = $total_posts;
+    $dat['admin_total_threads'] = $total_threads;
+    $dat['admin_range_start'] = $total_threads === 0 ? 0 : $offset + 1;
+    $dat['admin_range_end'] = $offset + count($oya);
+    $dat['admin_page_posts'] = count($oya) + array_sum(array_map('count', $ko));
+    echo $blade->run(ADMINFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500);
   }
 }
 

@@ -4,6 +4,8 @@
 
 `index.php`はリクエストの受け取りと画面遷移を担当します。投稿入力の取得と検証は`post.inc.php`の`PostValidator`へ追加してください。DB接続や画像ファイル操作を追加する場合は、直接実装せず以下の層へ追加してください。
 
+外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定しています。
+
 `PostValidator`は必須項目、文字数、NGワード、日本語フィルター、コメントURL、拒否ホストを画面描画から独立して検証します。
 
 `PostService`は新規投稿の準備、二重投稿判定、スレッド・返信作成、age更新、投稿者・管理者パスワードの認証、投稿編集、削除、管理者による非表示化を担当します。投稿に関するDB更新を`index.php`へ直接追加しないでください。
@@ -17,6 +19,8 @@
 ## リクエストセキュリティ
 
 `request_security.inc.php`の`RequestSecurity`がセッションの安全な開始、CSRFトークン生成、POST・同一オリジン・ユーザーコード・CSRFトークンの検証を担当します。検証失敗は`RequestSecurityException`として画面制御側へ返します。
+
+同ファイルの`AdminAuth`が管理者ログイン状態、管理パス変更時の失効、無操作タイムアウト、ログアウトを担当します。管理操作では管理パスをフォームで持ち回らず、`AdminAuth::isAuthenticated()`とCSRF検証を使用してください。
 
 `request_info.inc.php`の`RequestInfo`がクライアントIPなど、HTTPリクエスト由来の情報の取得と正規化を担当します。
 
@@ -33,6 +37,16 @@
 - `DatabaseMigrator`：スキーマ作成、バックアップ、マイグレーション
 
 新規投稿、一覧、カタログ、返信、編集、管理一覧、ログ上限削除を含む投稿クエリは`BoardRepository`へ集約しています。新しい投稿クエリも`index.php`へ直接SQLを書かず、`BoardRepository`へ追加します。
+
+管理一覧は`listAdminThreads()`で親スレッドをページ分割し、表示対象の親IDだけを`listAdminReplies()`へ渡します。レスを親と同じページに保つため、ページ境界は投稿単位ではなく親スレッド単位です。
+
+管理画面の検索条件は`AdminPostFilter`で正規化し、同じ条件からSQL、PHP上の一致判定、ページリンク用クエリを生成します。レスが検索に一致した場合は親記事も文脈として表示しますが、削除チェックボックスは条件に一致した記事だけに表示します。
+
+管理画面の非表示・再表示は`board_log.invz`を更新し、投稿本文と関連画像は保持します。`PostService::setVisibilityManyAsAdmin()`を経由し、完全削除とは別の操作として扱います。
+
+管理画面の記事番号から`mode=admin_post`の投稿詳細を開けます。詳細画面は管理者セッションを必須とし、投稿情報、親子関係、画像・動画情報、公開状態を確認して、編集・非表示・再表示・完全削除へ進めます。
+
+管理画面の基本統計は`BoardRepository::adminDashboardStats()`で1回のSQLに集約します。画像ディレクトリのファイル数と容量は走査負荷を抑えるため管理者セッションへ5分間キャッシュし、管理画面から完全削除した場合は破棄します。
 
 ## 画像
 

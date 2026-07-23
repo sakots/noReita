@@ -1,0 +1,13 @@
+{
+    "name": "sakots/noreita",
+    "description": "noReita oekaki bulletin board",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.0",
+        "eftec/bladeone": "4.19.1"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

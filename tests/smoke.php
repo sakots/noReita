@@ -67,6 +67,36 @@ smoke_test('request client IP is resolved from supported sources', static functi
     && RequestInfo::clientIp(['HTTP_CLIENT_IP' => 'not-an-ip']) === '';
 });
 
+smoke_test('administrator session validates password changes and idle timeout', static function (): bool {
+  $now = 1_700_000_000;
+  $session = [
+    'admin_auth_fingerprint' => AdminAuth::sessionFingerprint('admin-secret'),
+    'admin_auth_last_activity' => $now - 60,
+  ];
+  return AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now)
+    && !AdminAuth::hasValidSession($session, 'changed-secret', 1800, $now)
+    && !AdminAuth::hasValidSession($session, 'admin-secret', 30, $now)
+    && !AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now - 120);
+});
+
+smoke_test('Blade include names match template filename case', static function (): bool {
+  $theme = dirname(__DIR__) . '/noreita/theme/monoreita';
+  $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($theme));
+  foreach ($iterator as $file) {
+    if (!$file->isFile() || !str_ends_with($file->getFilename(), '.blade.php')) continue;
+    $source = file_get_contents($file->getPathname());
+    if (!is_string($source)) return false;
+    preg_match_all("/@include\\(['\"]([^'\"]+)['\"]/", $source, $matches);
+    foreach ($matches[1] as $include) {
+      $path = $theme . DIRECTORY_SEPARATOR . str_replace('.', DIRECTORY_SEPARATOR, $include) . '.blade.php';
+      if (!is_file($path)) {
+        throw new RuntimeException("missing template {$include} referenced by {$file->getFilename()}");
+      }
+    }
+  }
+  return true;
+});
+
 smoke_test('SQLite read and write', static function (): bool {
   $db = new PDO('sqlite::memory:');
   $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -216,6 +246,55 @@ smoke_test('failed database operation is rolled back', static function (): bool 
   return false;
 });
 
+smoke_test('administrator pagination keeps replies with their parent thread', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $insert = static function (int $thread, ?int $parent, int $tree, string $subject) use ($repository): int {
+    return $repository->insertPost([
+      'thread' => $thread, 'parent' => $parent, 'tree' => $tree,
+      'sub' => $subject, 'com' => '本文', 'a_name' => '名前',
+      'pwd' => password_hash('pass', PASSWORD_DEFAULT), 'picfile' => '',
+      'invz' => 0, 'age' => $tree,
+    ]);
+  };
+  $old = $insert(1, null, 100, '古い親');
+  $middle = $insert(1, null, 200, '中間の親');
+  $new = $insert(1, null, 300, '新しい親');
+  $reply_one = $insert(0, $middle, 201, '中間のレス1');
+  $reply_two = $insert(0, $middle, 202, '中間のレス2');
+  $db->exec("UPDATE board_log SET picfile='reply.png', nsfw=1, invz=1, admins=1 WHERE tid={$reply_two}");
+
+  $page = $repository->listAdminThreads(1, 1);
+  $replies = $repository->listAdminReplies(array_column($page, 'tid'));
+  $page_ids = array_map(static fn(array $row): int => (int)$row['tid'], $page);
+  $reply_filter = AdminPostFilter::normalize(['q' => 'レス1', 'type' => 'reply']);
+  $filtered_page = $repository->listAdminThreads(0, 10, $reply_filter);
+  $filter_valid = $repository->countAdminPosts($reply_filter) === 1
+    && $repository->countAdminThreads($reply_filter) === 1
+    && count($filtered_page) === 1 && (int)$filtered_page[0]['tid'] === $middle
+    && !AdminPostFilter::matches($filtered_page[0], $reply_filter)
+    && AdminPostFilter::matches($repository->findPost($reply_one), $reply_filter)
+    && str_contains(AdminPostFilter::query($reply_filter), 'q=%E3%83%AC%E3%82%B91');
+  try {
+    AdminPostFilter::normalize(['date_from' => '2026-02-30']);
+    return false;
+  } catch (InvalidArgumentException $e) {
+  }
+
+  $stats = $repository->adminDashboardStats();
+  return $filter_valid && $repository->countAdminPosts() === 5
+    && $repository->countAdminThreads() === 3
+    && $stats['total'] === 5 && $stats['threads'] === 3 && $stats['replies'] === 2
+    && $stats['images'] === 1 && $stats['nsfw'] === 1 && $stats['hidden'] === 1
+    && $stats['administrators'] === 1 && $stats['today'] === 5
+    && $stats['last_7_days'] === 5 && $stats['last_30_days'] === 5
+    && count($page) === 1 && (int)$page[0]['tid'] === $middle
+    && array_map(static fn(array $row): int => (int)$row['tid'], $replies) === [$reply_one, $reply_two]
+    && !in_array($old, $page_ids, true)
+    && !in_array($new, $page_ids, true);
+});
+
 smoke_test('UUIDv7 format and uniqueness', static function (): bool {
   $first = generate_uuid();
   $second = generate_uuid();
@@ -308,9 +387,31 @@ smoke_test('post service centralizes edit and delete authorization', static func
 
     if ($service->delete($hide_id, 'admin-pass', false) !== 'hidden'
       || (int)($repository->findPost($hide_id)['invz'] ?? 0) !== 1) return false;
+    if ($service->setVisibilityManyAsAdmin([$hide_id], false) !== 1
+      || (int)($repository->findPost($hide_id)['invz'] ?? 1) !== 0
+      || $service->setVisibilityManyAsAdmin([$hide_id, $hide_id], true) !== 1
+      || (int)($repository->findPost($hide_id)['invz'] ?? 0) !== 1) return false;
     if ($service->delete($delete_id, 'delete-pass', false) !== 'deleted'
       || $repository->findPost($delete_id) !== false
       || is_file($image_dir . DIRECTORY_SEPARATOR . 'owner.png')) return false;
+
+    $batch_parent = $insert('一括削除親', 'parent-pass', 'batch-parent.png');
+    $batch_reply = $repository->insertPost([
+      'thread' => 0, 'parent' => $batch_parent, 'sub' => '一括削除レス', 'com' => '本文',
+      'a_name' => '名前', 'pwd' => password_hash('reply-pass', PASSWORD_DEFAULT),
+      'picfile' => 'batch-reply.png', 'invz' => 0, 'age' => 0, 'tree' => time(),
+    ]);
+    $batch_other = $insert('一括削除別記事', 'other-pass', 'batch-other.png');
+    foreach (['batch-parent.png', 'batch-reply.png', 'batch-other.png'] as $image) {
+      file_put_contents($image_dir . DIRECTORY_SEPARATOR . $image, 'image');
+    }
+    if ($service->deleteManyAsAdmin([$batch_parent, $batch_reply, $batch_other, $batch_other, 'invalid']) !== 3
+      || $repository->findPost($batch_parent) !== false
+      || $repository->findPost($batch_reply) !== false
+      || $repository->findPost($batch_other) !== false) return false;
+    foreach (['batch-parent.png', 'batch-reply.png', 'batch-other.png'] as $image) {
+      if (is_file($image_dir . DIRECTORY_SEPARATOR . $image)) return false;
+    }
 
     $new_input = [
       'name' => '投稿者', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
@@ -375,6 +476,27 @@ smoke_test('image MIME mapping', static function (): bool {
     && get_image_type('image/png') === '.png'
     && get_image_type('image/webp') === '.webp'
     && get_image_type('image/avif') === '.avif';
+});
+
+smoke_test('image directory usage is counted and formatted', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_usage_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'one.png', str_repeat('a', 1024));
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'two.pch', str_repeat('b', 512));
+    mkdir($directory . DIRECTORY_SEPARATOR . 'nested', 0700);
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'ignored.png', 'ignored');
+    $usage = ImageService::directoryUsage($directory);
+    return $usage === ['files' => 2, 'bytes' => 1536]
+      && ImageService::formatBytes($usage['bytes']) === '1.5 KiB'
+      && ImageService::formatBytes(0) === '0 B';
+  } finally {
+    safe_unlink($directory . DIRECTORY_SEPARATOR . 'one.png');
+    safe_unlink($directory . DIRECTORY_SEPARATOR . 'two.pch');
+    safe_unlink($directory . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'ignored.png');
+    if (is_dir($directory . DIRECTORY_SEPARATOR . 'nested')) rmdir($directory . DIRECTORY_SEPARATOR . 'nested');
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('animation filenames reject path traversal', static function (): bool {

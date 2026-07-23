@@ -7,8 +7,8 @@ if (!extension_loaded('curl') || !extension_loaded('pdo_sqlite')) {
 }
 
 $source = dirname(__DIR__) . '/noreita';
-if (!is_file($source . '/BladeOne/lib/BladeOne.php')) {
-  fwrite(STDERR, "BladeOne is not installed. Run this test against an assembled release tree.\n");
+if (!is_file($source . '/vendor/autoload.php')) {
+  fwrite(STDERR, "Composer dependencies are not installed. Run composer install --working-dir=noreita.\n");
   exit(1);
 }
 
@@ -112,6 +112,7 @@ try {
   $config = str_replace("const BASE = 'https://example.com/noreita/';", "const BASE = 'http://localhost/';", $config);
   $config = str_replace('const EXTERNAL_IMAGE_THUMB = 1;', 'const EXTERNAL_IMAGE_THUMB = 0;', $config);
   $config = str_replace('const USE_MISSKEY_NOTE = 1;', 'const USE_MISSKEY_NOTE = 0;', $config);
+  $config = str_replace('const ADMIN_THREADS_PER_PAGE = 50;', 'const ADMIN_THREADS_PER_PAGE = 1;', $config);
   if (file_put_contents($webroot . '/config.php', $config) === false) {
     throw new RuntimeException('Could not create test config.php');
   }
@@ -160,6 +161,72 @@ try {
   [$status] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
+
+  [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$admin_detail_unauthorized_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
+  [$admin_edit_unauthorized_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
+  [$admin_manage_unauthorized_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'delno' => ['1'], 'token' => $token,
+  ]);
+  integration_test('administration routes require a login session', static function () use (
+    $admin_unauthorized_status, $admin_detail_unauthorized_status,
+    $admin_edit_unauthorized_status, $admin_manage_unauthorized_status
+  ): bool {
+    return $admin_unauthorized_status === 403
+      && $admin_detail_unauthorized_status === 403
+      && $admin_edit_unauthorized_status === 403
+      && $admin_manage_unauthorized_status === 403;
+  });
+
+  [$admin_login_form_status, $admin_login_form_body] = http_request($base_url . '?mode=admin_in', $cookie_jar);
+  integration_test('administrator login form contains a CSRF token', static function () use ($admin_login_form_status, $admin_login_form_body, $token): bool {
+    return $admin_login_form_status === 200
+      && str_contains($admin_login_form_body, 'mode=admin_login')
+      && str_contains($admin_login_form_body, 'name="token" value="' . $token . '"');
+  });
+
+  [$admin_wrong_password_status] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+    'adminpass' => 'wrong-admin-pass', 'token' => $token,
+  ]);
+  integration_test('administrator login rejects a wrong password', static function () use ($admin_wrong_password_status): bool {
+    return $admin_wrong_password_status === 403;
+  });
+
+  [$admin_login_status] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+    'adminpass' => 'integration-admin-pass', 'token' => $token,
+  ]);
+  $admin_session_id = cookie_value($cookie_jar, 'noreita_session');
+  $token = $admin_session_id === null ? '' : hash('sha256', $admin_session_id);
+  [$admin_status, $admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  integration_test('administrator login persists in the session', static function () use ($admin_login_status, $admin_status, $admin_body): bool {
+    return $admin_login_status === 302 && $admin_status === 200
+      && str_contains($admin_body, 'ADMIN MODE')
+      && str_contains($admin_body, '基本統計')
+      && str_contains($admin_body, '総投稿数')
+      && str_contains($admin_body, '画像ディレクトリ:')
+      && str_contains($admin_body, 'mode=admin_logout')
+      && str_contains($admin_body, 'mode=admin_manage')
+      && str_contains($admin_body, 'value="hide"')
+      && str_contains($admin_body, 'value="show"')
+      && str_contains($admin_body, 'value="delete"');
+  });
+
+  [$admin_empty_operation_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'token' => $token,
+  ]);
+  [$admin_invalid_operation_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'invalid', 'token' => $token,
+  ]);
+  [$admin_missing_post_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'delno' => ['999999'], 'token' => $token,
+  ]);
+  integration_test('administrator bulk operation validates selection and operation', static function () use (
+    $admin_empty_operation_status, $admin_invalid_operation_status, $admin_missing_post_status
+  ): bool {
+    return $admin_empty_operation_status === 400
+      && $admin_invalid_operation_status === 400
+      && $admin_missing_post_status === 404;
+  });
 
   $share_title = '共有テスト';
   $share_target = 'https://example.com/post/1';
@@ -213,6 +280,44 @@ try {
   });
 
   $post_id = (int)($row['tid'] ?? 0);
+  [$admin_manage_csrf_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => 'invalid-token',
+  ]);
+  $after_invalid_admin_csrf = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  integration_test('administrator post management rejects an invalid CSRF token', static function () use (
+    $admin_manage_csrf_status, $after_invalid_admin_csrf
+  ): bool {
+    return $admin_manage_csrf_status === 403 && $after_invalid_admin_csrf === 0;
+  });
+
+  [$admin_detail_status, $admin_detail_body] = http_request(
+    $base_url . '?mode=admin_post&id=' . $post_id, $cookie_jar
+  );
+  [$admin_detail_invalid_status] = http_request($base_url . '?mode=admin_post&id=invalid', $cookie_jar);
+  [$admin_detail_missing_status] = http_request($base_url . '?mode=admin_post&id=999999', $cookie_jar);
+  [$admin_detail_edit_status, $admin_detail_edit_body] = http_request(
+    $base_url . '?mode=admin_edit&id=' . $post_id, $cookie_jar
+  );
+  integration_test('administrator can inspect a post detail', static function () use (
+    $admin_detail_status, $admin_detail_body, $admin_detail_invalid_status,
+    $admin_detail_missing_status, $post_id, $marker
+  ): bool {
+    return $admin_detail_status === 200
+      && str_contains($admin_detail_body, '投稿詳細 No.' . $post_id)
+      && str_contains($admin_detail_body, $marker)
+      && str_contains($admin_detail_body, 'mode=admin_edit')
+      && str_contains($admin_detail_body, 'name="operation" value="hide"')
+      && $admin_detail_invalid_status === 400
+      && $admin_detail_missing_status === 404;
+  });
+  integration_test('administrator can open the edit form from a post detail', static function () use (
+    $admin_detail_edit_status, $admin_detail_edit_body
+  ): bool {
+    return $admin_detail_edit_status === 200
+      && str_contains($admin_detail_edit_body, 'mode=editexec')
+      && str_contains($admin_detail_edit_body, 'name="e_no"');
+  });
+
   $password_hash_before_edit = (string)$db->query('SELECT pwd FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
   [$rejected_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Attacker', 'mail' => '', 'url' => '',
@@ -310,6 +415,19 @@ try {
   });
 
   $image_post_id = (int)($image_row['tid'] ?? 0);
+  [$image_admin_detail_status, $image_admin_detail_body] = http_request(
+    $base_url . '?mode=admin_post&id=' . $image_post_id, $cookie_jar
+  );
+  integration_test('administrator post detail links animation to the playback screen', static function () use (
+    $image_admin_detail_status, $image_admin_detail_body, $image_base
+  ): bool {
+    return $image_admin_detail_status === 200
+      && str_contains($image_admin_detail_body, 'mode=anime')
+      && str_contains($image_admin_detail_body, 'pch=' . $image_base . '.pch')
+      && str_contains($image_admin_detail_body, '動画を再生する')
+      && !str_contains($image_admin_detail_body, '>関連する動画ファイルを開く<');
+  });
+
   [$image_edit_form_status, $image_edit_form_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);
@@ -400,6 +518,38 @@ try {
       && str_contains($replacement_body, 'id="edit_nsfw"');
   });
 
+  [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);
+  [$admin_page_two_status, $admin_page_two_body] = http_request($base_url . '?mode=admin&page=2', $cookie_jar);
+  [$admin_filtered_status, $admin_filtered_body] = http_request($base_url . '?mode=admin&isAdministrator=no&page=1', $cookie_jar);
+  [$admin_search_status, $admin_search_body] = http_request(
+    $base_url . '?mode=admin&q=' . rawurlencode("Administrator's edit"), $cookie_jar
+  );
+  [$admin_invalid_filter_status] = http_request($base_url . '?mode=admin&image=invalid', $cookie_jar);
+  [$admin_invalid_page_status] = http_request($base_url . '?mode=admin&page=invalid', $cookie_jar);
+  [$admin_missing_page_status] = http_request($base_url . '?mode=admin&page=99', $cookie_jar);
+  integration_test('administration pagination keeps thread pages separate and validates page numbers', static function () use (
+    $admin_page_one_status, $admin_page_one_body, $admin_page_two_status, $admin_page_two_body,
+    $admin_filtered_status, $admin_filtered_body, $admin_search_status, $admin_search_body,
+    $admin_invalid_filter_status, $admin_invalid_page_status, $admin_missing_page_status, $image_post_id, $post_id
+  ): bool {
+    return $admin_page_one_status === 200 && $admin_page_two_status === 200
+      && str_contains($admin_page_one_body, 'name="delno[]" value="' . $image_post_id . '"')
+      && !str_contains($admin_page_one_body, 'name="delno[]" value="' . $post_id . '"')
+      && str_contains($admin_page_one_body, 'page=2')
+      && str_contains($admin_page_two_body, 'name="delno[]" value="' . $post_id . '"')
+      && !str_contains($admin_page_two_body, 'name="delno[]" value="' . $image_post_id . '"')
+      && str_contains($admin_page_two_body, 'page=1')
+      && $admin_filtered_status === 200
+      && str_contains($admin_filtered_body, 'isAdministrator=no')
+      && str_contains($admin_filtered_body, 'page=2')
+      && $admin_search_status === 200
+      && str_contains($admin_search_body, 'name="delno[]" value="' . $post_id . '"')
+      && !str_contains($admin_search_body, 'name="delno[]" value="' . $image_post_id . '"')
+      && str_contains($admin_search_body, '検索結果')
+      && $admin_invalid_filter_status === 400
+      && $admin_invalid_page_status === 400 && $admin_missing_page_status === 404;
+  });
+
   [$image_delete_status] = http_request($base_url, $cookie_jar, [
     'mode' => 'del', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);
@@ -412,17 +562,82 @@ try {
       && !is_file($webroot . '/img/' . $image_base . '.pch');
   });
 
-  [$delete_status, $delete_body] = http_request($base_url, $cookie_jar, [
-    'mode' => 'del', 'delno' => (string)$post_id, 'pwd' => 'delete-pass',
+  [$admin_with_posts_status, $admin_with_posts_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  integration_test('administration screen renders a checkbox for each post', static function () use ($admin_with_posts_status, $admin_with_posts_body, $post_id): bool {
+    return $admin_with_posts_status === 200
+      && str_contains($admin_with_posts_body, 'name="delno[]" value="' . $post_id . '"')
+      && str_contains($admin_with_posts_body, 'mode=admin_post&amp;id=' . $post_id)
+      && !str_contains($admin_with_posts_body, 'name="adminpass"');
+  });
+
+  [$hide_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => $token,
+  ]);
+  $hidden_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  [$hidden_detail_status, $hidden_detail_body] = http_request(
+    $base_url . '?mode=admin_post&id=' . $post_id, $cookie_jar
+  );
+  [$hidden_filter_status, $hidden_filter_body] = http_request(
+    $base_url . '?mode=admin&visibility=hidden', $cookie_jar
+  );
+  [$hidden_search_status, $hidden_search_body] = http_request(
+    $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
+  );
+  integration_test('administrator can hide checked posts and find them with the hidden filter', static function () use (
+    $hide_status, $hidden_value, $hidden_detail_status, $hidden_detail_body,
+    $hidden_filter_status, $hidden_filter_body, $hidden_search_status, $hidden_search_body, $post_id
+  ): bool {
+    return $hide_status === 302 && $hidden_value === 1
+      && $hidden_detail_status === 200 && str_contains($hidden_detail_body, 'この記事を再表示')
+      && $hidden_filter_status === 200
+      && str_contains($hidden_filter_body, 'name="delno[]" value="' . $post_id . '"')
+      && str_contains($hidden_filter_body, '非表示')
+      && str_contains($hidden_filter_body, 'selected post(s) were hidden')
+      && $hidden_search_status === 200 && str_contains($hidden_search_body, '0件');
+  });
+
+  [$show_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'show', 'delno' => [(string)$post_id], 'token' => $token,
+  ]);
+  $visible_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  [$visible_admin_status, $visible_admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$visible_search_status, $visible_search_body] = http_request(
+    $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
+  );
+  integration_test('administrator can make checked posts visible again', static function () use (
+    $show_status, $visible_value, $visible_admin_status, $visible_admin_body,
+    $visible_search_status, $visible_search_body, $marker
+  ): bool {
+    return $show_status === 302 && $visible_value === 0
+      && $visible_admin_status === 200 && str_contains($visible_admin_body, 'selected post(s) were made visible')
+      && $visible_search_status === 200 && str_contains($visible_search_body, $marker);
+  });
+
+  [$delete_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'delete', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $remaining = (int)$db->query('SELECT COUNT(*) FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
-  integration_test('delete removes the post through HTTP', static function () use ($delete_status, $remaining): bool {
-    return $delete_status === 200 && $remaining === 0;
+  integration_test('administrator can delete checked posts without resending the password', static function () use ($delete_status, $remaining): bool {
+    return $delete_status === 302 && $remaining === 0;
   });
 
   [$empty_status, $empty_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
   integration_test('deleted post disappears from search', static function () use ($empty_status, $empty_body): bool {
     return $empty_status === 200 && str_contains($empty_body, '0件');
+  });
+
+  [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
+  [$admin_after_logout_status] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$admin_detail_after_logout_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
+  [$admin_edit_after_logout_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
+  integration_test('administrator logout destroys access to every administration screen', static function () use (
+    $admin_logout_status, $admin_after_logout_status,
+    $admin_detail_after_logout_status, $admin_edit_after_logout_status
+  ): bool {
+    return $admin_logout_status === 302
+      && $admin_after_logout_status === 403
+      && $admin_detail_after_logout_status === 403
+      && $admin_edit_after_logout_status === 403;
   });
 } catch (Throwable $e) {
   echo "FAIL: integration setup ({$e->getMessage()})\n";
