@@ -163,8 +163,19 @@ try {
   $token = $session_id === null ? '' : hash('sha256', $session_id);
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
-  integration_test('administration screen requires a login session', static function () use ($admin_unauthorized_status): bool {
-    return $admin_unauthorized_status === 403;
+  [$admin_detail_unauthorized_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
+  [$admin_edit_unauthorized_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
+  [$admin_manage_unauthorized_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'delno' => ['1'], 'token' => $token,
+  ]);
+  integration_test('administration routes require a login session', static function () use (
+    $admin_unauthorized_status, $admin_detail_unauthorized_status,
+    $admin_edit_unauthorized_status, $admin_manage_unauthorized_status
+  ): bool {
+    return $admin_unauthorized_status === 403
+      && $admin_detail_unauthorized_status === 403
+      && $admin_edit_unauthorized_status === 403
+      && $admin_manage_unauthorized_status === 403;
   });
 
   [$admin_login_form_status, $admin_login_form_body] = http_request($base_url . '?mode=admin_in', $cookie_jar);
@@ -206,10 +217,15 @@ try {
   [$admin_invalid_operation_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'invalid', 'token' => $token,
   ]);
+  [$admin_missing_post_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'delno' => ['999999'], 'token' => $token,
+  ]);
   integration_test('administrator bulk operation validates selection and operation', static function () use (
-    $admin_empty_operation_status, $admin_invalid_operation_status
+    $admin_empty_operation_status, $admin_invalid_operation_status, $admin_missing_post_status
   ): bool {
-    return $admin_empty_operation_status === 400 && $admin_invalid_operation_status === 400;
+    return $admin_empty_operation_status === 400
+      && $admin_invalid_operation_status === 400
+      && $admin_missing_post_status === 404;
   });
 
   $share_title = '共有テスト';
@@ -264,6 +280,16 @@ try {
   });
 
   $post_id = (int)($row['tid'] ?? 0);
+  [$admin_manage_csrf_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
+    'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => 'invalid-token',
+  ]);
+  $after_invalid_admin_csrf = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  integration_test('administrator post management rejects an invalid CSRF token', static function () use (
+    $admin_manage_csrf_status, $after_invalid_admin_csrf
+  ): bool {
+    return $admin_manage_csrf_status === 403 && $after_invalid_admin_csrf === 0;
+  });
+
   [$admin_detail_status, $admin_detail_body] = http_request(
     $base_url . '?mode=admin_post&id=' . $post_id, $cookie_jar
   );
@@ -548,6 +574,9 @@ try {
     'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $hidden_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  [$hidden_detail_status, $hidden_detail_body] = http_request(
+    $base_url . '?mode=admin_post&id=' . $post_id, $cookie_jar
+  );
   [$hidden_filter_status, $hidden_filter_body] = http_request(
     $base_url . '?mode=admin&visibility=hidden', $cookie_jar
   );
@@ -555,13 +584,15 @@ try {
     $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
   );
   integration_test('administrator can hide checked posts and find them with the hidden filter', static function () use (
-    $hide_status, $hidden_value, $hidden_filter_status, $hidden_filter_body,
-    $hidden_search_status, $hidden_search_body, $post_id
+    $hide_status, $hidden_value, $hidden_detail_status, $hidden_detail_body,
+    $hidden_filter_status, $hidden_filter_body, $hidden_search_status, $hidden_search_body, $post_id
   ): bool {
     return $hide_status === 302 && $hidden_value === 1
+      && $hidden_detail_status === 200 && str_contains($hidden_detail_body, 'この記事を再表示')
       && $hidden_filter_status === 200
       && str_contains($hidden_filter_body, 'name="delno[]" value="' . $post_id . '"')
       && str_contains($hidden_filter_body, '非表示')
+      && str_contains($hidden_filter_body, 'selected post(s) were hidden')
       && $hidden_search_status === 200 && str_contains($hidden_search_body, '0件');
   });
 
@@ -569,13 +600,16 @@ try {
     'operation' => 'show', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $visible_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  [$visible_admin_status, $visible_admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$visible_search_status, $visible_search_body] = http_request(
     $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
   );
   integration_test('administrator can make checked posts visible again', static function () use (
-    $show_status, $visible_value, $visible_search_status, $visible_search_body, $marker
+    $show_status, $visible_value, $visible_admin_status, $visible_admin_body,
+    $visible_search_status, $visible_search_body, $marker
   ): bool {
     return $show_status === 302 && $visible_value === 0
+      && $visible_admin_status === 200 && str_contains($visible_admin_body, 'selected post(s) were made visible')
       && $visible_search_status === 200 && str_contains($visible_search_body, $marker);
   });
 
@@ -594,8 +628,16 @@ try {
 
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
   [$admin_after_logout_status] = http_request($base_url . '?mode=admin', $cookie_jar);
-  integration_test('administrator logout destroys the login session', static function () use ($admin_logout_status, $admin_after_logout_status): bool {
-    return $admin_logout_status === 302 && $admin_after_logout_status === 403;
+  [$admin_detail_after_logout_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
+  [$admin_edit_after_logout_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
+  integration_test('administrator logout destroys access to every administration screen', static function () use (
+    $admin_logout_status, $admin_after_logout_status,
+    $admin_detail_after_logout_status, $admin_edit_after_logout_status
+  ): bool {
+    return $admin_logout_status === 302
+      && $admin_after_logout_status === 403
+      && $admin_detail_after_logout_status === 403
+      && $admin_edit_after_logout_status === 403;
   });
 } catch (Throwable $e) {
   echo "FAIL: integration setup ({$e->getMessage()})\n";
