@@ -56,6 +56,9 @@ const CATALOGFILE = "monoreita_catalog";
 //管理モードのテンプレートファイル
 const ADMINFILE = "monoreita_admin";
 
+//管理モードの記事詳細テンプレートファイル
+const ADMINPOSTFILE = "monoreita_admin_post";
+
 //SNSシェア選択のテンプレートファイル
 const SET_SHARE_SERVER = "monoreita_sns_share";
 

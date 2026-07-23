@@ -148,7 +148,7 @@
                     <span title="検索結果の親記事">－</span>
                   @endif
                 </td>
-                <td>{{$bbsline['tid']}}</td>
+                <td><a href="{{$self}}?mode=admin_post&amp;id={{$bbsline['tid']}}">{{$bbsline['tid']}}</a></td>
                 <td>{{$bbsline['a_name']}}</td>
                 <td>{{$bbsline['modified']}}</td>
                 <td>{!! mb_substr($bbsline['sub'], 0, 6) !!}</td>
@@ -171,7 +171,7 @@
                         <span title="検索結果の関連レス">－</span>
                       @endif
                     </td>
-                    <td>└{{$res['tid']}}</td>
+                    <td>└<a href="{{$self}}?mode=admin_post&amp;id={{$res['tid']}}">{{$res['tid']}}</a></td>
                     <td>{{$res['a_name']}}</td>
                     <td>{{$res['modified']}}</td>
                     <td>{!! mb_substr($res['sub'], 0, 6) !!}</td>

@@ -234,6 +234,12 @@ final class BoardRepository {
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
+  public function findRepliesForAdmin(int $parent): array {
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE parent = ? ORDER BY comid ASC');
+    $statement->execute([$parent]);
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
   public function incrementSodane(int $id): int {
     $statement = $this->db->prepare('UPDATE board_log SET sodane = CAST((CAST(sodane AS INTEGER) + 1) AS TEXT) WHERE tid = ?');
     $statement->execute([$id]);

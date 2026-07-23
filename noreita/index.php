@@ -358,6 +358,10 @@ switch ($mode) {
     return admin_delete();
   case 'admin_manage':
     return admin_manage();
+  case 'admin_post':
+    return admin_post();
+  case 'admin_edit':
+    return admin_edit();
   case 'admin': // 管理モード
     return admin();
   case 'set_share_server':
@@ -1819,6 +1823,77 @@ function admin_no_store(): void {
     header('Cache-Control: no-store, private');
     header('Pragma: no-cache');
   }
+}
+
+function admin_post_id(): int {
+  global $en;
+
+  $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+  if ($id === false || $id === null) {
+    error($en ? 'Invalid post number.' : '記事番号が不正です。', 400);
+  }
+  return (int)$id;
+}
+
+function require_admin_session(): void {
+  global $admin_pass;
+  global $en;
+
+  admin_no_store();
+  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
+}
+
+function admin_post(): void {
+  global $blade, $dat;
+  global $en;
+
+  require_admin_session();
+  $id = admin_post_id();
+
+  try {
+    $repository = new BoardRepository();
+    $post = $repository->findPost($id);
+    if (!$post) {
+      error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
+    }
+
+    $parent = false;
+    $replies = [];
+    if ((int)$post['thread'] === 1) {
+      $replies = $repository->findRepliesForAdmin($id);
+    } elseif ((int)$post['parent'] > 0) {
+      $parent = $repository->findPost((int)$post['parent']);
+    }
+
+    $picfile = basename((string)$post['picfile']);
+    $thumbnail = basename((string)$post['thumbnail']);
+    $pchfile = basename((string)$post['pchfile']);
+    $post['com_html'] = nl2br(h((string)$post['com']), false);
+    $dat['admin_post'] = $post;
+    $dat['admin_parent'] = $parent;
+    $dat['admin_replies'] = $replies;
+    $dat['admin_pic_url'] = $picfile !== '' && $picfile === (string)$post['picfile']
+      && is_file(IMG_DIR . $picfile) ? IMG_DIR . $picfile : '';
+    $dat['admin_thumbnail_url'] = $thumbnail !== '' && $thumbnail === (string)$post['thumbnail']
+      && is_file(IMG_DIR . $thumbnail) ? IMG_DIR . $thumbnail : '';
+    $dat['admin_pch_playback_url'] = $pchfile !== '' && $pchfile === (string)$post['pchfile']
+      && is_file(IMG_DIR . $pchfile)
+      ? PHP_SELF . '?mode=anime&pch=' . rawurlencode($pchfile)
+      : '';
+    $dat['token'] = RequestSecurity::csrfToken();
+    echo $blade->run(ADMINPOSTFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500);
+  }
+}
+
+function admin_edit(): void {
+  global $admin_pass;
+
+  require_admin_session();
+  editform(admin_post_id(), $admin_pass);
 }
 
 //管理モード

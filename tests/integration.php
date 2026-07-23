@@ -261,6 +261,34 @@ try {
   });
 
   $post_id = (int)($row['tid'] ?? 0);
+  [$admin_detail_status, $admin_detail_body] = http_request(
+    $base_url . '?mode=admin_post&id=' . $post_id, $cookie_jar
+  );
+  [$admin_detail_invalid_status] = http_request($base_url . '?mode=admin_post&id=invalid', $cookie_jar);
+  [$admin_detail_missing_status] = http_request($base_url . '?mode=admin_post&id=999999', $cookie_jar);
+  [$admin_detail_edit_status, $admin_detail_edit_body] = http_request(
+    $base_url . '?mode=admin_edit&id=' . $post_id, $cookie_jar
+  );
+  integration_test('administrator can inspect a post detail', static function () use (
+    $admin_detail_status, $admin_detail_body, $admin_detail_invalid_status,
+    $admin_detail_missing_status, $post_id, $marker
+  ): bool {
+    return $admin_detail_status === 200
+      && str_contains($admin_detail_body, '投稿詳細 No.' . $post_id)
+      && str_contains($admin_detail_body, $marker)
+      && str_contains($admin_detail_body, 'mode=admin_edit')
+      && str_contains($admin_detail_body, 'name="operation" value="hide"')
+      && $admin_detail_invalid_status === 400
+      && $admin_detail_missing_status === 404;
+  });
+  integration_test('administrator can open the edit form from a post detail', static function () use (
+    $admin_detail_edit_status, $admin_detail_edit_body
+  ): bool {
+    return $admin_detail_edit_status === 200
+      && str_contains($admin_detail_edit_body, 'mode=editexec')
+      && str_contains($admin_detail_edit_body, 'name="e_no"');
+  });
+
   $password_hash_before_edit = (string)$db->query('SELECT pwd FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
   [$rejected_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Attacker', 'mail' => '', 'url' => '',
@@ -358,6 +386,19 @@ try {
   });
 
   $image_post_id = (int)($image_row['tid'] ?? 0);
+  [$image_admin_detail_status, $image_admin_detail_body] = http_request(
+    $base_url . '?mode=admin_post&id=' . $image_post_id, $cookie_jar
+  );
+  integration_test('administrator post detail links animation to the playback screen', static function () use (
+    $image_admin_detail_status, $image_admin_detail_body, $image_base
+  ): bool {
+    return $image_admin_detail_status === 200
+      && str_contains($image_admin_detail_body, 'mode=anime')
+      && str_contains($image_admin_detail_body, 'pch=' . $image_base . '.pch')
+      && str_contains($image_admin_detail_body, '動画を再生する')
+      && !str_contains($image_admin_detail_body, '>関連する動画ファイルを開く<');
+  });
+
   [$image_edit_form_status, $image_edit_form_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);
@@ -496,6 +537,7 @@ try {
   integration_test('administration screen renders a checkbox for each post', static function () use ($admin_with_posts_status, $admin_with_posts_body, $post_id): bool {
     return $admin_with_posts_status === 200
       && str_contains($admin_with_posts_body, 'name="delno[]" value="' . $post_id . '"')
+      && str_contains($admin_with_posts_body, 'mode=admin_post&amp;id=' . $post_id)
       && !str_contains($admin_with_posts_body, 'name="adminpass"');
   });
 
