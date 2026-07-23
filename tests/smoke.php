@@ -263,6 +263,7 @@ smoke_test('administrator pagination keeps replies with their parent thread', st
   $new = $insert(1, null, 300, '新しい親');
   $reply_one = $insert(0, $middle, 201, '中間のレス1');
   $reply_two = $insert(0, $middle, 202, '中間のレス2');
+  $db->exec("UPDATE board_log SET picfile='reply.png', nsfw=1, invz=1, admins=1 WHERE tid={$reply_two}");
 
   $page = $repository->listAdminThreads(1, 1);
   $replies = $repository->listAdminReplies(array_column($page, 'tid'));
@@ -281,8 +282,13 @@ smoke_test('administrator pagination keeps replies with their parent thread', st
   } catch (InvalidArgumentException $e) {
   }
 
+  $stats = $repository->adminDashboardStats();
   return $filter_valid && $repository->countAdminPosts() === 5
     && $repository->countAdminThreads() === 3
+    && $stats['total'] === 5 && $stats['threads'] === 3 && $stats['replies'] === 2
+    && $stats['images'] === 1 && $stats['nsfw'] === 1 && $stats['hidden'] === 1
+    && $stats['administrators'] === 1 && $stats['today'] === 5
+    && $stats['last_7_days'] === 5 && $stats['last_30_days'] === 5
     && count($page) === 1 && (int)$page[0]['tid'] === $middle
     && array_map(static fn(array $row): int => (int)$row['tid'], $replies) === [$reply_one, $reply_two]
     && !in_array($old, $page_ids, true)
@@ -470,6 +476,27 @@ smoke_test('image MIME mapping', static function (): bool {
     && get_image_type('image/png') === '.png'
     && get_image_type('image/webp') === '.webp'
     && get_image_type('image/avif') === '.avif';
+});
+
+smoke_test('image directory usage is counted and formatted', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_usage_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'one.png', str_repeat('a', 1024));
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'two.pch', str_repeat('b', 512));
+    mkdir($directory . DIRECTORY_SEPARATOR . 'nested', 0700);
+    file_put_contents($directory . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'ignored.png', 'ignored');
+    $usage = ImageService::directoryUsage($directory);
+    return $usage === ['files' => 2, 'bytes' => 1536]
+      && ImageService::formatBytes($usage['bytes']) === '1.5 KiB'
+      && ImageService::formatBytes(0) === '0 B';
+  } finally {
+    safe_unlink($directory . DIRECTORY_SEPARATOR . 'one.png');
+    safe_unlink($directory . DIRECTORY_SEPARATOR . 'two.pch');
+    safe_unlink($directory . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'ignored.png');
+    if (is_dir($directory . DIRECTORY_SEPARATOR . 'nested')) rmdir($directory . DIRECTORY_SEPARATOR . 'nested');
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('animation filenames reject path traversal', static function (): bool {

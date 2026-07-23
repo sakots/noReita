@@ -1798,6 +1798,7 @@ function admin_manage(?string $forced_operation = null): void {
     );
     if ($operation === 'delete') {
       $count = $service->deleteManyAsAdmin($selected);
+      unset($_SESSION['admin_image_usage']);
       $_SESSION['admin_message'] = $en
         ? "{$count} selected post(s) were deleted."
         : "選択した{$count}件の記事を完全削除しました。";
@@ -1947,6 +1948,18 @@ function admin(): void {
 
   try {
     $repository = new BoardRepository();
+    $dashboard_stats = $repository->adminDashboardStats();
+    $cached_usage = $_SESSION['admin_image_usage'] ?? null;
+    if (!is_array($cached_usage) || !isset($cached_usage['measured_at'], $cached_usage['files'], $cached_usage['bytes'])
+      || (int)$cached_usage['measured_at'] < time() - 300) {
+      $usage = ImageService::directoryUsage(IMG_DIR);
+      $cached_usage = $usage + ['measured_at' => time()];
+      $_SESSION['admin_image_usage'] = $cached_usage;
+    }
+    $dashboard_stats['image_files'] = max(0, (int)$cached_usage['files']);
+    $dashboard_stats['image_bytes'] = max(0, (int)$cached_usage['bytes']);
+    $dashboard_stats['image_size'] = ImageService::formatBytes($dashboard_stats['image_bytes']);
+    $dat['admin_stats'] = $dashboard_stats;
     $total_posts = $repository->countAdminPosts($filters);
     $total_threads = $repository->countAdminThreads($filters);
     $total_pages = max(1, (int)ceil($total_threads / $per_page));

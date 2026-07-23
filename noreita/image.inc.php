@@ -24,6 +24,33 @@ final class ImageService {
     return in_array(strtolower($matches[1]), self::PLAYABLE_ANIMATION_EXTENSIONS, true);
   }
 
+  /** @return array{files:int,bytes:int} */
+  public static function directoryUsage(string $directory): array {
+    if (!is_dir($directory) || !is_readable($directory)) return ['files' => 0, 'bytes' => 0];
+
+    $files = 0;
+    $bytes = 0;
+    foreach (new DirectoryIterator($directory) as $entry) {
+      if ($entry->isDot() || !$entry->isFile() || $entry->isLink()) continue;
+      $size = $entry->getSize();
+      $files++;
+      if ($size > 0) $bytes += $size;
+    }
+    return ['files' => $files, 'bytes' => $bytes];
+  }
+
+  public static function formatBytes(int $bytes): string {
+    $bytes = max(0, $bytes);
+    $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+    $value = (float)$bytes;
+    $unit = 0;
+    while ($value >= 1024 && $unit < count($units) - 1) {
+      $value /= 1024;
+      $unit++;
+    }
+    return ($unit === 0 ? (string)$bytes : number_format($value, 1)) . ' ' . $units[$unit];
+  }
+
   public static function parseTemporaryMetadata(string $metadata_file): ?array {
     if (!is_file($metadata_file) || !is_readable($metadata_file)
       || strtolower(pathinfo($metadata_file, PATHINFO_EXTENSION)) !== 'dat') {

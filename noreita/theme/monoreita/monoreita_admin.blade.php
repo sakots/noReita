@@ -44,6 +44,35 @@
   </header>
   <main>
     <section class="thread">
+      <h2>基本統計</h2>
+      <table class="delfo">
+        <tr>
+          <th>総投稿数</th>
+          <th>親記事</th>
+          <th>レス</th>
+          <th>画像付き</th>
+          <th>NSFW</th>
+          <th>非表示</th>
+          <th>管理者投稿</th>
+        </tr>
+        <tr>
+          <td>{{$admin_stats['total']}}</td>
+          <td>{{$admin_stats['threads']}}</td>
+          <td>{{$admin_stats['replies']}}</td>
+          <td>{{$admin_stats['images']}}</td>
+          <td>{{$admin_stats['nsfw']}}</td>
+          <td>{{$admin_stats['hidden']}}</td>
+          <td>{{$admin_stats['administrators']}}</td>
+        </tr>
+      </table>
+      <p>
+        本日 {{$admin_stats['today']}}件 /
+        過去7日 {{$admin_stats['last_7_days']}}件 /
+        過去30日 {{$admin_stats['last_30_days']}}件
+      </p>
+      <p>画像ディレクトリ: {{$admin_stats['image_files']}}ファイル / {{$admin_stats['image_size']}}（最大5分間キャッシュ）</p>
+    </section>
+    <section class="thread">
       <form action="{{$self}}" method="get">
         <p>検索</p>
         <input type="hidden" name="mode" value="admin">

@@ -343,6 +343,25 @@ final class BoardRepository {
     return (int)$statement->fetchColumn();
   }
 
+  public function adminDashboardStats(): array {
+    $row = $this->db->query(
+      "SELECT
+        COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN CAST(thread AS INTEGER) = 1 THEN 1 ELSE 0 END), 0) AS threads,
+        COALESCE(SUM(CASE WHEN CAST(thread AS INTEGER) = 0 THEN 1 ELSE 0 END), 0) AS replies,
+        COALESCE(SUM(CASE WHEN COALESCE(picfile, '') != '' THEN 1 ELSE 0 END), 0) AS images,
+        COALESCE(SUM(CASE WHEN CAST(COALESCE(nsfw, 0) AS INTEGER) = 1 THEN 1 ELSE 0 END), 0) AS nsfw,
+        COALESCE(SUM(CASE WHEN CAST(COALESCE(invz, 0) AS INTEGER) = 1 THEN 1 ELSE 0 END), 0) AS hidden,
+        COALESCE(SUM(CASE WHEN CAST(COALESCE(admins, 0) AS INTEGER) = 1 THEN 1 ELSE 0 END), 0) AS administrators,
+        COALESCE(SUM(CASE WHEN date(created) = date('now', 'localtime') THEN 1 ELSE 0 END), 0) AS today,
+        COALESCE(SUM(CASE WHEN date(created) >= date('now', 'localtime', '-6 days') THEN 1 ELSE 0 END), 0) AS last_7_days,
+        COALESCE(SUM(CASE WHEN date(created) >= date('now', 'localtime', '-29 days') THEN 1 ELSE 0 END), 0) AS last_30_days
+      FROM board_log"
+    )->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) throw new RuntimeException('Failed to aggregate administration statistics.');
+    return array_map('intval', $row);
+  }
+
   public function listAdminThreads(int $offset, int $limit, array $filters = []): array {
     $filters = $filters ?: AdminPostFilter::normalize([]);
     $condition = AdminPostFilter::threadCondition($filters);

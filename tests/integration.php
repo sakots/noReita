@@ -190,6 +190,9 @@ try {
   integration_test('administrator login persists in the session', static function () use ($admin_login_status, $admin_status, $admin_body): bool {
     return $admin_login_status === 302 && $admin_status === 200
       && str_contains($admin_body, 'ADMIN MODE')
+      && str_contains($admin_body, '基本統計')
+      && str_contains($admin_body, '総投稿数')
+      && str_contains($admin_body, '画像ディレクトリ:')
       && str_contains($admin_body, 'mode=admin_logout')
       && str_contains($admin_body, 'mode=admin_manage')
       && str_contains($admin_body, 'value="hide"')
