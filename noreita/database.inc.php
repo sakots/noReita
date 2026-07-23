@@ -1,7 +1,7 @@
 <?php
 // database.inc.php for noReita (C) sakots 2026 MIT License
 
-const DATABASE_INC_VER = 20260722;
+const DATABASE_INC_VER = 20260723;
 
 final class Database {
   public static function connect(): PDO {
@@ -43,6 +43,15 @@ final class BoardRepository {
       : 'DELETE FROM board_log WHERE tid = ?';
     $statement = $this->db->prepare($sql);
     $statement->execute($with_replies ? [$id, $id] : [$id]);
+  }
+
+  public function findPostsForDeletion(int $id, bool $with_replies): array {
+    $sql = $with_replies
+      ? 'SELECT * FROM board_log WHERE tid = ? OR parent = ? ORDER BY thread DESC, tid ASC'
+      : 'SELECT * FROM board_log WHERE tid = ?';
+    $statement = $this->db->prepare($sql);
+    $statement->execute($with_replies ? [$id, $id] : [$id]);
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
   public function hidePost(int $id): void {

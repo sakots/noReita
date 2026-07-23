@@ -342,6 +342,24 @@ smoke_test('post service centralizes edit and delete authorization', static func
       || $repository->findPost($delete_id) !== false
       || is_file($image_dir . DIRECTORY_SEPARATOR . 'owner.png')) return false;
 
+    $batch_parent = $insert('一括削除親', 'parent-pass', 'batch-parent.png');
+    $batch_reply = $repository->insertPost([
+      'thread' => 0, 'parent' => $batch_parent, 'sub' => '一括削除レス', 'com' => '本文',
+      'a_name' => '名前', 'pwd' => password_hash('reply-pass', PASSWORD_DEFAULT),
+      'picfile' => 'batch-reply.png', 'invz' => 0, 'age' => 0, 'tree' => time(),
+    ]);
+    $batch_other = $insert('一括削除別記事', 'other-pass', 'batch-other.png');
+    foreach (['batch-parent.png', 'batch-reply.png', 'batch-other.png'] as $image) {
+      file_put_contents($image_dir . DIRECTORY_SEPARATOR . $image, 'image');
+    }
+    if ($service->deleteManyAsAdmin([$batch_parent, $batch_reply, $batch_other, $batch_other, 'invalid']) !== 3
+      || $repository->findPost($batch_parent) !== false
+      || $repository->findPost($batch_reply) !== false
+      || $repository->findPost($batch_other) !== false) return false;
+    foreach (['batch-parent.png', 'batch-reply.png', 'batch-other.png'] as $image) {
+      if (is_file($image_dir . DIRECTORY_SEPARATOR . $image)) return false;
+    }
+
     $new_input = [
       'name' => '投稿者', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
       'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,

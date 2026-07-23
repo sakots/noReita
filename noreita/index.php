@@ -52,7 +52,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260722) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260723) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -73,7 +73,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260721) {
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260722) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260723) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -353,6 +353,8 @@ switch ($mode) {
     return admin_login();
   case 'admin_logout':
     return admin_logout();
+  case 'admin_delete':
+    return admin_delete();
   case 'admin': // 管理モード
     return admin();
   case 'set_share_server':
@@ -1761,6 +1763,37 @@ function admin_logout(): void {
   redirect(PHP_SELF . '?mode=admin_in');
 }
 
+function admin_delete(): void {
+  global $admin_pass, $en;
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
+
+  $selected = filter_input_data('POST', 'delno');
+  if (!is_array($selected)) $selected = [];
+  try {
+    $count = (new PostService(
+      new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST
+    ))->deleteManyAsAdmin($selected);
+    $_SESSION['admin_message'] = $en
+      ? "{$count} selected post(s) were deleted."
+      : "選択した{$count}件の記事を削除しました。";
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Please select at least one post.' : '削除する記事を選択してください。', 400);
+  } catch (PostNotFoundException $e) {
+    error($en ? 'The selected posts do not exist.' : '選択した記事が見つかりません。', 404);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to delete the selected posts.' : '選択した記事の削除に失敗しました。', 500);
+  }
+  redirect(PHP_SELF . '?mode=admin');
+}
+
 function admin_no_store(): void {
   if (!headers_sent()) {
     header('Cache-Control: no-store, private');
@@ -1780,6 +1813,8 @@ function admin(): void {
   }
   $dat['path'] = IMG_DIR;
   $dat['token'] = RequestSecurity::csrfToken();
+  $dat['message'] = isset($_SESSION['admin_message']) ? (string)$_SESSION['admin_message'] : '';
+  unset($_SESSION['admin_message']);
 
   //最大何ページあるのか
   //記事呼び出しから

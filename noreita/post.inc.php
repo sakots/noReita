@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260722;
+const POST_INC_VER = 20260723;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -54,9 +54,32 @@ final class PostService {
       $this->repository->hidePost($post_id);
       return 'hidden';
     }
-    ImageService::deleteRelatedFiles($this->image_dir, (string)$authorization['post']['picfile']);
-    $this->repository->deletePost($post_id, $authorization['role'] === 'admin');
+    $with_replies = $authorization['role'] === 'admin';
+    foreach ($this->repository->findPostsForDeletion($post_id, $with_replies) as $post) {
+      ImageService::deleteRelatedFiles($this->image_dir, (string)$post['picfile']);
+    }
+    $this->repository->deletePost($post_id, $with_replies);
     return 'deleted';
+  }
+
+  public function deleteManyAsAdmin(array $post_ids): int {
+    $ids = [];
+    foreach ($post_ids as $post_id) {
+      $id = filter_var($post_id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+      if ($id !== false) $ids[(int)$id] = (int)$id;
+    }
+    if ($ids === []) throw new InvalidArgumentException('No posts were selected.');
+
+    $deleted_ids = [];
+    foreach ($ids as $id) {
+      if ($this->repository->findPost($id) === false) continue;
+      foreach ($this->repository->findPostsForDeletion($id, true) as $post) {
+        $deleted_ids[(int)$post['tid']] = true;
+      }
+      $this->delete($id, $this->admin_pass, true);
+    }
+    if ($deleted_ids === []) throw new PostNotFoundException('Posts were not found.');
+    return count($deleted_ids);
   }
 
   public function prepareNewPost(array $input, string $host, array $settings): array {

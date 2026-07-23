@@ -43,15 +43,18 @@
     </div>
   </header>
   <main>
+    <form action="{{$self}}?mode=admin_delete" method="post" onsubmit="return confirm('選択した記事を削除します。よろしいですか？');">
+      <input type="hidden" name="token" value="{{$token}}">
     <div>
       <div class="thread">
         <section class="delf">
-          @include('components.monoreita_adminDeleteForm') <!-- 管理モードの削除フォーム -->
+          <button class="button" type="submit">選択した記事を削除</button>
         </section>
       </div>
       <section class="thread">
         <table class="delfo">
           <tr>
+            <th><input type="checkbox" id="admin-select-all" aria-label="すべて選択"></th>
             <th>ID</th>
             <th>name</th>
             <th>date</th>
@@ -64,6 +67,7 @@
           @if (!empty($oya))
             @foreach ($oya as $bbsline)
               <tr>
+                <td><input type="checkbox" name="delno[]" value="{{$bbsline['tid']}}" aria-label="記事{{$bbsline['tid']}}を選択"></td>
                 <td>{{$bbsline['tid']}}</td>
                 <td>{{$bbsline['a_name']}}</td>
                 <td>{{$bbsline['modified']}}</td>
@@ -81,6 +85,7 @@
                 @foreach ($ko as $res)
                   @if ($bbsline['tid'] == $res['parent'])
                   <tr>
+                    <td><input type="checkbox" name="delno[]" value="{{$res['tid']}}" aria-label="記事{{$res['tid']}}を選択"></td>
                     <td>└{{$res['tid']}}</td>
                     <td>{{$res['a_name']}}</td>
                     <td>{{$res['modified']}}</td>
@@ -104,13 +109,21 @@
     </div>
     <div class="thread">
       <section class="delf">
-        @include('components.monoreita_adminDeleteForm') <!-- 管理モードの削除フォーム -->
+        <button class="button" type="submit">選択した記事を削除</button>
       </section>
     </div>
+    </form>
   </main>
   <footer id="footer">
     @include('components.monoreita_footerCopy') <!-- コピーライト -->
   </footer>
+  <script>
+    document.getElementById('admin-select-all')?.addEventListener('change', function () {
+      document.querySelectorAll('input[name="delno[]"]').forEach((checkbox) => {
+        checkbox.checked = this.checked;
+      });
+    });
+  </script>
 </body>
 
 </html>

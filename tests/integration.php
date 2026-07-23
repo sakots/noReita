@@ -189,7 +189,13 @@ try {
   integration_test('administrator login persists in the session', static function () use ($admin_login_status, $admin_status, $admin_body): bool {
     return $admin_login_status === 302 && $admin_status === 200
       && str_contains($admin_body, 'ADMIN MODE')
-      && str_contains($admin_body, 'mode=admin_logout');
+      && str_contains($admin_body, 'mode=admin_logout')
+      && str_contains($admin_body, 'mode=admin_delete');
+  });
+
+  [$admin_empty_delete_status] = http_request($base_url . '?mode=admin_delete', $cookie_jar, ['token' => $token]);
+  integration_test('administrator bulk delete requires a selection', static function () use ($admin_empty_delete_status): bool {
+    return $admin_empty_delete_status === 400;
   });
 
   $share_title = '共有テスト';
@@ -443,12 +449,19 @@ try {
       && !is_file($webroot . '/img/' . $image_base . '.pch');
   });
 
-  [$delete_status, $delete_body] = http_request($base_url, $cookie_jar, [
-    'mode' => 'del', 'delno' => (string)$post_id, 'admindel' => 'admindel', 'token' => $token,
+  [$admin_with_posts_status, $admin_with_posts_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  integration_test('administration screen renders a checkbox for each post', static function () use ($admin_with_posts_status, $admin_with_posts_body, $post_id): bool {
+    return $admin_with_posts_status === 200
+      && str_contains($admin_with_posts_body, 'name="delno[]" value="' . $post_id . '"')
+      && !str_contains($admin_with_posts_body, 'name="adminpass"');
+  });
+
+  [$delete_status] = http_request($base_url . '?mode=admin_delete', $cookie_jar, [
+    'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $remaining = (int)$db->query('SELECT COUNT(*) FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
-  integration_test('administrator session can delete without resending the password', static function () use ($delete_status, $remaining): bool {
-    return $delete_status === 200 && $remaining === 0;
+  integration_test('administrator can delete checked posts without resending the password', static function () use ($delete_status, $remaining): bool {
+    return $delete_status === 302 && $remaining === 0;
   });
 
   [$empty_status, $empty_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
