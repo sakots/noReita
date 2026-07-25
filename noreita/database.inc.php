@@ -561,12 +561,27 @@ final class DatabaseMigrator {
       $backup_path = $this->backup_dir . DIRECTORY_SEPARATOR . "{$base_name}-schema{$from_version}-{$timestamp}-{$suffix}.db";
     }
 
-    if (version_compare((string)$this->db->query('SELECT sqlite_version()')->fetchColumn(), '3.27.0', '>=')) {
-      $this->db->exec('VACUUM INTO ' . $this->db->quote($backup_path));
-    } else {
-      $this->createLegacyBackup($backup_path);
+    $previous_umask = umask(0077);
+    try {
+      if (version_compare((string)$this->db->query('SELECT sqlite_version()')->fetchColumn(), '3.27.0', '>=')) {
+        $this->db->exec('VACUUM INTO ' . $this->db->quote($backup_path));
+      } else {
+        $this->createLegacyBackup($backup_path);
+      }
+    } finally {
+      umask($previous_umask);
     }
-    chmod($backup_path, 0600);
+    clearstatcache(true, $backup_path);
+    $permission = fileperms($backup_path);
+    if ($permission === false) throw new RuntimeException('Could not read database backup permissions.');
+    if (($permission & 0777) !== 0600) {
+      @chmod($backup_path, 0600);
+      clearstatcache(true, $backup_path);
+      $permission = fileperms($backup_path);
+      if ($permission === false || (($permission & 0777) & 0077) !== 0) {
+        throw new RuntimeException('Could not secure database backup permissions.');
+      }
+    }
     return $backup_path;
   }
 

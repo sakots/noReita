@@ -59,7 +59,7 @@ if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260725) {
 // initialization.inc
 check_file(__DIR__.'/initialization.inc.php');
 require_once(__DIR__.'/initialization.inc.php');
-if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260723) {
+if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260725) {
   die($en ? 'Please update initialization.inc.php to the latest version.' : 'initialization.inc.phpを最新版に更新してください。');
 }
 
@@ -144,9 +144,13 @@ use eftec\bladeone\BladeOne;
 $views = __DIR__ . '/theme/' . THEME_DIR; // テンプレートフォルダ
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
-// キャッシュフォルダがなかったら作成
-if (!file_exists($cache)) {
-  mkdir($cache, PERMISSION_FOR_PRIVATE_DIR);
+// Bladeキャッシュに必要な場所だけを書き込み可能にする。
+if (!is_dir($cache) && !@mkdir($cache, PERMISSION_FOR_PRIVATE_DIR, true) && !is_dir($cache)) {
+  die($en ? 'Failed to create the Blade cache directory.' : 'Bladeキャッシュディレクトリを作成できません。');
+}
+if (!is_readable($cache) || !is_writable($cache)) {
+  die($en ? 'The Blade cache directory is not readable and writable.'
+    : 'Bladeキャッシュディレクトリを読み書きできません。');
 }
 
 $blade = new BladeOne($views, $cache, BladeOne::MODE_AUTO); // MODE_DEBUGだと開発モード MODE_AUTOが速い。

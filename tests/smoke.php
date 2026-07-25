@@ -174,7 +174,8 @@ smoke_test('database migration and backup', static function (): bool {
     }
 
     $backup_db = new PDO('sqlite:' . $backup);
-    return $backup_db->query('SELECT com FROM board_log')->fetchColumn() === 'preserved';
+    return $backup_db->query('SELECT com FROM board_log')->fetchColumn() === 'preserved'
+      && (fileperms($backup) & 0777) === 0600;
   } finally {
     foreach (glob($directory . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . '*.db') ?: [] as $file) {
       if (is_file($file)) unlink($file);
@@ -243,15 +244,24 @@ smoke_test('application initialization prepares runtime state', static function 
     } catch (RuntimeException $e) {
       $unsafe_permission_rejected = $e->getMessage() === 'Invalid directory permission configuration.';
     }
+    $read_only_root_supported = chmod($root, 0555);
+    if ($read_only_root_supported) {
+      clearstatcache(true, $root);
+      $read_only_root_supported = (fileperms($root) & 0777) === 0555;
+      $initializer->prepareDirectories();
+      chmod($root, 0700);
+    }
     return count(ApplicationInitializer::securityHeaders()) === 5
       && $schema_version === DatabaseMigrator::SCHEMA_VERSION
       && $unsafe_permission_rejected
+      && $read_only_root_supported
       && !array_filter(array_keys($directories), static fn(string $directory): bool => !is_dir($directory))
       && (fileperms($public_image) & 0777) === 0755
       && (fileperms($public_temp) & 0777) === 0755
       && (fileperms($private_session) & 0777) === 0700
       && (fileperms($database_file) & 0777) === 0600;
   } finally {
+    if (is_dir($root)) chmod($root, 0700);
     foreach ([$database_file, $database_file . '-wal', $database_file . '-shm'] as $file) {
       if (is_file($file)) unlink($file);
     }
