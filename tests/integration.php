@@ -77,6 +77,7 @@ function remove_tree(string $path): void {
 
 function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1'): array {
   $curl = curl_init($url);
+  $response_headers = [];
   curl_setopt_array($curl, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_FOLLOWLOCATION => false,
@@ -87,6 +88,15 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
       'Host: localhost', 'Origin: http://localhost',
       'Client-IP: ' . $forwarded_for, 'X-Forwarded-For: ' . $forwarded_for,
     ],
+    CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$response_headers): int {
+      $length = strlen($header);
+      $separator = strpos($header, ':');
+      if ($separator !== false) {
+        $name = strtolower(trim(substr($header, 0, $separator)));
+        $response_headers[$name] = trim(substr($header, $separator + 1));
+      }
+      return $length;
+    },
   ]);
   if ($post !== null) {
     curl_setopt($curl, CURLOPT_POST, true);
@@ -99,7 +109,7 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
   if ($body === false) {
     throw new RuntimeException("HTTP request failed: {$error}");
   }
-  return [$status, $body, $redirect_url];
+  return [$status, $body, $redirect_url, $response_headers];
 }
 
 function cookie_value(string $cookie_jar, string $name): ?string {
@@ -699,10 +709,10 @@ try {
   [$rate_second_status, $rate_second_body] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
     'adminpass' => $rate_limit_password, 'token' => $rate_limit_token,
   ]);
-  [$rate_third_status, $rate_third_body] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+  [$rate_third_status, $rate_third_body, , $rate_third_headers] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
     'adminpass' => $rate_limit_password, 'token' => $rate_limit_token,
   ]);
-  [$rate_correct_status, $rate_correct_body] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+  [$rate_correct_status, $rate_correct_body, , $rate_correct_headers] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
     'adminpass' => 'integration-admin-pass', 'token' => $rate_limit_token,
   ]);
   $rate_limit_records = glob($webroot . '/session/admin-login-*.json') ?: [];
@@ -713,13 +723,18 @@ try {
   integration_test('administrator login rate limit blocks repeated failures without storing passwords', static function () use (
     $rate_limit_form_body, $rate_first_status, $rate_first_body, $rate_second_status, $rate_second_body,
     $rate_third_status, $rate_third_body, $rate_correct_status, $rate_correct_body,
-    $rate_limit_password, $rate_limit_records, $rate_limit_record, $rate_limit_log
+    $rate_third_headers, $rate_correct_headers, $rate_limit_password,
+    $rate_limit_records, $rate_limit_record, $rate_limit_log
   ): bool {
     $responses = $rate_limit_form_body . $rate_first_body . $rate_second_body . $rate_third_body . $rate_correct_body;
+    $third_retry_after = $rate_third_headers['retry-after'] ?? '';
+    $correct_retry_after = $rate_correct_headers['retry-after'] ?? '';
     return $rate_first_status === 403
       && $rate_second_status === 403
       && $rate_third_status === 429
       && $rate_correct_status === 429
+      && ctype_digit($third_retry_after) && (int)$third_retry_after > 0
+      && ctype_digit($correct_retry_after) && (int)$correct_retry_after > 0
       && str_contains($rate_third_body, 'Too many administrator login attempts')
       && count($rate_limit_records) === 1
       && !str_contains($rate_limit_record, $rate_limit_password)
