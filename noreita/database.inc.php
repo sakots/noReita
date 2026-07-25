@@ -1,7 +1,7 @@
 <?php
 // database.inc.php for noReita (C) sakots 2026 MIT License
 
-const DATABASE_INC_VER = 20260723;
+const DATABASE_INC_VER = 20260725;
 
 final class AdminPostFilter {
   private const ENUMS = [
