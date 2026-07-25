@@ -1,5 +1,6 @@
 # noReita
 
+![php](https://img.shields.io/badge/php-7.4-green.svg)
 ![php](https://img.shields.io/badge/php-8.x-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
@@ -71,6 +72,11 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ## 履歴
 
 [すべての履歴はこちら](changelog.md)
+
+### [2026/07/23] v3.7.1
+
+- 動作要件をPHP7.4以上に下げた
+  - PHP7.4はすでにサポートの終了したバージョンです。できるだけPHP8.2以上の環境でご利用ください。
 
 ### [2026/07/23] v3.7.0
 
