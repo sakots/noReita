@@ -4,14 +4,28 @@
 const INITIALIZATION_INC_VER = 20260723;
 
 final class ApplicationInitializer {
+  private string $database_dsn;
+  private string $database_file;
+  private string $backup_dir;
+  private string $application_root;
+  private array $directories;
+  private int $database_permission;
+
   public function __construct(
-    private string $database_dsn,
-    private string $database_file,
-    private string $backup_dir,
-    private string $application_root,
-    private array $directories,
-    private int $database_permission = 0600
-  ) {}
+    string $database_dsn,
+    string $database_file,
+    string $backup_dir,
+    string $application_root,
+    array $directories,
+    int $database_permission = 0600
+  ) {
+    $this->database_dsn = $database_dsn;
+    $this->database_file = $database_file;
+    $this->backup_dir = $backup_dir;
+    $this->application_root = $application_root;
+    $this->directories = $directories;
+    $this->database_permission = $database_permission;
+  }
 
   public static function securityHeaders(): array {
     return [

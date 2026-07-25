@@ -1,6 +1,17 @@
 <?php
 declare(strict_types=1);
 
+if (!function_exists('str_contains')) {
+  function str_contains(string $haystack, string $needle): bool {
+    return $needle === '' || strpos($haystack, $needle) !== false;
+  }
+}
+if (!function_exists('str_starts_with')) {
+  function str_starts_with(string $haystack, string $needle): bool {
+    return $needle === '' || strpos($haystack, $needle) === 0;
+  }
+}
+
 if (!extension_loaded('curl') || !extension_loaded('pdo_sqlite')) {
   fwrite(STDERR, "curl and pdo_sqlite extensions are required.\n");
   exit(1);
@@ -130,10 +141,11 @@ try {
   if (!is_resource($process)) throw new RuntimeException('Could not start PHP server');
 
   $ready = false;
+  $startup_body = '';
   for ($attempt = 0; $attempt < 50; $attempt++) {
     usleep(100000);
     try {
-      [$status] = http_request($base_url, $cookie_jar);
+      [$status, $startup_body] = http_request($base_url, $cookie_jar);
       if ($status === 200) {
         $ready = true;
         break;
@@ -142,6 +154,9 @@ try {
     }
   }
   if (!$ready) throw new RuntimeException('PHP server did not become ready');
+  if (str_contains($startup_body, 'Please update') || str_contains($startup_body, '最新版に更新してください')) {
+    throw new RuntimeException('Application startup failed: ' . trim(strip_tags($startup_body)));
+  }
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
     $db = new PDO('sqlite:' . $webroot . '/reita.db');

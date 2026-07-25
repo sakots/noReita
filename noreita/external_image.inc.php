@@ -1,20 +1,30 @@
 <?php
 // external_image.inc.php for noReita (C) sakots 2026 MIT License
 
-const EXTERNAL_IMAGE_INC_VER = 20260718;
+const EXTERNAL_IMAGE_INC_VER = 20260725;
 
 final class ExternalImageService {
   public const MAX_BYTES = 1024 * 1024;
   private const MAX_REDIRECTS = 5;
   private const THUMBNAIL_EXTENSIONS = ['avif', 'webp', 'jpg', 'png', 'gif'];
+  private string $thumbnail_dir;
+  private string $thumbnail_url;
+  private int $thumbnail_width;
+  private int $file_permission;
+  private int $directory_permission;
 
   public function __construct(
-    private string $thumbnail_dir,
-    private string $thumbnail_url = 'thumbnail/',
-    private int $thumbnail_width = 200,
-    private int $file_permission = 0600,
-    private int $directory_permission = 0700,
+    string $thumbnail_dir,
+    string $thumbnail_url = 'thumbnail/',
+    int $thumbnail_width = 200,
+    int $file_permission = 0600,
+    int $directory_permission = 0700
   ) {
+    $this->thumbnail_dir = $thumbnail_dir;
+    $this->thumbnail_url = $thumbnail_url;
+    $this->thumbnail_width = $thumbnail_width;
+    $this->file_permission = $file_permission;
+    $this->directory_permission = $directory_permission;
   }
 
   // 本文中の外部画像URLへ、キャッシュしたサムネイルを追加する。
@@ -76,7 +86,8 @@ final class ExternalImageService {
   }
 
   // URLのホストを公開IPに解決する。全ての解決結果が安全な場合だけ返す。
-  public static function resolvePublicIp(string $host): string|false {
+  /** @return string|false */
+  public static function resolvePublicIp(string $host) {
     if (filter_var($host, FILTER_VALIDATE_IP)) {
       $addresses = [$host];
     } else {
@@ -102,7 +113,8 @@ final class ExternalImageService {
   }
 
   // HTTP Locationを現在のURLを基準に絶対URLへ変換する。
-  public static function resolveRedirectUrl(string $base_url, string $location): string|false {
+  /** @return string|false */
+  public static function resolveRedirectUrl(string $base_url, string $location) {
     $location = trim($location);
     if ($location === '' || preg_match('/[\x00-\x1F\x7F]/', $location)) return false;
     if (preg_match('|^https?://|i', $location)) return $location;
@@ -126,7 +138,8 @@ final class ExternalImageService {
   }
 
   // TLS、接続先IP、リダイレクト先、容量、画像内容を検証して取得する。
-  public static function downloadImage(string $url): string|false {
+  /** @return string|false */
+  public static function downloadImage(string $url) {
     if (!function_exists('curl_init')) return false;
 
     for ($redirects = 0; $redirects <= self::MAX_REDIRECTS; $redirects++) {

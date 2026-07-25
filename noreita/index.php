@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.7.0 lot.260723.0';
+const REITA_VER = 'v3.7.1 lot.260725.0';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -14,8 +14,8 @@ $en = (stripos($lang,'ja')!== 0);
 
 // phpのバージョンが古い場合動かさせない
 $php_ver = PHP_VERSION;
-if (version_compare($php_ver, '8.0.0', '<')) {
-  die($en ? "PHP version 8.0 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン8.0以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
+if (version_compare($php_ver, '7.4.0', '<')) {
+  die($en ? "PHP version 7.4 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.4以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
 }
 
 // functions.phpの存在とバージョンを確認
@@ -23,7 +23,7 @@ if (!is_file(__DIR__.'/functions.php')) {
   die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
 }
 require_once(__DIR__.'/functions.php');
-if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260722) {
+if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260725) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
@@ -52,7 +52,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260723) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260725) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -80,7 +80,7 @@ if(!defined('POST_INC_VER') || POST_INC_VER < 20260723) {
 // share.inc
 check_file(__DIR__.'/share.inc.php');
 require_once(__DIR__.'/share.inc.php');
-if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260718) {
+if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
   die($en ? 'Please update share.inc.php to the latest version.' : 'share.inc.phpを最新版に更新してください。');
 }
 
@@ -115,7 +115,7 @@ if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260716) {
 // external_image.inc
 check_file(__DIR__.'/external_image.inc.php');
 require_once(__DIR__.'/external_image.inc.php');
-if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260718) {
+if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260725) {
   error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
 }
 
@@ -1060,7 +1060,7 @@ function res(): void {
 }
 
 //お絵描き画面
-function paint_form(string $rep, int|null $reply_to): void {
+function paint_form(string $rep, ?int $reply_to): void {
   global $message, $usercode, $quality, $qualitys, $no;
   global $mode, $ctype, $pch, $type;
   global $blade, $dat;

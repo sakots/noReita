@@ -2,8 +2,10 @@
 
 set -euo pipefail
 
-if ! command -v php >/dev/null 2>&1; then
-  echo "php command not found" >&2
+PHP_BIN="${PHP_BIN:-php}"
+
+if ! command -v "$PHP_BIN" >/dev/null 2>&1; then
+  echo "PHP command not found: ${PHP_BIN}" >&2
   exit 1
 fi
 
@@ -18,8 +20,8 @@ if ((${#php_files[@]} == 0)); then
   exit 1
 fi
 
-echo "Linting ${#php_files[@]} PHP files with PHP $(php -r 'echo PHP_VERSION;')"
+echo "Linting ${#php_files[@]} PHP files with PHP $("$PHP_BIN" -r 'echo PHP_VERSION;')"
 
 for php_file in "${php_files[@]}"; do
-  php -l "$php_file"
+  "$PHP_BIN" -l "$php_file"
 done
