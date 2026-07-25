@@ -93,7 +93,7 @@ smoke_test('administrator session validates password changes and idle timeout', 
     && !AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now - 120);
 });
 
-smoke_test('administrator login rate limit locks by IP and clears after success', static function (): bool {
+smoke_test('administrator login rate limit locks by IP, clears after success, and removes expired records', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_admin_limit_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
   try {
@@ -115,7 +115,24 @@ smoke_test('administrator login rate limit locks by IP and clears after success'
     if ($limiter->retryAfter('192.0.2.10', 103) !== 0) return false;
 
     $limiter->recordFailure('192.0.2.20', 200);
-    return $limiter->recordFailure('192.0.2.20', 261) === 0;
+    if ($limiter->recordFailure('192.0.2.20', 261) !== 0) return false;
+
+    $before = glob($directory . DIRECTORY_SEPARATOR . 'admin-login-*.json') ?: [];
+    $limiter->recordFailure('192.0.2.30', 300);
+    $after = glob($directory . DIRECTORY_SEPARATOR . 'admin-login-*.json') ?: [];
+    $expired_records = array_values(array_diff($after, $before));
+    if (count($expired_records) !== 1 || !touch($expired_records[0], 100)) return false;
+
+    $before = $after;
+    $limiter->recordFailure('192.0.2.31', 300);
+    $after = glob($directory . DIRECTORY_SEPARATOR . 'admin-login-*.json') ?: [];
+    $fresh_records = array_values(array_diff($after, $before));
+    if (count($fresh_records) !== 1 || !touch($fresh_records[0], 400)) return false;
+
+    clearstatcache();
+    return $limiter->cleanupExpired(500) === 1
+      && !is_file($expired_records[0])
+      && is_file($fresh_records[0]);
   } finally {
     foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
       if (is_file($file)) unlink($file);

@@ -1774,6 +1774,8 @@ function admin_login(): void {
   );
   $retry_after = 0;
   try {
+    // 成否にかかわらず、ログイン試行時に期限切れ記録を少しずつ掃除する。
+    if (random_int(1, 100) === 1) $limiter->cleanupExpired();
     $retry_after = $limiter->retryAfter($client_ip);
   } catch (Throwable $e) {
     error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500);
@@ -1800,7 +1802,6 @@ function admin_login(): void {
   }
   try {
     $limiter->clear($client_ip);
-    if (random_int(1, 100) === 1) $limiter->cleanupExpired();
   } catch (Throwable $e) {
     error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500);
   }
