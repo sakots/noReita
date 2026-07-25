@@ -6,8 +6,10 @@ const SAVE_INC_VER = 20260716; //save.inc.phpのバージョン
 
 class image_save{
 
-  private int|string $security_timer,$imgfile,$en,$count,$errtext,$session_usercode; // プロパティとして宣言
-  private int|string $tool,$repcode,$stime,$resto,$timer,$error_type,$hide_animation,$pmax_w,$pmax_h,$usercode_header;
+  /** @var int|string */
+  private $security_timer,$imgfile,$en,$count,$errtext,$session_usercode;
+  /** @var int|string */
+  private $tool,$repcode,$stime,$resto,$timer,$error_type,$hide_animation,$pmax_w,$pmax_h,$usercode_header;
   
   function __construct(){
 

@@ -1,5 +1,22 @@
 <?php
-const FUNCTIONS_VER = 20260722;
+const FUNCTIONS_VER = 20260725;
+
+// PHP 8で追加された文字列関数のPHP 7.4向け互換実装
+if (!function_exists('str_contains')) {
+  function str_contains(string $haystack, string $needle): bool {
+    return $needle === '' || strpos($haystack, $needle) !== false;
+  }
+}
+if (!function_exists('str_starts_with')) {
+  function str_starts_with(string $haystack, string $needle): bool {
+    return $needle === '' || strpos($haystack, $needle) === 0;
+  }
+}
+if (!function_exists('str_ends_with')) {
+  function str_ends_with(string $haystack, string $needle): bool {
+    return $needle === '' || substr($haystack, -strlen($needle)) === $needle;
+  }
+}
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {
@@ -64,7 +81,7 @@ function get_image_type(string $img_type, ?string $dest = null): string {
  * @param string|array $strs
  * @return bool
  */
-function is_ngword(array $ngwords, string|array $strs): bool {
+function is_ngword(array $ngwords, $strs): bool {
   if (empty($ngwords)) {
     return false;
   }
@@ -183,7 +200,11 @@ function redirect(string $url): void {
 }
 
 //filter_input のラッパー関数
-function filter_input_data(string $input, string $key, int|string $filter=0): mixed {
+/**
+ * @param int|string $filter
+ * @return mixed
+ */
+function filter_input_data(string $input, string $key, $filter=0) {
   // $_GETまたは$_POSTからデータを取得
   $value = null;
   if ($input === 'GET') {
@@ -213,7 +234,7 @@ function filter_input_data(string $input, string $key, int|string $filter=0): mi
 }
 
 //エスケープ
-function h(string|null $str): string {
+function h(?string $str): string {
   if(zero_check($str)){
     return '0';
   }
@@ -223,7 +244,7 @@ function h(string|null $str): string {
   return htmlspecialchars($str,ENT_QUOTES,"utf-8",false);
 }
 //タブ除去
-function t(string|null $str): string {
+function t(?string $str): string {
   if(zero_check($str)){
     return '0';
   }
@@ -233,7 +254,7 @@ function t(string|null $str): string {
   return str_replace("\t","",(string)$str);
 }
 //タグ除去
-function s(string|null $str): string {
+function s(?string $str): string {
   if(zero_check($str)){
     return '0';
   }
@@ -244,7 +265,8 @@ function s(string|null $str): string {
 }
 
 // 0 または "0" かどうか
-function zero_check(string|int|null $str): bool {
+/** @param string|int|null $str */
+function zero_check($str): bool {
   return($str === 0 || $str === '0');
 }
 

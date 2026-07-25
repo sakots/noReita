@@ -10,6 +10,14 @@ Linux/WSL上では、プロジェクトのルートディレクトリで以下�
 ./scripts/integration-test.sh
 ```
 
+別名のPHPコマンドでテストする場合は、`PHP_BIN`を指定します。例えばPHP 7.4のコマンドが`php74`の場合は次のように実行できます。
+
+```bash
+PHP_BIN=php74 ./scripts/lint-php.sh
+PHP_BIN=php74 ./scripts/smoke-test.sh
+PHP_BIN=php74 ./scripts/integration-test.sh
+```
+
 `./scripts/lint-php.sh`ではPHP構文チェック、
 `./scripts/smoke-test.sh`ではスモークテスト、
 `./scripts/integration-test.sh`ではHTTP結合テストが行なえます。

@@ -32,7 +32,7 @@ function checker_options(array $arguments): array {
       $repair = true;
     } elseif ($argument === '--help' || $argument === '-h') {
       $help = true;
-    } elseif (str_starts_with($argument, '--root=')) {
+    } elseif (strpos($argument, '--root=') === 0) {
       $root = substr($argument, strlen('--root='));
     } else {
       throw new InvalidArgumentException("Unknown option: {$argument}");
@@ -91,7 +91,7 @@ function checker_configuration(string $root): array {
 }
 
 function checker_absolute_path(string $root, string $path): string {
-  if (str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1) return $path;
+  if (strpos($path, '/') === 0 || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1) return $path;
   return $root . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
 }
 

@@ -1,7 +1,7 @@
 <?php
 // share.inc.php for noReita (C) sakots 2026 MIT License
 
-const SHARE_INC_VER = 20260718;
+const SHARE_INC_VER = 20260725;
 
 final class ShareService {
   private const DEFAULT_SERVERS = [
@@ -35,12 +35,20 @@ final class ShareService {
       throw new InvalidArgumentException('A valid sharing destination is required.');
     }
 
-    $endpoint = match ($server) {
-      'https://x.com', 'https://twitter.com' => 'https://twitter.com/intent/tweet?text=',
-      'https://bsky.app' => 'https://bsky.app/intent/compose?text=',
-      'https://www.threads.net' => 'https://www.threads.net/intent/post?text=',
-      default => $server . '/share?text=',
-    };
+    switch ($server) {
+      case 'https://x.com':
+      case 'https://twitter.com':
+        $endpoint = 'https://twitter.com/intent/tweet?text=';
+        break;
+      case 'https://bsky.app':
+        $endpoint = 'https://bsky.app/intent/compose?text=';
+        break;
+      case 'https://www.threads.net':
+        $endpoint = 'https://www.threads.net/intent/post?text=';
+        break;
+      default:
+        $endpoint = $server . '/share?text=';
+    }
     return $endpoint . rawurlencode($title . ' ' . $url);
   }
 

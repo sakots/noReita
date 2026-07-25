@@ -169,7 +169,8 @@ final class BoardRepository {
     $this->db = $db ?? Database::connect();
   }
 
-  public function findPost(int $id): array|false {
+  /** @return array|false */
+  public function findPost(int $id) {
     $statement = $this->db->prepare('SELECT * FROM board_log WHERE tid = ?');
     $statement->execute([$id]);
     return $statement->fetch(PDO::FETCH_ASSOC);
@@ -276,7 +277,8 @@ final class BoardRepository {
     }
   }
 
-  public function latestThread(): array|false {
+  /** @return array|false */
+  public function latestThread() {
     return $this->db->query('SELECT * FROM board_log WHERE thread=1 ORDER BY tid DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
   }
 
@@ -390,7 +392,8 @@ final class BoardRepository {
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
-  public function oldestPost(): array|false {
+  /** @return array|false */
+  public function oldestPost() {
     return $this->db->query('SELECT * FROM board_log ORDER BY tid LIMIT 1')->fetch(PDO::FETCH_ASSOC);
   }
 

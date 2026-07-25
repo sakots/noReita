@@ -14,13 +14,25 @@ interface AdminPostManagementService {
 }
 
 final class PostService implements AdminPostManagementService {
+  private BoardRepository $repository;
+  private string $admin_pass;
+  private string $image_dir;
+  private int $thumbnail_width;
+  private int $file_permission;
+
   public function __construct(
-    private BoardRepository $repository,
-    private string $admin_pass,
-    private string $image_dir,
-    private int $thumbnail_width = 0,
-    private int $file_permission = 0600,
-  ) {}
+    BoardRepository $repository,
+    string $admin_pass,
+    string $image_dir,
+    int $thumbnail_width = 0,
+    int $file_permission = 0600
+  ) {
+    $this->repository = $repository;
+    $this->admin_pass = $admin_pass;
+    $this->image_dir = $image_dir;
+    $this->thumbnail_width = $thumbnail_width;
+    $this->file_permission = $file_permission;
+  }
 
   public function authorize(int $post_id, string $password): array {
     $post = $this->repository->findPost($post_id);
@@ -210,13 +222,15 @@ final class PostInput {
     return self::ctypeFromQuery($sources['session_usercode'] ?? null);
   }
 
-  private static function ctypeFromQuery(mixed $query): ?string {
+  /** @param mixed $query */
+  private static function ctypeFromQuery($query): ?string {
     if (!is_string($query) || $query === '') return null;
     parse_str($query, $values);
     return self::validCtype($values['ctype'] ?? null);
   }
 
-  private static function validCtype(mixed $ctype): ?string {
+  /** @param mixed $ctype */
+  private static function validCtype($ctype): ?string {
     return is_string($ctype) && in_array($ctype, self::CTYPES, true) ? $ctype : null;
   }
 }

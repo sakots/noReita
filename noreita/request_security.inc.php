@@ -79,7 +79,8 @@ final class RequestSecurity {
     self::assertSameOriginRequest((string)($GLOBALS['usercode'] ?? ''), $english);
   }
 
-  public static function sessionValue(string $key, mixed $default = null): mixed {
+  /** @param mixed $default @return mixed */
+  public static function sessionValue(string $key, $default = null) {
     self::startSession();
     return $_SESSION[$key] ?? $default;
   }

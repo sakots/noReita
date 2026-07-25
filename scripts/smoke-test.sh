@@ -2,10 +2,11 @@
 
 set -euo pipefail
 
-if ! command -v php >/dev/null 2>&1; then
-  echo "php command not found" >&2
+PHP_BIN="${PHP_BIN:-php}"
+
+if ! command -v "$PHP_BIN" >/dev/null 2>&1; then
+  echo "PHP command not found: ${PHP_BIN}" >&2
   exit 1
 fi
 
-php tests/smoke.php
-
+"$PHP_BIN" tests/smoke.php

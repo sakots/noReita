@@ -1,6 +1,17 @@
 <?php
 declare(strict_types=1);
 
+if (!function_exists('str_contains')) {
+  function str_contains(string $haystack, string $needle): bool {
+    return $needle === '' || strpos($haystack, $needle) !== false;
+  }
+}
+if (!function_exists('str_starts_with')) {
+  function str_starts_with(string $haystack, string $needle): bool {
+    return $needle === '' || strpos($haystack, $needle) === 0;
+  }
+}
+
 if (!extension_loaded('curl') || !extension_loaded('pdo_sqlite')) {
   fwrite(STDERR, "curl and pdo_sqlite extensions are required.\n");
   exit(1);
