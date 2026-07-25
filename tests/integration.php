@@ -124,6 +124,7 @@ try {
   $config = str_replace('const EXTERNAL_IMAGE_THUMB = 1;', 'const EXTERNAL_IMAGE_THUMB = 0;', $config);
   $config = str_replace('const USE_MISSKEY_NOTE = 1;', 'const USE_MISSKEY_NOTE = 0;', $config);
   $config = str_replace('const ADMIN_THREADS_PER_PAGE = 50;', 'const ADMIN_THREADS_PER_PAGE = 1;', $config);
+  $config = str_replace('const ADMIN_LOGIN_MAX_FAILURES = 5;', 'const ADMIN_LOGIN_MAX_FAILURES = 3;', $config);
   if (file_put_contents($webroot . '/config.php', $config) === false) {
     throw new RuntimeException('Could not create test config.php');
   }
@@ -241,9 +242,13 @@ try {
   ]);
   $admin_session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $admin_session_id === null ? '' : hash('sha256', $admin_session_id);
+  $login_attempt_records_after_success = glob($webroot . '/session/admin-login-*.json') ?: [];
   [$admin_status, $admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
-  integration_test('administrator login persists in the session', static function () use ($admin_login_status, $admin_status, $admin_body): bool {
+  integration_test('administrator login persists and clears prior failures', static function () use (
+    $admin_login_status, $admin_status, $admin_body, $login_attempt_records_after_success
+  ): bool {
     return $admin_login_status === 302 && $admin_status === 200
+      && $login_attempt_records_after_success === []
       && str_contains($admin_body, 'ADMIN MODE')
       && str_contains($admin_body, '基本統計')
       && str_contains($admin_body, '総投稿数')
@@ -682,6 +687,44 @@ try {
       && $admin_after_logout_status === 403
       && $admin_detail_after_logout_status === 403
       && $admin_edit_after_logout_status === 403;
+  });
+
+  [, $rate_limit_form_body] = http_request($base_url . '?mode=admin_in', $cookie_jar);
+  $rate_limit_session_id = cookie_value($cookie_jar, 'noreita_session');
+  $rate_limit_token = $rate_limit_session_id === null ? '' : hash('sha256', $rate_limit_session_id);
+  $rate_limit_password = 'never-log-this-password';
+  [$rate_first_status, $rate_first_body] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+    'adminpass' => $rate_limit_password, 'token' => $rate_limit_token,
+  ]);
+  [$rate_second_status, $rate_second_body] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+    'adminpass' => $rate_limit_password, 'token' => $rate_limit_token,
+  ]);
+  [$rate_third_status, $rate_third_body] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+    'adminpass' => $rate_limit_password, 'token' => $rate_limit_token,
+  ]);
+  [$rate_correct_status, $rate_correct_body] = http_request($base_url . '?mode=admin_login', $cookie_jar, [
+    'adminpass' => 'integration-admin-pass', 'token' => $rate_limit_token,
+  ]);
+  $rate_limit_records = glob($webroot . '/session/admin-login-*.json') ?: [];
+  $rate_limit_record = count($rate_limit_records) === 1
+    ? (string)file_get_contents($rate_limit_records[0])
+    : '';
+  $rate_limit_log = is_file($server_log) ? (string)file_get_contents($server_log) : '';
+  integration_test('administrator login rate limit blocks repeated failures without storing passwords', static function () use (
+    $rate_limit_form_body, $rate_first_status, $rate_first_body, $rate_second_status, $rate_second_body,
+    $rate_third_status, $rate_third_body, $rate_correct_status, $rate_correct_body,
+    $rate_limit_password, $rate_limit_records, $rate_limit_record, $rate_limit_log
+  ): bool {
+    $responses = $rate_limit_form_body . $rate_first_body . $rate_second_body . $rate_third_body . $rate_correct_body;
+    return $rate_first_status === 403
+      && $rate_second_status === 403
+      && $rate_third_status === 429
+      && $rate_correct_status === 429
+      && str_contains($rate_third_body, 'Too many administrator login attempts')
+      && count($rate_limit_records) === 1
+      && !str_contains($rate_limit_record, $rate_limit_password)
+      && !str_contains($responses, $rate_limit_password)
+      && !str_contains($rate_limit_log, $rate_limit_password);
   });
 } catch (Throwable $e) {
   echo "FAIL: integration setup ({$e->getMessage()})\n";

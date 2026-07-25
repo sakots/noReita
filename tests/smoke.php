@@ -93,6 +93,37 @@ smoke_test('administrator session validates password changes and idle timeout', 
     && !AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now - 120);
 });
 
+smoke_test('administrator login rate limit locks by IP and clears after success', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_admin_limit_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $limiter = new AdminLoginRateLimiter($directory, 'admin-secret', 3, 60, 120);
+    if ($limiter->recordFailure('192.0.2.10', 100) !== 0
+      || $limiter->recordFailure('192.0.2.10', 101) !== 0
+      || $limiter->recordFailure('192.0.2.10', 102) !== 120
+      || $limiter->retryAfter('192.0.2.10', 103) !== 119
+      || $limiter->retryAfter('192.0.2.11', 103) !== 0) {
+      return false;
+    }
+    $records = glob($directory . DIRECTORY_SEPARATOR . 'admin-login-*.json') ?: [];
+    if (count($records) !== 1) return false;
+    $stored = file_get_contents($records[0]);
+    if (!is_string($stored) || str_contains($stored, '192.0.2.10') || str_contains($stored, 'admin-secret')) {
+      return false;
+    }
+    $limiter->clear('192.0.2.10');
+    if ($limiter->retryAfter('192.0.2.10', 103) !== 0) return false;
+
+    $limiter->recordFailure('192.0.2.20', 200);
+    return $limiter->recordFailure('192.0.2.20', 261) === 0;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('Blade include names match template filename case', static function (): bool {
   $theme = dirname(__DIR__) . '/noreita/theme/monoreita';
   $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($theme));

@@ -1,7 +1,7 @@
 <?php
 // request_security.inc.php for noReita (C) sakots 2026 MIT License
 
-const REQUEST_SECURITY_INC_VER = 20260723;
+const REQUEST_SECURITY_INC_VER = 20260725;
 
 final class RequestSecurityException extends RuntimeException {
 }
@@ -149,5 +149,139 @@ final class AdminAuth {
 
   private static function clear(): void {
     unset($_SESSION[self::SESSION_FINGERPRINT], $_SESSION[self::SESSION_LAST_ACTIVITY]);
+  }
+}
+
+final class AdminLoginRateLimiter {
+  private string $directory;
+  private string $secret;
+  private int $max_failures;
+  private int $window_seconds;
+  private int $lockout_seconds;
+  private int $file_permission;
+
+  public function __construct(
+    string $directory,
+    string $secret,
+    int $max_failures = 5,
+    int $window_seconds = 900,
+    int $lockout_seconds = 900,
+    int $file_permission = 0600
+  ) {
+    if ($secret === '' || $max_failures < 1 || $window_seconds < 1 || $lockout_seconds < 1) {
+      throw new InvalidArgumentException('Invalid administrator login rate limit configuration.');
+    }
+    $this->directory = rtrim($directory, '/\\');
+    $this->secret = $secret;
+    $this->max_failures = $max_failures;
+    $this->window_seconds = $window_seconds;
+    $this->lockout_seconds = $lockout_seconds;
+    $this->file_permission = $file_permission;
+  }
+
+  public function retryAfter(string $ip, ?int $now = null): int {
+    $now = $now ?? time();
+    $path = $this->recordPath($ip);
+    if (!is_file($path)) return 0;
+    $handle = @fopen($path, 'c+');
+    if ($handle === false) throw new RuntimeException('Failed to open administrator login attempt record.');
+    try {
+      if (!flock($handle, LOCK_EX)) throw new RuntimeException('Failed to lock administrator login attempt record.');
+      $record = $this->readRecord($handle);
+      $retry_after = max(0, (int)$record['locked_until'] - $now);
+      if ($retry_after === 0 && (int)$record['first_failed_at'] <= $now - $this->window_seconds) {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        @unlink($path);
+        return 0;
+      }
+      flock($handle, LOCK_UN);
+      return $retry_after;
+    } finally {
+      if (is_resource($handle)) fclose($handle);
+    }
+  }
+
+  public function recordFailure(string $ip, ?int $now = null): int {
+    $now = $now ?? time();
+    if (!is_dir($this->directory) || !is_writable($this->directory)) {
+      throw new RuntimeException('Administrator login attempt directory is not writable.');
+    }
+    $path = $this->recordPath($ip);
+    $handle = @fopen($path, 'c+');
+    if ($handle === false) throw new RuntimeException('Failed to create administrator login attempt record.');
+    @chmod($path, $this->file_permission);
+    try {
+      if (!flock($handle, LOCK_EX)) throw new RuntimeException('Failed to lock administrator login attempt record.');
+      $record = $this->readRecord($handle);
+      if ((int)$record['locked_until'] > $now) {
+        $retry_after = (int)$record['locked_until'] - $now;
+      } else {
+        if ((int)$record['first_failed_at'] <= $now - $this->window_seconds) {
+          $record = ['failed_count' => 0, 'first_failed_at' => $now, 'locked_until' => 0];
+        }
+        if ((int)$record['first_failed_at'] === 0) $record['first_failed_at'] = $now;
+        $record['failed_count'] = (int)$record['failed_count'] + 1;
+        if ((int)$record['failed_count'] >= $this->max_failures) {
+          $record['locked_until'] = $now + $this->lockout_seconds;
+        }
+        $retry_after = max(0, (int)$record['locked_until'] - $now);
+        $record['updated_at'] = $now;
+        $this->writeRecord($handle, $record);
+      }
+      flock($handle, LOCK_UN);
+      return $retry_after;
+    } finally {
+      fclose($handle);
+    }
+  }
+
+  public function clear(string $ip): void {
+    $path = $this->recordPath($ip);
+    if (is_file($path) && !@unlink($path)) {
+      throw new RuntimeException('Failed to clear administrator login attempt record.');
+    }
+  }
+
+  public function cleanupExpired(?int $now = null, int $limit = 100): int {
+    $now = $now ?? time();
+    $files = glob($this->directory . DIRECTORY_SEPARATOR . 'admin-login-*.json') ?: [];
+    $removed = 0;
+    foreach (array_slice($files, 0, max(0, $limit)) as $path) {
+      $modified = @filemtime($path);
+      if ($modified !== false && $modified < $now - $this->window_seconds - $this->lockout_seconds
+        && @unlink($path)) {
+        $removed++;
+      }
+    }
+    return $removed;
+  }
+
+  private function recordPath(string $ip): string {
+    $identifier = hash_hmac('sha256', $ip !== '' ? $ip : 'unknown', $this->secret);
+    return $this->directory . DIRECTORY_SEPARATOR . 'admin-login-' . $identifier . '.json';
+  }
+
+  private function readRecord($handle): array {
+    rewind($handle);
+    $json = stream_get_contents($handle, 4096);
+    $record = is_string($json) && $json !== '' ? json_decode($json, true) : null;
+    if (!is_array($record)) {
+      return ['failed_count' => 0, 'first_failed_at' => 0, 'locked_until' => 0, 'updated_at' => 0];
+    }
+    return [
+      'failed_count' => max(0, (int)($record['failed_count'] ?? 0)),
+      'first_failed_at' => max(0, (int)($record['first_failed_at'] ?? 0)),
+      'locked_until' => max(0, (int)($record['locked_until'] ?? 0)),
+      'updated_at' => max(0, (int)($record['updated_at'] ?? 0)),
+    ];
+  }
+
+  private function writeRecord($handle, array $record): void {
+    $json = json_encode($record, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    rewind($handle);
+    if (!ftruncate($handle, 0) || fwrite($handle, $json) === false || !fflush($handle)) {
+      throw new RuntimeException('Failed to write administrator login attempt record.');
+    }
   }
 }
