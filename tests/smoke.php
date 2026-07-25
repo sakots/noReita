@@ -51,11 +51,25 @@ smoke_test('required PHP extensions', static function (): bool {
   return true;
 });
 
-smoke_test('session directory ships an Apache access denial rule', static function (): bool {
-  $rule = file_get_contents(dirname(__DIR__) . '/noreita/session/.htaccess');
-  return is_string($rule)
-    && str_contains($rule, 'Require all denied')
-    && str_contains($rule, 'Deny from all');
+smoke_test('private files and directories ship Apache access denial rules', static function (): bool {
+  $root_rule = file_get_contents(dirname(__DIR__) . '/noreita/.htaccess');
+  if (!is_string($root_rule)
+    || !str_contains($root_rule, 'mod_authz_core.c')
+    || !str_contains($root_rule, 'Require all denied')
+    || !str_contains($root_rule, 'Deny from all')
+    || !str_contains($root_rule, '^config\\.php$')
+    || !str_contains($root_rule, 'json|db')) {
+    return false;
+  }
+  foreach (['session', 'cache', 'backup'] as $directory) {
+    $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");
+    if (!is_string($rule)
+      || !str_contains($rule, 'Require all denied')
+      || !str_contains($rule, 'Deny from all')) {
+      return false;
+    }
+  }
+  return true;
 });
 
 smoke_test('request client IP is resolved from supported sources', static function (): bool {
@@ -77,6 +91,37 @@ smoke_test('administrator session validates password changes and idle timeout', 
     && !AdminAuth::hasValidSession($session, 'changed-secret', 1800, $now)
     && !AdminAuth::hasValidSession($session, 'admin-secret', 30, $now)
     && !AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now - 120);
+});
+
+smoke_test('administrator login rate limit locks by IP and clears after success', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_admin_limit_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $limiter = new AdminLoginRateLimiter($directory, 'admin-secret', 3, 60, 120);
+    if ($limiter->recordFailure('192.0.2.10', 100) !== 0
+      || $limiter->recordFailure('192.0.2.10', 101) !== 0
+      || $limiter->recordFailure('192.0.2.10', 102) !== 120
+      || $limiter->retryAfter('192.0.2.10', 103) !== 119
+      || $limiter->retryAfter('192.0.2.11', 103) !== 0) {
+      return false;
+    }
+    $records = glob($directory . DIRECTORY_SEPARATOR . 'admin-login-*.json') ?: [];
+    if (count($records) !== 1) return false;
+    $stored = file_get_contents($records[0]);
+    if (!is_string($stored) || str_contains($stored, '192.0.2.10') || str_contains($stored, 'admin-secret')) {
+      return false;
+    }
+    $limiter->clear('192.0.2.10');
+    if ($limiter->retryAfter('192.0.2.10', 103) !== 0) return false;
+
+    $limiter->recordFailure('192.0.2.20', 200);
+    return $limiter->recordFailure('192.0.2.20', 261) === 0;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('Blade include names match template filename case', static function (): bool {
@@ -129,7 +174,8 @@ smoke_test('database migration and backup', static function (): bool {
     }
 
     $backup_db = new PDO('sqlite:' . $backup);
-    return $backup_db->query('SELECT com FROM board_log')->fetchColumn() === 'preserved';
+    return $backup_db->query('SELECT com FROM board_log')->fetchColumn() === 'preserved'
+      && (fileperms($backup) & 0777) === 0600;
   } finally {
     foreach (glob($directory . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . '*.db') ?: [] as $file) {
       if (is_file($file)) unlink($file);
@@ -198,15 +244,24 @@ smoke_test('application initialization prepares runtime state', static function 
     } catch (RuntimeException $e) {
       $unsafe_permission_rejected = $e->getMessage() === 'Invalid directory permission configuration.';
     }
+    $read_only_root_supported = chmod($root, 0555);
+    if ($read_only_root_supported) {
+      clearstatcache(true, $root);
+      $read_only_root_supported = (fileperms($root) & 0777) === 0555;
+      $initializer->prepareDirectories();
+      chmod($root, 0700);
+    }
     return count(ApplicationInitializer::securityHeaders()) === 5
       && $schema_version === DatabaseMigrator::SCHEMA_VERSION
       && $unsafe_permission_rejected
+      && $read_only_root_supported
       && !array_filter(array_keys($directories), static fn(string $directory): bool => !is_dir($directory))
       && (fileperms($public_image) & 0777) === 0755
       && (fileperms($public_temp) & 0777) === 0755
       && (fileperms($private_session) & 0777) === 0700
       && (fileperms($database_file) & 0777) === 0600;
   } finally {
+    if (is_dir($root)) chmod($root, 0700);
     foreach ([$database_file, $database_file . '-wal', $database_file . '-shm'] as $file) {
       if (is_file($file)) unlink($file);
     }

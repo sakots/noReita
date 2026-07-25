@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.7.1 lot.260725.0';
+const REITA_VER = 'v3.7.2 lot.260725.1';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -38,7 +38,7 @@ if (!defined('CONF_VER') || CONF_VER < 20260723) {
 // request_security.inc
 check_file(__DIR__.'/request_security.inc.php');
 require_once(__DIR__.'/request_security.inc.php');
-if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260723) {
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260725) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
@@ -59,7 +59,7 @@ if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260725) {
 // initialization.inc
 check_file(__DIR__.'/initialization.inc.php');
 require_once(__DIR__.'/initialization.inc.php');
-if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260723) {
+if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260725) {
   die($en ? 'Please update initialization.inc.php to the latest version.' : 'initialization.inc.phpを最新版に更新してください。');
 }
 
@@ -144,9 +144,13 @@ use eftec\bladeone\BladeOne;
 $views = __DIR__ . '/theme/' . THEME_DIR; // テンプレートフォルダ
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
-// キャッシュフォルダがなかったら作成
-if (!file_exists($cache)) {
-  mkdir($cache, PERMISSION_FOR_PRIVATE_DIR);
+// Bladeキャッシュに必要な場所だけを書き込み可能にする。
+if (!is_dir($cache) && !@mkdir($cache, PERMISSION_FOR_PRIVATE_DIR, true) && !is_dir($cache)) {
+  die($en ? 'Failed to create the Blade cache directory.' : 'Bladeキャッシュディレクトリを作成できません。');
+}
+if (!is_readable($cache) || !is_writable($cache)) {
+  die($en ? 'The Blade cache directory is not readable and writable.'
+    : 'Bladeキャッシュディレクトリを読み書きできません。');
 }
 
 $blade = new BladeOne($views, $cache, BladeOne::MODE_AUTO); // MODE_DEBUGだと開発モード MODE_AUTOが速い。
@@ -225,6 +229,9 @@ $dat['use_hashtag'] = USE_HASHTAG;
 
 defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
 defined('ADMIN_SESSION_LIFETIME') or define('ADMIN_SESSION_LIFETIME', 1800);
+defined('ADMIN_LOGIN_MAX_FAILURES') or define('ADMIN_LOGIN_MAX_FAILURES', 5);
+defined('ADMIN_LOGIN_WINDOW') or define('ADMIN_LOGIN_WINDOW', 900);
+defined('ADMIN_LOGIN_LOCKOUT') or define('ADMIN_LOGIN_LOCKOUT', 900);
 defined('ADMIN_THREADS_PER_PAGE') or define('ADMIN_THREADS_PER_PAGE', 50);
 
 
@@ -1755,9 +1762,47 @@ function admin_login(): void {
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
+  $client_ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP);
+  $client_ip = is_string($client_ip) ? $client_ip : 'unknown';
+  $limiter = new AdminLoginRateLimiter(
+    __DIR__ . '/session',
+    $admin_pass,
+    ADMIN_LOGIN_MAX_FAILURES,
+    ADMIN_LOGIN_WINDOW,
+    ADMIN_LOGIN_LOCKOUT,
+    PERMISSION_FOR_LOG
+  );
+  $retry_after = 0;
+  try {
+    $retry_after = $limiter->retryAfter($client_ip);
+  } catch (Throwable $e) {
+    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500);
+  }
+  if ($retry_after > 0) {
+    header('Retry-After: ' . $retry_after);
+    error($en ? 'Too many administrator login attempts. Please try again later.'
+      : '管理者ログインの試行回数が多すぎます。時間をおいて再試行してください。', 429);
+  }
   $password = (string)filter_input_data('POST', 'adminpass');
   if (!AdminAuth::login($password, $admin_pass)) {
+    $retry_after = 0;
+    try {
+      $retry_after = $limiter->recordFailure($client_ip);
+    } catch (Throwable $e) {
+      error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500);
+    }
+    if ($retry_after > 0) {
+      header('Retry-After: ' . $retry_after);
+      error($en ? 'Too many administrator login attempts. Please try again later.'
+        : '管理者ログインの試行回数が多すぎます。時間をおいて再試行してください。', 429);
+    }
     error($en ? 'Administrator password is incorrect.' : '管理パスが違います。', 403);
+  }
+  try {
+    $limiter->clear($client_ip);
+    if (random_int(1, 100) === 1) $limiter->cleanupExpired();
+  } catch (Throwable $e) {
+    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500);
   }
   redirect(PHP_SELF . '?mode=admin');
 }

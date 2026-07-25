@@ -1,7 +1,7 @@
 <?php
 // initialization.inc.php for noReita (C) sakots 2026 MIT License
 
-const INITIALIZATION_INC_VER = 20260723;
+const INITIALIZATION_INC_VER = 20260725;
 
 final class ApplicationInitializer {
   private string $database_dsn;
@@ -42,14 +42,19 @@ final class ApplicationInitializer {
   }
 
   public function migrateDatabase(): void {
-    $database = new PDO($this->database_dsn);
-    (new DatabaseMigrator($database, $this->database_file, $this->backup_dir))->migrate();
+    $previous_umask = umask(0077);
+    try {
+      $database = new PDO($this->database_dsn);
+      (new DatabaseMigrator($database, $this->database_file, $this->backup_dir))->migrate();
+    } finally {
+      umask($previous_umask);
+    }
   }
 
   public function prepareDirectories(): void {
     $root = realpath($this->application_root);
-    if ($root === false || !is_dir($root) || !is_writable($root)) {
-      throw new RuntimeException('Application directory is not writable.');
+    if ($root === false || !is_dir($root)) {
+      throw new RuntimeException('Application directory does not exist.');
     }
     foreach ($this->directories as $directory => $permission) {
       if (!is_string($directory) || !is_int($permission)
@@ -61,11 +66,7 @@ final class ApplicationInitializer {
         && !is_dir($directory)) {
         throw new RuntimeException("Failed to create directory: {$directory}");
       }
-      $current_permission = fileperms($directory);
-      if (($current_permission === false || ($current_permission & 0777) !== $permission)
-        && !chmod($directory, $permission)) {
-        throw new RuntimeException("Failed to set directory permissions: {$directory}");
-      }
+      $this->applyPermission($directory, $permission, true);
       if (!is_readable($directory) || !is_writable($directory)) {
         throw new RuntimeException("Directory is not readable and writable: {$directory}");
       }
@@ -73,8 +74,34 @@ final class ApplicationInitializer {
   }
 
   public function secureDatabaseFile(): void {
-    if (is_file($this->database_file) && !chmod($this->database_file, $this->database_permission)) {
-      throw new RuntimeException('Failed to set database file permissions.');
+    if (!is_file($this->database_file)) return;
+    $this->applyPermission($this->database_file, $this->database_permission, false);
+    if (!is_readable($this->database_file) || !is_writable($this->database_file)) {
+      throw new RuntimeException('Database file is not readable and writable.');
+    }
+  }
+
+  private function applyPermission(string $path, int $permission, bool $directory): void {
+    clearstatcache(true, $path);
+    $current = fileperms($path);
+    if ($current === false) {
+      throw new RuntimeException("Failed to read permissions: {$path}");
+    }
+    $current &= 0777;
+    if ($current === $permission) return;
+
+    if (@chmod($path, $permission)) {
+      clearstatcache(true, $path);
+      $updated = fileperms($path);
+      if ($updated !== false && ($updated & 0777) === $permission) return;
+    }
+
+    // chmodが禁止された環境でも、現在値が要求より狭く安全なら継続する。
+    // 要求にない余分な権限が付いている場合は安全のため拒否する。
+    $unexpected = $current & ((~$permission) & 0777);
+    if ($unexpected !== 0) {
+      $kind = $directory ? 'directory' : 'file';
+      throw new RuntimeException("Failed to secure {$kind} permissions: {$path}");
     }
   }
 }

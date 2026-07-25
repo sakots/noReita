@@ -1,9 +1,24 @@
-<Files ~ "\.html?$">
-	<IfModule mod_headers.c>
-		Header set Pragma no-cache
-		Header set Cache-Control no-cache
-		Header set Expires "Thu, 01 Dec 1994 16:00:00 GMT"
-	</IfModule>
+<FilesMatch "\.html?$">
+  <IfModule mod_headers.c>
+    Header set Pragma "no-cache"
+    Header set Cache-Control "no-cache"
+    Header set Expires "Thu, 01 Dec 1994 16:00:00 GMT"
+  </IfModule>
+</FilesMatch>
+
+# 設定、DB、ログ、メタデータをHTTPから保護する。
+<FilesMatch "(?i)(^config\.php$|\.(?:ini|log|dat|json|db)$)">
+  # Apache 2.4以降
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+
+  # Apache 2.2および互換サーバー
+  <IfModule !mod_authz_core.c>
+    Order Allow,Deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
 </Files>
 <files ~ "(^config\.php$|\.(ini|log|dat|json|db)$)">
 	order allow,deny

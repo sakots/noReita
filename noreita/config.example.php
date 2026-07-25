@@ -230,6 +230,12 @@ const SESSION_NAME = 'noreita_session';
 // 管理者ログインの無操作タイムアウト（秒）
 const ADMIN_SESSION_LIFETIME = 1800;
 
+// 管理者ログインの試行回数制限
+// 判定期間内にこの回数失敗すると、同じ接続元IPを一時的に拒否します。
+const ADMIN_LOGIN_MAX_FAILURES = 5;
+const ADMIN_LOGIN_WINDOW = 900; // 判定期間（秒）
+const ADMIN_LOGIN_LOCKOUT = 900; // 拒否時間（秒）
+
 // 管理画面で1ページに表示する親スレッド数（推奨: 50～100、最大: 100）
 const ADMIN_THREADS_PER_PAGE = 50;
 

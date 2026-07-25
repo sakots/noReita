@@ -25,11 +25,11 @@ composer install --working-dir=noreita --no-dev --prefer-dist
 
 `.htaccess`が有効なApacheまたはApache互換サーバーを想定しています。
 
-`noreita/session/.htaccess`はセッションディレクトリ全体へのHTTPアクセスを拒否します。Apache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
+ルートの`.htaccess`は`config.php`、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`は各ディレクトリ全体を拒否します。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
 
-FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後に`noreita/session/.htaccess`が存在することを確認してください。このファイルを削除したり、セッションファイルだけを公開ディレクトリへ移動したりしないでください。
+FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後にルート、`session/`、`cache/`、`backup/`の各`.htaccess`が存在することを確認してください。これらを削除したり、非公開ファイルだけを別の公開ディレクトリへ移動したりしないでください。
 
-`.htaccess`が禁止されているサーバーでは、サーバー管理画面またはApache本体の設定で`session/`へのアクセスを拒否する必要があります。
+`.htaccess`が禁止されているサーバーでは、サーバー管理画面またはApache本体の設定で設定ファイル、DB、`session/`、`cache/`、`backup/`へのアクセスを拒否する必要があります。
 
 ## nginxを使う場合のDB・設定ファイル保護
 
@@ -42,6 +42,8 @@ nginxは`.htaccess`を使用しません。`session/`、`backup/`、データベ
 `session/`、`cache/`、`backup/`は`0700`、DB・ログ・DBバックアップは`0600`で管理します。これらを`0777`や`0666`に変更しないでください。
 
 サーバー固有の実行方式により書き込めない場合は、サーバー事業者が指定する範囲で`PERMISSION_FOR_DIR`などを調整してください。グループまたはその他のユーザーに書き込みを許可する設定は、初期化処理が安全でない設定として拒否します。
+
+noReitaのルートディレクトリ全体をPHPから書き込み可能にする必要はありません。DBと上記の実行時ディレクトリだけに書き込み権限を与えてください。既存の権限が設定値と異なる場合にだけ`chmod()`を試行します。レンタルサーバーが`chmod()`を禁止していても、現在の権限が設定値より狭く、PHPから読み書き可能なら起動を継続します。設定値にない権限が付いていて安全性を確保できない場合は起動を拒否します。
 
 v3.7.0以前の`config.php`にあった`0606`と`0707`は安全な初期値ではないため廃止しました。更新時は`config.example.php`を基に設定し直してください。
 
