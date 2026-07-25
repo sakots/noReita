@@ -25,11 +25,11 @@ composer install --working-dir=noreita --no-dev --prefer-dist
 
 `.htaccess`が有効なApacheまたはApache互換サーバーを想定しています。
 
-`noreita/session/.htaccess`はセッションディレクトリ全体へのHTTPアクセスを拒否します。Apache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
+ルートの`.htaccess`は`config.php`、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`は各ディレクトリ全体を拒否します。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
 
-FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後に`noreita/session/.htaccess`が存在することを確認してください。このファイルを削除したり、セッションファイルだけを公開ディレクトリへ移動したりしないでください。
+FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後にルート、`session/`、`cache/`、`backup/`の各`.htaccess`が存在することを確認してください。これらを削除したり、非公開ファイルだけを別の公開ディレクトリへ移動したりしないでください。
 
-`.htaccess`が禁止されているサーバーでは、サーバー管理画面またはApache本体の設定で`session/`へのアクセスを拒否する必要があります。
+`.htaccess`が禁止されているサーバーでは、サーバー管理画面またはApache本体の設定で設定ファイル、DB、`session/`、`cache/`、`backup/`へのアクセスを拒否する必要があります。
 
 ## nginxを使う場合のDB・設定ファイル保護
 

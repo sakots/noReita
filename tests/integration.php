@@ -133,11 +133,17 @@ try {
   $address = stream_socket_get_name($socket, false);
   fclose($socket);
   $port = (int)substr(strrchr((string)$address, ':'), 1);
+  $origin_url = "http://127.0.0.1:{$port}";
   $base_url = "http://127.0.0.1:{$port}/index.php";
 
   $log = fopen($server_log, 'ab');
   if ($log === false) throw new RuntimeException('Could not create server log');
-  $process = proc_open([PHP_BINARY, '-S', "127.0.0.1:{$port}", '-t', $webroot], [STDIN, $log, $log], $pipes, $webroot);
+  $process = proc_open(
+    [PHP_BINARY, '-S', "127.0.0.1:{$port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [STDIN, $log, $log],
+    $pipes,
+    $webroot
+  );
   if (!is_resource($process)) throw new RuntimeException('Could not start PHP server');
 
   $ready = false;
@@ -157,6 +163,29 @@ try {
   if (str_contains($startup_body, 'Please update') || str_contains($startup_body, '最新版に更新してください')) {
     throw new RuntimeException('Application startup failed: ' . trim(strip_tags($startup_body)));
   }
+
+  $protected_probes = [
+    'config.php' => 'integration-admin-pass',
+    'reita.db' => 'SQLite format',
+    'session/http-access-probe' => 'session-secret',
+    'backup/http-access-probe.db' => 'backup-secret',
+    'cache/http-access-probe.bladec' => 'blade-cache-secret',
+  ];
+  foreach ($protected_probes as $relative_path => $secret) {
+    $probe_path = $webroot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative_path);
+    if (!is_file($probe_path) && file_put_contents($probe_path, $secret) === false) {
+      throw new RuntimeException("Could not create protected HTTP probe: {$relative_path}");
+    }
+  }
+  $protected_results = [];
+  foreach ($protected_probes as $relative_path => $secret) {
+    $encoded_path = implode('/', array_map('rawurlencode', explode('/', $relative_path)));
+    [$probe_status, $probe_body] = http_request($origin_url . '/' . $encoded_path, $cookie_jar);
+    $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
+  }
+  integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
+    return count($protected_results) === 5 && !in_array(false, $protected_results, true);
+  });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
     $db = new PDO('sqlite:' . $webroot . '/reita.db');

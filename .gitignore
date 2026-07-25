@@ -23,4 +23,12 @@
 noreita/session/*
 !noreita/session/.htaccess
 
+# 非公開ランタイムディレクトリも拒否設定だけを配布する
+!noreita/cache/
+noreita/cache/*
+!noreita/cache/.htaccess
+!noreita/backup/
+noreita/backup/*
+!noreita/backup/.htaccess
+
 config.php

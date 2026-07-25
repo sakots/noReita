@@ -51,11 +51,25 @@ smoke_test('required PHP extensions', static function (): bool {
   return true;
 });
 
-smoke_test('session directory ships an Apache access denial rule', static function (): bool {
-  $rule = file_get_contents(dirname(__DIR__) . '/noreita/session/.htaccess');
-  return is_string($rule)
-    && str_contains($rule, 'Require all denied')
-    && str_contains($rule, 'Deny from all');
+smoke_test('private files and directories ship Apache access denial rules', static function (): bool {
+  $root_rule = file_get_contents(dirname(__DIR__) . '/noreita/.htaccess');
+  if (!is_string($root_rule)
+    || !str_contains($root_rule, 'mod_authz_core.c')
+    || !str_contains($root_rule, 'Require all denied')
+    || !str_contains($root_rule, 'Deny from all')
+    || !str_contains($root_rule, '^config\\.php$')
+    || !str_contains($root_rule, 'json|db')) {
+    return false;
+  }
+  foreach (['session', 'cache', 'backup'] as $directory) {
+    $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");
+    if (!is_string($rule)
+      || !str_contains($rule, 'Require all denied')
+      || !str_contains($rule, 'Deny from all')) {
+      return false;
+    }
+  }
+  return true;
 });
 
 smoke_test('request client IP is resolved from supported sources', static function (): bool {
