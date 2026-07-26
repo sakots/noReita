@@ -240,6 +240,20 @@ final class BoardRepository {
     return $statement->rowCount();
   }
 
+  /** @return mixed */
+  public function transaction(callable $operation) {
+    if ($this->db->inTransaction()) return $operation();
+    $this->db->beginTransaction();
+    try {
+      $result = $operation();
+      $this->db->commit();
+      return $result;
+    } catch (Throwable $e) {
+      if ($this->db->inTransaction()) $this->db->rollBack();
+      throw $e;
+    }
+  }
+
   public function findThreadIdByUuid(string $uuid): ?int {
     $statement = $this->db->prepare('SELECT tid, parent, thread FROM board_log WHERE uuid = ? AND invz = 0 LIMIT 1');
     $statement->execute([$uuid]);

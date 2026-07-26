@@ -1,7 +1,7 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260721;
+const IMAGE_INC_VER = 20260726;
 
 final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
@@ -184,15 +184,79 @@ final class ImageService {
   }
 
   public static function deleteRelatedFiles(string $image_dir, string $image_name): void {
-    if ($image_name === '') return;
-    $base_name = pathinfo(basename($image_name), PATHINFO_FILENAME);
+    foreach (self::relatedFilePaths($image_dir, [$image_name]) as $path) safe_unlink($path);
+  }
+
+  public static function stageRelatedFilesForDeletion(
+    string $image_dir,
+    string $staging_root,
+    array $image_names
+  ): array {
+    $paths = self::relatedFilePaths($image_dir, $image_names);
+    if ($paths === []) return ['directory' => '', 'files' => []];
+
+    $staging_root = rtrim($staging_root, '/\\');
+    if (!is_dir($staging_root) && !mkdir($staging_root, 0700, true) && !is_dir($staging_root)) {
+      throw new RuntimeException('Failed to create deletion staging directory.');
+    }
+    $staging_directory = $staging_root . DIRECTORY_SEPARATOR . 'delete-' . bin2hex(random_bytes(12));
+    if (!mkdir($staging_directory, 0700)) {
+      throw new RuntimeException('Failed to create deletion staging operation.');
+    }
+
+    $staged = ['directory' => $staging_directory, 'files' => []];
+    try {
+      foreach ($paths as $path) {
+        $destination = $staging_directory . DIRECTORY_SEPARATOR . basename($path);
+        if (!rename($path, $destination)) {
+          throw new RuntimeException('Failed to stage a related image file for deletion.');
+        }
+        $staged['files'][] = ['original' => $path, 'staged' => $destination];
+      }
+      return $staged;
+    } catch (Throwable $e) {
+      self::rollbackStagedDeletion($staged);
+      throw $e;
+    }
+  }
+
+  public static function rollbackStagedDeletion(array $staged): void {
+    $failed = false;
+    foreach (array_reverse($staged['files'] ?? []) as $file) {
+      $original = (string)($file['original'] ?? '');
+      $temporary = (string)($file['staged'] ?? '');
+      if ($temporary === '' || !is_file($temporary)) continue;
+      if ($original === '' || is_file($original) || !rename($temporary, $original)) $failed = true;
+    }
+    $directory = (string)($staged['directory'] ?? '');
+    if ($directory !== '' && is_dir($directory)) @rmdir($directory);
+    if ($failed) throw new RuntimeException('Failed to restore a related image file after deletion failure.');
+  }
+
+  public static function completeStagedDeletion(array $staged): void {
+    foreach ($staged['files'] ?? [] as $file) {
+      safe_unlink((string)($file['staged'] ?? ''));
+    }
+    $directory = (string)($staged['directory'] ?? '');
+    if ($directory !== '' && is_dir($directory)) @rmdir($directory);
+  }
+
+  private static function relatedFilePaths(string $image_dir, array $image_names): array {
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
-    foreach (self::RELATED_EXTENSIONS as $extension) {
-      safe_unlink($image_dir . $base_name . '.' . $extension);
+    $paths = [];
+    foreach ($image_names as $image_name) {
+      if (!is_string($image_name) || $image_name === '') continue;
+      $base_name = pathinfo(basename($image_name), PATHINFO_FILENAME);
+      if ($base_name === '') continue;
+      foreach (self::RELATED_EXTENSIONS as $extension) {
+        $path = $image_dir . $base_name . '.' . $extension;
+        if (is_file($path)) $paths[$path] = $path;
+      }
+      foreach (glob($image_dir . $base_name . '_thumb_*') ?: [] as $thumbnail) {
+        if (is_file($thumbnail)) $paths[$thumbnail] = $thumbnail;
+      }
     }
-    foreach (glob($image_dir . $base_name . '_thumb_*') ?: [] as $thumbnail) {
-      if (is_file($thumbnail)) safe_unlink($thumbnail);
-    }
+    return array_values($paths);
   }
 
   public static function createThumbnail(string $source, string $destination, int $width, bool $nsfw = false): string {

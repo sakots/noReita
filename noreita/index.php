@@ -66,14 +66,14 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260726) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260721) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260726) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260723) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260726) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 

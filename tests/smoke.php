@@ -808,6 +808,70 @@ smoke_test('related image files are deleted together', static function (): bool 
   }
 });
 
+smoke_test('post deletion restores every related file when the database transaction fails', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_delete_' . bin2hex(random_bytes(8));
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  $staging = $root . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-staging';
+  if (!mkdir($images, 0700, true)) return false;
+  $files = [
+    'parent.png', 'parent.pch', 'parent_thumb_safe_test.webp',
+    'reply.webp', 'reply.chi', 'reply_thumb_nsfw_test.webp',
+  ];
+  try {
+    foreach ($files as $file) file_put_contents($images . DIRECTORY_SEPARATOR . $file, $file);
+
+    $db = new PDO('sqlite::memory:');
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db->exec('CREATE TABLE board_log (
+      tid INTEGER PRIMARY KEY, parent INTEGER NOT NULL, thread INTEGER NOT NULL,
+      picfile TEXT NOT NULL, pwd TEXT NOT NULL
+    )');
+    $insert = $db->prepare('INSERT INTO board_log VALUES (?, ?, ?, ?, ?)');
+    $password = password_hash('post-password', PASSWORD_DEFAULT);
+    $insert->execute([1, 0, 1, 'parent.png', $password]);
+    $insert->execute([2, 1, 0, 'reply.webp', $password]);
+    $db->exec("CREATE TRIGGER reject_reply_deletion BEFORE DELETE ON board_log
+      WHEN OLD.tid = 2 BEGIN SELECT RAISE(ABORT, 'forced deletion failure'); END");
+
+    $service = new PostService(
+      new BoardRepository($db), 'admin-secret', $images, 100, 0600, $staging
+    );
+    $failed = false;
+    try {
+      $service->deleteManyAsAdmin(['1']);
+    } catch (PDOException $e) {
+      $failed = str_contains($e->getMessage(), 'forced deletion failure');
+    }
+    if (!$failed
+      || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 2
+      || array_filter($files, static fn(string $file): bool => !is_file($images . DIRECTORY_SEPARATOR . $file))
+      || (glob($staging . DIRECTORY_SEPARATOR . 'delete-*') ?: []) !== []) {
+      return false;
+    }
+
+    $db->exec('DROP TRIGGER reject_reply_deletion');
+    $deleted = $service->deleteManyAsAdmin(['1']);
+    return $deleted === 2
+      && (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === 0
+      && array_filter($files, static fn(string $file): bool => is_file($images . DIRECTORY_SEPARATOR . $file)) === []
+      && (glob($staging . DIRECTORY_SEPARATOR . 'delete-*') ?: []) === [];
+  } finally {
+    foreach ([$images, $staging] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+        if (is_file($file)) unlink($file);
+        if (is_dir($file)) {
+          foreach (glob($file . DIRECTORY_SEPARATOR . '*') ?: [] as $nested) if (is_file($nested)) unlink($nested);
+          rmdir($file);
+        }
+      }
+      if (is_dir($directory)) rmdir($directory);
+    }
+    $backup = $root . DIRECTORY_SEPARATOR . 'backup';
+    if (is_dir($backup)) rmdir($backup);
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 smoke_test('posted image replacement can roll back or complete atomically', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_replace_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';

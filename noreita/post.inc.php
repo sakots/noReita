@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260723;
+const POST_INC_VER = 20260726;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -19,19 +19,24 @@ final class PostService implements AdminPostManagementService {
   private string $image_dir;
   private int $thumbnail_width;
   private int $file_permission;
+  private string $deletion_staging_dir;
 
   public function __construct(
     BoardRepository $repository,
     string $admin_pass,
     string $image_dir,
     int $thumbnail_width = 0,
-    int $file_permission = 0600
+    int $file_permission = 0600,
+    string $deletion_staging_dir = ''
   ) {
     $this->repository = $repository;
     $this->admin_pass = $admin_pass;
     $this->image_dir = $image_dir;
     $this->thumbnail_width = $thumbnail_width;
     $this->file_permission = $file_permission;
+    $this->deletion_staging_dir = $deletion_staging_dir !== ''
+      ? $deletion_staging_dir
+      : dirname(rtrim($image_dir, '/\\')) . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-staging';
   }
 
   public function authorize(int $post_id, string $password): array {
@@ -72,10 +77,10 @@ final class PostService implements AdminPostManagementService {
       return 'hidden';
     }
     $with_replies = $authorization['role'] === 'admin';
-    foreach ($this->repository->findPostsForDeletion($post_id, $with_replies) as $post) {
-      ImageService::deleteRelatedFiles($this->image_dir, (string)$post['picfile']);
-    }
-    $this->repository->deletePost($post_id, $with_replies);
+    $posts = $this->repository->findPostsForDeletion($post_id, $with_replies);
+    $this->deletePostsAtomically($posts, function () use ($post_id, $with_replies): void {
+      $this->repository->deletePost($post_id, $with_replies);
+    });
     return 'deleted';
   }
 
@@ -83,15 +88,43 @@ final class PostService implements AdminPostManagementService {
     $ids = self::normalizePostIds($post_ids);
 
     $deleted_ids = [];
+    $posts = [];
+    $existing_ids = [];
     foreach ($ids as $id) {
       if ($this->repository->findPost($id) === false) continue;
+      $existing_ids[] = $id;
       foreach ($this->repository->findPostsForDeletion($id, true) as $post) {
         $deleted_ids[(int)$post['tid']] = true;
+        $posts[(int)$post['tid']] = $post;
       }
-      $this->delete($id, $this->admin_pass, true);
     }
     if ($deleted_ids === []) throw new PostNotFoundException('Posts were not found.');
+    $this->deletePostsAtomically(array_values($posts), function () use ($existing_ids): void {
+      foreach ($existing_ids as $id) $this->repository->deletePost($id, true);
+    });
     return count($deleted_ids);
+  }
+
+  private function deletePostsAtomically(array $posts, callable $delete_database_rows): void {
+    $image_names = array_map(static fn(array $post): string => (string)($post['picfile'] ?? ''), $posts);
+    $staged = ImageService::stageRelatedFilesForDeletion(
+      $this->image_dir, $this->deletion_staging_dir, $image_names
+    );
+    try {
+      $this->repository->transaction($delete_database_rows);
+    } catch (Throwable $e) {
+      try {
+        ImageService::rollbackStagedDeletion($staged);
+      } catch (Throwable $rollback_error) {
+        throw new RuntimeException(
+          $e->getMessage() . ' Related image rollback also failed: ' . $rollback_error->getMessage(),
+          0,
+          $e
+        );
+      }
+      throw $e;
+    }
+    ImageService::completeStagedDeletion($staged);
   }
 
   public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int {
