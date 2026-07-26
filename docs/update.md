@@ -20,6 +20,12 @@ v3.7.4ではSQLiteのロック待機時間を指定する設定が追加され�
 const DB_BUSY_TIMEOUT = 5000;
 ```
 
+古いPHPセッションファイルの保持時間も設定できます。既存の`config.php`に追加しない場合は、既定値の86400秒（24時間）で動作します。
+
+```php
+const SESSION_FILE_LIFETIME = 86400;
+```
+
 ## DB移行スクリプトが必要なバージョン
 
 v2からv3系統への更新では、先に`noreita_db2_to_3.php`を実行してください。
