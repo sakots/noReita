@@ -8,8 +8,17 @@
 
 require_once(__DIR__.'/config.php');
 require_once(__DIR__.'/functions.php');
+require_once(__DIR__.'/request_security.inc.php');
 
-const CONNECT_MISSKEY_API_VER = 20260716;
+// index.phpを経由しないMisskeyコールバックの直接実行時だけDB接続を初期化する。
+// index.phpから読み込まれた場合は、すでに読み込み済みのDatabaseと後続のDB定数定義を使用する。
+if (!class_exists('Database', false)) {
+	defined('DB_FILE') or define('DB_FILE', __DIR__ . '/' . DB_NAME . '.db');
+	defined('DB_PDO') or define('DB_PDO', 'sqlite:' . DB_FILE);
+	require_once(__DIR__.'/database.inc.php');
+}
+
+const CONNECT_MISSKEY_API_VER = 20260726;
 
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 ? explode( ',', $http_langs )[0] : '';
@@ -20,8 +29,7 @@ class connect_misskey_api{
 
 	private static function get_thread_no(int $no): int {
 		try {
-			$db = new PDO(DB_PDO);
-			$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+			$db = Database::connect();
 			$stmt = $db->prepare("SELECT tid, parent, thread FROM board_log WHERE tid = :no LIMIT 1");
 			$stmt->execute([':no' => $no]);
 			$post = $stmt->fetch(PDO::FETCH_ASSOC);

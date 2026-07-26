@@ -1,7 +1,7 @@
 <?php
 // database.inc.php for noReita (C) sakots 2026 MIT License
 
-const DATABASE_INC_VER = 20260725;
+const DATABASE_INC_VER = 20260726;
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -154,11 +154,30 @@ final class AdminPostFilter {
 }
 
 final class Database {
-  public static function connect(): PDO {
-    $db = new PDO(DB_PDO);
+  private const DEFAULT_BUSY_TIMEOUT_MS = 5000;
+  private const MAX_BUSY_TIMEOUT_MS = 60000;
+
+  public static function connect(?string $dsn = null, ?int $busy_timeout_ms = null): PDO {
+    $db = new PDO($dsn ?? DB_PDO);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $db->exec('PRAGMA journal_mode=WAL;');
+    if ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+      $timeout = $busy_timeout_ms ?? self::configuredBusyTimeout();
+      if ($timeout < 0 || $timeout > self::MAX_BUSY_TIMEOUT_MS) {
+        throw new InvalidArgumentException('SQLite busy timeout must be between 0 and 60000 milliseconds.');
+      }
+      $db->exec('PRAGMA busy_timeout = ' . $timeout);
+      $db->exec('PRAGMA journal_mode=WAL;');
+    }
     return $db;
+  }
+
+  private static function configuredBusyTimeout(): int {
+    if (!defined('DB_BUSY_TIMEOUT')) return self::DEFAULT_BUSY_TIMEOUT_MS;
+    $timeout = constant('DB_BUSY_TIMEOUT');
+    if (!is_int($timeout)) {
+      throw new InvalidArgumentException('DB_BUSY_TIMEOUT must be an integer.');
+    }
+    return $timeout;
   }
 }
 
@@ -219,6 +238,20 @@ final class BoardRepository {
     $value = $hidden ? 1 : 0;
     $statement->execute([$value, ...$ids, $value]);
     return $statement->rowCount();
+  }
+
+  /** @return mixed */
+  public function transaction(callable $operation) {
+    if ($this->db->inTransaction()) return $operation();
+    $this->db->beginTransaction();
+    try {
+      $result = $operation();
+      $this->db->commit();
+      return $result;
+    } catch (Throwable $e) {
+      if ($this->db->inTransaction()) $this->db->rollBack();
+      throw $e;
+    }
   }
 
   public function findThreadIdByUuid(string $uuid): ?int {

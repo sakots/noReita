@@ -8,7 +8,7 @@
 
 `PostValidator`は必須項目、文字数、NGワード、日本語フィルター、コメントURL、拒否ホストを画面描画から独立して検証します。
 
-`PostService`は新規投稿の準備、二重投稿判定、スレッド・返信作成、age更新、投稿者・管理者パスワードの認証、投稿編集、削除、管理者による非表示化を担当します。投稿に関するDB更新を`index.php`へ直接追加しないでください。
+`PostService`は新規投稿の準備、二重投稿判定、スレッド・返信作成、age更新、投稿者・管理者パスワードの認証、投稿編集、削除、管理者による非表示化を担当します。投稿に関するDB更新を`index.php`へ直接追加しないでください。画像付き投稿の削除では関連ファイルを`backup/delete-staging/`へ一時退避し、DBトランザクション失敗時に復元します。DB削除の確定後にだけ退避ファイルを完全削除します。
 
 `PostInput`は投稿種別など、複数のHTTP入力元に対応する値の取得と正規化を担当します。
 
@@ -18,7 +18,7 @@
 
 ## リクエストセキュリティ
 
-`request_security.inc.php`の`RequestSecurity`がセッションの安全な開始、CSRFトークン生成、POST・同一オリジン・ユーザーコード・CSRFトークンの検証を担当します。検証失敗は`RequestSecurityException`として画面制御側へ返します。
+`request_security.inc.php`の`RequestSecurity`がセッションの安全な開始、CSRFトークン生成、POST・同一オリジン・ユーザーコード・CSRFトークンの検証を担当します。検証失敗は`RequestSecurityException`として画面制御側へ返します。`SessionFileCleaner`は期限切れの`session/sess_*`だけを確率的かつ1回100件まで削除します。現在のセッション、別プロセスがロック中のセッション、管理者ログイン試行記録、`.htaccess`は削除しません。
 
 同ファイルの`AdminAuth`が管理者ログイン状態、管理パス変更時の失効、無操作タイムアウト、ログアウトを担当します。管理操作では管理パスをフォームで持ち回らず、`AdminAuth::isAuthenticated()`とCSRF検証を使用してください。
 
@@ -32,9 +32,9 @@
 
 ## データベース
 
-`database.inc.php`がSQLite接続、投稿リポジトリ、スキーママイグレーションを担当します。
+`database.inc.php`がSQLite接続、投稿リポジトリ、スキーママイグレーションを担当します。接続時に例外モード、WAL、`busy_timeout`を設定し、通常処理、DB移行、Misskey連携で同じ設定を使用します。既定では別処理の書き込みロックが解除されるまで最大5秒待ちます。待機時間は`config.php`の`DB_BUSY_TIMEOUT`で0～60000ミリ秒の範囲に変更できます。
 
-- `Database::connect()`：共通のPDO接続とWAL設定
+- `Database::connect()`：共通のPDO接続とWAL・ロック待機設定
 - `BoardRepository`：投稿の取得、検索、削除、非表示化
 - `DatabaseMigrator`：スキーマ作成、バックアップ、マイグレーション
 

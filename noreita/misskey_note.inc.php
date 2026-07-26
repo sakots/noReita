@@ -4,7 +4,7 @@
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
 
-const MISSKEY_NOTE_VER = 20260722; //misskey_note.inc.phpのバージョン
+const MISSKEY_NOTE_VER = 20260726; //misskey_note.inc.phpのバージョン
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -16,8 +16,7 @@ require_once __DIR__ . '/index.php';
 function get_post_from_db(int $no): ?array {
   global $en;
   try {
-    $db = new PDO(DB_PDO);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db = Database::connect();
 
     $sql = "SELECT * FROM board_log WHERE tid = :no";
     $stmt = $db->prepare($sql);
@@ -59,8 +58,7 @@ function get_post_from_db(int $no): ?array {
 function check_post_exists(int $no): bool {
   global $en;
   try {
-    $db = new PDO(DB_PDO);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db = Database::connect();
 
     $sql = "SELECT COUNT(*) as count FROM board_log WHERE tid = :no";
     $stmt = $db->prepare($sql);
@@ -78,8 +76,7 @@ function check_post_exists(int $no): bool {
 function verify_post_password(int $no, string $id, string $pwd): bool {
   global $en;
   try {
-    $db = new PDO(DB_PDO);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db = Database::connect();
 
     $sql = "SELECT pwd FROM board_log WHERE tid = :no AND id = :id";
     $stmt = $db->prepare($sql);
@@ -101,8 +98,7 @@ function verify_post_password(int $no, string $id, string $pwd): bool {
 function check_edit_permission(int $no, string $id, string $pwd, bool $admin): bool {
   global $en;
   try {
-    $db = new PDO(DB_PDO);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db = Database::connect();
 
     $sql = "SELECT created, admins FROM board_log WHERE tid = :no AND id = :id";
     $stmt = $db->prepare($sql);

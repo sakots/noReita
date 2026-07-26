@@ -58,7 +58,10 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'Require all denied')
     || !str_contains($root_rule, 'Deny from all')
     || !str_contains($root_rule, '^config\\.php$')
-    || !str_contains($root_rule, 'json|db')) {
+    || !str_contains($root_rule, 'json|db')
+    || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
+    || preg_match('/<\\/files>/i', $root_rule) === 1
+    || preg_match('/<files\\s+~/i', $root_rule) === 1) {
     return false;
   }
   foreach (['session', 'cache', 'backup'] as $directory) {
@@ -141,6 +144,67 @@ smoke_test('administrator login rate limit locks by IP, clears after success, an
   }
 });
 
+smoke_test('expired PHP session files are cleaned with active and unrelated files preserved', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_sessions_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $files = [
+    'sess_expiredA' => 100,
+    'sess_expiredB' => 100,
+    'sess_current' => 100,
+    'sess_locked' => 100,
+    'sess_fresh' => 450,
+    'sess_bad.name' => 100,
+    'admin-login-test.json' => 100,
+    '.htaccess' => 100,
+  ];
+  $locked_handle = null;
+  try {
+    foreach ($files as $name => $modified) {
+      $path = $directory . DIRECTORY_SEPARATOR . $name;
+      file_put_contents($path, $name);
+      touch($path, $modified);
+    }
+    $locked_handle = fopen($directory . DIRECTORY_SEPARATOR . 'sess_locked', 'r+');
+    if ($locked_handle === false || !flock($locked_handle, LOCK_EX | LOCK_NB)) return false;
+
+    $first_removed = SessionFileCleaner::cleanup($directory, 100, 'current', 1, 500);
+    $expired_remaining = array_filter(
+      ['sess_expiredA', 'sess_expiredB'],
+      static fn(string $name): bool => is_file($directory . DIRECTORY_SEPARATOR . $name)
+    );
+    if ($first_removed !== 1
+      || count($expired_remaining) !== 1
+      || !is_file($directory . DIRECTORY_SEPARATOR . 'sess_locked')) {
+      return false;
+    }
+
+    flock($locked_handle, LOCK_UN);
+    fclose($locked_handle);
+    $locked_handle = null;
+    $second_removed = SessionFileCleaner::cleanup($directory, 100, 'current', 100, 500);
+    return $second_removed === 2
+      && !is_file($directory . DIRECTORY_SEPARATOR . 'sess_expiredA')
+      && !is_file($directory . DIRECTORY_SEPARATOR . 'sess_expiredB')
+      && !is_file($directory . DIRECTORY_SEPARATOR . 'sess_locked')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'sess_current')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'sess_fresh')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'sess_bad.name')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'admin-login-test.json')
+      && is_file($directory . DIRECTORY_SEPARATOR . '.htaccess');
+  } finally {
+    if (is_resource($locked_handle)) {
+      flock($locked_handle, LOCK_UN);
+      fclose($locked_handle);
+    }
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    $hidden_rule = $directory . DIRECTORY_SEPARATOR . '.htaccess';
+    if (is_file($hidden_rule)) unlink($hidden_rule);
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('Blade include names match template filename case', static function (): bool {
   $theme = dirname(__DIR__) . '/noreita/theme/monoreita';
   $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($theme));
@@ -166,6 +230,75 @@ smoke_test('SQLite read and write', static function (): bool {
   $statement = $db->prepare('INSERT INTO smoke (value) VALUES (:value)');
   $statement->execute(['value' => 'noReita']);
   return $db->query('SELECT value FROM smoke')->fetchColumn() === 'noReita';
+});
+
+smoke_test('SQLite connections wait for a temporary write lock', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_busy_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $database_file = $directory . DIRECTORY_SEPARATOR . 'busy.db';
+  $ready_file = $directory . DIRECTORY_SEPARATOR . 'ready';
+  $process = null;
+  $pipes = [];
+
+  try {
+    $database = Database::connect('sqlite:' . $database_file, 1500);
+    $database->exec('CREATE TABLE busy_test (value TEXT NOT NULL)');
+    if ((int)$database->query('PRAGMA busy_timeout')->fetchColumn() !== 1500) return false;
+    $database = null;
+
+    $lock_script = <<<'PHP'
+$db = new PDO('sqlite:' . $argv[1]);
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$db->exec('PRAGMA journal_mode=WAL');
+$db->exec('BEGIN IMMEDIATE');
+file_put_contents($argv[2], 'ready');
+usleep(350000);
+$db->exec('COMMIT');
+PHP;
+    $process = proc_open(
+      [PHP_BINARY, '-r', $lock_script, $database_file, $ready_file],
+      [STDIN, ['pipe', 'w'], ['pipe', 'w']],
+      $pipes
+    );
+    if (!is_resource($process)) return false;
+
+    $deadline = microtime(true) + 3;
+    while (!is_file($ready_file) && microtime(true) < $deadline) usleep(10000);
+    if (!is_file($ready_file)) return false;
+
+    $started = microtime(true);
+    $waiting_database = Database::connect('sqlite:' . $database_file, 1500);
+    $waiting_database->exec("INSERT INTO busy_test VALUES ('written-after-lock')");
+    $elapsed = microtime(true) - $started;
+    $stored = $waiting_database->query('SELECT value FROM busy_test')->fetchColumn();
+    $waiting_database = null;
+
+    foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe);
+    $pipes = [];
+    $exit_code = proc_close($process);
+    $process = null;
+
+    $invalid_timeout_rejected = false;
+    try {
+      Database::connect('sqlite:' . $database_file, -1);
+    } catch (InvalidArgumentException $e) {
+      $invalid_timeout_rejected = true;
+    }
+    return $exit_code === 0
+      && $stored === 'written-after-lock'
+      && $elapsed >= 0.2
+      && $invalid_timeout_rejected;
+  } finally {
+    foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe);
+    if (is_resource($process)) {
+      proc_terminate($process);
+      proc_close($process);
+    }
+    foreach ([$ready_file, $database_file, $database_file . '-wal', $database_file . '-shm'] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('database migration and backup', static function (): bool {
@@ -733,6 +866,70 @@ smoke_test('related image files are deleted together', static function (): bool 
       if (is_file($file)) unlink($file);
     }
     if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('post deletion restores every related file when the database transaction fails', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_delete_' . bin2hex(random_bytes(8));
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  $staging = $root . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-staging';
+  if (!mkdir($images, 0700, true)) return false;
+  $files = [
+    'parent.png', 'parent.pch', 'parent_thumb_safe_test.webp',
+    'reply.webp', 'reply.chi', 'reply_thumb_nsfw_test.webp',
+  ];
+  try {
+    foreach ($files as $file) file_put_contents($images . DIRECTORY_SEPARATOR . $file, $file);
+
+    $db = new PDO('sqlite::memory:');
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db->exec('CREATE TABLE board_log (
+      tid INTEGER PRIMARY KEY, parent INTEGER NOT NULL, thread INTEGER NOT NULL,
+      picfile TEXT NOT NULL, pwd TEXT NOT NULL
+    )');
+    $insert = $db->prepare('INSERT INTO board_log VALUES (?, ?, ?, ?, ?)');
+    $password = password_hash('post-password', PASSWORD_DEFAULT);
+    $insert->execute([1, 0, 1, 'parent.png', $password]);
+    $insert->execute([2, 1, 0, 'reply.webp', $password]);
+    $db->exec("CREATE TRIGGER reject_reply_deletion BEFORE DELETE ON board_log
+      WHEN OLD.tid = 2 BEGIN SELECT RAISE(ABORT, 'forced deletion failure'); END");
+
+    $service = new PostService(
+      new BoardRepository($db), 'admin-secret', $images, 100, 0600, $staging
+    );
+    $failed = false;
+    try {
+      $service->deleteManyAsAdmin(['1']);
+    } catch (PDOException $e) {
+      $failed = str_contains($e->getMessage(), 'forced deletion failure');
+    }
+    if (!$failed
+      || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 2
+      || array_filter($files, static fn(string $file): bool => !is_file($images . DIRECTORY_SEPARATOR . $file))
+      || (glob($staging . DIRECTORY_SEPARATOR . 'delete-*') ?: []) !== []) {
+      return false;
+    }
+
+    $db->exec('DROP TRIGGER reject_reply_deletion');
+    $deleted = $service->deleteManyAsAdmin(['1']);
+    return $deleted === 2
+      && (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === 0
+      && array_filter($files, static fn(string $file): bool => is_file($images . DIRECTORY_SEPARATOR . $file)) === []
+      && (glob($staging . DIRECTORY_SEPARATOR . 'delete-*') ?: []) === [];
+  } finally {
+    foreach ([$images, $staging] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+        if (is_file($file)) unlink($file);
+        if (is_dir($file)) {
+          foreach (glob($file . DIRECTORY_SEPARATOR . '*') ?: [] as $nested) if (is_file($nested)) unlink($nested);
+          rmdir($file);
+        }
+      }
+      if (is_dir($directory)) rmdir($directory);
+    }
+    $backup = $root . DIRECTORY_SEPARATOR . 'backup';
+    if (is_dir($backup)) rmdir($backup);
+    if (is_dir($root)) rmdir($root);
   }
 });
 

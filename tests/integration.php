@@ -204,6 +204,24 @@ try {
       && (int)$db->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='board_log'")->fetchColumn() === 1;
   });
 
+  integration_test('application startup does not redefine database constants', static function () use ($startup_body): bool {
+    return !str_contains($startup_body, 'Constant DB_FILE already defined')
+      && !str_contains($startup_body, 'Constant DB_PDO already defined');
+  });
+
+  [$misskey_callback_status, $misskey_callback_body] = http_request(
+    $origin_url . '/connect_misskey_api.php', $cookie_jar
+  );
+  integration_test('Misskey callback initializes standalone dependencies', static function () use (
+    $misskey_callback_status, $misskey_callback_body
+  ): bool {
+    return $misskey_callback_status === 200
+      && str_contains($misskey_callback_body, 'セッションがありません')
+      && !str_contains($misskey_callback_body, 'Fatal error')
+      && !str_contains($misskey_callback_body, 'Class &quot;Database&quot; not found')
+      && !str_contains($misskey_callback_body, 'Class &quot;RequestSecurity&quot; not found');
+  });
+
   [$missing_continue_status, $missing_continue_body] = http_request($base_url . '?mode=continue&no=1784', $cookie_jar);
   integration_test('missing continuation image shows a normal error page', static function () use ($missing_continue_status, $missing_continue_body): bool {
     return $missing_continue_status === 404

@@ -58,6 +58,10 @@ const USE_AXNOS = 1;
 // 拡張子は.dbで固定です。
 const DB_NAME = 'reita';
 
+// SQLiteがほかの処理による書き込みロックの解除を待つ時間（ミリ秒）
+// 通常は変更する必要はありません。0～60000の整数を指定してください。
+const DB_BUSY_TIMEOUT = 5000;
+
 /* -------- お絵かきリプを使う -------- */
 
 // お絵かきリプを使う 使う:1 使わない:0
@@ -226,6 +230,10 @@ const USER_DEL = 1;
 
 // セッションの名前
 const SESSION_NAME = 'noreita_session';
+
+// PHPセッションファイルを保持する時間（秒）
+// この時間アクセスされていない古いセッションファイルを自動削除します。
+const SESSION_FILE_LIFETIME = 86400;
 
 // 管理者ログインの無操作タイムアウト（秒）
 const ADMIN_SESSION_LIFETIME = 1800;

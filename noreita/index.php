@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.7.3 lot.260725.2';
+const REITA_VER = 'v3.7.4 lot.260726.0';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -38,7 +38,7 @@ if (!defined('CONF_VER') || CONF_VER < 20260723) {
 // request_security.inc
 check_file(__DIR__.'/request_security.inc.php');
 require_once(__DIR__.'/request_security.inc.php');
-if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260725) {
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260726) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
@@ -52,28 +52,28 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260725) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260726) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
 // initialization.inc
 check_file(__DIR__.'/initialization.inc.php');
 require_once(__DIR__.'/initialization.inc.php');
-if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260725) {
+if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260726) {
   die($en ? 'Please update initialization.inc.php to the latest version.' : 'initialization.inc.phpを最新版に更新してください。');
 }
 
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260721) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260726) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260723) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260726) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -87,14 +87,14 @@ if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260722) {
+if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260726) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
 check_file(__DIR__.'/connect_misskey_api.php');
 require_once(__DIR__.'/connect_misskey_api.php');
-if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260716) {
+if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260726) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
@@ -229,6 +229,7 @@ $dat['use_hashtag'] = USE_HASHTAG;
 
 defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
 defined('ADMIN_SESSION_LIFETIME') or define('ADMIN_SESSION_LIFETIME', 1800);
+defined('SESSION_FILE_LIFETIME') or define('SESSION_FILE_LIFETIME', 86400);
 defined('ADMIN_LOGIN_MAX_FAILURES') or define('ADMIN_LOGIN_MAX_FAILURES', 5);
 defined('ADMIN_LOGIN_WINDOW') or define('ADMIN_LOGIN_WINDOW', 900);
 defined('ADMIN_LOGIN_LOCKOUT') or define('ADMIN_LOGIN_LOCKOUT', 900);

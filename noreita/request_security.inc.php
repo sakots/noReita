@@ -1,7 +1,7 @@
 <?php
 // request_security.inc.php for noReita (C) sakots 2026 MIT License
 
-const REQUEST_SECURITY_INC_VER = 20260725;
+const REQUEST_SECURITY_INC_VER = 20260726;
 
 final class RequestSecurityException extends RuntimeException {
 }
@@ -10,9 +10,12 @@ final class RequestSecurity {
   public static function startSession(): void {
     if (session_status() !== PHP_SESSION_NONE) return;
 
+    $session_directory = __DIR__ . '/session/';
+    $session_file_lifetime = self::sessionFileLifetime();
     session_name(defined('SESSION_NAME') ? SESSION_NAME : 'noreita_session');
-    session_save_path(__DIR__ . '/session/');
+    session_save_path($session_directory);
     ini_set('session.use_strict_mode', '1');
+    ini_set('session.gc_maxlifetime', (string)$session_file_lifetime);
     session_set_cookie_params([
       'lifetime' => 0,
       'path' => '',
@@ -22,6 +25,15 @@ final class RequestSecurity {
       'samesite' => 'Lax',
     ]);
     session_start();
+    try {
+      if (random_int(1, 100) === 1) {
+        SessionFileCleaner::cleanup(
+          $session_directory, $session_file_lifetime, session_id(), 100
+        );
+      }
+    } catch (Throwable $e) {
+      // セッション掃除の失敗で通常のリクエストを停止しない。
+    }
     self::disableCacheHeaders();
   }
 
@@ -89,11 +101,59 @@ final class RequestSecurity {
     return isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && strtolower((string)$_SERVER['HTTPS']) !== 'off';
   }
 
+  private static function sessionFileLifetime(): int {
+    $lifetime = defined('SESSION_FILE_LIFETIME') ? constant('SESSION_FILE_LIFETIME') : 86400;
+    if (!is_int($lifetime) || $lifetime < 60 || $lifetime > 31536000) {
+      throw new RuntimeException('SESSION_FILE_LIFETIME must be between 60 and 31536000 seconds.');
+    }
+    return $lifetime;
+  }
+
   private static function disableCacheHeaders(): void {
     if (headers_sent()) return;
     header('Expires:');
     header('Cache-Control:');
     header('Pragma:');
+  }
+}
+
+final class SessionFileCleaner {
+  public static function cleanup(
+    string $directory,
+    int $lifetime,
+    string $current_session_id = '',
+    int $limit = 100,
+    ?int $now = null
+  ): int {
+    if ($lifetime < 1 || $limit < 1 || !is_dir($directory)) return 0;
+    $now = $now ?? time();
+    $current_file = $current_session_id !== '' ? 'sess_' . $current_session_id : '';
+    $removed = 0;
+
+    foreach (new DirectoryIterator($directory) as $file) {
+      if ($removed >= $limit) break;
+      if ($file->isDot() || $file->isLink() || !$file->isFile()) continue;
+      $filename = $file->getFilename();
+      if (!preg_match('/^sess_[A-Za-z0-9,-]+$/D', $filename)
+        || ($current_file !== '' && hash_equals($current_file, $filename))) {
+        continue;
+      }
+
+      $path = $file->getPathname();
+      $handle = @fopen($path, 'r+');
+      if ($handle === false) continue;
+      try {
+        if (!flock($handle, LOCK_EX | LOCK_NB)) continue;
+        $stat = fstat($handle);
+        if (is_array($stat) && (int)$stat['mtime'] < $now - $lifetime && @unlink($path)) {
+          $removed++;
+        }
+        flock($handle, LOCK_UN);
+      } finally {
+        fclose($handle);
+      }
+    }
+    return $removed;
   }
 }
 
