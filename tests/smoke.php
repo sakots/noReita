@@ -144,6 +144,67 @@ smoke_test('administrator login rate limit locks by IP, clears after success, an
   }
 });
 
+smoke_test('expired PHP session files are cleaned with active and unrelated files preserved', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_sessions_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $files = [
+    'sess_expiredA' => 100,
+    'sess_expiredB' => 100,
+    'sess_current' => 100,
+    'sess_locked' => 100,
+    'sess_fresh' => 450,
+    'sess_bad.name' => 100,
+    'admin-login-test.json' => 100,
+    '.htaccess' => 100,
+  ];
+  $locked_handle = null;
+  try {
+    foreach ($files as $name => $modified) {
+      $path = $directory . DIRECTORY_SEPARATOR . $name;
+      file_put_contents($path, $name);
+      touch($path, $modified);
+    }
+    $locked_handle = fopen($directory . DIRECTORY_SEPARATOR . 'sess_locked', 'r+');
+    if ($locked_handle === false || !flock($locked_handle, LOCK_EX | LOCK_NB)) return false;
+
+    $first_removed = SessionFileCleaner::cleanup($directory, 100, 'current', 1, 500);
+    $expired_remaining = array_filter(
+      ['sess_expiredA', 'sess_expiredB'],
+      static fn(string $name): bool => is_file($directory . DIRECTORY_SEPARATOR . $name)
+    );
+    if ($first_removed !== 1
+      || count($expired_remaining) !== 1
+      || !is_file($directory . DIRECTORY_SEPARATOR . 'sess_locked')) {
+      return false;
+    }
+
+    flock($locked_handle, LOCK_UN);
+    fclose($locked_handle);
+    $locked_handle = null;
+    $second_removed = SessionFileCleaner::cleanup($directory, 100, 'current', 100, 500);
+    return $second_removed === 2
+      && !is_file($directory . DIRECTORY_SEPARATOR . 'sess_expiredA')
+      && !is_file($directory . DIRECTORY_SEPARATOR . 'sess_expiredB')
+      && !is_file($directory . DIRECTORY_SEPARATOR . 'sess_locked')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'sess_current')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'sess_fresh')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'sess_bad.name')
+      && is_file($directory . DIRECTORY_SEPARATOR . 'admin-login-test.json')
+      && is_file($directory . DIRECTORY_SEPARATOR . '.htaccess');
+  } finally {
+    if (is_resource($locked_handle)) {
+      flock($locked_handle, LOCK_UN);
+      fclose($locked_handle);
+    }
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    $hidden_rule = $directory . DIRECTORY_SEPARATOR . '.htaccess';
+    if (is_file($hidden_rule)) unlink($hidden_rule);
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('Blade include names match template filename case', static function (): bool {
   $theme = dirname(__DIR__) . '/noreita/theme/monoreita';
   $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($theme));

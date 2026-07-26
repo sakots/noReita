@@ -38,7 +38,7 @@ if (!defined('CONF_VER') || CONF_VER < 20260723) {
 // request_security.inc
 check_file(__DIR__.'/request_security.inc.php');
 require_once(__DIR__.'/request_security.inc.php');
-if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260725) {
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260726) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
@@ -229,6 +229,7 @@ $dat['use_hashtag'] = USE_HASHTAG;
 
 defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
 defined('ADMIN_SESSION_LIFETIME') or define('ADMIN_SESSION_LIFETIME', 1800);
+defined('SESSION_FILE_LIFETIME') or define('SESSION_FILE_LIFETIME', 86400);
 defined('ADMIN_LOGIN_MAX_FAILURES') or define('ADMIN_LOGIN_MAX_FAILURES', 5);
 defined('ADMIN_LOGIN_WINDOW') or define('ADMIN_LOGIN_WINDOW', 900);
 defined('ADMIN_LOGIN_LOCKOUT') or define('ADMIN_LOGIN_LOCKOUT', 900);

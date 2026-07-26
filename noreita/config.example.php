@@ -231,6 +231,10 @@ const USER_DEL = 1;
 // セッションの名前
 const SESSION_NAME = 'noreita_session';
 
+// PHPセッションファイルを保持する時間（秒）
+// この時間アクセスされていない古いセッションファイルを自動削除します。
+const SESSION_FILE_LIFETIME = 86400;
+
 // 管理者ログインの無操作タイムアウト（秒）
 const ADMIN_SESSION_LIFETIME = 1800;
 
