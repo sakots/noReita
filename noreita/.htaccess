@@ -19,8 +19,3 @@
     Deny from all
   </IfModule>
 </FilesMatch>
-</Files>
-<files ~ "(^config\.php$|\.(ini|log|dat|json|db)$)">
-	order allow,deny
-	deny from all
-</files>
