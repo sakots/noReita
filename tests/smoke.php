@@ -58,7 +58,10 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'Require all denied')
     || !str_contains($root_rule, 'Deny from all')
     || !str_contains($root_rule, '^config\\.php$')
-    || !str_contains($root_rule, 'json|db')) {
+    || !str_contains($root_rule, 'json|db')
+    || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
+    || preg_match('/<\\/files>/i', $root_rule) === 1
+    || preg_match('/<files\\s+~/i', $root_rule) === 1) {
     return false;
   }
   foreach (['session', 'cache', 'backup'] as $directory) {
@@ -166,6 +169,75 @@ smoke_test('SQLite read and write', static function (): bool {
   $statement = $db->prepare('INSERT INTO smoke (value) VALUES (:value)');
   $statement->execute(['value' => 'noReita']);
   return $db->query('SELECT value FROM smoke')->fetchColumn() === 'noReita';
+});
+
+smoke_test('SQLite connections wait for a temporary write lock', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_busy_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $database_file = $directory . DIRECTORY_SEPARATOR . 'busy.db';
+  $ready_file = $directory . DIRECTORY_SEPARATOR . 'ready';
+  $process = null;
+  $pipes = [];
+
+  try {
+    $database = Database::connect('sqlite:' . $database_file, 1500);
+    $database->exec('CREATE TABLE busy_test (value TEXT NOT NULL)');
+    if ((int)$database->query('PRAGMA busy_timeout')->fetchColumn() !== 1500) return false;
+    $database = null;
+
+    $lock_script = <<<'PHP'
+$db = new PDO('sqlite:' . $argv[1]);
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$db->exec('PRAGMA journal_mode=WAL');
+$db->exec('BEGIN IMMEDIATE');
+file_put_contents($argv[2], 'ready');
+usleep(350000);
+$db->exec('COMMIT');
+PHP;
+    $process = proc_open(
+      [PHP_BINARY, '-r', $lock_script, $database_file, $ready_file],
+      [STDIN, ['pipe', 'w'], ['pipe', 'w']],
+      $pipes
+    );
+    if (!is_resource($process)) return false;
+
+    $deadline = microtime(true) + 3;
+    while (!is_file($ready_file) && microtime(true) < $deadline) usleep(10000);
+    if (!is_file($ready_file)) return false;
+
+    $started = microtime(true);
+    $waiting_database = Database::connect('sqlite:' . $database_file, 1500);
+    $waiting_database->exec("INSERT INTO busy_test VALUES ('written-after-lock')");
+    $elapsed = microtime(true) - $started;
+    $stored = $waiting_database->query('SELECT value FROM busy_test')->fetchColumn();
+    $waiting_database = null;
+
+    foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe);
+    $pipes = [];
+    $exit_code = proc_close($process);
+    $process = null;
+
+    $invalid_timeout_rejected = false;
+    try {
+      Database::connect('sqlite:' . $database_file, -1);
+    } catch (InvalidArgumentException $e) {
+      $invalid_timeout_rejected = true;
+    }
+    return $exit_code === 0
+      && $stored === 'written-after-lock'
+      && $elapsed >= 0.2
+      && $invalid_timeout_rejected;
+  } finally {
+    foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe);
+    if (is_resource($process)) {
+      proc_terminate($process);
+      proc_close($process);
+    }
+    foreach ([$ready_file, $database_file, $database_file . '-wal', $database_file . '-shm'] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('database migration and backup', static function (): bool {

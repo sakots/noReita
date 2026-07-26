@@ -1,7 +1,7 @@
 <?php
 // initialization.inc.php for noReita (C) sakots 2026 MIT License
 
-const INITIALIZATION_INC_VER = 20260725;
+const INITIALIZATION_INC_VER = 20260726;
 
 final class ApplicationInitializer {
   private string $database_dsn;
@@ -44,7 +44,7 @@ final class ApplicationInitializer {
   public function migrateDatabase(): void {
     $previous_umask = umask(0077);
     try {
-      $database = new PDO($this->database_dsn);
+      $database = Database::connect($this->database_dsn);
       (new DatabaseMigrator($database, $this->database_file, $this->backup_dir))->migrate();
     } finally {
       umask($previous_umask);

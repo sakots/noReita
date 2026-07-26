@@ -32,9 +32,9 @@
 
 ## データベース
 
-`database.inc.php`がSQLite接続、投稿リポジトリ、スキーママイグレーションを担当します。
+`database.inc.php`がSQLite接続、投稿リポジトリ、スキーママイグレーションを担当します。接続時に例外モード、WAL、`busy_timeout`を設定し、通常処理、DB移行、Misskey連携で同じ設定を使用します。既定では別処理の書き込みロックが解除されるまで最大5秒待ちます。待機時間は`config.php`の`DB_BUSY_TIMEOUT`で0～60000ミリ秒の範囲に変更できます。
 
-- `Database::connect()`：共通のPDO接続とWAL設定
+- `Database::connect()`：共通のPDO接続とWAL・ロック待機設定
 - `BoardRepository`：投稿の取得、検索、削除、非表示化
 - `DatabaseMigrator`：スキーマ作成、バックアップ、マイグレーション
 
