@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260726;
+const POST_INC_VER = 20260728;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -108,7 +108,7 @@ final class PostService implements AdminPostManagementService {
   private function deletePostsAtomically(array $posts, callable $delete_database_rows): void {
     $image_names = array_map(static fn(array $post): string => (string)($post['picfile'] ?? ''), $posts);
     $staged = ImageService::stageRelatedFilesForDeletion(
-      $this->image_dir, $this->deletion_staging_dir, $image_names
+      $this->image_dir, $this->deletion_staging_dir, $image_names, $posts
     );
     try {
       $this->repository->transaction($delete_database_rows);
@@ -125,6 +125,16 @@ final class PostService implements AdminPostManagementService {
       throw $e;
     }
     ImageService::completeStagedDeletion($staged);
+  }
+
+  public function recoverInterruptedDeletions(): array {
+    return ImageService::recoverStagedDeletions(
+      $this->image_dir,
+      $this->deletion_staging_dir,
+      function (array $posts): bool {
+        return $this->repository->hasAnyMatchingPosts($posts);
+      }
+    );
   }
 
   public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int {

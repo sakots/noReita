@@ -1,7 +1,7 @@
 <?php
 // database.inc.php for noReita (C) sakots 2026 MIT License
 
-const DATABASE_INC_VER = 20260726;
+const DATABASE_INC_VER = 20260728;
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -222,6 +222,16 @@ final class BoardRepository {
     $statement = $this->db->prepare($sql);
     $statement->execute($with_replies ? [$id, $id] : [$id]);
     return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  public function hasAnyMatchingPosts(array $posts): bool {
+    $statement = $this->db->prepare('SELECT 1 FROM board_log WHERE tid = ? AND picfile = ? LIMIT 1');
+    foreach ($posts as $post) {
+      if (!is_array($post)) continue;
+      $statement->execute([(int)($post['id'] ?? 0), (string)($post['picfile'] ?? '')]);
+      if ($statement->fetchColumn() !== false) return true;
+    }
+    return false;
   }
 
   public function hidePost(int $id): void {

@@ -933,6 +933,85 @@ smoke_test('post deletion restores every related file when the database transact
   }
 });
 
+smoke_test('interrupted post deletions recover from manifests without touching active operations', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_recover_delete_' . bin2hex(random_bytes(8));
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  $staging = $root . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-staging';
+  if (!mkdir($images, 0700, true)) return false;
+  try {
+    $db = new PDO('sqlite::memory:');
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db->exec('CREATE TABLE board_log (tid INTEGER PRIMARY KEY, picfile TEXT NOT NULL)');
+    $insert = $db->prepare('INSERT INTO board_log VALUES (?, ?)');
+    $service = new PostService(
+      new BoardRepository($db), 'admin-secret', $images, 100, 0600, $staging
+    );
+
+    foreach (['restore.png', 'restore.pch', 'restore_thumb_safe_test.webp'] as $file) {
+      file_put_contents($images . DIRECTORY_SEPARATOR . $file, $file);
+    }
+    $insert->execute([1, 'restore.png']);
+    $restore_stage = ImageService::stageRelatedFilesForDeletion(
+      $images, $staging, ['restore.png'], [['tid' => 1, 'picfile' => 'restore.png']]
+    );
+    flock($restore_stage['lock_handle'], LOCK_UN);
+    fclose($restore_stage['lock_handle']);
+    $restored = $service->recoverInterruptedDeletions();
+    if ($restored['restored'] !== 1
+      || !is_file($images . DIRECTORY_SEPARATOR . 'restore.png')
+      || !is_file($images . DIRECTORY_SEPARATOR . 'restore.pch')
+      || !is_file($images . DIRECTORY_SEPARATOR . 'restore_thumb_safe_test.webp')) {
+      return false;
+    }
+
+    foreach (['complete.webp', 'complete.chi', 'complete_thumb_nsfw_test.webp'] as $file) {
+      file_put_contents($images . DIRECTORY_SEPARATOR . $file, $file);
+    }
+    $insert->execute([2, 'complete.webp']);
+    $complete_stage = ImageService::stageRelatedFilesForDeletion(
+      $images, $staging, ['complete.webp'], [['tid' => 2, 'picfile' => 'complete.webp']]
+    );
+    $db->exec('DELETE FROM board_log WHERE tid = 2');
+    flock($complete_stage['lock_handle'], LOCK_UN);
+    fclose($complete_stage['lock_handle']);
+    $completed = $service->recoverInterruptedDeletions();
+    if ($completed['completed'] !== 1
+      || is_file($images . DIRECTORY_SEPARATOR . 'complete.webp')
+      || is_file($images . DIRECTORY_SEPARATOR . 'complete.chi')
+      || is_file($images . DIRECTORY_SEPARATOR . 'complete_thumb_nsfw_test.webp')) {
+      return false;
+    }
+
+    file_put_contents($images . DIRECTORY_SEPARATOR . 'active.png', 'active');
+    $insert->execute([3, 'active.png']);
+    $active_stage = ImageService::stageRelatedFilesForDeletion(
+      $images, $staging, ['active.png'], [['tid' => 3, 'picfile' => 'active.png']]
+    );
+    $active = $service->recoverInterruptedDeletions();
+    $active_was_skipped = $active['skipped'] === 1
+      && !is_file($images . DIRECTORY_SEPARATOR . 'active.png')
+      && is_file($active_stage['directory'] . DIRECTORY_SEPARATOR . 'active.png');
+    ImageService::rollbackStagedDeletion($active_stage);
+
+    return $active_was_skipped
+      && is_file($images . DIRECTORY_SEPARATOR . 'active.png')
+      && (glob($staging . DIRECTORY_SEPARATOR . 'delete-*') ?: []) === [];
+  } finally {
+    $iterator = is_dir($root)
+      ? new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      )
+      : null;
+    if ($iterator !== null) {
+      foreach ($iterator as $item) {
+        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+      }
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 smoke_test('posted image replacement can roll back or complete atomically', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_replace_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';

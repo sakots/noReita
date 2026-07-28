@@ -52,7 +52,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260726) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260728) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -66,14 +66,14 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260726) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260726) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260728) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260726) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260728) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -411,6 +411,10 @@ function init(): void {
     $initializer->prepareDirectories();
     $initializer->migrateDatabase();
     $initializer->secureDatabaseFile();
+    (new PostService(
+      new BoardRepository(), '', __DIR__ . '/' . IMG_DIR, PDEF_W, PERMISSION_FOR_DEST,
+      __DIR__ . '/backup/delete-staging'
+    ))->recoverInterruptedDeletions();
   } catch (Throwable $e) {
     error(($en ? 'Application initialization failed. ' : 'アプリケーションの初期化に失敗しました。') . h($e->getMessage()), 500);
     return;

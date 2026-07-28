@@ -1,7 +1,7 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260726;
+const IMAGE_INC_VER = 20260728;
 
 final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
@@ -190,10 +190,11 @@ final class ImageService {
   public static function stageRelatedFilesForDeletion(
     string $image_dir,
     string $staging_root,
-    array $image_names
+    array $image_names,
+    array $posts = []
   ): array {
     $paths = self::relatedFilePaths($image_dir, $image_names);
-    if ($paths === []) return ['directory' => '', 'files' => []];
+    if ($paths === []) return ['directory' => '', 'files' => [], 'lock_handle' => null];
 
     $staging_root = rtrim($staging_root, '/\\');
     if (!is_dir($staging_root) && !mkdir($staging_root, 0700, true) && !is_dir($staging_root)) {
@@ -204,8 +205,25 @@ final class ImageService {
       throw new RuntimeException('Failed to create deletion staging operation.');
     }
 
-    $staged = ['directory' => $staging_directory, 'files' => []];
+    $lock_path = $staging_directory . DIRECTORY_SEPARATOR . '.lock';
+    $lock_handle = @fopen($lock_path, 'c+');
+    if ($lock_handle === false || !flock($lock_handle, LOCK_EX | LOCK_NB)) {
+      if (is_resource($lock_handle)) fclose($lock_handle);
+      @unlink($lock_path);
+      @rmdir($staging_directory);
+      throw new RuntimeException('Failed to lock deletion staging operation.');
+    }
+    @chmod($lock_path, 0600);
+
+    $staged = ['directory' => $staging_directory, 'files' => [], 'lock_handle' => $lock_handle];
+    $manifest = [
+      'version' => 1,
+      'created_at' => time(),
+      'posts' => self::normalizeDeletionManifestPosts($posts),
+      'files' => array_map('basename', $paths),
+    ];
     try {
+      self::writeDeletionManifest($staging_directory, $manifest);
       foreach ($paths as $path) {
         $destination = $staging_directory . DIRECTORY_SEPARATOR . basename($path);
         if (!rename($path, $destination)) {
@@ -229,16 +247,71 @@ final class ImageService {
       if ($original === '' || is_file($original) || !rename($temporary, $original)) $failed = true;
     }
     $directory = (string)($staged['directory'] ?? '');
-    if ($directory !== '' && is_dir($directory)) @rmdir($directory);
-    if ($failed) throw new RuntimeException('Failed to restore a related image file after deletion failure.');
+    if ($failed) {
+      self::releaseDeletionLock($staged);
+      throw new RuntimeException('Failed to restore a related image file after deletion failure.');
+    }
+    self::removeDeletionStagingOperation($staged);
   }
 
   public static function completeStagedDeletion(array $staged): void {
     foreach ($staged['files'] ?? [] as $file) {
       safe_unlink((string)($file['staged'] ?? ''));
     }
-    $directory = (string)($staged['directory'] ?? '');
-    if ($directory !== '' && is_dir($directory)) @rmdir($directory);
+    self::removeDeletionStagingOperation($staged);
+  }
+
+  public static function recoverStagedDeletions(
+    string $image_dir,
+    string $staging_root,
+    callable $should_restore
+  ): array {
+    $result = ['restored' => 0, 'completed' => 0, 'skipped' => 0, 'invalid' => 0];
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $staging_root = rtrim($staging_root, '/\\');
+    if (!is_dir($staging_root)) return $result;
+
+    foreach (new DirectoryIterator($staging_root) as $operation) {
+      if ($operation->isDot() || $operation->isLink() || !$operation->isDir()
+        || !preg_match('/^delete-[a-f0-9]{24}$/D', $operation->getFilename())) {
+        continue;
+      }
+      $directory = $operation->getPathname();
+      $lock_path = $directory . DIRECTORY_SEPARATOR . '.lock';
+      $lock_handle = @fopen($lock_path, 'c+');
+      if ($lock_handle === false || !flock($lock_handle, LOCK_EX | LOCK_NB)) {
+        if (is_resource($lock_handle)) fclose($lock_handle);
+        $result['skipped']++;
+        continue;
+      }
+
+      $manifest = self::readDeletionManifest($directory);
+      if ($manifest === null) {
+        flock($lock_handle, LOCK_UN);
+        fclose($lock_handle);
+        $result['invalid']++;
+        continue;
+      }
+
+      $staged = ['directory' => $directory, 'files' => [], 'lock_handle' => $lock_handle];
+      foreach ($manifest['files'] as $filename) {
+        $staged['files'][] = [
+          'original' => $image_dir . $filename,
+          'staged' => $directory . DIRECTORY_SEPARATOR . $filename,
+        ];
+      }
+
+      if ($should_restore($manifest['posts'])) {
+        self::rollbackStagedDeletion($staged);
+        $result['restored']++;
+      } else {
+        // DBから記事が消えている場合は、移動前に残ったファイルも削除を完了する。
+        foreach ($staged['files'] as $file) safe_unlink((string)$file['original']);
+        self::completeStagedDeletion($staged);
+        $result['completed']++;
+      }
+    }
+    return $result;
   }
 
   private static function relatedFilePaths(string $image_dir, array $image_names): array {
@@ -257,6 +330,77 @@ final class ImageService {
       }
     }
     return array_values($paths);
+  }
+
+  private static function normalizeDeletionManifestPosts(array $posts): array {
+    $normalized = [];
+    foreach ($posts as $post) {
+      if (!is_array($post)) continue;
+      $id = filter_var($post['tid'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+      $picfile = basename((string)($post['picfile'] ?? ''));
+      if ($id !== false && $picfile !== '') {
+        $normalized[(int)$id] = ['id' => (int)$id, 'picfile' => $picfile];
+      }
+    }
+    return array_values($normalized);
+  }
+
+  private static function writeDeletionManifest(string $directory, array $manifest): void {
+    $json = json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    $temporary = $directory . DIRECTORY_SEPARATOR . '.manifest.tmp';
+    $path = $directory . DIRECTORY_SEPARATOR . 'manifest.json';
+    if (file_put_contents($temporary, $json, LOCK_EX) === false || !rename($temporary, $path)) {
+      @unlink($temporary);
+      throw new RuntimeException('Failed to write deletion staging manifest.');
+    }
+    @chmod($path, 0600);
+  }
+
+  private static function readDeletionManifest(string $directory): ?array {
+    $path = $directory . DIRECTORY_SEPARATOR . 'manifest.json';
+    $json = @file_get_contents($path, false, null, 0, 65536);
+    $manifest = is_string($json) ? json_decode($json, true) : null;
+    if (!is_array($manifest) || (int)($manifest['version'] ?? 0) !== 1
+      || !is_array($manifest['posts'] ?? null) || !is_array($manifest['files'] ?? null)) {
+      return null;
+    }
+    $posts = [];
+    foreach ($manifest['posts'] as $post) {
+      if (!is_array($post) || !is_int($post['id'] ?? null) || $post['id'] < 1
+        || !is_string($post['picfile'] ?? null) || basename($post['picfile']) !== $post['picfile']
+        || $post['picfile'] === '') {
+        return null;
+      }
+      $posts[] = ['id' => $post['id'], 'picfile' => $post['picfile']];
+    }
+    $files = [];
+    foreach ($manifest['files'] as $filename) {
+      if (!is_string($filename) || $filename === '' || basename($filename) !== $filename
+        || in_array($filename, ['.', '..', 'manifest.json', '.lock'], true)) {
+        return null;
+      }
+      $files[$filename] = $filename;
+    }
+    if ($posts === [] || $files === []) return null;
+    return ['posts' => $posts, 'files' => array_values($files)];
+  }
+
+  private static function removeDeletionStagingOperation(array $staged): void {
+    $directory = (string)($staged['directory'] ?? '');
+    if ($directory === '') return;
+    @unlink($directory . DIRECTORY_SEPARATOR . 'manifest.json');
+    @unlink($directory . DIRECTORY_SEPARATOR . '.manifest.tmp');
+    self::releaseDeletionLock($staged);
+    @unlink($directory . DIRECTORY_SEPARATOR . '.lock');
+    if (is_dir($directory)) @rmdir($directory);
+  }
+
+  private static function releaseDeletionLock(array $staged): void {
+    $handle = $staged['lock_handle'] ?? null;
+    if (is_resource($handle)) {
+      flock($handle, LOCK_UN);
+      fclose($handle);
+    }
   }
 
   public static function createThumbnail(string $source, string $destination, int $width, bool $nsfw = false): string {
