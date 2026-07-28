@@ -30,5 +30,8 @@ noreita/cache/*
 !noreita/backup/
 noreita/backup/*
 !noreita/backup/.htaccess
+!noreita/errorlog/
+noreita/errorlog/*
+!noreita/errorlog/.htaccess
 
 config.php
