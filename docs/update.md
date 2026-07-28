@@ -10,6 +10,10 @@
 - サムネイル
 - セッションなど
 
+プログラム本体を更新するときは、新規ファイルの`noreita/error_handler.inc.php`と
+`noreita/errorlog/.htaccess`もアップロードしてください。FTPソフトで隠しファイルを
+転送しない設定になっている場合は、`.htaccess`を個別に確認してください。
+
 ## `config.example.php`に設定項目が増えた場合の反映方法
 
 新しく増えた設定を末尾等に追加してください
@@ -53,6 +57,9 @@ scripts/integration-test.sh
 ```
 
 このテストは一時ディレクトリと一時SQLite DBを使用し、設置済み掲示板の`config.php`やDBは変更しません。
+
+更新後に`noreita/errorlog/`へブラウザーでアクセスし、403になることも確認してください。
+PHPエラーの調査方法は[エラー調査手順](errors.md)を参照してください。
 
 GitHub Actionsでは、PHP 7.4、8.0、8.3の各環境で`composer.lock`から依存ライブラリを配置し、このHTTP結合テストを自動実行します。
 
