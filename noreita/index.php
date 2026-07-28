@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.7.4 lot.260726.0';
+const REITA_VER = 'v3.7.5 lot.260728.0';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
