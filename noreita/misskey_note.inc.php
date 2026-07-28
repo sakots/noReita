@@ -4,7 +4,7 @@
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
 
-const MISSKEY_NOTE_VER = 20260726; //misskey_note.inc.phpのバージョン
+const MISSKEY_NOTE_VER = 20260728; //misskey_note.inc.phpのバージョン
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -49,7 +49,7 @@ function get_post_from_db(int $no): ?array {
       'pwd'      => $post['pwd'],
     ];
   } catch (PDOException $e) {
-    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage(), 500);
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   return null;
 }
@@ -67,7 +67,7 @@ function check_post_exists(int $no): bool {
 
     return $result['count'] > 0;
   } catch (PDOException $e) {
-    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage(), 500);
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   return false;
 }
@@ -89,7 +89,7 @@ function verify_post_password(int $no, string $id, string $pwd): bool {
 
     return password_verify($pwd, $post['pwd']);
   } catch (PDOException $e) {
-    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage(), 500);
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   return false;
 }
@@ -119,7 +119,7 @@ function check_edit_permission(int $no, string $id, string $pwd, bool $admin): b
 
     return verify_post_password($no, $id, $pwd);
   } catch (PDOException $e) {
-    error($en ? "Database error: " . $e->getMessage() : "データベースエラー: " . $e->getMessage(), 500);
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   return false;
 }
@@ -178,7 +178,7 @@ function create_res(array $post): array {
 
     return $res;
   } catch (Exception $e) {
-    error($en ? "Error processing post data: " . $e->getMessage() : "投稿データの処理中にエラーが発生しました: " . $e->getMessage(), 500);
+    error($en ? 'Failed to process post data.' : '投稿データの処理中にエラーが発生しました。', 500, $e);
   }
   return [];
 }

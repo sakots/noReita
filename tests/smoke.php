@@ -64,7 +64,7 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || preg_match('/<files\\s+~/i', $root_rule) === 1) {
     return false;
   }
-  foreach (['session', 'cache', 'backup'] as $directory) {
+  foreach (['session', 'cache', 'backup', 'errorlog'] as $directory) {
     $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");
     if (!is_string($rule)
       || !str_contains($rule, 'Require all denied')

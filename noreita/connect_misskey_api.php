@@ -6,8 +6,10 @@
 //Misskey APIに接続
 //noReita用に改造by sakots
 
-require_once(__DIR__.'/config.php');
 require_once(__DIR__.'/functions.php');
+require_once(__DIR__.'/error_handler.inc.php');
+ApplicationErrorHandler::install(__DIR__ . '/errorlog');
+require_once(__DIR__.'/config.php');
 require_once(__DIR__.'/request_security.inc.php');
 
 // index.phpを経由しないMisskeyコールバックの直接実行時だけDB接続を初期化する。
@@ -18,7 +20,7 @@ if (!class_exists('Database', false)) {
 	require_once(__DIR__.'/database.inc.php');
 }
 
-const CONNECT_MISSKEY_API_VER = 20260726;
+const CONNECT_MISSKEY_API_VER = 20260728;
 
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 ? explode( ',', $http_langs )[0] : '';

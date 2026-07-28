@@ -20,12 +20,22 @@ if (version_compare($php_ver, '7.4.0', '<')) {
 
 // functions.phpの存在とバージョンを確認
 if (!is_file(__DIR__.'/functions.php')) {
-  die(__DIR__.'/functions.php'.($en ? ' does not exist.':'がありません。'));
+  die($en ? 'functions.php does not exist.' : 'functions.phpがありません。');
 }
 require_once(__DIR__.'/functions.php');
-if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260725) {
+if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260728) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
+
+// 公開画面へのPHPエラー詳細表示を止め、非公開ログへ記録する。
+if (!is_file(__DIR__ . '/error_handler.inc.php')) {
+  die($en ? 'The error handler is missing.' : 'エラーハンドラーがありません。');
+}
+require_once(__DIR__ . '/error_handler.inc.php');
+if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260728) {
+  die($en ? 'Please update the error handler.' : 'エラーハンドラーを最新版に更新してください。');
+}
+ApplicationErrorHandler::install(__DIR__ . '/errorlog');
 
 // コンフィグ
 check_file(__DIR__.'/config.php');
@@ -87,14 +97,14 @@ if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260726) {
+if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260728) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
 check_file(__DIR__.'/connect_misskey_api.php');
 require_once(__DIR__.'/connect_misskey_api.php');
-if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260726) {
+if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260728) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
@@ -404,6 +414,7 @@ function init(): void {
       __DIR__ . '/session' => PERMISSION_FOR_PRIVATE_DIR,
       __DIR__ . '/cache' => PERMISSION_FOR_PRIVATE_DIR,
       __DIR__ . '/backup' => PERMISSION_FOR_PRIVATE_DIR,
+      __DIR__ . '/errorlog' => PERMISSION_FOR_PRIVATE_DIR,
     ],
   );
   $initializer->sendSecurityHeaders();
@@ -416,7 +427,7 @@ function init(): void {
       __DIR__ . '/backup/delete-staging'
     ))->recoverInterruptedDeletions();
   } catch (Throwable $e) {
-    error(($en ? 'Application initialization failed. ' : 'アプリケーションの初期化に失敗しました。') . h($e->getMessage()), 500);
+    error($en ? 'Application initialization failed.' : 'アプリケーションの初期化に失敗しました。', 500, $e);
     return;
   }
 }
@@ -555,7 +566,7 @@ function regist(): void {
       $dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
     }
   } catch (Throwable $e) {
-    error(($en ? 'Posting failed. ' : '投稿処理に失敗しました。') . h($e->getMessage()), 500);
+    error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $pictmp, $picfile, $mode);
   //header('Location:'.PHP_SELF);
@@ -566,7 +577,7 @@ function regist(): void {
     $repository = new BoardRepository();
     $th_cnt = $repository->countThreads();
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   if ($th_cnt > MAX_THREAD) {
@@ -580,7 +591,7 @@ function regist(): void {
     try {
       (new BoardRepository())->markOldThreads($th_cnt - $th_id);
     } catch (PDOException $e) {
-      echo "DB接続エラー:" . $e->getMessage();
+      error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     }
   }
 
@@ -597,6 +608,7 @@ function regist(): void {
 //通常表示モード
 function def(): void {
   global $dat, $blade;
+  global $en;
   $dsp_res = DSP_RES;
   $page_def = PAGE_DEF;
 
@@ -609,7 +621,7 @@ function def(): void {
     $repository = new BoardRepository();
     $th_cnt = $repository->countThreads();
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   if ($th_cnt > MAX_THREAD) {
@@ -661,7 +673,7 @@ function def(): void {
     $dat['next'] = ($page + 1);
 
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
   //読み込み
@@ -774,7 +786,7 @@ function def(): void {
 
     echo $blade->run(MAINFILE, $dat);
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -825,7 +837,7 @@ function catalog(): void {
     $dat['next'] = ($page + 1);
 
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error(LANG === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   //読み込み
@@ -854,7 +866,7 @@ function catalog(): void {
     $dat['catalogmode'] = 'catalog';
     echo $blade->run(CATALOGFILE, $dat);
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error(LANG === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -906,7 +918,7 @@ function search(): void {
     $dat['s_result'] = $i;
     echo $blade->run(CATALOGFILE, $dat);
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error(LANG === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -933,14 +945,16 @@ function sodane(): void {
 
   } catch (PDOException $e) {
     if ($is_ajax) {
+      $error_id = ApplicationErrorHandler::reportThrowable($e);
+      http_response_code(500);
       header('Content-Type: application/json');
       echo json_encode([
         'success' => false,
-        'error' => 'DB接続エラー:' . $e->getMessage()
+        'error' => ApplicationErrorHandler::publicMessage($error_id, LANG === 'English')
       ]);
       return;
     } else {
-      echo "DB接続エラー:" . $e->getMessage();
+      error(LANG === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     }
   }
 
@@ -952,6 +966,7 @@ function sodane(): void {
 //レス画面
 function res(): void {
   global $blade, $dat;
+  global $en;
   $resno = filter_input(INPUT_GET, 'res',FILTER_VALIDATE_INT);
   $uuid = trim((string)filter_input(INPUT_GET, 'uuid'));
 
@@ -1063,7 +1078,7 @@ function res(): void {
     }
     $db = null;
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
   $dat['path'] = IMG_DIR;
@@ -1311,7 +1326,8 @@ function open_pch(string $sp = ""): void {
   try {
     $playback = ImageService::animationPlaybackData(IMG_DIR, $pch, (int)($sp ?: PCH_SPEED));
   } catch (Throwable $e) {
-    error((LANG === 'English' ? 'Failed to open animation. ' : '動画を開けませんでした。') . h($e->getMessage()), 404);
+    ApplicationErrorHandler::reportThrowable($e, 'animation-open-error');
+    error(LANG === 'English' ? 'Failed to open animation.' : '動画を開けませんでした。', 404);
     return;
   }
   $template = $playback['template_type'] === 'tegaki' ? ANIMEFILE_TEGAKI : ANIMEFILE;
@@ -1410,7 +1426,7 @@ function in_continue(): void {
     $repository = new BoardRepository();
     $oya = $repository->findPostsByImage($no);
   } catch (Throwable $e) {
-    error($en ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500);
+    error($en ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500, $e);
     return;
   }
   if (empty($oya) || !is_file(IMG_DIR . $no) || !is_readable(IMG_DIR . $no)) {
@@ -1485,7 +1501,7 @@ function in_continue(): void {
 
     $db = null; //db切断
   } catch (Throwable $e) {
-    error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500);
+    error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500, $e);
   }
 
   echo $blade->run(OTHERFILE, $dat);
@@ -1527,7 +1543,7 @@ function delmode(): void {
     error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     return;
   } catch (Throwable $e) {
-    error(($en ? 'Deletion failed. ' : '削除に失敗しました。') . h($e->getMessage()), 500);
+    error($en ? 'Deletion failed.' : '削除に失敗しました。', 500, $e);
     return;
   }
   //変数クリア
@@ -1633,7 +1649,7 @@ function picreplace(): void {
     }
   } catch (Throwable $e) {
     if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
-    error(($en ? 'Image replacement failed. ' : '画像差し替えに失敗しました。') . h($e->getMessage()), 500);
+    error($en ? 'Image replacement failed.' : '画像差し替えに失敗しました。', 500, $e);
   }
   editform((int)$no, (string)$pwd_f);
 }
@@ -1679,7 +1695,7 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
   } catch (PostAuthorizationException $e) {
     error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
   } catch (Throwable $e) {
-    error(($en ? 'Failed to open edit mode. ' : '編集画面を開けませんでした。') . h($e->getMessage()), 500);
+    error($en ? 'Failed to open edit mode.' : '編集画面を開けませんでした。', 500, $e);
   }
 }
 
@@ -1738,7 +1754,7 @@ function editexec(): void {
     error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     return;
   } catch (Throwable $e) {
-    error(($en ? 'Editing failed. ' : '編集に失敗しました。') . h($e->getMessage()), 500);
+    error($en ? 'Editing failed.' : '編集に失敗しました。', 500, $e);
     return;
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $resto, $pictmp, $picfile, $mode);
@@ -1783,7 +1799,7 @@ function admin_login(): void {
     if (random_int(1, 100) === 1) $limiter->cleanupExpired();
     $retry_after = $limiter->retryAfter($client_ip);
   } catch (Throwable $e) {
-    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500);
+    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
   if ($retry_after > 0) {
     header('Retry-After: ' . $retry_after);
@@ -1796,7 +1812,7 @@ function admin_login(): void {
     try {
       $retry_after = $limiter->recordFailure($client_ip);
     } catch (Throwable $e) {
-      error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500);
+      error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
     }
     if ($retry_after > 0) {
       header('Retry-After: ' . $retry_after);
@@ -1808,7 +1824,7 @@ function admin_login(): void {
   try {
     $limiter->clear($client_ip);
   } catch (Throwable $e) {
-    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500);
+    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
   redirect(PHP_SELF . '?mode=admin');
 }
@@ -1870,7 +1886,7 @@ function admin_manage(?string $forced_operation = null): void {
   } catch (PostNotFoundException $e) {
     error($en ? 'The selected posts do not exist.' : '選択した記事が見つかりません。', 404);
   } catch (Throwable $e) {
-    error($en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500);
+    error($en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500, $e);
   }
   redirect(PHP_SELF . '?mode=admin');
 }
@@ -1942,7 +1958,7 @@ function admin_post(): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $blade->run(ADMINPOSTFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500);
+    error($en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500, $e);
   }
 }
 
@@ -2050,7 +2066,7 @@ function admin(): void {
     $dat['admin_page_posts'] = count($oya) + array_sum(array_map('count', $ko));
     echo $blade->run(ADMINFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500);
+    error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500, $e);
   }
 }
 
@@ -2069,7 +2085,7 @@ function usrchk(): void {
       $flag = false;
     }
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   if (!$flag) {
     error($en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています", 403);
@@ -2153,6 +2169,7 @@ function save_image(): void {
 
 //ログの行数が最大値を超えていたら削除
 function logdel(): void {
+  global $en;
   //オーバーした行の画像とスレ番号を取得
   try {
     $repository = new BoardRepository();
@@ -2165,15 +2182,22 @@ function logdel(): void {
 
     $repository->deletePost($del_id, true);
   } catch (PDOException $e) {
-    echo "DB接続エラー:" . $e->getMessage();
+    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
 //エラー画面
-function error(string $mes, int $status = 400): void {
+function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   global $db;
   global $blade, $dat;
+  global $en;
   if ($status < 400 || $status > 599) $status = 500;
+  if ($status >= 500) {
+    $error_id = $cause !== null
+      ? ApplicationErrorHandler::reportThrowable($cause)
+      : ApplicationErrorHandler::reportMessage(strip_tags($mes));
+    $mes = h(ApplicationErrorHandler::publicMessage($error_id, $en));
+  }
   http_response_code($status);
   $db = null; //db切断
   $dat['errmes'] = $mes;

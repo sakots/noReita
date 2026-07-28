@@ -1,5 +1,5 @@
 <?php
-const FUNCTIONS_VER = 20260725;
+const FUNCTIONS_VER = 20260728;
 
 // PHP 8で追加された文字列関数のPHP 7.4向け互換実装
 if (!function_exists('str_contains')) {
@@ -275,10 +275,10 @@ function check_file(string $path): void {
   $msg = initial_error_message();
 
   if (!is_file($path)){
-    die(h($path) . $msg['001']);
+    die(h(basename($path)) . $msg['001']);
   }
   if (!is_readable($path)){
-    die(h($path) . $msg['002']);
+    die(h(basename($path)) . $msg['002']);
   }
 }
 

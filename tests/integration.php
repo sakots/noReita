@@ -138,6 +138,17 @@ try {
   if (file_put_contents($webroot . '/config.php', $config) === false) {
     throw new RuntimeException('Could not create test config.php');
   }
+  $error_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/error_handler.inc.php';
+$admin_pass = 'error-probe-secret';
+ApplicationErrorHandler::install(__DIR__ . '/errorlog');
+trigger_error('Warning password=error-probe-secret at ' . __FILE__, E_USER_WARNING);
+throw new RuntimeException('Failure token=error-probe-secret at ' . __FILE__);
+PHP;
+  if (file_put_contents($webroot . '/error-probe.php', $error_probe) === false) {
+    throw new RuntimeException('Could not create error handling probe.');
+  }
 
   $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
   if ($socket === false) throw new RuntimeException("Could not reserve port: {$error_message}");
@@ -181,6 +192,7 @@ try {
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
     'cache/http-access-probe.bladec' => 'blade-cache-secret',
+    'errorlog/http-access-probe.log' => 'error-log-secret',
   ];
   foreach ($protected_probes as $relative_path => $secret) {
     $probe_path = $webroot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative_path);
@@ -195,7 +207,7 @@ try {
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 5 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 6 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -207,6 +219,31 @@ try {
   integration_test('application startup does not redefine database constants', static function () use ($startup_body): bool {
     return !str_contains($startup_body, 'Constant DB_FILE already defined')
       && !str_contains($startup_body, 'Constant DB_PDO already defined');
+  });
+
+  [$error_probe_status, $error_probe_body] = http_request($origin_url . '/error-probe.php', $cookie_jar);
+  preg_match('/\\b\\d{14}-[a-f0-9]{8}\\b/', $error_probe_body, $error_id_match);
+  $error_probe_id = (string)($error_id_match[0] ?? '');
+  $error_log_contents = '';
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $error_log_contents .= (string)file_get_contents($error_log_file);
+  }
+  integration_test('PHP errors expose only an ID while private logs retain redacted diagnostics', static function () use (
+    $error_probe_status, $error_probe_body, $error_probe_id, $error_log_contents, $webroot
+  ): bool {
+    return $error_probe_status === 500
+      && $error_probe_id !== ''
+      && str_contains($error_probe_body, $error_probe_id)
+      && str_contains($error_probe_body, 'Date: ' . substr($error_probe_id, 0, 8))
+      && !str_contains($error_probe_body, 'error-probe-secret')
+      && !str_contains($error_probe_body, $webroot)
+      && !str_contains($error_probe_body, 'RuntimeException')
+      && str_contains($error_log_contents, $error_probe_id)
+      && str_contains($error_log_contents, '"date":"' . substr($error_probe_id, 0, 8) . '"')
+      && str_contains($error_log_contents, '[REDACTED]')
+      && str_contains($error_log_contents, 'RuntimeException')
+      && str_contains($error_log_contents, 'error-probe.php')
+      && !str_contains($error_log_contents, 'error-probe-secret');
   });
 
   [$misskey_callback_status, $misskey_callback_body] = http_request(
