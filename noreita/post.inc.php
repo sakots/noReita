@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260728;
+const POST_INC_VER = 20260806;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -20,6 +20,8 @@ final class PostService implements AdminPostManagementService {
   private int $thumbnail_width;
   private int $file_permission;
   private string $deletion_staging_dir;
+  private string $deletion_quarantine_dir;
+  private int $deletion_quarantine_retention_days;
 
   public function __construct(
     BoardRepository $repository,
@@ -27,7 +29,9 @@ final class PostService implements AdminPostManagementService {
     string $image_dir,
     int $thumbnail_width = 0,
     int $file_permission = 0600,
-    string $deletion_staging_dir = ''
+    string $deletion_staging_dir = '',
+    string $deletion_quarantine_dir = '',
+    int $deletion_quarantine_retention_days = 30
   ) {
     $this->repository = $repository;
     $this->admin_pass = $admin_pass;
@@ -37,6 +41,10 @@ final class PostService implements AdminPostManagementService {
     $this->deletion_staging_dir = $deletion_staging_dir !== ''
       ? $deletion_staging_dir
       : dirname(rtrim($image_dir, '/\\')) . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-staging';
+    $this->deletion_quarantine_dir = $deletion_quarantine_dir !== ''
+      ? $deletion_quarantine_dir
+      : dirname($this->deletion_staging_dir) . DIRECTORY_SEPARATOR . 'delete-quarantine';
+    $this->deletion_quarantine_retention_days = max(1, min(3650, $deletion_quarantine_retention_days));
   }
 
   public function authorize(int $post_id, string $password): array {
@@ -133,7 +141,9 @@ final class PostService implements AdminPostManagementService {
       $this->deletion_staging_dir,
       function (array $posts): bool {
         return $this->repository->hasAnyMatchingPosts($posts);
-      }
+      },
+      $this->deletion_quarantine_dir,
+      $this->deletion_quarantine_retention_days
     );
   }
 

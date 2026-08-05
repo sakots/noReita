@@ -1066,6 +1066,61 @@ smoke_test('interrupted post deletions recover from manifests without touching a
   }
 });
 
+smoke_test('invalid deletion recovery data is quarantined and expires safely', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_delete_quarantine_' . bin2hex(random_bytes(8));
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  $staging = $root . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-staging';
+  $quarantine = $root . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-quarantine';
+  if (!mkdir($staging, 0700, true) || !mkdir($images, 0700, true)) return false;
+  try {
+    $operation = $staging . DIRECTORY_SEPARATOR . 'delete-' . str_repeat('a', 24);
+    mkdir($operation, 0700);
+    file_put_contents($operation . '/.lock', '');
+    file_put_contents($operation . '/manifest.json', '{broken');
+    file_put_contents($operation . '/orphan.png', 'image');
+
+    $now = 1700000000;
+    $result = ImageService::recoverStagedDeletions(
+      $images, $staging, static fn(array $posts): bool => false, $quarantine, 30, $now
+    );
+    $quarantined = glob($quarantine . DIRECTORY_SEPARATOR . 'quarantine-delete-*') ?: [];
+    if ($result['invalid'] !== 1 || $result['quarantined'] !== 1 || count($quarantined) !== 1
+      || is_dir($operation) || !is_file($quarantined[0] . '/quarantine.json')
+      || !is_file($quarantined[0] . '/orphan.png')) {
+      return false;
+    }
+
+    touch($quarantined[0], 100);
+    $unsafe = $quarantine . DIRECTORY_SEPARATOR . 'quarantine-delete-' . str_repeat('b', 24)
+      . '-20200101000000-' . str_repeat('c', 8);
+    mkdir($unsafe, 0700);
+    mkdir($unsafe . '/nested', 0700);
+    touch($unsafe, 100);
+    $unrelated = $quarantine . DIRECTORY_SEPARATOR . 'keep-this-directory';
+    mkdir($unrelated, 0700);
+    touch($unrelated, 100);
+
+    return ImageService::cleanupDeletionQuarantine($quarantine, 30, 10, $now) === 1
+      && !is_dir($quarantined[0])
+      && is_dir($unsafe)
+      && is_dir($unrelated);
+  } finally {
+    $iterator = is_dir($root)
+      ? new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      )
+      : null;
+    if ($iterator !== null) {
+      foreach ($iterator as $item) {
+        if ($item->isLink() || $item->isFile()) unlink($item->getPathname());
+        elseif ($item->isDir()) rmdir($item->getPathname());
+      }
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 smoke_test('posted image replacement can roll back or complete atomically', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_replace_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';

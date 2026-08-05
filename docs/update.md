@@ -39,6 +39,12 @@ const ERROR_LOG_MAX_BYTES = 5242880;
 const ERROR_LOG_MAX_FILES_PER_DAY = 5;
 ```
 
+削除復旧データの隔離期間も設定できます。追加しない場合は30日です。
+
+```php
+const DELETE_QUARANTINE_RETENTION_DAYS = 30;
+```
+
 ## DB移行スクリプトが必要なバージョン
 
 v2からv3系統への更新では、先に`noreita_db2_to_3.php`を実行してください。

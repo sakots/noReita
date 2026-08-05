@@ -438,6 +438,9 @@ const ERROR_LOG_MAX_BYTES = 5242880;
 // 1日に作成するPHPエラーログの最大ファイル数
 const ERROR_LOG_MAX_FILES_PER_DAY = 5;
 
+// 判断不能な投稿削除復旧データを隔離して保持する日数
+const DELETE_QUARANTINE_RETENTION_DAYS = 30;
+
 // csrfトークンを使って不正な投稿を拒絶する する:1 しない:0
 // する:1 にすると外部サイトからの不正な投稿を拒絶することができます
 const CHECK_CSRF_TOKEN = 1;
