@@ -30,6 +30,15 @@ const DB_BUSY_TIMEOUT = 5000;
 const SESSION_FILE_LIFETIME = 86400;
 ```
 
+v3.7.6ではPHPエラーログの保持期間と容量上限を設定できます。既存の`config.php`へ
+追加しない場合も、30日、1ファイル5 MiB、1日5ファイルの既定値で動作します。
+
+```php
+const ERROR_LOG_RETENTION_DAYS = 30;
+const ERROR_LOG_MAX_BYTES = 5242880;
+const ERROR_LOG_MAX_FILES_PER_DAY = 5;
+```
+
 ## DB移行スクリプトが必要なバージョン
 
 v2からv3系統への更新では、先に`noreita_db2_to_3.php`を実行してください。

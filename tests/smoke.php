@@ -13,6 +13,7 @@ const ID_CYCLE = '0';
 const ID_SEED = 'smoke-test-seed';
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
+require_once dirname(__DIR__) . '/noreita/error_handler.inc.php';
 require_once dirname(__DIR__) . '/noreita/request_security.inc.php';
 require_once dirname(__DIR__) . '/noreita/request_info.inc.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
@@ -49,6 +50,59 @@ smoke_test('required PHP extensions', static function (): bool {
     }
   }
   return true;
+});
+
+smoke_test('error logs rotate at capacity and expired files are cleaned safely', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_error_logs_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $locked_handle = null;
+  try {
+    if (!ErrorLogStorage::append($directory, '20260805', "first\n", 10, 2)
+      || !ErrorLogStorage::append($directory, '20260805', "second\n", 10, 2)
+      || ErrorLogStorage::append($directory, '20260805', "third\n", 10, 2)) {
+      return false;
+    }
+    if ((string)file_get_contents($directory . '/error-20260805.log') !== "first\n"
+      || (string)file_get_contents($directory . '/error-20260805.1.log') !== "second\n") {
+      return false;
+    }
+
+    $now = 1700000000;
+    $today = date('Ymd', $now);
+    $files = [
+      'error-20200101.log' => 100,
+      'error-20200101.1.log' => 100,
+      'error-20200101.2.log' => 100,
+      'error-20200102.log' => $now,
+      'error-' . $today . '.log' => 100,
+      'unrelated.log' => 100,
+    ];
+    foreach ($files as $name => $modified) {
+      file_put_contents($directory . DIRECTORY_SEPARATOR . $name, $name);
+      touch($directory . DIRECTORY_SEPARATOR . $name, $modified);
+    }
+    $locked_path = $directory . '/error-20200101.2.log';
+    $locked_handle = fopen($locked_path, 'r');
+    if ($locked_handle === false || !flock($locked_handle, LOCK_EX | LOCK_NB)) return false;
+
+    $removed = ErrorLogStorage::cleanup($directory, 30, 20, $now);
+    return $removed === 2
+      && !is_file($directory . '/error-20200101.log')
+      && !is_file($directory . '/error-20200101.1.log')
+      && is_file($locked_path)
+      && is_file($directory . '/error-20200102.log')
+      && is_file($directory . '/error-' . $today . '.log')
+      && is_file($directory . '/unrelated.log');
+  } finally {
+    if (is_resource($locked_handle)) {
+      flock($locked_handle, LOCK_UN);
+      fclose($locked_handle);
+    }
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('private files and directories ship Apache access denial rules', static function (): bool {

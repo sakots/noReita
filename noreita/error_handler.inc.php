@@ -1,12 +1,88 @@
 <?php
 // error_handler.inc.php for noReita (C) sakots 2026 MIT License
 
-const ERROR_HANDLER_INC_VER = 20260728;
+const ERROR_HANDLER_INC_VER = 20260805;
+
+final class ErrorLogStorage {
+  public static function append(
+    string $directory,
+    string $date,
+    string $line,
+    int $max_bytes,
+    int $max_files
+  ): bool {
+    if ($directory === '' || $max_bytes < 1 || $max_files < 1 || strlen($line) > $max_bytes) return false;
+
+    for ($index = 0; $index < $max_files; $index++) {
+      $suffix = $index === 0 ? '' : '.' . $index;
+      $path = $directory . DIRECTORY_SEPARATOR . 'error-' . $date . $suffix . '.log';
+      $handle = @fopen($path, 'c+b');
+      if ($handle === false) continue;
+      try {
+        if (!@flock($handle, LOCK_EX)) continue;
+        $stat = @fstat($handle);
+        $size = is_array($stat) ? (int)($stat['size'] ?? 0) : $max_bytes;
+        if ($size + strlen($line) > $max_bytes) continue;
+        if (@fseek($handle, 0, SEEK_END) !== 0) continue;
+        $remaining = $line;
+        while ($remaining !== '') {
+          $written = @fwrite($handle, $remaining);
+          if ($written === false || $written === 0) return false;
+          $remaining = substr($remaining, $written);
+        }
+        @fflush($handle);
+        @chmod($path, 0600);
+        return true;
+      } finally {
+        @flock($handle, LOCK_UN);
+        @fclose($handle);
+      }
+    }
+    return false;
+  }
+
+  public static function cleanup(
+    string $directory,
+    int $retention_days,
+    int $limit = 20,
+    ?int $now = null
+  ): int {
+    if ($directory === '' || $retention_days < 1 || $limit < 1 || !is_dir($directory)) return 0;
+    $now = $now ?? time();
+    $cutoff = $now - ($retention_days * 86400);
+    $today = date('Ymd', $now);
+    $removed = 0;
+    $files = glob($directory . DIRECTORY_SEPARATOR . 'error-*.log') ?: [];
+    sort($files, SORT_STRING);
+    foreach ($files as $path) {
+      $name = basename($path);
+      if (!preg_match('/^error-(\d{8})(?:\.\d+)?\.log$/D', $name, $matches)
+        || $matches[1] === $today
+        || (int)(@filemtime($path) ?: $now) >= $cutoff) {
+        continue;
+      }
+      $handle = @fopen($path, 'r');
+      if ($handle === false) continue;
+      $locked = @flock($handle, LOCK_EX | LOCK_NB);
+      if ($locked && @unlink($path)) $removed++;
+      if ($locked) @flock($handle, LOCK_UN);
+      @fclose($handle);
+      if ($removed >= $limit) break;
+    }
+    return $removed;
+  }
+}
 
 final class ApplicationErrorHandler {
+  private const DEFAULT_RETENTION_DAYS = 30;
+  private const DEFAULT_MAX_BYTES = 5242880;
+  private const DEFAULT_MAX_FILES_PER_DAY = 5;
   private static string $log_directory = '';
   private static bool $installed = false;
   private static bool $rendering = false;
+  private static int $retention_days = self::DEFAULT_RETENTION_DAYS;
+  private static int $max_bytes = self::DEFAULT_MAX_BYTES;
+  private static int $max_files_per_day = self::DEFAULT_MAX_FILES_PER_DAY;
 
   public static function install(string $log_directory): void {
     if (self::$installed) return;
@@ -23,6 +99,21 @@ final class ApplicationErrorHandler {
     set_exception_handler([self::class, 'handleException']);
     register_shutdown_function([self::class, 'handleShutdown']);
     self::$installed = true;
+  }
+
+  public static function configure(int $retention_days, int $max_bytes, int $max_files_per_day): void {
+    self::$retention_days = max(1, min(3650, $retention_days));
+    self::$max_bytes = max(65536, min(104857600, $max_bytes));
+    self::$max_files_per_day = max(1, min(100, $max_files_per_day));
+    try {
+      if (random_int(1, 100) === 1) self::cleanupLogs();
+    } catch (Throwable $e) {
+      // ログ整理に失敗してもアプリケーション処理は継続する。
+    }
+  }
+
+  public static function cleanupLogs(?int $now = null, int $limit = 20): int {
+    return ErrorLogStorage::cleanup(self::$log_directory, self::$retention_days, $limit, $now);
   }
 
   public static function handleError(
@@ -115,12 +206,14 @@ final class ApplicationErrorHandler {
       . PHP_EOL;
 
     self::prepareLogDirectory();
-    $log_file = self::$log_directory . DIRECTORY_SEPARATOR . 'error-' . date('Ymd') . '.log';
-    $written = self::$log_directory !== ''
-      && @file_put_contents($log_file, $line, FILE_APPEND | LOCK_EX) !== false;
-    if ($written) {
-      @chmod($log_file, 0600);
-    } else {
+    $written = ErrorLogStorage::append(
+      self::$log_directory,
+      date('Ymd'),
+      $line,
+      self::$max_bytes,
+      self::$max_files_per_day
+    );
+    if (!$written) {
       error_log('[noReita ' . $error_id . '] ' . self::redact((string)($details['message'] ?? 'Internal error')));
     }
     return $error_id;
