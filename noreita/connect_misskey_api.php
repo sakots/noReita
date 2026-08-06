@@ -10,6 +10,11 @@ require_once(__DIR__.'/functions.php');
 require_once(__DIR__.'/error_handler.inc.php');
 ApplicationErrorHandler::install(__DIR__ . '/errorlog');
 require_once(__DIR__.'/config.php');
+ApplicationErrorHandler::configure(
+	defined('ERROR_LOG_RETENTION_DAYS') ? (int)constant('ERROR_LOG_RETENTION_DAYS') : 30,
+	defined('ERROR_LOG_MAX_BYTES') ? (int)constant('ERROR_LOG_MAX_BYTES') : 5242880,
+	defined('ERROR_LOG_MAX_FILES_PER_DAY') ? (int)constant('ERROR_LOG_MAX_FILES_PER_DAY') : 5
+);
 require_once(__DIR__.'/request_security.inc.php');
 
 // index.phpを経由しないMisskeyコールバックの直接実行時だけDB接続を初期化する。
@@ -20,7 +25,7 @@ if (!class_exists('Database', false)) {
 	require_once(__DIR__.'/database.inc.php');
 }
 
-const CONNECT_MISSKEY_API_VER = 20260728;
+const CONNECT_MISSKEY_API_VER = 20260806;
 
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 ? explode( ',', $http_langs )[0] : '';

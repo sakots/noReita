@@ -13,6 +13,7 @@ const ID_CYCLE = '0';
 const ID_SEED = 'smoke-test-seed';
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
+require_once dirname(__DIR__) . '/noreita/error_handler.inc.php';
 require_once dirname(__DIR__) . '/noreita/request_security.inc.php';
 require_once dirname(__DIR__) . '/noreita/request_info.inc.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
@@ -49,6 +50,59 @@ smoke_test('required PHP extensions', static function (): bool {
     }
   }
   return true;
+});
+
+smoke_test('error logs rotate at capacity and expired files are cleaned safely', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_error_logs_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $locked_handle = null;
+  try {
+    if (!ErrorLogStorage::append($directory, '20260805', "first\n", 10, 2)
+      || !ErrorLogStorage::append($directory, '20260805', "second\n", 10, 2)
+      || ErrorLogStorage::append($directory, '20260805', "third\n", 10, 2)) {
+      return false;
+    }
+    if ((string)file_get_contents($directory . '/error-20260805.log') !== "first\n"
+      || (string)file_get_contents($directory . '/error-20260805.1.log') !== "second\n") {
+      return false;
+    }
+
+    $now = 1700000000;
+    $today = date('Ymd', $now);
+    $files = [
+      'error-20200101.log' => 100,
+      'error-20200101.1.log' => 100,
+      'error-20200101.2.log' => 100,
+      'error-20200102.log' => $now,
+      'error-' . $today . '.log' => 100,
+      'unrelated.log' => 100,
+    ];
+    foreach ($files as $name => $modified) {
+      file_put_contents($directory . DIRECTORY_SEPARATOR . $name, $name);
+      touch($directory . DIRECTORY_SEPARATOR . $name, $modified);
+    }
+    $locked_path = $directory . '/error-20200101.2.log';
+    $locked_handle = fopen($locked_path, 'r');
+    if ($locked_handle === false || !flock($locked_handle, LOCK_EX | LOCK_NB)) return false;
+
+    $removed = ErrorLogStorage::cleanup($directory, 30, 20, $now);
+    return $removed === 2
+      && !is_file($directory . '/error-20200101.log')
+      && !is_file($directory . '/error-20200101.1.log')
+      && is_file($locked_path)
+      && is_file($directory . '/error-20200102.log')
+      && is_file($directory . '/error-' . $today . '.log')
+      && is_file($directory . '/unrelated.log');
+  } finally {
+    if (is_resource($locked_handle)) {
+      flock($locked_handle, LOCK_UN);
+      fclose($locked_handle);
+    }
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('private files and directories ship Apache access denial rules', static function (): bool {
@@ -1006,6 +1060,61 @@ smoke_test('interrupted post deletions recover from manifests without touching a
     if ($iterator !== null) {
       foreach ($iterator as $item) {
         $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+      }
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
+smoke_test('invalid deletion recovery data is quarantined and expires safely', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_delete_quarantine_' . bin2hex(random_bytes(8));
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  $staging = $root . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-staging';
+  $quarantine = $root . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-quarantine';
+  if (!mkdir($staging, 0700, true) || !mkdir($images, 0700, true)) return false;
+  try {
+    $operation = $staging . DIRECTORY_SEPARATOR . 'delete-' . str_repeat('a', 24);
+    mkdir($operation, 0700);
+    file_put_contents($operation . '/.lock', '');
+    file_put_contents($operation . '/manifest.json', '{broken');
+    file_put_contents($operation . '/orphan.png', 'image');
+
+    $now = 1700000000;
+    $result = ImageService::recoverStagedDeletions(
+      $images, $staging, static fn(array $posts): bool => false, $quarantine, 30, $now
+    );
+    $quarantined = glob($quarantine . DIRECTORY_SEPARATOR . 'quarantine-delete-*') ?: [];
+    if ($result['invalid'] !== 1 || $result['quarantined'] !== 1 || count($quarantined) !== 1
+      || is_dir($operation) || !is_file($quarantined[0] . '/quarantine.json')
+      || !is_file($quarantined[0] . '/orphan.png')) {
+      return false;
+    }
+
+    touch($quarantined[0], 100);
+    $unsafe = $quarantine . DIRECTORY_SEPARATOR . 'quarantine-delete-' . str_repeat('b', 24)
+      . '-20200101000000-' . str_repeat('c', 8);
+    mkdir($unsafe, 0700);
+    mkdir($unsafe . '/nested', 0700);
+    touch($unsafe, 100);
+    $unrelated = $quarantine . DIRECTORY_SEPARATOR . 'keep-this-directory';
+    mkdir($unrelated, 0700);
+    touch($unrelated, 100);
+
+    return ImageService::cleanupDeletionQuarantine($quarantine, 30, 10, $now) === 1
+      && !is_dir($quarantined[0])
+      && is_dir($unsafe)
+      && is_dir($unrelated);
+  } finally {
+    $iterator = is_dir($root)
+      ? new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      )
+      : null;
+    if ($iterator !== null) {
+      foreach ($iterator as $item) {
+        if ($item->isLink() || $item->isFile()) unlink($item->getPathname());
+        elseif ($item->isDir()) rmdir($item->getPathname());
       }
     }
     if (is_dir($root)) rmdir($root);

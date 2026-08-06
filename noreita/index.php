@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.7.5 lot.260728.0';
+const REITA_VER = 'v3.7.6 lot.260806.0';
 
 // 言語判定
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
@@ -32,7 +32,7 @@ if (!is_file(__DIR__ . '/error_handler.inc.php')) {
   die($en ? 'The error handler is missing.' : 'エラーハンドラーがありません。');
 }
 require_once(__DIR__ . '/error_handler.inc.php');
-if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260728) {
+if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260805) {
   die($en ? 'Please update the error handler.' : 'エラーハンドラーを最新版に更新してください。');
 }
 ApplicationErrorHandler::install(__DIR__ . '/errorlog');
@@ -40,6 +40,11 @@ ApplicationErrorHandler::install(__DIR__ . '/errorlog');
 // コンフィグ
 check_file(__DIR__.'/config.php');
 require(__DIR__ . '/config.php');
+ApplicationErrorHandler::configure(
+  defined('ERROR_LOG_RETENTION_DAYS') ? (int)constant('ERROR_LOG_RETENTION_DAYS') : 30,
+  defined('ERROR_LOG_MAX_BYTES') ? (int)constant('ERROR_LOG_MAX_BYTES') : 5242880,
+  defined('ERROR_LOG_MAX_FILES_PER_DAY') ? (int)constant('ERROR_LOG_MAX_FILES_PER_DAY') : 5
+);
 //コンフィグのバージョンが古くて互換性がない場合動かさせない
 if (!defined('CONF_VER') || CONF_VER < 20260723) {
   die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
@@ -76,14 +81,14 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260726) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260728) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260806) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260728) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260806) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -104,7 +109,7 @@ if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260728) {
 // connect_misskey_api.php
 check_file(__DIR__.'/connect_misskey_api.php');
 require_once(__DIR__.'/connect_misskey_api.php');
-if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260728) {
+if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260806) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
@@ -422,10 +427,17 @@ function init(): void {
     $initializer->prepareDirectories();
     $initializer->migrateDatabase();
     $initializer->secureDatabaseFile();
-    (new PostService(
+    $recovery = (new PostService(
       new BoardRepository(), '', __DIR__ . '/' . IMG_DIR, PDEF_W, PERMISSION_FOR_DEST,
-      __DIR__ . '/backup/delete-staging'
+      __DIR__ . '/backup/delete-staging', __DIR__ . '/backup/delete-quarantine',
+      defined('DELETE_QUARANTINE_RETENTION_DAYS') ? (int)constant('DELETE_QUARANTINE_RETENTION_DAYS') : 30
     ))->recoverInterruptedDeletions();
+    if (array_sum($recovery) > 0) {
+      ApplicationErrorHandler::reportMessage(
+        'Deletion recovery result: ' . json_encode($recovery, JSON_UNESCAPED_SLASHES),
+        'deletion-recovery'
+      );
+    }
   } catch (Throwable $e) {
     error($en ? 'Application initialization failed.' : 'アプリケーションの初期化に失敗しました。', 500, $e);
     return;

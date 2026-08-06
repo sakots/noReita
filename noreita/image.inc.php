@@ -1,7 +1,7 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260728;
+const IMAGE_INC_VER = 20260806;
 
 final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
@@ -264,11 +264,22 @@ final class ImageService {
   public static function recoverStagedDeletions(
     string $image_dir,
     string $staging_root,
-    callable $should_restore
+    callable $should_restore,
+    string $quarantine_root = '',
+    int $quarantine_retention_days = 30,
+    ?int $now = null
   ): array {
-    $result = ['restored' => 0, 'completed' => 0, 'skipped' => 0, 'invalid' => 0];
+    $result = ['restored' => 0, 'completed' => 0, 'skipped' => 0, 'invalid' => 0,
+      'quarantined' => 0, 'purged' => 0];
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
     $staging_root = rtrim($staging_root, '/\\');
+    $quarantine_root = $quarantine_root !== ''
+      ? rtrim($quarantine_root, '/\\')
+      : dirname($staging_root) . DIRECTORY_SEPARATOR . 'delete-quarantine';
+    $now = $now ?? time();
+    $result['purged'] = self::cleanupDeletionQuarantine(
+      $quarantine_root, $quarantine_retention_days, 10, $now
+    );
     if (!is_dir($staging_root)) return $result;
 
     foreach (new DirectoryIterator($staging_root) as $operation) {
@@ -286,10 +297,17 @@ final class ImageService {
       }
 
       $manifest = self::readDeletionManifest($directory);
+      if ($manifest !== null && !self::deletionStagingContentsAreExpected($directory, $manifest['files'])) {
+        $manifest = null;
+      }
       if ($manifest === null) {
-        flock($lock_handle, LOCK_UN);
-        fclose($lock_handle);
         $result['invalid']++;
+        if (self::quarantineDeletionStaging($directory, $quarantine_root, $lock_handle, $now)) {
+          $result['quarantined']++;
+        } else {
+          flock($lock_handle, LOCK_UN);
+          fclose($lock_handle);
+        }
         continue;
       }
 
@@ -312,6 +330,87 @@ final class ImageService {
       }
     }
     return $result;
+  }
+
+  public static function cleanupDeletionQuarantine(
+    string $quarantine_root,
+    int $retention_days,
+    int $limit = 10,
+    ?int $now = null
+  ): int {
+    $quarantine_root = rtrim($quarantine_root, '/\\');
+    if ($quarantine_root === '' || $retention_days < 1 || $limit < 1 || !is_dir($quarantine_root)) return 0;
+    $now = $now ?? time();
+    $cutoff = $now - ($retention_days * 86400);
+    $removed = 0;
+    foreach (new DirectoryIterator($quarantine_root) as $entry) {
+      if ($entry->isDot() || $entry->isLink() || !$entry->isDir()
+        || !preg_match('/^quarantine-delete-[a-f0-9]{24}-\d{14}-[a-f0-9]{8}$/D', $entry->getFilename())
+        || $entry->getMTime() >= $cutoff) {
+        continue;
+      }
+      if (self::removeSafeQuarantineDirectory($entry->getPathname())) $removed++;
+      if ($removed >= $limit) break;
+    }
+    return $removed;
+  }
+
+  private static function deletionStagingContentsAreExpected(string $directory, array $manifest_files): bool {
+    $allowed = array_fill_keys(array_merge($manifest_files, ['manifest.json', '.lock']), true);
+    foreach (new DirectoryIterator($directory) as $entry) {
+      if ($entry->isDot()) continue;
+      if ($entry->isLink() || !$entry->isFile() || !isset($allowed[$entry->getFilename()])) return false;
+    }
+    return true;
+  }
+
+  private static function quarantineDeletionStaging(
+    string $directory,
+    string $quarantine_root,
+    $lock_handle,
+    int $now
+  ): bool {
+    if (!is_dir($quarantine_root)
+      && !@mkdir($quarantine_root, 0700, true)
+      && !is_dir($quarantine_root)) {
+      return false;
+    }
+    @chmod($quarantine_root, 0700);
+    try {
+      $random = bin2hex(random_bytes(4));
+    } catch (Throwable $e) {
+      $random = substr(hash('sha256', uniqid('', true)), 0, 8);
+    }
+    $destination = $quarantine_root . DIRECTORY_SEPARATOR . 'quarantine-' . basename($directory)
+      . '-' . date('YmdHis', $now) . '-' . $random;
+    if (!@rename($directory, $destination)) return false;
+
+    $metadata = json_encode([
+      'version' => 1,
+      'detected_at' => $now,
+      'reason' => 'Invalid deletion manifest or unexpected staging contents.',
+    ], JSON_UNESCAPED_SLASHES);
+    if (is_string($metadata)) {
+      @file_put_contents($destination . DIRECTORY_SEPARATOR . 'quarantine.json', $metadata, LOCK_EX);
+    }
+    @chmod($destination . DIRECTORY_SEPARATOR . 'quarantine.json', 0600);
+    @chmod($destination, 0700);
+    flock($lock_handle, LOCK_UN);
+    fclose($lock_handle);
+    return true;
+  }
+
+  private static function removeSafeQuarantineDirectory(string $directory): bool {
+    $files = [];
+    foreach (new DirectoryIterator($directory) as $entry) {
+      if ($entry->isDot()) continue;
+      if ($entry->isLink() || !$entry->isFile()) return false;
+      $files[] = $entry->getPathname();
+    }
+    foreach ($files as $file) {
+      if (!@unlink($file)) return false;
+    }
+    return @rmdir($directory);
   }
 
   private static function relatedFilePaths(string $image_dir, array $image_names): array {
