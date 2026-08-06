@@ -14,6 +14,7 @@
 ってなったので諦めて、[ROIS](https://github.com/sakots/ROIS) から改良したものがこちらになります。
 
 Reactで絵板を作れなかったので、noReita。
+Codex使用。
 
 [PaintBBS NEO](https://github.com/funige/neo/)
 と
@@ -74,6 +75,15 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ## 履歴
 
 [すべての履歴はこちら](changelog.md)
+
+### [2026/08/06] v3.7.6
+
+- PHPエラーログの肥大化防止を追加
+  - 更新から30日を過ぎたログをアクセス時に少量ずつ自動削除
+  - 1ファイル5 MiB、1日5ファイルの既定上限でローテーション
+  - 当日分、書き込み中のログ、無関係なファイルを自動削除の対象外にした
+- 判断不能な投稿削除復旧データを`backup/delete-quarantine/`へ隔離
+  - 既定で30日保持し、安全に削除できるものだけを自動整理
 
 ### [2026/07/28] v3.7.5
 
