@@ -172,12 +172,7 @@ final class Database {
   }
 
   private static function configuredBusyTimeout(): int {
-    if (!defined('DB_BUSY_TIMEOUT')) return self::DEFAULT_BUSY_TIMEOUT_MS;
-    $timeout = constant('DB_BUSY_TIMEOUT');
-    if (!is_int($timeout)) {
-      throw new InvalidArgumentException('DB_BUSY_TIMEOUT must be an integer.');
-    }
-    return $timeout;
+    return Config::int('database.busy_timeout');
   }
 }
 

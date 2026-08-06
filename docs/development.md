@@ -25,7 +25,7 @@ PHP_BIN=php74 ./scripts/integration-test.sh
 成功すると最後に概ね以下のように表示されます。
 
 ```txt
-Smoke tests: 38 passed, 0 failed.
+Smoke tests: 41 passed, 0 failed.
 Integration tests: 41 passed, 0 failed.
 ```
 

@@ -29,19 +29,20 @@ $default='';
 
 //--------- 説明と設定ここまで ---------
 
-include(__DIR__.'/config.php'); // config.phpの設定を読み込む
-
-// データベース接続PDO
-define('DB_PDO', 'sqlite:'.DB_NAME.'.db');
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
+$db_name = Config::string('database.name');
+$image_dir = Config::string('paths.images');
+$db_pdo = 'sqlite:' . __DIR__ . '/' . $db_name . '.db';
 
 // db接続の前にdbがなかったらそもそも処理しない
 // これを入れないとテーブルも何もないdbが作られていろいろ困る
-if (!is_file(DB_NAME.'.db')) {
+if (!is_file(__DIR__ . '/' . $db_name . '.db')) {
   $filename = $default;
 } else {
   try {
     // db接続
-    $db = new PDO(DB_PDO);
+    $db = new PDO($db_pdo);
     // ORDER BY picfile で picfile名（画像の最終更新）の順、DESCで大きい順を指定
     // LIMIT 1 で1行だけ取り出すので最新のものだけになる
     $sql ="SELECT picfile FROM tlog WHERE invz=0 ORDER BY picfile DESC LIMIT 1";
@@ -53,7 +54,7 @@ if (!is_file(DB_NAME.'.db')) {
     if (empty($msg)) {
       $filename = $default;
     } else {
-      $filename = IMG_DIR.$msg["picfile"];
+      $filename = __DIR__ . '/' . $image_dir . $msg["picfile"];
     }
     $db = null;// db切断
   } catch (PDOException $e) {

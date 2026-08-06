@@ -2,6 +2,16 @@
 
 ## すべての履歴
 
+### [2026/08/06] v4.0.0
+
+- `config.php`をGit管理する配布既定値の配列へ変更
+- 設置者固有の部分上書きを`config.local.php`へ分離し、Git管理対象外に設定
+- 設定の型、必須値、値域、URL、相対パス、権限、リスト構造を起動時に検証
+- 設定参照を旧PHP定数・グローバル変数から型別`Config`アクセサーへ移行
+- index、Misskeyコールバック、CLI、同梱プラグインの設定初期化を統一
+- v3 `config.php`から`config.local.php`を生成する`scripts/migrate-config-v3.php`を追加
+- Apache、nginx向け文書、HTTP結合テストでlocal設定のアクセス拒否を追加
+
 ### [2026/08/06] v3.7.6
 
 - PHPエラーログの肥大化防止を追加

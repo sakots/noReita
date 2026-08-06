@@ -6,21 +6,14 @@
 //Misskey APIに接続
 //noReita用に改造by sakots
 
-require_once(__DIR__.'/functions.php');
-require_once(__DIR__.'/error_handler.inc.php');
-ApplicationErrorHandler::install(__DIR__ . '/errorlog');
-require_once(__DIR__.'/config.php');
-ApplicationErrorHandler::configure(
-	defined('ERROR_LOG_RETENTION_DAYS') ? (int)constant('ERROR_LOG_RETENTION_DAYS') : 30,
-	defined('ERROR_LOG_MAX_BYTES') ? (int)constant('ERROR_LOG_MAX_BYTES') : 5242880,
-	defined('ERROR_LOG_MAX_FILES_PER_DAY') ? (int)constant('ERROR_LOG_MAX_FILES_PER_DAY') : 5
-);
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
 require_once(__DIR__.'/request_security.inc.php');
 
 // index.phpを経由しないMisskeyコールバックの直接実行時だけDB接続を初期化する。
 // index.phpから読み込まれた場合は、すでに読み込み済みのDatabaseと後続のDB定数定義を使用する。
 if (!class_exists('Database', false)) {
-	defined('DB_FILE') or define('DB_FILE', __DIR__ . '/' . DB_NAME . '.db');
+	defined('DB_FILE') or define('DB_FILE', __DIR__ . '/' . Config::string('database.name') . '.db');
 	defined('DB_PDO') or define('DB_PDO', 'sqlite:' . DB_FILE);
 	require_once(__DIR__.'/database.inc.php');
 }
@@ -92,7 +85,7 @@ class connect_misskey_api{
 		$src_image=basename($src_image);
 
 		// 画像のアップロード
-		$imagePath = __DIR__.'/'.IMG_DIR.$src_image;
+		$imagePath = __DIR__.'/'.Config::string('paths.images').$src_image;
 
 		if(!is_file($imagePath)){
 			die("Error: " . ($en ? "Image does not exist." : "画像がありません。") . ": " . $imagePath);
@@ -178,7 +171,7 @@ class connect_misskey_api{
 		$src_image_filename = pathinfo($src_image, PATHINFO_FILENAME );//拡張子除去
 
 		$thread_no = self::get_thread_no((int)$no);
-		$fixed_link = BASE.'?mode=res&res='.$thread_no.'#'.$src_image_filename;
+		$fixed_link = Config::string('site.base_url').'?mode=res&res='.$thread_no.'#'.$src_image_filename;
 		$fixed_link = filter_var($fixed_link,FILTER_VALIDATE_URL) ? $fixed_link : '';
 		$article_url_link = $article_url_link ? $fixed_link : '';
 		$com=str_replace(["\r\n","\r"],"\n",$com);
@@ -226,7 +219,7 @@ class connect_misskey_api{
 			unset($_SESSION['sns_api_val']);
 			unset($_SESSION['userdel']);
 
-			redirect(BASE.'?mode=misskey_success&no='.$thread_no);
+			redirect(Config::string('site.base_url').'?mode=misskey_success&no='.$thread_no);
 		}
 		else {
 			die("Error: " . ($en ? "Failed to post the content." : "投稿に失敗しました。") . " (API response missing createdNote)");

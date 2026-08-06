@@ -51,7 +51,7 @@ function copy_tree(string $source, string $destination): void {
   }
   $skip = ['backup', 'cache', 'errorlog', 'img', 'session', 'temp', 'thumb', 'thumbnail', 'tmp'];
   foreach (new DirectoryIterator($source) as $item) {
-    if ($item->isDot() || in_array($item->getFilename(), $skip, true) || $item->getFilename() === 'config.php') {
+    if ($item->isDot() || in_array($item->getFilename(), $skip, true) || $item->getFilename() === 'config.local.php') {
       continue;
     }
     $target = $destination . DIRECTORY_SEPARATOR . $item->getFilename();
@@ -127,16 +127,23 @@ function cookie_value(string $cookie_jar, string $name): ?string {
 
 try {
   copy_tree($source, $webroot);
-  $config = file_get_contents($webroot . '/config.example.php');
-  if ($config === false) throw new RuntimeException('Could not read config.example.php');
-  $config = str_replace("\$admin_pass = 'admin_pass';", "\$admin_pass = 'integration-admin-pass';", $config);
-  $config = str_replace("const BASE = 'https://example.com/noreita/';", "const BASE = 'http://localhost/';", $config);
-  $config = str_replace('const EXTERNAL_IMAGE_THUMB = 1;', 'const EXTERNAL_IMAGE_THUMB = 0;', $config);
-  $config = str_replace('const USE_MISSKEY_NOTE = 1;', 'const USE_MISSKEY_NOTE = 0;', $config);
-  $config = str_replace('const ADMIN_THREADS_PER_PAGE = 50;', 'const ADMIN_THREADS_PER_PAGE = 1;', $config);
-  $config = str_replace('const ADMIN_LOGIN_MAX_FAILURES = 5;', 'const ADMIN_LOGIN_MAX_FAILURES = 3;', $config);
-  if (file_put_contents($webroot . '/config.php', $config) === false) {
-    throw new RuntimeException('Could not create test config.php');
+  $config_local = <<<'PHP'
+<?php
+return [
+  'admin' => [
+    'password' => 'integration-admin-pass',
+    'threads_per_page' => 1,
+    'login' => ['max_failures' => 3],
+  ],
+  'site' => ['base_url' => 'http://localhost/'],
+  'features' => [
+    'external_image_thumbnail' => false,
+    'misskey_note' => false,
+  ],
+];
+PHP;
+  if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
+    throw new RuntimeException('Could not create test config.local.php');
   }
   $error_probe = <<<'PHP'
 <?php
@@ -187,7 +194,8 @@ PHP;
   }
 
   $protected_probes = [
-    'config.php' => 'integration-admin-pass',
+    'config.php' => 'admin_pass',
+    'config.local.php' => 'integration-admin-pass',
     'reita.db' => 'SQLite format',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
@@ -207,7 +215,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 6 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 7 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -805,6 +813,11 @@ PHP;
 } finally {
   if ($failed > 0 && is_file($server_log)) {
     echo "--- server log ---\n" . file_get_contents($server_log) . "\n";
+  }
+  if ($failed > 0) {
+    foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $application_log) {
+      echo "--- application error log ---\n" . file_get_contents($application_log) . "\n";
+    }
   }
   if (is_resource($process)) {
     proc_terminate($process);

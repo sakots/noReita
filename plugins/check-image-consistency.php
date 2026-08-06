@@ -12,7 +12,7 @@ Usage: php {$script} [--root=PATH] [--json] [--repair]
 
 Checks noReita's database and image directory. The default mode is read-only.
 
-  --root=PATH  Directory containing config.php and the SQLite database
+  --root=PATH  Directory containing the noReita v4 configuration and SQLite database
   --json       Print a machine-readable JSON report
   --repair     Back up the database and repair safely recoverable problems
   --help       Show this help
@@ -54,22 +54,19 @@ function checker_options(array $arguments): array {
 
 /** @return array{root:string,database:string,image_dir:string,thumbnail_file:string,thumbnail_width:int,file_permission:int} */
 function checker_configuration(string $root): array {
-  $config_file = $root . DIRECTORY_SEPARATOR . 'config.php';
-  if (!is_file($config_file) || !is_readable($config_file)) {
-    throw new RuntimeException("Readable config.php was not found in: {$root}");
+  $loader = $root . DIRECTORY_SEPARATOR . 'config_loader.inc.php';
+  if (!is_file($loader) || !is_readable($loader)) {
+    throw new RuntimeException("Readable config_loader.inc.php was not found in: {$root}");
   }
+  require_once $loader;
+  Config::load($root);
 
-  require $config_file;
-  if (!defined('DB_NAME') || !defined('IMG_DIR')) {
-    throw new RuntimeException('config.php must define DB_NAME and IMG_DIR.');
-  }
-
-  $database_name = (string)constant('DB_NAME');
+  $database_name = Config::string('database.name');
   if ($database_name === '' || basename($database_name) !== $database_name) {
-    throw new RuntimeException('DB_NAME must be a plain file name.');
+    throw new RuntimeException('database.name must be a plain file name.');
   }
-  $image_setting = (string)constant('IMG_DIR');
-  if ($image_setting === '') throw new RuntimeException('IMG_DIR must not be empty.');
+  $image_setting = Config::string('paths.images');
+  if ($image_setting === '') throw new RuntimeException('paths.images must not be empty.');
 
   $image_dir = checker_absolute_path($root, $image_setting);
   $database = $root . DIRECTORY_SEPARATOR . $database_name . '.db';
@@ -85,8 +82,8 @@ function checker_configuration(string $root): array {
     'database' => $database,
     'image_dir' => rtrim($image_dir, '/\\'),
     'thumbnail_file' => $thumbnail_file,
-    'thumbnail_width' => defined('PDEF_W') ? max(1, (int)constant('PDEF_W')) : 400,
-    'file_permission' => defined('PERMISSION_FOR_DEST') ? (int)constant('PERMISSION_FOR_DEST') : 0600,
+    'thumbnail_width' => max(1, Config::int('limits.paint_default_width')),
+    'file_permission' => Config::int('permissions.public_file'),
   ];
 }
 

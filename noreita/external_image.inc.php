@@ -209,8 +209,8 @@ function external_image_service(): ExternalImageService {
       __DIR__ . '/thumbnail',
       'thumbnail/',
       200,
-      PERMISSION_FOR_DEST,
-      PERMISSION_FOR_DIR,
+      Config::int('permissions.public_file'),
+      Config::int('permissions.public_directory'),
     );
   }
   return $service;

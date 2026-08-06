@@ -35,8 +35,19 @@ BladeOneとSQLiteは使っていますが、データベースの形式を変え
 
 ## 設置
 
-`config.example.php`を`config.php`に名称変更し、その管理者パスワードをテキストエディタ(VSCodeなど)で編集してください。
-初期設定のままだと動かないようにしています。
+`config.php`は配布する既定値です。設置者固有の値は同じディレクトリへ
+`config.local.php`を作成して上書きしてください。最低限、管理者パスワードを設定します。
+
+```php
+<?php
+return [
+  'admin' => ['password' => '推測されにくい管理者パスワード'],
+  'site' => ['base_url' => 'https://example.com/noreita/'],
+];
+```
+
+`config.local.php`はGit管理とプログラム更新の上書き対象から除外されます。
+設定の型、必須値、範囲、URL、パス、権限は起動時に検証されます。
 
 [リリース](https://github.com/sakots/noReita/releases/latest) からダウンロードして、
 FTPソフトをつかってサーバーにアップロードするだけです。簡単。
@@ -64,10 +75,21 @@ FTPソフトをつかってサーバーにアップロードするだけです�
 
 [こちらで「やこうさんパレット」が配布されています](https://github.com/satopian/potiboard_plugin)
 
-使用する場合は、`config.php`内の`$pallets_dat`の列に、
+使用する場合は、`config.local.php`で`drawing.palettes`を上書きします。
 
-```config.php
-$pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マンセルHV/C','p_munsellHVC.txt'],['マンセルV2','p_munsell_V2_.txt'],['やこうさん','palette.dat']);
+```php
+<?php
+return [
+  'drawing' => [
+    'palettes' => [
+      ['標準', 'palette.txt'],
+      ['PCCS_HSL', 'p_PCCS.txt'],
+      ['マンセルHV/C', 'p_munsellHVC.txt'],
+      ['マンセルV2', 'p_munsell_V2_.txt'],
+      ['やこうさん', 'palette.dat'],
+    ],
+  ],
+];
 ```
 
 などと加えてください。
@@ -75,6 +97,12 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ## 履歴
 
 [すべての履歴はこちら](changelog.md)
+
+### [2026/08/06] v4.0.0
+
+- 配布既定値の`config.php`と設置者固有の`config.local.php`へ設定を分離
+- 配列設定、型別`Config`参照、起動時検証、全エントリーポイント共通初期化へ移行
+- v3 `config.php`変換CLIと設定上書き・検証・HTTP保護テストを追加
 
 ### [2026/08/06] v3.7.6
 

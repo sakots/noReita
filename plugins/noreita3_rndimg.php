@@ -29,19 +29,20 @@ $default = '';
 
 //--------- 説明と設定ここまで ---------
 
-include(__DIR__.'/config.php'); // config.phpの設定を読み込む
-
-// データベース接続PDO
-const DB_PDO = 'sqlite:'.DB_NAME.'.db';
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
+$db_name = Config::string('database.name');
+$image_dir = Config::string('paths.images');
+$db_pdo = 'sqlite:' . __DIR__ . '/' . $db_name . '.db';
 
 // db接続の前にdbがなかったらそもそも処理しない
 // これを入れないとテーブルも何もないdbが作られていろいろ困る
-if (!is_file(DB_NAME.'.db')) {
+if (!is_file(__DIR__ . '/' . $db_name . '.db')) {
   $filename = $default;
 } else {
   try {
     // db接続
-    $db = new PDO(DB_PDO);
+    $db = new PDO($db_pdo);
     // LIMIT 1 で取り出す画像が1枚だけ決まる。
     // 紆余曲折を経てこの文に行き着いた →
     // https://www.it-swarm-ja.com/ja/sql/SQLiteでランダムな行を選択します/970867568/
@@ -53,7 +54,7 @@ if (!is_file(DB_NAME.'.db')) {
     if (empty($msg)) {
       $filename = $default;
     } else {
-      $filename = IMG_DIR.$msg["picfile"];
+      $filename = __DIR__ . '/' . $image_dir . $msg["picfile"];
     }
     $db = null; // db切断
 
@@ -93,4 +94,3 @@ if (!is_file(DB_NAME.'.db')) {
     echo "DB接続エラー:" .$e->getMessage();
   }
 }
-

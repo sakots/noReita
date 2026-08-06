@@ -111,7 +111,7 @@
               </label>
             </div>
 
-            @if ($use_nsfw === 1)
+            @if ($use_nsfw)
             <div class="form-group">
               <label>
                 <input type="checkbox" name="hide_thumbnail" value="1">

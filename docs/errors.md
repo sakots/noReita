@@ -49,10 +49,15 @@ POSTデータ、Cookie、セッション全体は記録しません。管理パ�
 ログはアクセス時に確率的に整理され、既定では更新から30日を過ぎたものを1回20件まで
 削除します。当日分、書き込み中のログ、命名規則に一致しないファイルは削除しません。
 
-保持期間、1ファイルの容量、1日あたりのファイル数は`config.php`で変更できます。
+保持期間、1ファイルの容量、1日あたりのファイル数は`config.local.php`で変更できます。
 
 ```php
-const ERROR_LOG_RETENTION_DAYS = 30;
-const ERROR_LOG_MAX_BYTES = 5242880;
-const ERROR_LOG_MAX_FILES_PER_DAY = 5;
+<?php
+return [
+  'error_log' => [
+    'retention_days' => 30,
+    'max_bytes' => 5242880,
+    'max_files_per_day' => 5,
+  ],
+];
 ```

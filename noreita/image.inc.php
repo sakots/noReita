@@ -180,7 +180,7 @@ final class ImageService {
     $image_info = @getimagesize($file_path);
     return $image_info !== false
       && $image_info[0] > 0 && $image_info[1] > 0
-      && $image_info[0] <= PMAX_W && $image_info[1] <= PMAX_H;
+      && $image_info[0] <= Config::int('limits.paint_max_width') && $image_info[1] <= Config::int('limits.paint_max_height');
   }
 
   public static function deleteRelatedFiles(string $image_dir, string $image_name): void {

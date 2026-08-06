@@ -34,9 +34,14 @@
 
 `initialization.inc.php`の`ApplicationInitializer`がセキュリティヘッダー、実行時ディレクトリの準備、DBマイグレーション、DBファイルの権限設定を担当します。起動時のファイル環境処理は`index.php`へ直接追加せず、このクラスへ追加してください。
 
+`bootstrap.php`はすべてのHTTP・CLIエントリーポイントに共通する起動処理です。
+`config.php`の既定値と任意の`config.local.php`を読み込み、`Config`で検証した後に
+エラー処理とタイムゾーンを設定します。設定参照には`Config::string()`、
+`Config::int()`、`Config::bool()`、`Config::array()`を使用します。
+
 ## データベース
 
-`database.inc.php`がSQLite接続、投稿リポジトリ、スキーママイグレーションを担当します。接続時に例外モード、WAL、`busy_timeout`を設定し、通常処理、DB移行、Misskey連携で同じ設定を使用します。既定では別処理の書き込みロックが解除されるまで最大5秒待ちます。待機時間は`config.php`の`DB_BUSY_TIMEOUT`で0～60000ミリ秒の範囲に変更できます。
+`database.inc.php`がSQLite接続、投稿リポジトリ、スキーママイグレーションを担当します。接続時に例外モード、WAL、`busy_timeout`を設定し、通常処理、DB移行、Misskey連携で同じ設定を使用します。既定では別処理の書き込みロックが解除されるまで最大5秒待ちます。待機時間は`config.local.php`の`database.busy_timeout`で0～60000ミリ秒の範囲に変更できます。
 
 - `Database::connect()`：共通のPDO接続とWAL・ロック待機設定
 - `BoardRepository`：投稿の取得、検索、削除、非表示化

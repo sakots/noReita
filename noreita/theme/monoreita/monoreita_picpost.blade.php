@@ -93,7 +93,7 @@
                 (記事の編集削除用。英数字で)
               </td>
             </tr>
-            @if ($use_nsfw === 1)
+            @if ($use_nsfw)
             <tr>
               <td>NSFW</td>
               <td>

@@ -51,7 +51,7 @@
             </td>
           </tr>
           @endif
-          @if ($use_nsfw === 1 && $bbsline['picfile'] !== '')
+          @if ($use_nsfw && $bbsline['picfile'] !== '')
           <tr>
             <td>NSFW</td>
             <td>

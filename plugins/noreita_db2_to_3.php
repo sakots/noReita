@@ -15,14 +15,13 @@
 // これを開くと、noReita3のデータベースが移行されます。
 // 移行が完了したら、セキュリティのためにこのファイルは削除してください。
 
-include(__DIR__.'/config.php'); // config.phpの設定を読み込む
-
-// データベース接続PDO
-const DB_PDO = 'sqlite:'.DB_NAME.'.db';
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
+$db_pdo = 'sqlite:' . __DIR__ . '/' . Config::string('database.name') . '.db';
 
 try {
   // db接続
-  $db = new PDO(DB_PDO);
+  $db = new PDO($db_pdo);
   $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
   // board_logテーブルが存在しなければ作成

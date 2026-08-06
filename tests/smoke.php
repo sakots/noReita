@@ -1,16 +1,18 @@
 <?php
 declare(strict_types=1);
 
-const LANG = 'Japanese';
-const PHP_SELF = 'index.php';
-const PMAX_W = 800;
-const PMAX_H = 800;
 const PTIME_D = '日';
 const PTIME_H = '時間';
 const PTIME_M = '分';
 const PTIME_S = '秒';
-const ID_CYCLE = '0';
-const ID_SEED = 'smoke-test-seed';
+
+require_once dirname(__DIR__) . '/noreita/config_loader.inc.php';
+$config_defaults = require dirname(__DIR__) . '/noreita/config.php';
+Config::initializeForTesting($config_defaults, [
+  'admin' => ['password' => 'smoke-test-admin'],
+  'site' => ['base_url' => 'https://smoke.example/'],
+  'identity' => ['cycle' => 0, 'seed' => 'smoke-test-seed'],
+]);
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/error_handler.inc.php';
@@ -24,6 +26,7 @@ require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 require_once dirname(__DIR__) . '/noreita/share.inc.php';
 require_once dirname(__DIR__) . '/plugins/check-image-consistency.php';
+require_once dirname(__DIR__) . '/scripts/migrate-config-v3.php';
 
 $passed = 0;
 $failed = 0;
@@ -50,6 +53,70 @@ smoke_test('required PHP extensions', static function (): bool {
     }
   }
   return true;
+});
+
+smoke_test('configuration overrides defaults and replaces list values', static function (): bool {
+  $defaults = require dirname(__DIR__) . '/noreita/config.php';
+  $resolved = Config::resolve($defaults, [
+    'admin' => ['password' => 'configured-admin', 'login' => ['max_failures' => 9]],
+    'site' => ['base_url' => 'https://configured.example/'],
+    'features' => ['nsfw' => false],
+    'social' => ['servers' => [['Local', 'https://social.example']]],
+  ]);
+  return $resolved['admin']['name'] === '管理人'
+    && $resolved['admin']['login']['max_failures'] === 9
+    && $resolved['features']['nsfw'] === false
+    && $resolved['social']['servers'] === [['Local', 'https://social.example']];
+});
+
+smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges', static function (): bool {
+  $defaults = require dirname(__DIR__) . '/noreita/config.php';
+  $invalid = [
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'unknown' => true],
+    ['admin' => ['password' => 'configured-admin', 'threads_per_page' => '50'], 'site' => ['base_url' => 'https://configured.example/']],
+    ['admin' => ['password' => 'configured-admin', 'threads_per_page' => 101], 'site' => ['base_url' => 'https://configured.example/']],
+    ['admin' => ['password' => 'admin_pass'], 'site' => ['base_url' => 'https://configured.example/']],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://example.com/noreita/']],
+  ];
+  foreach ($invalid as $override) {
+    try {
+      Config::resolve($defaults, $override);
+      return false;
+    } catch (ConfigException $e) {
+      if (str_contains($e->getMessage(), 'configured-admin')) return false;
+    }
+  }
+  return true;
+});
+
+smoke_test('v3 configuration is converted to a validated local override', static function (): bool {
+  $file = tempnam(sys_get_temp_dir(), 'noreita_v3_config_');
+  if ($file === false) return false;
+  $source = <<<'PHP'
+<?php
+$admin_pass = 'migrated-admin';
+$admin_name = '旧管理人';
+$servers = [['移行先', 'https://social.example']];
+const BASE = 'https://board.example/';
+const ID_SEED = 'migrated-id-seed';
+const CRYPT_PASS = 'migrated-paint-key';
+const USE_NSFW = 0;
+const SNS_WINDOW_WIDTH = '720';
+PHP;
+  try {
+    if (file_put_contents($file, $source) === false) return false;
+    $defaults = require dirname(__DIR__) . '/noreita/config.php';
+    $overrides = migration_convert(migration_read_legacy($file), $defaults);
+    $resolved = Config::resolve($defaults, $overrides);
+    return $resolved['admin']['password'] === 'migrated-admin'
+      && $resolved['admin']['name'] === '旧管理人'
+      && $resolved['site']['base_url'] === 'https://board.example/'
+      && $resolved['features']['nsfw'] === false
+      && $resolved['social']['window_width'] === 720
+      && $resolved['social']['servers'] === [['移行先', 'https://social.example']];
+  } finally {
+    if (is_file($file)) unlink($file);
+  }
 });
 
 smoke_test('error logs rotate at capacity and expired files are cleaned safely', static function (): bool {
@@ -111,13 +178,16 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'mod_authz_core.c')
     || !str_contains($root_rule, 'Require all denied')
     || !str_contains($root_rule, 'Deny from all')
-    || !str_contains($root_rule, '^config\\.php$')
+    || !str_contains($root_rule, '^config(?:\\.[a-z0-9_-]+)*\\.php$')
     || !str_contains($root_rule, 'json|db')
     || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
     || preg_match('/<\\/files>/i', $root_rule) === 1
     || preg_match('/<files\\s+~/i', $root_rule) === 1) {
     return false;
   }
+  $ignore = file_get_contents(dirname(__DIR__) . '/.gitignore');
+  if (!is_string($ignore) || !str_contains($ignore, 'config.local.php')
+    || preg_match('/^config\.php$/m', $ignore) === 1) return false;
   foreach (['session', 'cache', 'backup', 'errorlog'] as $directory) {
     $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");
     if (!is_string($rule)

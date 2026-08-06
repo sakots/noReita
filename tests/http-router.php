@@ -10,7 +10,7 @@ $basename = strtolower(basename($path));
 $extension = strtolower(pathinfo($basename, PATHINFO_EXTENSION));
 
 $protected_directory = in_array($top_level, ['session', 'cache', 'backup', 'errorlog'], true);
-$protected_file = $basename === 'config.php'
+$protected_file = preg_match('/\Aconfig(?:\.[a-z0-9_-]+)*\.php\z/i', $basename) === 1
   || in_array($extension, ['ini', 'log', 'dat', 'json', 'db'], true);
 
 if ($protected_directory || $protected_file) {
