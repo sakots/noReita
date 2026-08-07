@@ -230,15 +230,15 @@ return [
     // 使用するテーマのディレクトリ名です。
     'theme' => 'monoreita',
     // PaintBBS NEOを配置するディレクトリです。
-    'neo' => 'app/neo/',
+    'neo' => 'https://oekakibbs.moe/apps/neo/',
     // ChickenPaintを配置するディレクトリです。
-    'chickenpaint' => 'app/chickenpaint/',
+    'chickenpaint' => 'https://oekakibbs.moe/apps/chickenpaint/',
     // Klecksを配置するディレクトリです。
-    'klecks' => 'app/klecks/',
+    'klecks' => 'https://oekakibbs.moe/apps/klecks/',
     // Tegakiを配置するディレクトリです。
-    'tegaki' => 'app/tegaki/',
+    'tegaki' => 'https://oekakibbs.moe/apps/tegaki/',
     // Axnos Paintを配置するディレクトリです。
-    'axnos' => 'app/axnos/',
+    'axnos' => 'https://oekakibbs.moe/apps/axnos/',
     // 投稿画像を保存するディレクトリです。
     'images' => 'img/',
     // 投稿画像のサムネイルを保存するディレクトリです。
