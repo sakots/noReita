@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.0.0 lot.260806.0';
+const REITA_VER = 'v4.0.0β lot.260807.0';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -65,7 +65,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260806) {
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260806) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260807) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -1653,6 +1653,9 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     } else {
       $dat['message'] = $en ? 'Administrator editing mode...' : '管理者編集モード...';
     }
+    $msg['input_name'] = PostService::nameForEdit(
+      (string)$msg['a_name'], (string)($dat['name_cookie'] ?? ''), $authorization['role'] === 'owner'
+    );
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
@@ -1707,10 +1710,17 @@ function editexec(): void {
 
   try {
     $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
-    $service->edit((int)$e_no, $pwd, [
+    $edit_role = $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
     ]);
+    if ($edit_role === 'owner') {
+      $https_only = (bool)($_SERVER['HTTPS'] ?? '');
+      setcookie(
+        'name_c', $name, time() + (Config::int('board.cookie_days') * 24 * 3600),
+        '', '', $https_only, true
+      );
+    }
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
   } catch (PostNotFoundException $e) {
     error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);

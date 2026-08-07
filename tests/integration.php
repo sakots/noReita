@@ -381,18 +381,24 @@ PHP;
   });
 
   $marker = 'integration-' . bin2hex(random_bytes(6));
+  $raw_trip_name = "Integration O'Brien#integration-trip";
   [$post_status, $post_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
-    'mode' => 'regist', 'send' => '1', 'name' => "Integration O'Brien", 'mail' => '', 'url' => '',
+    'mode' => 'regist', 'send' => '1', 'name' => $raw_trip_name, 'mail' => '', 'url' => '',
     'sub' => "Integration's subject", 'com' => "結合テスト user's {$marker}", 'pwd' => 'delete-pass',
     'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
   ]);
 
   $db = new PDO('sqlite:' . $webroot . '/reita.db');
   $row = $db->query('SELECT tid, a_name, sub, com FROM board_log ORDER BY tid DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-  integration_test('post is stored through HTTP', static function () use ($status, $post_status, $row, $marker): bool {
+  integration_test('post stores a displayed trip while retaining its original name in the cookie', static function () use (
+    $status, $post_status, $row, $marker, $cookie_jar, $raw_trip_name
+  ): bool {
     return $status === 200 && $post_status === 200 && is_array($row)
-      && $row['a_name'] === "Integration O'Brien" && $row['sub'] === "Integration's subject"
-      && $row['com'] === "結合テスト user's {$marker}";
+      && str_starts_with((string)$row['a_name'], "Integration O'Brien ◆")
+      && !str_contains((string)$row['a_name'], '#integration-trip')
+      && $row['sub'] === "Integration's subject"
+      && $row['com'] === "結合テスト user's {$marker}"
+      && urldecode((string)cookie_value($cookie_jar, 'name_c')) === $raw_trip_name;
   });
 
   $search_term = "user's {$marker}";
@@ -402,6 +408,32 @@ PHP;
   });
 
   $post_id = (int)($row['tid'] ?? 0);
+  [$owner_edit_form_status, $owner_edit_form_body] = http_request($base_url . '?mode=edit', $cookie_jar, [
+    'mode' => 'edit', 'delno' => (string)$post_id, 'pwd' => 'delete-pass',
+  ]);
+  preg_match('/<input[^>]+name="name"[^>]+value="([^"]*)"/i', $owner_edit_form_body, $owner_name_match);
+  integration_test('owner edit form restores the pre-trip name', static function () use (
+    $owner_edit_form_status, $owner_name_match, $raw_trip_name
+  ): bool {
+    return $owner_edit_form_status === 200
+      && html_entity_decode((string)($owner_name_match[1] ?? ''), ENT_QUOTES, 'UTF-8') === $raw_trip_name;
+  });
+  [$trip_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => $raw_trip_name, 'mail' => '', 'url' => '',
+    'sub' => "Integration's subject", 'com' => "結合テスト user's {$marker}", 'pwd' => 'delete-pass',
+    'sodane' => '0', 'token' => $token,
+  ]);
+  $trip_name_after_edit = (string)$db->query(
+    'SELECT a_name FROM board_log WHERE tid = ' . $post_id
+  )->fetchColumn();
+  integration_test('owner edit converts the retained raw name back to a displayed trip', static function () use (
+    $trip_edit_status, $trip_name_after_edit, $cookie_jar, $raw_trip_name
+  ): bool {
+    return $trip_edit_status === 200
+      && str_starts_with($trip_name_after_edit, "Integration O'Brien ◆")
+      && !str_contains($trip_name_after_edit, '#integration-trip')
+      && urldecode((string)cookie_value($cookie_jar, 'name_c')) === $raw_trip_name;
+  });
   [$admin_manage_csrf_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => 'invalid-token',
   ]);

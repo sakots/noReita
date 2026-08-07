@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260806;
+const POST_INC_VER = 20260807;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -59,9 +59,13 @@ final class PostService implements AdminPostManagementService {
     throw new PostAuthorizationException('Invalid password.');
   }
 
-  public function edit(int $post_id, string $password, array $values): void {
+  public function edit(int $post_id, string $password, array $values): string {
     $authorization = $this->authorize($post_id, $password);
     $post = $authorization['post'];
+    $submitted_name = (string)($values['name'] ?? '');
+    $values['name'] = hash_equals((string)$post['a_name'], $submitted_name)
+      ? $submitted_name
+      : generate_trip($submitted_name);
     $values['pwdh'] = (string)$post['pwd'];
     $values['nsfw'] = (int)$post['nsfw'];
     $values['thumbnail'] = (string)($post['thumbnail'] ?? '');
@@ -76,6 +80,12 @@ final class PostService implements AdminPostManagementService {
       $values['nsfw'] = (int)$nsfw;
     }
     $this->repository->updateContent($post_id, $values);
+    return $authorization['role'];
+  }
+
+  public static function nameForEdit(string $stored_name, string $saved_name, bool $is_owner): string {
+    if (!$is_owner || $saved_name === '') return $stored_name;
+    return hash_equals($stored_name, generate_trip($saved_name)) ? $saved_name : $stored_name;
   }
 
   public function delete(int $post_id, string $password, bool $delete_as_admin): string {

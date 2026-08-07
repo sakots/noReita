@@ -758,7 +758,7 @@ smoke_test('post service centralizes edit and delete authorization', static func
     }
 
     $new_input = [
-      'name' => '投稿者', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
+      'name' => '投稿者#trip-secret', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
       'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,
       'resto' => '', 'modid' => '',
     ];
@@ -771,7 +771,15 @@ smoke_test('post service centralizes edit and delete authorization', static func
       'pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0, 'utime' => '',
       'tool' => '', 'nsfw' => false, 'ctype' => null, 'thumbnail' => '',
     ]);
-    if (($repository->findPost($new_id)['sub'] ?? '') !== '新規題名') return false;
+    $new_post = $repository->findPost($new_id);
+    $trip_name = generate_trip('投稿者#trip-secret');
+    if (($new_post['sub'] ?? '') !== '新規題名'
+      || ($new_post['a_name'] ?? '') !== $trip_name
+      || PostService::nameForEdit($trip_name, '投稿者#trip-secret', true) !== '投稿者#trip-secret'
+      || PostService::nameForEdit($trip_name, '別人#trip-secret', true) !== $trip_name
+      || PostService::nameForEdit($trip_name, '投稿者#trip-secret', false) !== $trip_name) {
+      return false;
+    }
     try {
       $service->prepareNewPost($new_input, 'new.example.com', $settings);
       return false;
