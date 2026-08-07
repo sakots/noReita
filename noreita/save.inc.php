@@ -201,10 +201,6 @@ class image_save{
       $im_in = @ImageCreateFromPNG($_FILES['picture']['tmp_name']);
       if(!$im_in){
         $this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。");
-      }else{
-        // if(PHP_VERSION_ID < 80000) {//PHP8.0未満の時は
-        //  ImageDestroy($im_in);
-        // }
       }
     }
 

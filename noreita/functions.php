@@ -1,22 +1,5 @@
 <?php
-const FUNCTIONS_VER = 20260728;
-
-// PHP 8で追加された文字列関数のPHP 7.4向け互換実装
-if (!function_exists('str_contains')) {
-  function str_contains(string $haystack, string $needle): bool {
-    return $needle === '' || strpos($haystack, $needle) !== false;
-  }
-}
-if (!function_exists('str_starts_with')) {
-  function str_starts_with(string $haystack, string $needle): bool {
-    return $needle === '' || strpos($haystack, $needle) === 0;
-  }
-}
-if (!function_exists('str_ends_with')) {
-  function str_ends_with(string $haystack, string $needle): bool {
-    return $needle === '' || substr($haystack, -strlen($needle)) === $needle;
-  }
-}
+const FUNCTIONS_VER = 20260807;
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {

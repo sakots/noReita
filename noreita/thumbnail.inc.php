@@ -14,7 +14,7 @@
 // nsfwスイッチを1またはtrueにすると、サムネイル画像をぼかします。
 // 省略またはfalse、0ならぼかしません。
 
-const THUMBNAIL_VER = 20260716; //thumbnail.inc.phpのバージョン
+const THUMBNAIL_VER = 20260807; //thumbnail.inc.phpのバージョン
 
 class Thumbnail {
   private string $image_url; // 入力画像URL
@@ -93,14 +93,11 @@ class Thumbnail {
     // サムネイル用の空の画像を作成
     $thumb_image = imagecreatetruecolor($this->thumb_width, $thumb_height);
     if ($thumb_image === false) {
-      imagedestroy($src_image);
       return false; // サムネイル画像の作成に失敗
     }
 
     // 画像をリサイズしてサムネイルにコピー
     if (!imagecopyresampled($thumb_image, $src_image, 0, 0, 0, 0, $this->thumb_width, $thumb_height, $src_width, $src_height)) {
-      if(PHP_VERSION_ID < 80000) imagedestroy($src_image);
-      if(PHP_VERSION_ID < 80000) imagedestroy($thumb_image);
       return false; // リサイズに失敗
     }
     // nsfwスイッチがオンならぼかす
@@ -117,7 +114,6 @@ class Thumbnail {
       // 小さい画像を元のサイズに拡大してぼかす
       imagecopyresampled($thumb_image, $small_image, 0, 0, 0, 0, $this->thumb_width, $thumb_height, $small_width, $small_height);
 
-      if(PHP_VERSION_ID < 80000) imagedestroy($small_image);
     }
 
     // サムネイルを保存
@@ -141,9 +137,6 @@ class Thumbnail {
       }
     }
 
-    // サムネイルを保存した後にリサイズ画像を破棄
-    if(PHP_VERSION_ID < 80000) imagedestroy($src_image);
-    if(PHP_VERSION_ID < 80000) imagedestroy($thumb_image);
     return $result;
   }
 }

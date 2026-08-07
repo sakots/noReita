@@ -3,7 +3,7 @@
     "description": "noReita oekaki bulletin board",
     "license": "MIT",
     "require": {
-        "php": ">=7.4",
+        "php": ">=8.1",
         "eftec/bladeone": "4.19.1"
     },
     "config": {

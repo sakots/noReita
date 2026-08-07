@@ -1,7 +1,6 @@
 # noReita
 
-![php](https://img.shields.io/badge/php-7.4-green.svg)
-![php](https://img.shields.io/badge/php-8.x-green.svg)
+![php](https://img.shields.io/badge/php-%3E%3D8.1-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
 ![version](https://img.shields.io/github/v/release/sakots/noReita)
@@ -9,9 +8,6 @@
 ![License](https://img.shields.io/github/license/sakots/noReita)
 
 ## 概要
-
-[Reactでお絵描き掲示板を作ろうとした](https://github.com/sakots/Reita)けど、あれ、jsxの中身に配列を送ってコンパイルして…って無理じゃね？
-ってなったので諦めて、[ROIS](https://github.com/sakots/ROIS) から改良したものがこちらになります。
 
 Reactで絵板を作れなかったので、noReita。
 Codex使用。
@@ -101,6 +97,7 @@ return [
 
 ### [2026/08/06] v4.0.0
 
+- 動作要件をPHP 8.1以上へ変更し、PHP 8.1～8.5をCIで検証
 - 続き描き後などの投稿者編集画面で、トリップ変換前の名前を保持するように修正
 - 続き描き後の本文編集に、対象記事で認証済みのパスワードを引き継ぐように修正
 - 配布既定値の`config.php`と設置者固有の`config.local.php`へ設定を分離

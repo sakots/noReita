@@ -3,6 +3,17 @@
 
 require_once __DIR__ . '/config_loader.inc.php';
 
+const NOREITA_MIN_PHP_VERSION = '8.1.0';
+const NOREITA_MIN_PHP_VERSION_ID = 80100;
+
+if (PHP_VERSION_ID < NOREITA_MIN_PHP_VERSION_ID) {
+  if (!headers_sent()) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=UTF-8');
+  }
+  exit('PHP ' . NOREITA_MIN_PHP_VERSION . ' or higher is required. Current PHP version: ' . PHP_VERSION);
+}
+
 final class ApplicationBootstrap {
   private static bool $booted = false;
   private static bool $english = false;
@@ -13,10 +24,6 @@ final class ApplicationBootstrap {
     $languages = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
     $language = $languages !== '' ? explode(',', $languages)[0] : '';
     self::$english = stripos($language, 'ja') !== 0;
-
-    if (version_compare(PHP_VERSION, '7.4.0', '<')) {
-      throw new RuntimeException('PHP 7.4 or higher is required.');
-    }
 
     $functions = $root . '/functions.php';
     $error_handler = $root . '/error_handler.inc.php';

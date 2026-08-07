@@ -18,7 +18,7 @@ try {
 $en = ApplicationBootstrap::english();
 
 // functions.phpのバージョンを確認
-if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260728) {
+if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
@@ -100,7 +100,7 @@ if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260716) {
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260716) {
+if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260807) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 

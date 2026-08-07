@@ -7,6 +7,7 @@ const PTIME_M = '分';
 const PTIME_S = '秒';
 
 require_once dirname(__DIR__) . '/noreita/config_loader.inc.php';
+require_once dirname(__DIR__) . '/noreita/bootstrap.php';
 $config_defaults = require dirname(__DIR__) . '/noreita/config.php';
 Config::initializeForTesting($config_defaults, [
   'admin' => ['password' => 'smoke-test-admin'],
@@ -45,6 +46,12 @@ function smoke_test(string $name, callable $test): void {
     $failed++;
   }
 }
+
+smoke_test('minimum PHP version is 8.1', static function (): bool {
+  return NOREITA_MIN_PHP_VERSION === '8.1.0'
+    && NOREITA_MIN_PHP_VERSION_ID === 80100
+    && PHP_VERSION_ID >= NOREITA_MIN_PHP_VERSION_ID;
+});
 
 smoke_test('required PHP extensions', static function (): bool {
   foreach (['curl', 'gd', 'mbstring', 'pdo_sqlite'] as $extension) {

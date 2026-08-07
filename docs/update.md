@@ -66,7 +66,7 @@ scripts/integration-test.sh
 更新後に`noreita/errorlog/`へブラウザーでアクセスし、403になることも確認してください。
 PHPエラーの調査方法は[エラー調査手順](errors.md)を参照してください。
 
-GitHub Actionsでは、PHP 7.4、8.0、8.3の各環境で`composer.lock`から依存ライブラリを配置し、このHTTP結合テストを自動実行します。
+GitHub Actionsでは、PHP 8.1、8.2、8.3、8.4、8.5の各環境で`composer.lock`から依存ライブラリを配置し、このHTTP結合テストを自動実行します。
 
 ## 不具合時の元バージョンへの戻し方
 
