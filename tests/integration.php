@@ -125,6 +125,23 @@ function cookie_value(string $cookie_jar, string $name): ?string {
   return null;
 }
 
+function replace_cookie_value(string $cookie_jar, string $name, string $value): bool {
+  $lines = file($cookie_jar, FILE_IGNORE_NEW_LINES) ?: [];
+  $replaced = false;
+  foreach ($lines as &$line) {
+    $prefix = str_starts_with($line, '#HttpOnly_') ? '#HttpOnly_' : '';
+    $record = $prefix !== '' ? substr($line, strlen($prefix)) : $line;
+    if ($record === '' || ($record[0] ?? '') === '#') continue;
+    $fields = explode("\t", $record);
+    if (count($fields) < 7 || $fields[5] !== $name) continue;
+    $fields[6] = $value;
+    $line = $prefix . implode("\t", $fields);
+    $replaced = true;
+  }
+  unset($line);
+  return $replaced && file_put_contents($cookie_jar, implode(PHP_EOL, $lines) . PHP_EOL) !== false;
+}
+
 try {
   copy_tree($source, $webroot);
   $config_local = <<<'PHP'
@@ -646,6 +663,9 @@ PHP;
     'image-pass', 'aes-128-cbc', '0qYzf1x6nyN4gS1', OPENSSL_RAW_DATA, 'T3pkYxNyjN7Wz3pu'
   );
   if ($encrypted_password === false) throw new RuntimeException('Could not encrypt replacement password');
+  if (!replace_cookie_value($cookie_jar, 'pwd_cookie', 'another-post-pass')) {
+    throw new RuntimeException('Could not prepare a mismatched saved password');
+  }
   [$replacement_status, $replacement_body] = http_request(
     $base_url . '?mode=picrep&no=' . $image_post_id . '&repcode=' . rawurlencode($replacement_code)
       . '&pwd=' . bin2hex($encrypted_password) . '&stime=300',
@@ -668,8 +688,35 @@ PHP;
       && is_file($webroot . '/img/' . $replacement_thumbnail)
       && !is_file($webroot . '/img/' . $continued_from_thumbnail)
       && str_contains($replacement_body, 'action="index.php?mode=editexec"')
+      && preg_match('/name="pwd"[^>]+value="image-pass"/', $replacement_body) === 1
       && str_contains($replacement_body, 'src="img/' . $replacement_thumbnail . '"')
       && str_contains($replacement_body, 'id="edit_nsfw"');
+  });
+
+  preg_match('/name="token" value="([^"]+)"/', $replacement_body, $replacement_token_match);
+  $replacement_edit_token = html_entity_decode(
+    (string)($replacement_token_match[1] ?? ''), ENT_QUOTES, 'UTF-8'
+  );
+  $continued_subject = 'Continued drawing subject ' . $marker;
+  $continued_comment = "続き描き後に更新した本文です\n{$marker}";
+  [$continued_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Continued artist#trip-key',
+    'mail' => 'continued@example.com', 'url' => 'https://example.com/continued',
+    'sub' => $continued_subject, 'com' => $continued_comment, 'pwd' => 'image-pass',
+    'sodane' => '0', 'nsfw' => '0', 'token' => $replacement_edit_token,
+  ]);
+  $continued_content = $db->query(
+    'SELECT a_name, mail, a_url, sub, com FROM board_log WHERE tid = ' . $image_post_id
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('comment fields submitted after continued drawing are stored', static function () use (
+    $continued_edit_status, $continued_content, $continued_subject, $continued_comment
+  ): bool {
+    return $continued_edit_status === 200 && is_array($continued_content)
+      && str_starts_with((string)$continued_content['a_name'], 'Continued artist ◆')
+      && $continued_content['mail'] === 'continued@example.com'
+      && $continued_content['a_url'] === 'https://example.com/continued'
+      && $continued_content['sub'] === $continued_subject
+      && $continued_content['com'] === $continued_comment;
   });
 
   [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);

@@ -1656,6 +1656,11 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     $msg['input_name'] = PostService::nameForEdit(
       (string)$msg['a_name'], (string)($dat['name_cookie'] ?? ''), $authorization['role'] === 'owner'
     );
+    // 続き描きや所有者編集で認証済みの投稿パスワードを使う。
+    // 別投稿で保存されたCookieのパスワードでは、画像だけ更新され本文編集が失敗し得る。
+    $msg['input_password'] = $authorization['role'] === 'owner'
+      ? (string)$post_pwd
+      : (string)($dat['pwd_cookie'] ?? '');
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
