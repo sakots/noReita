@@ -59,6 +59,7 @@
     "dyntools",
     "editexec",
     "editform",
+    "endfor",
     "endforeach",
     "epost",
     "errmes",
