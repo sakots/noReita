@@ -89,6 +89,37 @@ smoke_test('BladeOne and Twig render through the template engine abstraction', s
   }
 });
 
+smoke_test('eda Twig theme templates compile', static function (): bool {
+  $views = dirname(__DIR__) . '/noreita/theme/eda';
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_eda_twig_' . bin2hex(random_bytes(8));
+  $cache = $root . DIRECTORY_SEPARATOR . 'cache';
+  if (!is_dir($views) || !mkdir($cache, 0700, true)) return false;
+  try {
+    $engine = TemplateEngineFactory::create('twig', $views, $cache);
+    if (!$engine instanceof TwigTemplateEngine) return false;
+    $count = 0;
+    $prefix = strlen($views) + 1;
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($views, FilesystemIterator::SKIP_DOTS)) as $file) {
+      $path = $file->getPathname();
+      if (!$file->isFile() || !str_ends_with($path, '.twig')) continue;
+      $engine->validate(substr($path, $prefix, -5));
+      $count++;
+    }
+    return $count > 0;
+  } finally {
+    if (is_dir($root)) {
+      $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      );
+      foreach ($iterator as $item) {
+        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+      }
+      rmdir($root);
+    }
+  }
+});
+
 smoke_test('required PHP extensions', static function (): bool {
   foreach (['curl', 'gd', 'mbstring', 'pdo_sqlite'] as $extension) {
     if (!extension_loaded($extension)) {

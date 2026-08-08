@@ -228,7 +228,7 @@ return [
   // テーマ、アプリ、画像などを配置するパスです。ディレクトリは末尾に「/」を付けます。
   'paths' => [
     // 使用するテーマのディレクトリ名です。
-    'theme' => 'monoreita',
+    'theme' => 'eda',
     // PaintBBS NEOを配置するディレクトリです。
     'neo' => 'https://oekakibbs.moe/apps/neo/',
     // ChickenPaintを配置するディレクトリです。

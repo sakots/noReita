@@ -31,6 +31,14 @@ final class TwigTemplateEngine implements TemplateEngine {
       'auto_reload' => true,
       'autoescape' => 'html',
     ]);
+    $this->twig->addFunction(new \Twig\TwigFunction('mb_substr', static function ($value, int $start, ?int $length = null): string {
+      $value = (string)$value;
+      return $length === null ? mb_substr($value, $start) : mb_substr($value, $start, $length);
+    }));
+    $this->twig->addFunction(new \Twig\TwigFunction('count', static function ($value): int {
+      return is_countable($value) ? count($value) : 0;
+    }));
+    $this->twig->addFunction(new \Twig\TwigFunction('time', static fn (): int => time()));
     $this->blade_fallback = new BladeTemplateEngine($views, $cache);
   }
 
@@ -41,6 +49,15 @@ final class TwigTemplateEngine implements TemplateEngine {
       return $this->twig->render($twig_template, $data);
     }
     return $this->blade_fallback->render($template, $data);
+  }
+
+  /** Compile a Twig template without rendering it. */
+  public function validate(string $template): void {
+    TemplateEngineFactory::assertTemplateName($template);
+    $twig_template = $template . '.twig';
+    if ($this->twig->getLoader()->exists($twig_template)) {
+      $this->twig->load($twig_template);
+    }
   }
 }
 

@@ -153,6 +153,7 @@ return [
     'login' => ['max_failures' => 3],
   ],
   'site' => ['base_url' => 'http://localhost/'],
+  'paths' => ['theme' => 'eda'],
   'features' => [
     'external_image_thumbnail' => false,
     'misskey_note' => false,
@@ -162,14 +163,10 @@ PHP;
   if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
     throw new RuntimeException('Could not create test config.local.php');
   }
-  $theme_config_file = $webroot . '/theme/monoreita/theme_conf.php';
+  $theme_config_file = $webroot . '/theme/eda/theme_conf.php';
   $theme_config = file_get_contents($theme_config_file);
-  $twig_theme_config = is_string($theme_config)
-    ? str_replace("const THEME_TEMPLATE_ENGINE = 'blade';", "const THEME_TEMPLATE_ENGINE = 'twig';", $theme_config)
-    : false;
-  if (!is_string($twig_theme_config) || $twig_theme_config === $theme_config
-    || file_put_contents($theme_config_file, $twig_theme_config) === false) {
-    throw new RuntimeException('Could not configure Twig for the integration-test theme.');
+  if (!is_string($theme_config) || !str_contains($theme_config, "const THEME_TEMPLATE_ENGINE = 'twig';")) {
+    throw new RuntimeException('The integration-test theme must select Twig.');
   }
   $error_probe = <<<'PHP'
 <?php
