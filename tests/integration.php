@@ -100,7 +100,14 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
   ]);
   if ($post !== null) {
     curl_setopt($curl, CURLOPT_POST, true);
-    curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($post));
+    $is_multipart = false;
+    foreach ($post as $value) {
+      if ($value instanceof CURLFile) {
+        $is_multipart = true;
+        break;
+      }
+    }
+    curl_setopt($curl, CURLOPT_POSTFIELDS, $is_multipart ? $post : http_build_query($post));
   }
   $body = curl_exec($curl);
   $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
@@ -299,9 +306,12 @@ PHP;
   });
 
   // pictmp initializes the CSRF token in the same session used for posting.
-  [$status] = http_request($base_url . '?mode=pictmp', $cookie_jar);
+  [$status, $pictmp_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
+  integration_test('image upload form is available when enabled', static function () use ($status, $pictmp_body): bool {
+    return $status === 200 && str_contains($pictmp_body, 'name="image_upload"');
+  });
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_detail_unauthorized_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
@@ -831,6 +841,31 @@ PHP;
   [$empty_status, $empty_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
   integration_test('deleted post disappears from search', static function () use ($empty_status, $empty_body): bool {
     return $empty_status === 200 && str_contains($empty_body, '0件');
+  });
+
+  $upload_source = $root . '/direct-upload.png';
+  $upload_png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL0XQAAAABJRU5ErkJggg==', true);
+  if ($upload_png === false || file_put_contents($upload_source, $upload_png) === false) {
+    throw new RuntimeException('Could not create direct upload image.');
+  }
+  $upload_marker = 'direct-upload-' . bin2hex(random_bytes(6));
+  [$direct_upload_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
+    'sub' => 'Direct image upload', 'com' => "画像アップロード {$upload_marker}", 'pwd' => 'upload-delete-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+    'image_upload' => new CURLFile($upload_source, 'image/png', 'untrusted-client-name.png'),
+  ]);
+  $upload_row_statement = $db->prepare('SELECT picfile, img_w, img_h, tool, thumbnail FROM board_log WHERE com = :comment LIMIT 1');
+  $upload_row_statement->execute([':comment' => "画像アップロード {$upload_marker}"]);
+  $upload_row = $upload_row_statement->fetch(PDO::FETCH_ASSOC);
+  integration_test('direct image upload uses an oekaki-style generated filename', static function () use (
+    $direct_upload_status, $upload_row, $webroot
+  ): bool {
+    return $direct_upload_status === 200 && is_array($upload_row)
+      && preg_match('/^\\d{16}\\.png$/D', (string)$upload_row['picfile']) === 1
+      && (int)$upload_row['img_w'] === 1 && (int)$upload_row['img_h'] === 1
+      && $upload_row['tool'] === 'Upload' && $upload_row['thumbnail'] === ''
+      && is_file($webroot . '/img/' . $upload_row['picfile']);
   });
 
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);

@@ -34,6 +34,18 @@ return [
     'name' => 'reita',
   ],
 
+  'features' => [
+    // ブラウザからの画像アップロードを無効にする場合はfalseにします。
+    'image_upload' => true,
+  ],
+
+  'limits' => [
+    // 直接アップロードする画像の容量、幅、高さの上限です。
+    'upload_kb' => 10000,
+    'image_width' => 4000,
+    'image_height' => 4000,
+  ],
+
   'identity' => [
     // 投稿者IDの生成に使う秘密文字列です。必ずランダムな値へ変更してください。
     'seed' => 'replace-with-a-long-random-id-seed',

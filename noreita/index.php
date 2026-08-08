@@ -234,6 +234,10 @@ $dat['use_hashtag'] = Config::bool('features.hashtag');
 $dat['sodane'] = SODANE;
 
 $dat['use_oekaki_reply'] = Config::bool('features.oekaki_reply');
+$dat['use_image_upload'] = Config::bool('features.image_upload');
+$dat['upload_max_kb'] = Config::int('limits.upload_kb');
+$dat['upload_max_width'] = Config::int('limits.image_width');
+$dat['upload_max_height'] = Config::int('limits.image_height');
 
 $dat['theme_name'] = THEME_NAME;
 
@@ -490,6 +494,9 @@ function regist(): void {
   $pwd = $input['pwd'];
   $pal = $input['pal'];
   $nsfw_flag = $input['nsfw_flag'];
+  $uploaded_file = $_FILES['image_upload'] ?? null;
+  $has_uploaded_file = $uploaded_file !== null
+    && (!is_array($uploaded_file) || ($uploaded_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
 
   // クッキー保存用
   $original_name = $name;
@@ -503,18 +510,41 @@ function regist(): void {
     error($e->getMessage(), $e->getCode() ?: 400);
     return;
   }
+  if ($has_uploaded_file && !Config::bool('features.image_upload')) {
+    error($en ? 'Image uploads are disabled.' : '画像アップロードは無効です。', 403);
+    return;
+  }
+  if ($has_uploaded_file && $picfile) {
+    error($en ? 'Choose either a drawing image or an uploaded image.' : 'お絵かき画像とアップロード画像を同時に投稿することはできません。', 400);
+    return;
+  }
   //セキュリティ関連ここまで
 
+  $uploaded_image = null;
   try {
     $repository = new BoardRepository();
     if (isset($_POST["send"])) {
       $service = new PostService($repository, Config::string("admin.password"), Config::string('paths.images'));
+      if ($has_uploaded_file) {
+        if (!is_array($uploaded_file)) {
+          throw new ImageUploadException('Invalid uploaded file.', 400);
+        }
+        $uploaded_image = ImageService::storeUploadedImage(
+          $uploaded_file, Config::string('paths.images'), Config::int('limits.upload_kb'),
+          Config::int('limits.image_width'), Config::int('limits.image_height'),
+          Config::int('limits.paint_default_width'), Config::bool('features.nsfw') && $nsfw_flag === '1',
+          Config::int('permissions.public_file')
+        );
+        $input['picfile'] = $uploaded_image['picfile'];
+        $picfile = $uploaded_image['picfile'];
+      }
       try {
         $prepared_post = $service->prepareNewPost($input, $host, [
           'default_name' => Config::string('board.default_name'), 'default_comment' => Config::string('board.default_comment'), 'default_subject' => Config::string('board.default_subject'),
           'admin_name' => Config::string("admin.name"), 'admin_cap' => Config::string('admin.cap'),
         ]);
       } catch (DuplicatePostException $e) {
+        if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
         error($en ? 'Duplicate post?' : '二重投稿ですか ?', 409);
         return;
       }
@@ -523,7 +553,9 @@ function regist(): void {
         'img_w' => 0, 'img_h' => 0, 'pchfile' => '', 'psec' => 0, 'utime' => '',
         'tool' => '', 'thumbnail' => '', 'nsfw' => false, 'ctype' => null,
       ];
-      if ($picfile) {
+      if (is_array($uploaded_image)) {
+        $image_result = $uploaded_image;
+      } elseif ($picfile) {
         $ctype = PostInput::ctypeFromHttp();
         $image_result = ImageService::finalizeNewPost(
           Config::string('paths.temporary'), Config::string('paths.images'), (string)$picfile, $ctype, (bool)Config::bool('features.display_paint_time'), Config::int('limits.paint_default_width'),
@@ -548,7 +580,11 @@ function regist(): void {
 
       $dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
     }
+  } catch (ImageUploadException $e) {
+    if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
+    error($en ? $e->getMessage() : '画像ファイルを受け付けられませんでした。', $e->getCode() ?: 400, $e);
   } catch (Throwable $e) {
+    if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $pictmp, $picfile, $mode);

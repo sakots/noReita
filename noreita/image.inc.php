@@ -1,10 +1,13 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260806;
+const IMAGE_INC_VER = 20260808;
+
+final class ImageUploadException extends RuntimeException {
+}
 
 final class ImageService {
-  private const RELATED_EXTENSIONS = ['png', 'jpg', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
+  private const RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
   private const PLAYABLE_ANIMATION_EXTENSIONS = ['pch', 'spch', 'tgkr'];
 
   public static function isSafePostedImageFilename(string $filename): bool {
@@ -181,6 +184,109 @@ final class ImageService {
     return $image_info !== false
       && $image_info[0] > 0 && $image_info[1] > 0
       && $image_info[0] <= Config::int('limits.paint_max_width') && $image_info[1] <= Config::int('limits.paint_max_height');
+  }
+
+  /**
+   * Stores a browser-uploaded image using the same time + microsecond basename
+   * used by the drawing applications. The client filename is never retained.
+   *
+   * @return array{picfile:string,img_w:int,img_h:int,pchfile:string,psec:int,utime:string,tool:string,thumbnail:string,nsfw:bool,ctype:string}
+   */
+  public static function storeUploadedImage(
+    array $upload,
+    string $image_dir,
+    int $max_kilobytes,
+    int $max_width,
+    int $max_height,
+    int $thumbnail_width,
+    bool $nsfw,
+    int $permission
+  ): array {
+    $error = $upload['error'] ?? UPLOAD_ERR_NO_FILE;
+    if (!is_int($error) && !ctype_digit((string)$error)) {
+      throw new ImageUploadException('Invalid uploaded file.', 400);
+    }
+    $error = (int)$error;
+    if ($error !== UPLOAD_ERR_OK) {
+      $messages = [
+        UPLOAD_ERR_INI_SIZE => 'The uploaded image exceeds the server limit.',
+        UPLOAD_ERR_FORM_SIZE => 'The uploaded image exceeds the form limit.',
+        UPLOAD_ERR_PARTIAL => 'The image upload was incomplete.',
+        UPLOAD_ERR_NO_FILE => 'No image was uploaded.',
+      ];
+      throw new ImageUploadException($messages[$error] ?? 'Failed to upload image.', 400);
+    }
+
+    $temporary_file = $upload['tmp_name'] ?? null;
+    $size = $upload['size'] ?? null;
+    if (!is_string($temporary_file) || !is_uploaded_file($temporary_file)
+      || (!is_int($size) && !ctype_digit((string)$size))) {
+      throw new ImageUploadException('Invalid uploaded file.', 400);
+    }
+    $size = (int)$size;
+    $max_bytes = $max_kilobytes * 1024;
+    if ($max_kilobytes < 1 || $size < 1 || $size > $max_bytes) {
+      throw new ImageUploadException('The uploaded image exceeds the size limit.', 400);
+    }
+
+    $types = [
+      'image/png' => 'png', 'image/jpeg' => 'jpg', 'image/gif' => 'gif',
+      'image/webp' => 'webp', 'image/avif' => 'avif',
+    ];
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($temporary_file);
+    $image = @getimagesize($temporary_file);
+    if (!is_string($mime) || !isset($types[$mime]) || $image === false
+      || ($image['mime'] ?? null) !== $mime) {
+      throw new ImageUploadException('Unsupported image format.', 400);
+    }
+    $width = (int)$image[0];
+    $height = (int)$image[1];
+    if ($max_width < 1 || $max_height < 1 || $width < 1 || $height < 1
+      || $width > $max_width || $height > $max_height) {
+      throw new ImageUploadException('The uploaded image dimensions exceed the limit.', 400);
+    }
+
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
+    if (!is_dir($image_dir) || !is_writable($image_dir)) {
+      throw new RuntimeException('Image directory is not writable.');
+    }
+    $extension = $types[$mime];
+    $filename = self::newOekakiImageFilename($image_dir, $extension);
+    $destination = $image_dir . $filename;
+    $staged = tempnam($image_dir, '.noreita_upload_');
+    if ($staged === false) throw new RuntimeException('Failed to prepare uploaded image.');
+
+    try {
+      if (!move_uploaded_file($temporary_file, $staged)) {
+        throw new RuntimeException('Failed to store uploaded image.');
+      }
+      if (is_file($destination) || !rename($staged, $destination)) {
+        throw new RuntimeException('Failed to finalize uploaded image.');
+      }
+      @chmod($destination, $permission);
+      $thumbnail = self::refreshNsfwThumbnail($image_dir, $filename, '', $nsfw, $thumbnail_width, $permission);
+      return [
+        'picfile' => $filename, 'img_w' => $width, 'img_h' => $height,
+        'pchfile' => '', 'psec' => 0, 'utime' => '', 'tool' => 'Upload',
+        'thumbnail' => $thumbnail, 'nsfw' => $nsfw, 'ctype' => 'img',
+      ];
+    } catch (Throwable $e) {
+      safe_unlink($staged);
+      self::deleteRelatedFiles($image_dir, $filename);
+      throw $e;
+    }
+  }
+
+  private static function newOekakiImageFilename(string $image_dir, string $extension): string {
+    for ($attempt = 0; $attempt < 20; $attempt++) {
+      // Keep the historical naming convention: Unix timestamp + six microsecond digits.
+      $base_name = time() . substr(microtime(), 2, 6);
+      if ((glob($image_dir . $base_name . '.*') ?: []) === []) {
+        return $base_name . '.' . $extension;
+      }
+      usleep(1000);
+    }
+    throw new RuntimeException('Failed to allocate image filename.');
   }
 
   public static function deleteRelatedFiles(string $image_dir, string $image_name): void {
@@ -364,6 +470,7 @@ final class ImageService {
     return true;
   }
 
+  /** @param resource $lock_handle */
   private static function quarantineDeletionStaging(
     string $directory,
     string $quarantine_root,

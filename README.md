@@ -49,6 +49,20 @@ FTPソフトをつかってサーバーにアップロードするだけです�
 
 管理者ログインが試行回数制限で拒否された場合は、[管理者ログインのロック解除手順](docs/admin-login.md)を参照してください。
 
+### 画像アップロード
+
+投稿フォームでは、お絵かきに加えてPNG、JPEG、GIF、WebP、AVIF画像を直接アップロードできます。
+保存名はお絵かき画像と同じ「時刻＋マイクロ秒」の自動生成名となり、元のファイル名は保存しません。
+無効化や上限の変更は`config.local.php`で行えます。
+
+```php
+<?php
+return [
+  'features' => ['image_upload' => false],
+  'limits' => ['upload_kb' => 2000, 'image_width' => 800, 'image_height' => 800],
+];
+```
+
 ## 各お絵かきアプリのURL
 
 noReita v4から、デフォルトの状態ではアプリは配布ではなく[https://oekakibbs.moe/apps/](https://oekakibbs.moe/apps/) を参照するようにしました。

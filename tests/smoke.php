@@ -151,12 +151,13 @@ smoke_test('configuration overrides defaults and replaces list values', static f
   $resolved = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin', 'login' => ['max_failures' => 9]],
     'site' => ['base_url' => 'https://configured.example/'],
-    'features' => ['nsfw' => false],
+    'features' => ['nsfw' => false, 'image_upload' => false],
     'social' => ['servers' => [['Local', 'https://social.example']]],
   ]);
   return $resolved['admin']['name'] === '管理人'
     && $resolved['admin']['login']['max_failures'] === 9
     && $resolved['features']['nsfw'] === false
+    && $resolved['features']['image_upload'] === false
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
 });
 

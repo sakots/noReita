@@ -42,6 +42,20 @@
         <textarea name="com" rows="5" cols="48" id="p_input_com" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
       </td>
     </tr>
+    @if ($use_image_upload)
+    <tr>
+      <td>upload</td>
+      <td><input type="file" name="image_upload" accept="image/png,image/jpeg,image/gif,image/webp,image/avif">（PNG / JPEG / GIF / WebP / AVIF、{{$upload_max_kb}}KBまで）</td>
+    </tr>
+    @endif
+    @if ($use_nsfw)
+    <tr>
+      <td>NSFW</td>
+      <td><input type="checkbox" name="nsfw" value="1" id="nsfw_reply_button_{{$resno}}"><label for="nsfw_reply_button_{{$resno}}">（画像をNSFWとして投稿できます。）</label></td>
+    </tr>
+    @else
+    <input type="hidden" name="nsfw" value="0">
+    @endif
     <tr>
       <td>pass</td>
       <td>
