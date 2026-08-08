@@ -25,21 +25,26 @@ final class TwigTemplateEngine implements TemplateEngine {
   private BladeTemplateEngine $blade_fallback;
 
   public function __construct(string $views, string $cache) {
-    $loader = new \Twig\Loader\FilesystemLoader($views);
-    $this->twig = new \Twig\Environment($loader, [
-      'cache' => $cache . DIRECTORY_SEPARATOR . 'twig',
+    $this->twig = self::createEnvironment($views, $cache . DIRECTORY_SEPARATOR . 'twig');
+    $this->blade_fallback = new BladeTemplateEngine($views, $cache);
+  }
+
+  /** @param string|false $cache */
+  public static function createEnvironment(string $views, $cache): \Twig\Environment {
+    $twig = new \Twig\Environment(new \Twig\Loader\FilesystemLoader($views), [
+      'cache' => $cache,
       'auto_reload' => true,
       'autoescape' => 'html',
     ]);
-    $this->twig->addFunction(new \Twig\TwigFunction('mb_substr', static function ($value, int $start, ?int $length = null): string {
+    $twig->addFunction(new \Twig\TwigFunction('mb_substr', static function ($value, int $start, ?int $length = null): string {
       $value = (string)$value;
       return $length === null ? mb_substr($value, $start) : mb_substr($value, $start, $length);
     }));
-    $this->twig->addFunction(new \Twig\TwigFunction('count', static function ($value): int {
+    $twig->addFunction(new \Twig\TwigFunction('count', static function ($value): int {
       return is_countable($value) ? count($value) : 0;
     }));
-    $this->twig->addFunction(new \Twig\TwigFunction('time', static fn (): int => time()));
-    $this->blade_fallback = new BladeTemplateEngine($views, $cache);
+    $twig->addFunction(new \Twig\TwigFunction('time', static fn (): int => time()));
+    return $twig;
   }
 
   public function render(string $template, array $data = []): string {

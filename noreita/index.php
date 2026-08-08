@@ -112,7 +112,16 @@ if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260725) {
 }
 
 // テーマ
-require(__DIR__ . '/theme/' . Config::string('paths.theme') . '/theme_conf.php');
+$theme_directory = __DIR__ . '/theme/' . Config::string('paths.theme');
+require($theme_directory . '/theme_conf.php');
+require_once __DIR__ . '/theme_manifest.inc.php';
+try {
+  $theme_manifest = ThemeManifest::load($theme_directory);
+  ThemeManifest::assertMatchesRuntime($theme_manifest, ThemeManifest::runtimeMetadata());
+} catch (ThemeManifestException $e) {
+  http_response_code(500);
+  die($en ? 'Theme configuration error: ' . h($e->getMessage()) : 'テーマ設定エラー: ' . h($e->getMessage()));
+}
 
 // タイムゾーン設定
 date_default_timezone_set(Config::string('site.timezone'));
@@ -133,7 +142,7 @@ if (!is_file($autoload)) {
 require_once $autoload;
 require_once __DIR__ . '/template_engine.inc.php';
 
-$views = __DIR__ . '/theme/' . Config::string('paths.theme'); // テンプレートフォルダ
+$views = $theme_directory; // テンプレートフォルダ
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
 // テンプレートキャッシュに必要な場所だけを書き込み可能にする。

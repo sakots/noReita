@@ -28,6 +28,7 @@ require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 require_once dirname(__DIR__) . '/noreita/share.inc.php';
 require_once dirname(__DIR__) . '/noreita/template_engine.inc.php';
+require_once dirname(__DIR__) . '/noreita/theme_manifest.inc.php';
 require_once dirname(__DIR__) . '/plugins/check-image-consistency.php';
 require_once dirname(__DIR__) . '/scripts/migrate-config-v3.php';
 
@@ -118,6 +119,22 @@ smoke_test('eda Twig theme templates compile', static function (): bool {
       rmdir($root);
     }
   }
+});
+
+smoke_test('theme manifests and diagnostics detect theme integrity problems', static function (): bool {
+  $eda = dirname(__DIR__) . '/noreita/theme/eda';
+  $manifest = ThemeManifest::load($eda);
+  $runtime = [
+    'id' => $manifest['id'], 'version' => $manifest['version'], 'engine' => $manifest['engine'],
+    'templates' => $manifest['templates'],
+  ];
+  $report = ThemeDiagnostics::inspect($eda, $manifest, $runtime);
+  if ($report['summary']['errors'] !== 0 || $report['summary']['templates_checked'] !== 13) return false;
+  $invalid = $manifest;
+  $invalid['assets']['css'][] = 'css/missing-theme-asset.css';
+  $invalid_report = ThemeDiagnostics::inspect($eda, $invalid, $runtime);
+  return $invalid_report['summary']['errors'] > 0
+    && in_array('missing_asset', array_column($invalid_report['issues'], 'code'), true);
 });
 
 smoke_test('required PHP extensions', static function (): bool {
