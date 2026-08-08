@@ -162,6 +162,15 @@ PHP;
   if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
     throw new RuntimeException('Could not create test config.local.php');
   }
+  $theme_config_file = $webroot . '/theme/monoreita/theme_conf.php';
+  $theme_config = file_get_contents($theme_config_file);
+  $twig_theme_config = is_string($theme_config)
+    ? str_replace("const THEME_TEMPLATE_ENGINE = 'blade';", "const THEME_TEMPLATE_ENGINE = 'twig';", $theme_config)
+    : false;
+  if (!is_string($twig_theme_config) || $twig_theme_config === $theme_config
+    || file_put_contents($theme_config_file, $twig_theme_config) === false) {
+    throw new RuntimeException('Could not configure Twig for the integration-test theme.');
+  }
   $error_probe = <<<'PHP'
 <?php
 require_once __DIR__ . '/error_handler.inc.php';

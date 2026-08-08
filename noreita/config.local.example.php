@@ -46,4 +46,5 @@ return [
     // 同一ドメインに複数のnoReitaを設置する場合は、設置ごとに異なる名前にします。
     'session_name' => 'noreita_session',
   ],
+
 ];

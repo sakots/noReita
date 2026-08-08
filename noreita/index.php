@@ -123,7 +123,7 @@ if (Config::string("admin.password") === 'admin_pass') {
   die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
 }
 
-// Composer dependencies (BladeOne v4.19.1)
+// Composer dependencies (BladeOne / Twig)
 $autoload = __DIR__ . '/vendor/autoload.php';
 if (!is_file($autoload)) {
   die($en
@@ -131,24 +131,27 @@ if (!is_file($autoload)) {
     : 'Composer依存ライブラリがありません。noReitaディレクトリでcomposer installを実行してください。');
 }
 require_once $autoload;
-use eftec\bladeone\BladeOne;
+require_once __DIR__ . '/template_engine.inc.php';
 
 $views = __DIR__ . '/theme/' . Config::string('paths.theme'); // テンプレートフォルダ
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
-// Bladeキャッシュに必要な場所だけを書き込み可能にする。
+// テンプレートキャッシュに必要な場所だけを書き込み可能にする。
 if (!is_dir($cache) && !@mkdir($cache, Config::int('permissions.private_directory'), true) && !is_dir($cache)) {
-  die($en ? 'Failed to create the Blade cache directory.' : 'Bladeキャッシュディレクトリを作成できません。');
+  die($en ? 'Failed to create the template cache directory.' : 'テンプレートキャッシュディレクトリを作成できません。');
 }
 if (!is_readable($cache) || !is_writable($cache)) {
-  die($en ? 'The Blade cache directory is not readable and writable.'
-    : 'Bladeキャッシュディレクトリを読み書きできません。');
+  die($en ? 'The template cache directory is not readable and writable.'
+    : 'テンプレートキャッシュディレクトリを読み書きできません。');
 }
 
-$blade = new BladeOne($views, $cache, BladeOne::MODE_AUTO); // MODE_DEBUGだと開発モード MODE_AUTOが速い。
-$blade->pipeEnable = true; // パイプのフィルターを使えるようにする
+$theme_template_engine = defined('THEME_TEMPLATE_ENGINE') ? THEME_TEMPLATE_ENGINE : 'blade';
+if (!is_string($theme_template_engine) || !in_array($theme_template_engine, ['blade', 'twig'], true)) {
+  die($en ? 'The theme template engine must be blade or twig.' : 'テーマのテンプレートエンジンはbladeまたはtwigを指定してください。');
+}
+$template_engine = TemplateEngineFactory::create($theme_template_engine, $views, $cache);
 
-$dat = array(); // bladeに格納する変数
+$dat = array(); // テンプレートに格納する変数
 
 // var_dump($_POST);
 
@@ -405,7 +408,7 @@ function init(): void {
 }
 
 function show_share_server_form(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
 
   $dat['servers'] = ShareService::servers(Config::array('social.servers'));
   $dat['encoded_t'] = (string)filter_input_data('GET', 'encoded_t');
@@ -414,7 +417,7 @@ function show_share_server_form(): void {
   $dat['sns_server_direct_input_cookie'] = (string)filter_input_data('COOKIE', 'sns_server_direct_input_cookie');
   $dat['admin_pass'] = null;
   $dat['token'] = RequestSecurity::csrfToken();
-  echo $blade->run(SET_SHARE_SERVER, $dat);
+  echo $template_engine->render(SET_SHARE_SERVER, $dat);
 }
 
 function submit_share_server(): void {
@@ -577,7 +580,7 @@ function regist(): void {
 
 //通常表示モード
 function def(): void {
-  global $dat, $blade;
+  global $dat, $template_engine;
   global $en;
   $dsp_res = Config::int('board.replies_shown');
   $page_def = Config::int('board.page_size');
@@ -754,7 +757,7 @@ function def(): void {
     $dat['dsp_res'] = Config::int('board.replies_shown');
     $dat['path'] = Config::string('paths.images');
 
-    echo $blade->run(MAINFILE, $dat);
+    echo $template_engine->render(MAINFILE, $dat);
   } catch (PDOException $e) {
     error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
@@ -762,7 +765,7 @@ function def(): void {
 
 //カタログモード
 function catalog(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   $page_def = Config::int('board.catalog_size');
 
   $start = 0;
@@ -834,7 +837,7 @@ function catalog(): void {
 
     //$smarty->debugging = true;
     $dat['catalogmode'] = 'catalog';
-    echo $blade->run(CATALOGFILE, $dat);
+    echo $template_engine->render(CATALOGFILE, $dat);
   } catch (PDOException $e) {
     error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
@@ -842,7 +845,7 @@ function catalog(): void {
 
 //検索モード 現在全件表示のみ対応
 function search(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
 
   $search_f = (string)filter_input(INPUT_GET, 'search');
   $search = $search_f;
@@ -886,7 +889,7 @@ function search(): void {
     $dat['path'] = Config::string('paths.images');
 
     $dat['s_result'] = $i;
-    echo $blade->run(CATALOGFILE, $dat);
+    echo $template_engine->render(CATALOGFILE, $dat);
   } catch (PDOException $e) {
     error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
@@ -935,7 +938,7 @@ function sodane(): void {
 
 //レス画面
 function res(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
   $resno = filter_input(INPUT_GET, 'res',FILTER_VALIDATE_INT);
   $uuid = trim((string)filter_input(INPUT_GET, 'uuid'));
@@ -1053,14 +1056,14 @@ function res(): void {
 
   $dat['path'] = Config::string('paths.images');
 
-  echo $blade->run(RESFILE, $dat);
+  echo $template_engine->render(RESFILE, $dat);
 }
 
 //お絵描き画面
 function paint_form(string $rep, ?int $reply_to): void {
   global $message, $usercode, $quality, $qualitys, $no;
   global $mode, $ctype, $pch, $type;
-  global $blade, $dat;
+  global $template_engine, $dat;
 
   $pwd = (string)filter_input(INPUT_POST, 'pwd');
   $imgfile = filter_input(INPUT_POST, 'img');
@@ -1278,18 +1281,18 @@ function paint_form(string $rep, ?int $reply_to): void {
   }
   //出力
   if ($tool === 'chicken' || $tool === 'klecks' || $tool === 'tegaki' || $tool === 'axnos') {
-    echo $blade->run(PAINTFILE_BE, $dat);
+    echo $template_engine->render(PAINTFILE_BE, $dat);
   } elseif ($tool === 'shi' || $tool === 'neo') {
-    echo $blade->run(PAINTFILE, $dat);
+    echo $template_engine->render(PAINTFILE, $dat);
   } else {
-    echo $blade->run(PAINTFILE, $dat);
+    echo $template_engine->render(PAINTFILE, $dat);
   }
 }
 
 //アニメ再生
 
 function open_pch(string $sp = ""): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
 
   $pch = (string)filter_input(INPUT_GET, 'pch');
   try {
@@ -1303,13 +1306,13 @@ function open_pch(string $sp = ""): void {
   unset($playback['template_type']);
   $dat = array_merge($dat, $playback);
 
-  echo $blade->run($template, $dat);
+  echo $template_engine->render($template, $dat);
 }
 
 //お絵かき投稿
 function paint_com(string $tmpmode): void {
   global $usercode, $ptime;
-  global $blade, $dat;
+  global $template_engine, $dat;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
   $resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
@@ -1376,12 +1379,12 @@ function paint_com(string $tmpmode): void {
   $tmp2 = array();
   $dat['tmp'] = $tmp2;
 
-  echo $blade->run(PICFILE, $dat);
+  echo $template_engine->render(PICFILE, $dat);
 }
 
 //コンティニュー画面in
 function in_continue(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
 
   $no = trim((string)filter_input(INPUT_GET, 'no')); // 画像ファイル名なので文字列として取得
@@ -1473,7 +1476,7 @@ function in_continue(): void {
     error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500, $e);
   }
 
-  echo $blade->run(OTHERFILE, $dat);
+  echo $template_engine->render(OTHERFILE, $dat);
 }
 
 //削除くん
@@ -1624,7 +1627,7 @@ function picreplace(): void {
 
 //編集モードくん入口
 function editform(?int $authorized_post_id = null, ?string $authorized_password = null): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
 
   //csrfトークンをセット
@@ -1664,7 +1667,7 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
-    echo $blade->run(OTHERFILE, $dat);
+    echo $template_engine->render(OTHERFILE, $dat);
   } catch (PostNotFoundException $e) {
     error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
   } catch (PostAuthorizationException $e) {
@@ -1744,7 +1747,7 @@ function editexec(): void {
 
 //管理モードin
 function admin_in(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   admin_no_store();
   if (AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     redirect(Config::string('site.script_name') . '?mode=admin');
@@ -1752,7 +1755,7 @@ function admin_in(): void {
   $dat['othermode'] = 'admin_in';
   $dat['token'] = RequestSecurity::csrfToken();
 
-  echo $blade->run(OTHERFILE, $dat);
+  echo $template_engine->render(OTHERFILE, $dat);
 }
 
 function admin_login(): void {
@@ -1898,7 +1901,7 @@ function require_admin_session(): void {
 }
 
 function admin_post(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
 
   require_admin_session();
@@ -1935,7 +1938,7 @@ function admin_post(): void {
       ? Config::string('site.script_name') . '?mode=anime&pch=' . rawurlencode($pchfile)
       : '';
     $dat['token'] = RequestSecurity::csrfToken();
-    echo $blade->run(ADMINPOSTFILE, $dat);
+    echo $template_engine->render(ADMINPOSTFILE, $dat);
   } catch (Throwable $e) {
     error($en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500, $e);
   }
@@ -1948,7 +1951,7 @@ function admin_edit(): void {
 
 //管理モード
 function admin(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
 
   admin_no_store();
@@ -2040,7 +2043,7 @@ function admin(): void {
     $dat['admin_range_start'] = $total_threads === 0 ? 0 : $offset + 1;
     $dat['admin_range_end'] = $offset + count($oya);
     $dat['admin_page_posts'] = count($oya) + array_sum(array_map('count', $ko));
-    echo $blade->run(ADMINFILE, $dat);
+    echo $template_engine->render(ADMINFILE, $dat);
   } catch (Throwable $e) {
     error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500, $e);
   }
@@ -2070,7 +2073,7 @@ function usrchk(): void {
 
 //OK画面
 function ok(string $mes): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   $dat['okmes'] = $mes;
   $dat['othermode'] = 'ok';
   $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
@@ -2078,7 +2081,7 @@ function ok(string $mes): void {
   if($http_x_requested_with || $async_flag){
     die("OK!\n$mes");
   }
-  echo $blade->run(OTHERFILE, $dat);
+  echo $template_engine->render(OTHERFILE, $dat);
 }
 
 //Asyncリクエストの時は処理を中断
@@ -2165,7 +2168,7 @@ function logdel(): void {
 //エラー画面
 function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   global $db;
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
   if ($status < 400 || $status > 599) $status = 500;
   if ($status >= 500) {
@@ -2183,15 +2186,15 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   if($http_x_requested_with || $async_flag){
     die("error\n$mes");
   }
-  if (!isset($blade)) die($mes);
-  echo $blade->run(OTHERFILE, $dat);
+  if (!isset($template_engine)) die($mes);
+  echo $template_engine->render(OTHERFILE, $dat);
   exit;
 }
 
 //画像差し替え失敗
 function error2(): void {
   global $db;
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $self;
   global $en;
   http_response_code(500);
@@ -2203,6 +2206,6 @@ function error2(): void {
   if($http_x_requested_with || $async_flag){
     die($en ? "error?\nImage not found. There might be a failure in the posting.<a href=\"{{$self}}?mode=piccom\">Uploaded images</a> might still be available." : "error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
   }
-  echo $blade->run(OTHERFILE, $dat);
+  echo $template_engine->render(OTHERFILE, $dat);
   exit;
 }

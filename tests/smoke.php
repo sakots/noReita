@@ -8,6 +8,7 @@ const PTIME_S = '秒';
 
 require_once dirname(__DIR__) . '/noreita/config_loader.inc.php';
 require_once dirname(__DIR__) . '/noreita/bootstrap.php';
+require_once dirname(__DIR__) . '/noreita/vendor/autoload.php';
 $config_defaults = require dirname(__DIR__) . '/noreita/config.php';
 Config::initializeForTesting($config_defaults, [
   'admin' => ['password' => 'smoke-test-admin'],
@@ -26,6 +27,7 @@ require_once dirname(__DIR__) . '/noreita/initialization.inc.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 require_once dirname(__DIR__) . '/noreita/share.inc.php';
+require_once dirname(__DIR__) . '/noreita/template_engine.inc.php';
 require_once dirname(__DIR__) . '/plugins/check-image-consistency.php';
 require_once dirname(__DIR__) . '/scripts/migrate-config-v3.php';
 
@@ -51,6 +53,40 @@ smoke_test('minimum PHP version is 8.1', static function (): bool {
   return NOREITA_MIN_PHP_VERSION === '8.1.0'
     && NOREITA_MIN_PHP_VERSION_ID === 80100
     && PHP_VERSION_ID >= NOREITA_MIN_PHP_VERSION_ID;
+});
+
+smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
+  $views = $root . DIRECTORY_SEPARATOR . 'views';
+  $cache = $root . DIRECTORY_SEPARATOR . 'cache';
+  if (!mkdir($views, 0700, true) || !mkdir($cache, 0700, true)) return false;
+  try {
+    if (file_put_contents($views . DIRECTORY_SEPARATOR . 'sample.blade.php', 'Hello {{ $name }}') === false
+      || file_put_contents($views . DIRECTORY_SEPARATOR . 'sample.twig', 'Hello {{ name }}') === false
+      || file_put_contents($views . DIRECTORY_SEPARATOR . 'fallback.blade.php', 'Fallback {{ $name }}') === false) return false;
+    $blade = TemplateEngineFactory::create('blade', $views, $cache);
+    $twig = TemplateEngineFactory::create('twig', $views, $cache);
+    try {
+      TemplateEngineFactory::create('unknown', $views, $cache);
+      return false;
+    } catch (InvalidArgumentException $e) {
+      // Expected: only configured engines may be selected.
+    }
+    return $blade->render('sample', ['name' => 'BladeOne']) === 'Hello BladeOne'
+      && $twig->render('sample', ['name' => 'Twig']) === 'Hello Twig'
+      && $twig->render('fallback', ['name' => 'BladeOne']) === 'Fallback BladeOne';
+  } finally {
+    if (is_dir($root)) {
+      $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      );
+      foreach ($iterator as $item) {
+        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+      }
+      rmdir($root);
+    }
+  }
 });
 
 smoke_test('required PHP extensions', static function (): bool {

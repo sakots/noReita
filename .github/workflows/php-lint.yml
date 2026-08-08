@@ -31,7 +31,11 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
           extensions: curl, gd, mbstring, pdo_sqlite
+          tools: composer:v2
           coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --working-dir=noreita --no-interaction --no-progress --prefer-dist
 
       - name: Check PHP syntax
         run: bash scripts/lint-php.sh

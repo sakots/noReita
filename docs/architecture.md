@@ -4,7 +4,9 @@
 
 `index.php`はリクエストの受け取りと画面遷移を担当します。投稿入力の取得と検証は`post.inc.php`の`PostValidator`へ追加してください。DB接続や画像ファイル操作を追加する場合は、直接実装せず以下の層へ追加してください。
 
-外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定しています。
+外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定し、Twig 3も同梱します。
+
+`template_engine.inc.php`が画面描画の共通入口です。`TemplateEngine`を通して論理テンプレート名とデータ配列を渡し、テーマの`theme_conf.php`にある`THEME_TEMPLATE_ENGINE`定数で`blade`または`twig`を選択します。定数がない既存テーマは互換性のため`blade`として扱います。BladeOneは従来どおり`.blade.php`、Twigは同名の`.twig`をテーマディレクトリから読み込みます。Twig選択時に`.twig`がない画面は`.blade.php`へフォールバックするため、テーマを稼働させたまま1画面ずつ移行できます。Twigの自動エスケープを有効にしているため、HTMLを出力する値はTwigテンプレート側で必要な箇所だけ`|raw`を明示してください。
 
 `PostValidator`は必須項目、文字数、NGワード、日本語フィルター、コメントURL、拒否ホストを画面描画から独立して検証します。
 

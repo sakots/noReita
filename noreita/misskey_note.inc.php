@@ -188,7 +188,7 @@ class misskey_note {
   //投稿済みの記事をMisskeyにノートするための前処理
   public static function before_misskey_note(): void {
     global $home, $set_nsfw, $en, $deny_all_posts;
-    global $blade, $dat;
+    global $template_engine, $dat;
     //管理者判定処理
     RequestSecurity::startSession();
     $admin_post = admin_post_valid();
@@ -225,14 +225,14 @@ class misskey_note {
     $admin_pass = null;
 
     $dat['misskey_mode'] = 'before';
-    echo $blade->run(MISSKEYFILE, $dat);
+    echo $template_engine->render(MISSKEYFILE, $dat);
     exit();
   }
 
   //投稿済みの画像をMisskeyにNoteするための投稿フォーム
   public static function misskey_note_edit_form(): void {
     global $home, $set_nsfw, $en, $max_kb, $use_upload, $admin;
-    global $blade, $dat;
+    global $template_engine, $dat;
 
     try {
       RequestSecurity::assertCurrentSameOriginRequest($en);
@@ -296,7 +296,7 @@ class misskey_note {
     // HTML出力
     $dat['misskey_mode'] = 'note_edit_form';
 
-    echo $blade->run(MISSKEYFILE, $dat);
+    echo $template_engine->render(MISSKEYFILE, $dat);
     exit();
   }
 
@@ -469,7 +469,7 @@ class misskey_note {
 
   // Misskeyへの投稿が成功した事を知らせる画面
   public static function misskey_success(): void {
-    global $en, $blade, $dat;
+    global $en, $template_engine, $dat;
     $no = (string)filter_input_data('GET', 'no', FILTER_VALIDATE_INT);
 
     RequestSecurity::startSession();
@@ -481,7 +481,7 @@ class misskey_note {
     $admin_pass = null;
     $dat['misskey_mode'] = 'success';
     $dat['no'] = $no;
-    echo $blade->run(MISSKEYFILE, $dat);
+    echo $template_engine->render(MISSKEYFILE, $dat);
     exit();
   }
 }
