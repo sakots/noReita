@@ -1,3 +1,14 @@
 <Files ~ "\.blade.php?$">
 	deny from all
 </Files>
+
+# テーマ設定SQLite DBと一時ジャーナルへのHTTPアクセスを拒否する。
+<FilesMatch "(?i)^theme_settings\.db(?:-(?:wal|shm|journal))?$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order Allow,Deny
+    Deny from all
+  </IfModule>
+</FilesMatch>

@@ -1,57 +1,46 @@
-// モダンなCSS切り替え機能
-class CssSwitcher {
+// eda theme's preset stylesheet switcher.
+class EdaCssSwitcher {
   constructor() {
-    this.cookieName = "_monoreita_colorIdx";
+    this.cookieName = '_eda_colorIdx';
     this.init();
   }
 
   init() {
-    const colorIdx = this.getCookie(this.cookieName);
-    if (colorIdx) {
-      this.enableCss(Number(colorIdx));
-    }
+    const colorIndex = this.getCookie(this.cookieName);
+    if (colorIndex !== '') this.enableCss(Number(colorIndex));
   }
 
   enableCss(index) {
-    const cssElement = document.getElementById(`css${index}`);
-    if (cssElement) {
-      cssElement.removeAttribute("disabled");
-    }
+    const stylesheet = document.getElementById(`css${index}`);
+    if (stylesheet) stylesheet.removeAttribute('disabled');
   }
 
   setCss(selectElement) {
-    const index = selectElement.selectedIndex;
-    this.setCookie(this.cookieName, index);
+    this.setCookie(this.cookieName, selectElement.selectedIndex);
     window.location.reload();
   }
 
   getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) {
-      return decodeURIComponent(parts.pop().split(';').shift());
-    }
-    return "";
+    const parts = (`; ${document.cookie}`).split(`; ${name}=`);
+    return parts.length === 2 ? decodeURIComponent(parts.pop().split(';').shift()) : '';
   }
 
   setCookie(name, value) {
-    const maxAge = 365 * 24 * 60 * 60; // 1年
-    document.cookie = `${name}=${encodeURIComponent(value)};max-age=${maxAge};path=/`;
+    document.cookie = `${name}=${encodeURIComponent(value)};max-age=${365 * 24 * 60 * 60};path=/`;
   }
 }
 
-// 初期化
-const cssSwitcher = new CssSwitcher();
+const edaCssSwitcher = new EdaCssSwitcher();
 
-// グローバル関数として公開（既存のHTMLとの互換性のため）
+// Existing theme markup calls these functions directly.
 function SetCss(obj) {
-  cssSwitcher.setCss(obj);
+  edaCssSwitcher.setCss(obj);
 }
 
 function GetCookie(key) {
-  return cssSwitcher.getCookie(key);
+  return edaCssSwitcher.getCookie(key);
 }
 
-function SetCookie(key, val) {
-  cssSwitcher.setCookie(key, val);
+function SetCookie(key, value) {
+  edaCssSwitcher.setCookie(key, value);
 }

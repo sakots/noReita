@@ -260,6 +260,19 @@ $dat['use_misskey_note'] = Config::bool('features.misskey_note');
 //初期設定
 init();
 
+$dat['theme_settings'] = [];
+$dat['theme_settings_json'] = '{}';
+try {
+  $theme_settings = theme_settings_provider();
+  if ($theme_settings !== null) {
+    $template_data = $theme_settings->templateData();
+    if (!is_array($template_data)) throw new RuntimeException('Theme settings template data is invalid.');
+    $dat = array_merge($dat, $template_data);
+  }
+} catch (Throwable $e) {
+  error($en ? 'Theme settings initialization failed.' : 'テーマ設定の初期化に失敗しました。', 500, $e);
+}
+
 del_temp();
 
 clean_old_thumbnails();
@@ -357,6 +370,8 @@ switch ($mode) {
     return admin_delete();
   case 'admin_manage':
     return admin_manage();
+  case 'admin_theme_settings':
+    return admin_theme_settings();
   case 'admin_post':
     return admin_post();
   case 'admin_edit':
@@ -1919,6 +1934,70 @@ function admin_manage(?string $forced_operation = null): void {
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
 
+/** @return object|null Theme providers implement templateData(), save(array), and reset(). */
+function theme_settings_provider(): ?object {
+  global $theme_directory;
+
+  if (!defined('THEME_SETTINGS_CLASS')) return null;
+  $class = constant('THEME_SETTINGS_CLASS');
+  if (!is_string($class) || $class === '' || !class_exists($class)) {
+    throw new RuntimeException('Theme settings provider is unavailable.');
+  }
+  $provider = new $class(
+    $theme_directory, Config::int('database.busy_timeout'), Config::int('permissions.private_file')
+  );
+  foreach (['templateData', 'save', 'reset'] as $method) {
+    if (!method_exists($provider, $method)) {
+      throw new RuntimeException('Theme settings provider has an invalid interface.');
+    }
+  }
+  return $provider;
+}
+
+function admin_theme_settings(): void {
+  global $en;
+
+  admin_no_store();
+  $settings = null;
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  require_admin_session();
+  try {
+    $settings = theme_settings_provider();
+  } catch (Throwable $e) {
+    error($en ? 'Theme settings are unavailable.' : 'テーマ設定を利用できません。', 500, $e);
+    return;
+  }
+  if ($settings === null) {
+    error($en ? 'Theme color settings are unavailable for this theme.' : 'このテーマでは配色設定を利用できません。', 404);
+    return;
+  }
+
+  $operation = (string)filter_input_data('POST', 'operation');
+  if (!in_array($operation, ['save', 'reset'], true)) {
+    error($en ? 'Invalid theme settings operation.' : 'テーマ設定の操作が不正です。', 400);
+  }
+  try {
+    if ($operation === 'reset') {
+      $settings->reset();
+      $_SESSION['theme_settings_message'] = $en ? 'Theme settings were reset.' : 'テーマ標準の設定に戻しました。';
+    } else {
+      $values = $_POST['theme_settings'] ?? null;
+      if (!is_array($values)) throw new InvalidArgumentException('Invalid theme settings.');
+      $settings->save($values);
+      $_SESSION['theme_settings_message'] = $en ? 'Theme settings were saved.' : 'テーマ設定をサイト全体に保存しました。';
+    }
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Invalid theme settings values.' : 'テーマ設定の値が不正です。', 400);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to save theme settings.' : 'テーマ設定を保存できませんでした。', 500, $e);
+  }
+  redirect(Config::string('site.script_name') . '?mode=admin');
+}
+
 function admin_no_store(): void {
   if (!headers_sent()) {
     header('Cache-Control: no-store, private');
@@ -2007,6 +2086,8 @@ function admin(): void {
   $dat['token'] = RequestSecurity::csrfToken();
   $dat['message'] = isset($_SESSION['admin_message']) ? (string)$_SESSION['admin_message'] : '';
   unset($_SESSION['admin_message']);
+  $dat['theme_settings_message'] = isset($_SESSION['theme_settings_message']) ? (string)$_SESSION['theme_settings_message'] : '';
+  unset($_SESSION['theme_settings_message']);
 
   $filters = [];
   try {

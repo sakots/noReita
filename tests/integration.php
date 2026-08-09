@@ -227,6 +227,7 @@ PHP;
     'config.php' => 'admin_pass',
     'config.local.php' => 'integration-admin-pass',
     'reita.db' => 'SQLite format',
+    'theme/eda/theme_settings.db' => 'SQLite format',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
     'cache/http-access-probe.bladec' => 'blade-cache-secret',
@@ -245,7 +246,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 7 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 8 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -356,6 +357,9 @@ PHP;
     return $admin_login_status === 302 && $admin_status === 200
       && $login_attempt_records_after_success === []
       && str_contains($admin_body, 'ADMIN MODE')
+      && str_contains($admin_body, 'id="eda-theme-color-form"')
+      && str_contains($admin_body, 'themeColorManager.js')
+      && str_contains($admin_body, 'mode=admin_theme_settings')
       && str_contains($admin_body, '基本統計')
       && str_contains($admin_body, '総投稿数')
       && str_contains($admin_body, '画像ディレクトリ:')
@@ -364,6 +368,37 @@ PHP;
       && str_contains($admin_body, 'value="hide"')
       && str_contains($admin_body, 'value="show"')
       && str_contains($admin_body, 'value="delete"');
+  });
+
+  $theme_colors = [
+    'pageBackground' => '#123456', 'pageBackgroundEnd' => '#000000',
+    'text' => '#eeeeee', 'link' => '#eeeeee', 'linkVisited' => '#999999', 'linkAction' => '#cc0000',
+    'surface' => '#112222', 'border' => '#992222', 'button' => '#333355', 'buttonText' => '#ffffff',
+    'inputBackground' => '#eeeeee', 'inputText' => '#000000',
+    'threadBackground' => '#001122', 'threadText' => '#ddffee',
+    'noticeBackground' => '#554433', 'replyText' => '#cc88cc',
+  ];
+  [$theme_save_status] = http_request($base_url . '?mode=admin_theme_settings', $cookie_jar, [
+    'operation' => 'save', 'theme_settings' => ['colors' => $theme_colors], 'token' => $token,
+  ]);
+  $theme_database = new PDO('sqlite:' . $webroot . '/theme/eda/theme_settings.db');
+  $stored_theme_colors = (string)$theme_database->query(
+    "SELECT value FROM theme_settings WHERE setting_key = 'colors'"
+  )->fetchColumn();
+  [$theme_render_status, $theme_render_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$theme_reset_status] = http_request($base_url . '?mode=admin_theme_settings', $cookie_jar, [
+    'operation' => 'reset', 'token' => $token,
+  ]);
+  $theme_color_rows_after_reset = (int)$theme_database->query('SELECT COUNT(*) FROM theme_settings')->fetchColumn();
+  integration_test('administrator saves eda theme colors in the separate theme database', static function () use (
+    $theme_save_status, $stored_theme_colors, $theme_render_status, $theme_render_body,
+    $theme_reset_status, $theme_color_rows_after_reset
+  ): bool {
+    return $theme_save_status === 302
+      && str_contains($stored_theme_colors, '"pageBackground":"#123456"')
+      && $theme_render_status === 200 && str_contains($theme_render_body, '"pageBackground":"#123456"')
+      && $theme_reset_status === 302
+      && $theme_color_rows_after_reset === 0;
   });
 
   [$admin_empty_operation_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [

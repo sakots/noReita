@@ -24,6 +24,7 @@ require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/external_image.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
 require_once dirname(__DIR__) . '/noreita/initialization.inc.php';
+require_once dirname(__DIR__) . '/noreita/theme/eda/theme_settings.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 require_once dirname(__DIR__) . '/noreita/share.inc.php';
@@ -159,6 +160,39 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['features']['nsfw'] === false
     && $resolved['features']['image_upload'] === false
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
+});
+
+smoke_test('eda theme settings database initializes separately and validates saved colors', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_theme_settings_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $settings = new EdaThemeSettings($directory);
+    $colors = EdaThemeSettings::defaults();
+    $colors['pageBackground'] = '#123456';
+    $settings->saveColors($colors);
+    $stored = $settings->colors();
+    $database = new PDO('sqlite:' . $settings->databaseFile());
+    $version = (int)$database->query('PRAGMA user_version')->fetchColumn();
+    $table_exists = $database->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='theme_settings'")->fetchColumn() !== false;
+    $invalid_rejected = false;
+    try {
+      $settings->saveColors(['pageBackground' => 'invalid']);
+    } catch (InvalidArgumentException $e) {
+      $invalid_rejected = true;
+    }
+    $settings->resetColors();
+    $result = $stored['pageBackground'] === '#123456'
+      && $settings->colors() === [] && $version === 1 && $table_exists && $invalid_rejected
+      && (fileperms($settings->databaseFile()) & 0777) === 0600;
+    $database = null;
+    unset($settings);
+    return $result;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . 'theme_settings.db*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges', static function (): bool {

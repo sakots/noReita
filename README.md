@@ -63,6 +63,11 @@ return [
 ];
 ```
 
+### edaテーマの配色管理
+
+edaテーマでは、管理画面の「テーマカラー」から配色をサイト全体へ保存できます。
+配色は投稿DBとは別の`noreita/theme/eda/theme_settings.db`に保存され、v3から更新した既存サイトでも最初の起動時に自動作成されます。テーマディレクトリはPHPから書き込み可能にしてください。DBファイルはHTTPアクセスを拒否し、権限は`0600`に設定されます。
+
 ## 各お絵かきアプリのURL
 
 noReita v4から、デフォルトの状態ではアプリは配布ではなく[https://oekakibbs.moe/apps/](https://oekakibbs.moe/apps/) を参照するようにしました。

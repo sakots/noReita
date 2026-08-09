@@ -13,6 +13,10 @@ const THEME_VER = "lot.260808.0";
 // テンプレートエンジン。Twigテーマでは'twig'に変更します。
 const THEME_TEMPLATE_ENGINE = 'twig';
 
+// テーマ固有設定の保存処理。テーマを差し替えてもコアへ実装を残しません。
+require_once __DIR__ . '/theme_settings.php';
+const THEME_SETTINGS_CLASS = 'EdaThemeSettings';
+
 /* -------------------- */
 
 //編集したときの目印
