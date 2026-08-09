@@ -39,12 +39,9 @@
         <p>カタログモード</p>
       {% endif %}
       {% if catalogmode == 'search' %}
-        <p>検索モード -「{{ author }}」の作品 - {{ s_result }}件</p>
+        <p>検索結果 - {{ search_label }}「{{ search_term }}」- {{ s_result }}件</p>
       {% endif %}
-      {% if catalogmode == 'hashsearch' %}
-        <p>本文検索 -「{{ tag }}」- {{ s_result }}件</p>
-      {% endif %}
-      {% if catalogmode == 'catalog' %}
+      {% if catalog_paging_enabled %}
       <hr>
       {% include 'components/eda_pagingCatalogMode.twig' %} <!-- カタログモードのページング -->
       {% endif %}
@@ -95,7 +92,7 @@
     </div>
     <div>
       <section class="thread">
-        {% if catalogmode == 'catalog' %}
+        {% if catalog_paging_enabled %}
           {% include 'components/eda_pagingCatalogMode.twig' %} <!-- カタログモードのページング -->
           <hr>
         {% endif %}

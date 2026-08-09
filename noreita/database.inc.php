@@ -176,6 +176,45 @@ final class Database {
   }
 }
 
+final class PublicPostSearch {
+  /** @return array<string,string> */
+  public static function normalize(array $values): array {
+    $query = trim((string)($values['query'] ?? ''));
+    if ($query === '' || mb_strlen($query, 'UTF-8') > 100) {
+      throw new InvalidArgumentException('Search query must be between 1 and 100 characters.');
+    }
+    return [
+      'query' => $query,
+      'target' => self::choice($values['target'] ?? null, ['author', 'subject', 'comment', 'all'], 'author'),
+      'match' => self::choice($values['match'] ?? null, ['exact', 'partial'], 'partial'),
+      'post_type' => self::choice($values['post_type'] ?? null, ['all', 'thread', 'reply'], 'all'),
+      'image' => self::choice($values['image'] ?? null, ['any', 'with', 'without'], 'any'),
+      'nsfw' => self::choice($values['nsfw'] ?? null, ['any', 'safe', 'nsfw'], 'any'),
+      'sort' => self::choice($values['sort'] ?? null, ['newest', 'oldest'], 'newest'),
+    ];
+  }
+
+  /** @param array<string,string> $criteria */
+  public static function queryString(array $criteria): string {
+    return http_build_query([
+      'target' => $criteria['target'], 'match' => $criteria['match'], 'post_type' => $criteria['post_type'],
+      'image' => $criteria['image'], 'nsfw' => $criteria['nsfw'], 'sort' => $criteria['sort'],
+      'search' => $criteria['query'],
+    ], '', '&', PHP_QUERY_RFC3986);
+  }
+
+  /** @param array<string,string> $criteria */
+  public static function label(array $criteria): string {
+    $targets = ['author' => '作者名', 'subject' => '題名', 'comment' => '本文', 'all' => 'すべて'];
+    return $targets[$criteria['target']] ?? '検索';
+  }
+
+  /** @param mixed $value @param array<int,string> $allowed */
+  private static function choice($value, array $allowed, string $default): string {
+    return is_string($value) && in_array($value, $allowed, true) ? $value : $default;
+  }
+}
+
 final class BoardRepository {
   private PDO $db;
 
@@ -365,6 +404,55 @@ final class BoardRepository {
     $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
     $statement->execute();
     return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  /** @param array<string,string> $criteria */
+  public function countPublicSearch(array $criteria): int {
+    $condition = $this->publicSearchCondition($criteria);
+    $statement = $this->db->prepare("SELECT COUNT(*) FROM board_log WHERE {$condition['sql']}");
+    $statement->execute($condition['params']);
+    return (int)$statement->fetchColumn();
+  }
+
+  /** @param array<string,string> $criteria */
+  public function searchVisiblePosts(array $criteria, int $offset, int $limit): array {
+    if ($offset < 0 || $limit < 1 || $limit > 200) throw new InvalidArgumentException('Invalid public search range.');
+    $condition = $this->publicSearchCondition($criteria);
+    $order = $criteria['sort'] === 'oldest' ? 'age ASC, tree ASC' : 'age DESC, tree DESC';
+    $statement = $this->db->prepare(
+      "SELECT * FROM board_log WHERE {$condition['sql']} ORDER BY {$order} LIMIT ? OFFSET ?"
+    );
+    $index = 1;
+    foreach ($condition['params'] as $value) $statement->bindValue($index++, $value, PDO::PARAM_STR);
+    $statement->bindValue($index++, $limit, PDO::PARAM_INT);
+    $statement->bindValue($index, $offset, PDO::PARAM_INT);
+    $statement->execute();
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
+  /** @param array<string,string> $criteria
+   * @return array{sql:string,params:array<int,string>} */
+  private function publicSearchCondition(array $criteria): array {
+    $criteria = PublicPostSearch::normalize($criteria);
+    $operator = $criteria['match'] === 'exact' ? '=' : 'LIKE';
+    $value = $criteria['match'] === 'exact' ? $criteria['query'] : '%' . $criteria['query'] . '%';
+    $sql = 'invz = 0';
+    $params = [];
+    if ($criteria['target'] === 'all') {
+      $sql .= " AND (a_name {$operator} ? OR sub {$operator} ? OR com {$operator} ?)";
+      $params = [$value, $value, $value];
+    } else {
+      $column = ['author' => 'a_name', 'subject' => 'sub', 'comment' => 'com'][$criteria['target']];
+      $sql .= " AND {$column} {$operator} ?";
+      $params[] = $value;
+    }
+    if ($criteria['post_type'] === 'thread') $sql .= ' AND thread = 1';
+    if ($criteria['post_type'] === 'reply') $sql .= ' AND thread = 0';
+    if ($criteria['image'] === 'with') $sql .= " AND picfile != ''";
+    if ($criteria['image'] === 'without') $sql .= " AND picfile = ''";
+    if ($criteria['nsfw'] === 'safe') $sql .= ' AND CAST(COALESCE(nsfw, 0) AS INTEGER) = 0';
+    if ($criteria['nsfw'] === 'nsfw') $sql .= ' AND CAST(COALESCE(nsfw, 0) AS INTEGER) = 1';
+    return compact('sql', 'params');
   }
 
   public function countAdminPosts(array $filters = []): int {

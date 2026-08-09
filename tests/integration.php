@@ -484,6 +484,21 @@ PHP;
     return $search_status === 200 && str_contains($search_body, $marker) && str_contains($search_body, '1件');
   });
 
+  [$public_search_status, $public_search_body] = http_request(
+    $base_url . '?mode=search&target=all&match=partial&post_type=thread&image=any&nsfw=safe&sort=newest&search=' . rawurlencode($marker),
+    $cookie_jar
+  );
+  [$empty_public_search_status] = http_request($base_url . '?mode=search&target=all&search=', $cookie_jar);
+  integration_test('public search filters targets and rejects an empty query', static function () use (
+    $public_search_status, $public_search_body, $empty_public_search_status, $marker
+  ): bool {
+    return $public_search_status === 200 && $empty_public_search_status === 400
+      && str_contains($public_search_body, '検索結果 - すべて')
+      && str_contains($public_search_body, $marker)
+      && str_contains($public_search_body, 'name="post_type"')
+      && str_contains($public_search_body, 'value="thread" selected');
+  });
+
   $post_id = (int)($row['tid'] ?? 0);
   [$owner_edit_form_status, $owner_edit_form_body] = http_request($base_url . '?mode=edit', $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$post_id, 'pwd' => 'delete-pass',

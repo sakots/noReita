@@ -226,6 +226,10 @@ $dat['use_sub'] = Config::bool('features.require_subject');
 $dat['addinfo'] = Config::array("board.additional_info");
 
 $dat['display_painttime'] = Config::bool('features.display_paint_time');
+$dat['search_criteria'] = [
+  'query' => '', 'target' => 'author', 'match' => 'partial', 'post_type' => 'all',
+  'image' => 'any', 'nsfw' => 'any', 'sort' => 'newest',
+];
 
 $dat['share_button'] = Config::bool('features.share_button');
 
@@ -833,41 +837,18 @@ function catalog(): void {
   //ページング
   try {
     $repository = new BoardRepository();
-    if (isset($_GET['page']) && is_numeric($_GET['page'])) {
-      $page = $_GET['page'];
-      $page = max($page, 1);
-    } else {
-      $page = 1;
-    }
-    $start = $page_def * ($page - 1);
-
-    //最大何ページあるのか
     $th_cnt = $repository->countVisibleImages();
-    $max_page = floor($th_cnt / $page_def) + 1;
-    //最後にスレ数0のページができたら表示しない処理
-    if (($th_cnt % $page_def) == 0) {
-      $max_page = $max_page - 1;
-      //ただしそれが1ページ目なら困るから表示
-      $max_page = max($max_page, 1);
-    }
-    $dat['max_page'] = $max_page;
-
-    //リンク作成用
-    $dat['nowpage'] = $page;
-    $p = 1;
-    $pp = array();
-    $paging = array();
-    while ($p <= $max_page) {
-      $paging[($p)] = compact('p');
-      $pp[] = $paging;
-      $p++;
-    }
-    $dat['paging'] = $paging;
-    $dat['pp'] = $pp;
-
-    $dat['back'] = ($page - 1);
-
-    $dat['next'] = ($page + 1);
+    $page_value = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $pagination = catalog_paging($th_cnt, $page_def, $page_value === false || $page_value === null ? 1 : $page_value);
+    $start = $pagination['start'];
+    $dat['max_page'] = $pagination['max_page'];
+    $dat['nowpage'] = $pagination['page'];
+    $dat['paging'] = $pagination['paging'];
+    $dat['pp'] = $pagination['pp'];
+    $dat['back'] = $pagination['back'];
+    $dat['next'] = $pagination['next'];
+    $dat['catalog_paging_query'] = 'mode=catalog';
+    $dat['catalog_paging_enabled'] = true;
 
   } catch (PDOException $e) {
     error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
@@ -903,31 +884,57 @@ function catalog(): void {
   }
 }
 
-//検索モード 現在全件表示のみ対応
+/** @return array{page:int,max_page:int,start:int,paging:array<int,array{p:int}>,pp:array<int,array<int,array{p:int}>>,back:int,next:int} */
+function catalog_paging(int $total, int $per_page, int $requested_page): array {
+  if ($per_page < 1) throw new InvalidArgumentException('Invalid catalog page size.');
+  $max_page = max(1, (int)ceil($total / $per_page));
+  $page = min(max($requested_page, 1), $max_page);
+  $paging = [];
+  $pp = [];
+  for ($p = 1; $p <= $max_page; $p++) {
+    $paging[$p] = compact('p');
+    $pp[] = $paging;
+  }
+  return [
+    'page' => $page, 'max_page' => $max_page, 'start' => $per_page * ($page - 1),
+    'paging' => $paging, 'pp' => $pp, 'back' => $page - 1, 'next' => $page + 1,
+  ];
+}
+
+/** @return array<string,string> */
+function public_search_criteria(): array {
+  $query = (string)filter_input(INPUT_GET, 'search');
+  $target = filter_input(INPUT_GET, 'target');
+  $legacy_tag = filter_input(INPUT_GET, 'tag');
+  $legacy_similar = filter_input(INPUT_GET, 'similar');
+  if (!is_string($target) || $target === '') {
+    return PublicPostSearch::normalize([
+      'query' => $query,
+      'target' => $legacy_tag === 'tag' ? 'comment' : 'author',
+      'match' => $legacy_tag === 'tag' || $legacy_similar === 'similar' ? 'partial' : 'exact',
+      // Legacy author search showed image posts only.
+      'image' => $legacy_tag === 'tag' ? 'any' : 'with',
+    ]);
+  }
+  return PublicPostSearch::normalize([
+    'query' => $query, 'target' => $target, 'match' => filter_input(INPUT_GET, 'match'),
+    'post_type' => filter_input(INPUT_GET, 'post_type'), 'image' => filter_input(INPUT_GET, 'image'),
+    'nsfw' => filter_input(INPUT_GET, 'nsfw'), 'sort' => filter_input(INPUT_GET, 'sort'),
+  ]);
+}
+
+//検索モード
 function search(): void {
   global $template_engine, $dat;
 
-  $search_f = (string)filter_input(INPUT_GET, 'search');
-  $search = $search_f;
-  //部分一致検索
-  $similar =  filter_input(INPUT_GET, 'similar');
-  //本文検索
-  $tag = filter_input(INPUT_GET, 'tag');
-
-  //読み込み
   try {
+    $criteria = public_search_criteria();
     $repository = new BoardRepository();
-    //全スレッド取得
-    //まずtagがあれば全文検索
-    if ($tag == 'tag') {
-      $posts = $repository->searchComments($search);
-      $dat['catalogmode'] = 'hashsearch';
-      $dat['tag'] = $search_f;
-    } else {
-      $posts = $repository->searchAuthors($search, $similar === 'similar');
-      $dat['catalogmode'] = 'search';
-      $dat['author'] = $search_f;
-    }
+    $page_value = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $pagination = catalog_paging(
+      $repository->countPublicSearch($criteria), Config::int('board.catalog_size'), $page_value === false || $page_value === null ? 1 : $page_value
+    );
+    $posts = $repository->searchVisiblePosts($criteria, $pagination['start'], Config::int('board.catalog_size'));
 
     $oya = array();
     $ko = array();
@@ -947,9 +954,22 @@ function search(): void {
     $dat['oya'] = $oya;
     $dat['ko'] = $ko;
     $dat['path'] = Config::string('paths.images');
-
-    $dat['s_result'] = $i;
+    $dat['catalogmode'] = 'search';
+    $dat['search_term'] = $criteria['query'];
+    $dat['search_label'] = PublicPostSearch::label($criteria);
+    $dat['s_result'] = $repository->countPublicSearch($criteria);
+    $dat['search_criteria'] = $criteria;
+    $dat['catalog_paging_query'] = 'mode=search&' . PublicPostSearch::queryString($criteria);
+    $dat['catalog_paging_enabled'] = true;
+    $dat['max_page'] = $pagination['max_page'];
+    $dat['nowpage'] = $pagination['page'];
+    $dat['paging'] = $pagination['paging'];
+    $dat['pp'] = $pagination['pp'];
+    $dat['back'] = $pagination['back'];
+    $dat['next'] = $pagination['next'];
     echo $template_engine->render(CATALOGFILE, $dat);
+  } catch (InvalidArgumentException $e) {
+    error(Config::string('site.language') === 'English' ? 'Invalid search criteria.' : '検索条件が不正です。', 400, $e);
   } catch (PDOException $e) {
     error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
