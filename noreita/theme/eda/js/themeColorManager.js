@@ -88,11 +88,13 @@ input[type=submit], input[name=upfile], button, .button { color: var(--eda-butto
   function presets() {
     const raw = window.EDA_THEME_COLOR_PRESETS;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { mono: defaults() };
-    return Object.fromEntries(Object.entries(raw).flatMap(([name, values]) => {
-      if (typeof name !== 'string' || !values || typeof values !== 'object' || Array.isArray(values)) return [];
+    const sanitizedPresets = {};
+    Object.entries(raw).forEach(([name, values]) => {
+      if (!values || typeof values !== 'object' || Array.isArray(values)) return;
       const sanitized = Object.fromEntries(Object.entries(values).filter(([key, value]) => colors[key] && normalize(value)));
-      return Object.keys(sanitized).length === Object.keys(colors).length ? [[name, sanitized]] : [];
-    }));
+      if (Object.keys(sanitized).length === Object.keys(colors).length) sanitizedPresets[name] = sanitized;
+    });
+    return Object.keys(sanitizedPresets).length > 0 ? sanitizedPresets : { mono: defaults() };
   }
 
   const saved = serverColors();
@@ -105,6 +107,7 @@ input[type=submit], input[name=upfile], button, .button { color: var(--eda-butto
     const fields = Array.from(form.querySelectorAll('input[data-eda-theme-color]'));
     const presetSelect = document.getElementById('eda-theme-color-preset');
     const presetLoad = document.getElementById('eda-theme-color-preset-load');
+    const status = document.getElementById('eda-theme-color-status');
     const current = window.EdaThemeColors.get();
     fields.forEach((field) => {
       field.value = current[field.dataset.edaThemeColor] || field.value;
@@ -115,7 +118,7 @@ input[type=submit], input[name=upfile], button, .button { color: var(--eda-butto
       return Object.fromEntries(fields.map((field) => [field.dataset.edaThemeColor, field.value]));
     }
 
-    presetLoad?.addEventListener('click', () => {
+    function loadSelectedPreset() {
       const selected = presetSelect?.value;
       const values = selected ? window.EdaThemeColors.presets()[selected] : null;
       if (!values) return;
@@ -123,7 +126,12 @@ input[type=submit], input[name=upfile], button, .button { color: var(--eda-butto
         field.value = values[field.dataset.edaThemeColor] || field.value;
       });
       window.EdaThemeColors.preview(readFields());
-    });
+      if (status) status.textContent = `基準配色「${selected}」を読み込みました。保存するとサイトへ反映されます。`;
+    }
+
+    // Selecting a preset immediately fills the form; the button remains available for keyboard users.
+    presetSelect?.addEventListener('change', loadSelectedPreset);
+    presetLoad?.addEventListener('click', loadSelectedPreset);
 
   });
 })();
