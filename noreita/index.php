@@ -239,6 +239,9 @@ $dat['sodane'] = SODANE;
 
 $dat['use_oekaki_reply'] = Config::bool('features.oekaki_reply');
 $dat['use_image_upload'] = Config::bool('features.image_upload');
+$dat['diary_mode'] = Config::bool('features.diary_mode');
+$dat['can_create_thread'] = diary_post_allowed(false);
+$dat['can_post_reply'] = diary_post_allowed(true);
 $dat['upload_max_kb'] = Config::int('limits.upload_kb');
 $dat['upload_max_width'] = Config::int('limits.image_width');
 $dat['upload_max_height'] = Config::int('limits.image_height');
@@ -337,10 +340,16 @@ switch ($mode) {
   case 'sodane': // そうだね
     return sodane();
   case 'paint':
+    if (!diary_post_allowed((string)filter_input(INPUT_POST, 'resto') !== '')) {
+      error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
+    }
     return paint_form("", filter_input_data('POST','modid',FILTER_VALIDATE_INT));
   case 'piccom':
     return paint_com("");
   case 'pictmp':
+    if (!diary_post_allowed(false)) {
+      error($en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
+    }
     return paint_com("tmp");
   case 'anime':
     return open_pch($sp ?? "");
@@ -504,6 +513,10 @@ function regist(): void {
   }
 
   $input = PostValidator::inputFromHttp();
+  if (!diary_post_allowed($input['resto'] !== '')) {
+    error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
+    return;
+  }
   $sub = $input['sub'];
   $name = $input['name'];
   $mail = $input['mail'];
@@ -2042,6 +2055,15 @@ function require_admin_session(): void {
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
+}
+
+function diary_post_allowed(bool $is_reply): bool {
+  return DiaryPostPolicy::allows(
+    Config::bool('features.diary_mode'),
+    Config::bool('features.diary_allow_public_replies'),
+    AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime')),
+    $is_reply
+  );
 }
 
 function admin_post(): void {

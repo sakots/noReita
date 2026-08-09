@@ -102,6 +102,10 @@ return [
     'oekaki_reply' => true,
     // ブラウザから画像ファイルを直接アップロードして投稿できるようにします。
     'image_upload' => true,
+    // 日記モードでは新規投稿を、管理者ログイン中の利用者だけに限定します。
+    'diary_mode' => false,
+    // 日記モードで一般利用者からの返信を許可します。falseにすると返信も管理者限定です。
+    'diary_allow_public_replies' => true,
     // 投稿を外部サービスへ共有するボタンを表示します。
     'share_button' => true,
     // 共有先を選択する詳細メニューを表示します。

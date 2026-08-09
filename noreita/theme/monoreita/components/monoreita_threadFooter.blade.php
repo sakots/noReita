@@ -15,8 +15,10 @@
       </span>
     @endif
   @endif
-  @if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)
+  @if ($can_post_reply && ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time))
     <span class="button"><a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}"><span class="ic--baseline-reply"></span> 返信</a></span>
+  @elseif (!$can_post_reply)
+    返信は管理者のみです。
   @else
     このスレは古いので返信できません…
   @endif

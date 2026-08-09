@@ -1,3 +1,4 @@
+{% if resno is defined ? can_post_reply : can_create_thread %}
 <form action="{{ self }}" method="post" enctype="multipart/form-data">
   <p>
     <label>幅：<input class="form" type="number" min="300" max="{{ pmax_w }}" name="picw" value="{{ pdef_w }}" required></label>
@@ -38,3 +39,8 @@
     {% if use_image_upload %}<li>画像アップロードは幅{{ upload_max_width }}px、高さ{{ upload_max_height }}px、{{ upload_max_kb }}KBまでです。</li>{% endif %}
   </ul>
 </form>
+{% elseif resno is defined %}
+<p>返信は管理者のみ投稿できます。</p>
+{% else %}
+<p>日記モードでは新規投稿は管理者のみです。</p>
+{% endif %}

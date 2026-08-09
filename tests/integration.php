@@ -983,6 +983,144 @@ PHP;
       && !str_contains($responses, $rate_limit_password)
       && !str_contains($rate_limit_log, $rate_limit_password);
   });
+
+  $diary_config_local = str_replace(
+    "    'misskey_note' => false,",
+    "    'misskey_note' => false,\n    'diary_mode' => true,\n    'diary_allow_public_replies' => false,",
+    $config_local
+  );
+  if ($diary_config_local === $config_local
+    || file_put_contents($webroot . '/config.local.php', $diary_config_local) === false) {
+    throw new RuntimeException('Could not enable diary mode for the HTTP test.');
+  }
+
+  if (is_resource($process)) {
+    proc_terminate($process);
+    proc_close($process);
+    $process = null;
+  }
+  $diary_socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
+  if ($diary_socket === false) throw new RuntimeException("Could not reserve diary test port: {$error_message}");
+  $diary_address = stream_socket_get_name($diary_socket, false);
+  fclose($diary_socket);
+  $diary_port = (int)substr(strrchr((string)$diary_address, ':'), 1);
+  $diary_base_url = "http://127.0.0.1:{$diary_port}/index.php";
+  $process = proc_open(
+    [PHP_BINARY, '-S', "127.0.0.1:{$diary_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [STDIN, $log, $log],
+    $pipes,
+    $webroot
+  );
+  if (!is_resource($process)) throw new RuntimeException('Could not start diary-mode PHP server.');
+  $diary_ready = false;
+  for ($attempt = 0; $attempt < 50; $attempt++) {
+    usleep(100000);
+    try {
+      [$diary_startup_status] = http_request($diary_base_url, $root . '/diary-ready-cookies.txt');
+      if ($diary_startup_status === 200) {
+        $diary_ready = true;
+        break;
+      }
+    } catch (Throwable $ignored) {
+    }
+  }
+  if (!$diary_ready) throw new RuntimeException('Diary-mode PHP server did not become ready.');
+
+  $diary_cookie_jar = $root . DIRECTORY_SEPARATOR . 'diary-cookies.txt';
+  [$diary_form_status, $diary_form_body] = http_request($diary_base_url, $diary_cookie_jar);
+  http_request($diary_base_url . '?mode=admin_in', $diary_cookie_jar);
+  $diary_session_id = cookie_value($diary_cookie_jar, 'noreita_session');
+  $diary_token = $diary_session_id === null ? '' : hash('sha256', $diary_session_id);
+  $diary_parent_statement = $db->prepare('SELECT tid FROM board_log WHERE com = :comment LIMIT 1');
+  $diary_parent_statement->execute([':comment' => "画像アップロード {$upload_marker}"]);
+  $diary_parent_id = (int)$diary_parent_statement->fetchColumn();
+  [$diary_new_post_status] = http_request($diary_base_url . '?mode=regist', $diary_cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'public diary visitor', 'mail' => '', 'url' => '',
+    'sub' => 'Denied diary post', 'com' => 'This new post must be rejected.', 'pwd' => 'public-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_token,
+  ]);
+  [$diary_upload_form_status] = http_request($diary_base_url . '?mode=pictmp', $diary_cookie_jar);
+  [$diary_reply_denied_status] = http_request($diary_base_url . '?mode=reply', $diary_cookie_jar, [
+    'mode' => 'reply', 'send' => '1', 'resto' => (string)$diary_parent_id,
+    'name' => 'public diary visitor', 'mail' => '', 'url' => '', 'sub' => '',
+    'com' => 'This reply must be rejected.', 'pwd' => 'public-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_token,
+  ]);
+  integration_test('diary mode rejects public new posts, uploads, and replies when replies are disabled', static function () use (
+    $diary_form_status, $diary_form_body, $diary_new_post_status, $diary_upload_form_status, $diary_reply_denied_status
+  ): bool {
+    return $diary_form_status === 200
+      && $diary_new_post_status === 403
+      && $diary_upload_form_status === 403
+      && $diary_reply_denied_status === 403;
+  });
+
+  // OPcacheが秒単位の更新時刻で設定ファイルを検出する環境でも、次の設定を読み直せるようにします。
+  sleep(1);
+  $diary_replies_config = str_replace(
+    "    'diary_allow_public_replies' => false,",
+    "    'diary_allow_public_replies' => true,",
+    $diary_config_local
+  );
+  if ($diary_replies_config === $diary_config_local
+    || file_put_contents($webroot . '/config.local.php', $diary_replies_config) === false) {
+    throw new RuntimeException('Could not enable public diary replies for the HTTP test.');
+  }
+  if (is_resource($process)) {
+    proc_terminate($process);
+    proc_close($process);
+    $process = null;
+  }
+  $diary_replies_socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
+  if ($diary_replies_socket === false) throw new RuntimeException("Could not reserve diary reply test port: {$error_message}");
+  $diary_replies_address = stream_socket_get_name($diary_replies_socket, false);
+  fclose($diary_replies_socket);
+  $diary_replies_port = (int)substr(strrchr((string)$diary_replies_address, ':'), 1);
+  $diary_replies_url = "http://127.0.0.1:{$diary_replies_port}/index.php";
+  $process = proc_open(
+    [PHP_BINARY, '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [STDIN, $log, $log],
+    $pipes,
+    $webroot
+  );
+  if (!is_resource($process)) throw new RuntimeException('Could not restart PHP server for public diary replies.');
+  $diary_replies_ready = false;
+  for ($attempt = 0; $attempt < 50; $attempt++) {
+    usleep(100000);
+    try {
+      [$diary_replies_startup_status] = http_request($diary_replies_url, $root . '/diary-replies-ready-cookies.txt');
+      if ($diary_replies_startup_status === 200) {
+        $diary_replies_ready = true;
+        break;
+      }
+    } catch (Throwable $ignored) {
+    }
+  }
+  if (!$diary_replies_ready) throw new RuntimeException('Public-reply diary PHP server did not become ready.');
+  $diary_replies_cookie_jar = $root . DIRECTORY_SEPARATOR . 'diary-replies-cookies.txt';
+  http_request($diary_replies_url . '?mode=admin_in', $diary_replies_cookie_jar);
+  $diary_replies_session_id = cookie_value($diary_replies_cookie_jar, 'noreita_session');
+  $diary_replies_token = $diary_replies_session_id === null ? '' : hash('sha256', $diary_replies_session_id);
+  $diary_reply_marker = '日記返信-' . bin2hex(random_bytes(6));
+  [$diary_reply_allowed_status, $diary_reply_allowed_body] = http_request($diary_replies_url . '?mode=reply', $diary_replies_cookie_jar, [
+    'mode' => 'reply', 'send' => '1', 'resto' => (string)$diary_parent_id,
+    'name' => 'public diary visitor', 'mail' => '', 'url' => '', 'sub' => '',
+    'com' => $diary_reply_marker, 'pwd' => 'public-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_replies_token,
+  ]);
+  [$diary_new_post_still_denied_status] = http_request($diary_replies_url . '?mode=regist', $diary_replies_cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'public diary visitor', 'mail' => '', 'url' => '',
+    'sub' => 'Still denied diary post', 'com' => 'This new post must still be rejected.', 'pwd' => 'public-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_replies_token,
+  ]);
+  integration_test('diary mode can allow public replies without allowing new posts', static function () use (
+    $diary_reply_allowed_status, $diary_reply_allowed_body, $diary_new_post_still_denied_status
+  ): bool {
+    return $diary_reply_allowed_status === 200
+      && (str_contains($diary_reply_allowed_body, '書き込みに成功しました。')
+        || str_contains($diary_reply_allowed_body, 'Successfully posted.'))
+      && $diary_new_post_still_denied_status === 403;
+  });
 } catch (Throwable $e) {
   echo "FAIL: integration setup ({$e->getMessage()})\n";
   $failed++;

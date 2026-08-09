@@ -8,6 +8,12 @@ final class PostNotFoundException extends RuntimeException {}
 final class PostAuthorizationException extends RuntimeException {}
 final class DuplicatePostException extends RuntimeException {}
 
+final class DiaryPostPolicy {
+  public static function allows(bool $diary_mode, bool $allow_public_replies, bool $is_admin, bool $is_reply): bool {
+    return !$diary_mode || $is_admin || ($is_reply && $allow_public_replies);
+  }
+}
+
 interface AdminPostManagementService {
   public function deleteManyAsAdmin(array $post_ids): int;
   public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int;

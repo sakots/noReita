@@ -1,3 +1,4 @@
+@if ($can_post_reply)
 <form action="{{$self}}?mode=reply" method="post" class="postform" enctype="multipart/form-data">
   <table>
     <tr>
@@ -71,3 +72,6 @@
     </tr>
   </table>
 </form>
+@else
+<p>返信は管理者のみ投稿できます。</p>
+@endif

@@ -152,14 +152,29 @@ smoke_test('configuration overrides defaults and replaces list values', static f
   $resolved = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin', 'login' => ['max_failures' => 9]],
     'site' => ['base_url' => 'https://configured.example/'],
-    'features' => ['nsfw' => false, 'image_upload' => false],
+    'features' => [
+      'nsfw' => false,
+      'image_upload' => false,
+      'diary_mode' => true,
+      'diary_allow_public_replies' => false,
+    ],
     'social' => ['servers' => [['Local', 'https://social.example']]],
   ]);
   return $resolved['admin']['name'] === '管理人'
     && $resolved['admin']['login']['max_failures'] === 9
     && $resolved['features']['nsfw'] === false
     && $resolved['features']['image_upload'] === false
+    && $resolved['features']['diary_mode'] === true
+    && $resolved['features']['diary_allow_public_replies'] === false
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
+});
+
+smoke_test('diary posting policy restricts new posts and can allow public replies', static function (): bool {
+  return DiaryPostPolicy::allows(false, false, false, false)
+    && !DiaryPostPolicy::allows(true, true, false, false)
+    && DiaryPostPolicy::allows(true, true, false, true)
+    && !DiaryPostPolicy::allows(true, false, false, true)
+    && DiaryPostPolicy::allows(true, false, true, false);
 });
 
 smoke_test('eda theme settings database initializes separately and validates saved colors', static function (): bool {
