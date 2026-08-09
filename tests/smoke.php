@@ -167,7 +167,10 @@ smoke_test('eda theme settings database initializes separately and validates sav
   if (!mkdir($directory, 0700)) return false;
   try {
     $settings = new EdaThemeSettings($directory);
-    $colors = EdaThemeSettings::defaults();
+    $defaults = EdaThemeSettings::defaults();
+    $presets = EdaThemeSettings::colorPresets();
+    $initial_template_data = $settings->templateData();
+    $colors = $defaults;
     $colors['pageBackground'] = '#123456';
     $settings->saveColors($colors);
     $stored = $settings->colors();
@@ -183,6 +186,9 @@ smoke_test('eda theme settings database initializes separately and validates sav
     $settings->resetColors();
     $result = $stored['pageBackground'] === '#123456'
       && $settings->colors() === [] && $version === 1 && $table_exists && $invalid_rejected
+      && $defaults['pageBackground'] === '#cccccc' && $defaults['threadBackground'] === '#99ccff'
+      && $presets['dark']['pageBackground'] === '#111111' && $presets['dark']['threadText'] === '#eeeecc'
+      && $initial_template_data['theme_colors']['pageBackground'] === '#cccccc'
       && (fileperms($settings->databaseFile()) & 0777) === 0600;
     $database = null;
     unset($settings);

@@ -358,7 +358,13 @@ PHP;
       && $login_attempt_records_after_success === []
       && str_contains($admin_body, 'ADMIN MODE')
       && str_contains($admin_body, 'id="eda-theme-color-form"')
+      && str_contains($admin_body, 'id="eda-theme-color-preset"')
+      && str_contains($admin_body, 'value="dark">dark</option>')
       && str_contains($admin_body, 'themeColorManager.js')
+      && str_contains($admin_body, 'EDA_THEME_COLOR_PRESETS')
+      && str_contains($admin_body, 'css/mono/eda.min.css')
+      && !str_contains($admin_body, 'switchcss.js')
+      && !str_contains($admin_body, 'css/reita/eda.min.css')
       && str_contains($admin_body, 'mode=admin_theme_settings')
       && str_contains($admin_body, '基本統計')
       && str_contains($admin_body, '総投稿数')

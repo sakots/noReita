@@ -6,12 +6,23 @@ final class EdaThemeSettings {
   private const COLOR_SETTING_KEY = 'colors';
 
   private const DEFAULT_COLORS = [
-    'pageBackground' => '#222244', 'pageBackgroundEnd' => '#000000',
-    'text' => '#eeeeee', 'link' => '#eeeeee', 'linkVisited' => '#999999', 'linkAction' => '#cc0000',
-    'surface' => '#112222', 'border' => '#992222', 'button' => '#333355', 'buttonText' => '#ffffff',
+    // Keep these in sync with css/mono/_eda_conf.scss, eda's base stylesheet.
+    'pageBackground' => '#cccccc', 'pageBackgroundEnd' => '#cccccc',
+    'text' => '#000000', 'link' => '#003366', 'linkVisited' => '#666666', 'linkAction' => '#ff0000',
+    'surface' => '#eeeeee', 'border' => '#003366', 'button' => '#336699', 'buttonText' => '#ffffff',
+    'inputBackground' => '#ffffff', 'inputText' => '#000000',
+    'threadBackground' => '#99ccff', 'threadText' => '#000066',
+    'noticeBackground' => '#ffcccc', 'replyText' => '#114411',
+  ];
+
+  private const DARK_COLORS = [
+    // Keep these in sync with css/dark/_eda_conf.scss.
+    'pageBackground' => '#111111', 'pageBackgroundEnd' => '#111111',
+    'text' => '#fefefe', 'link' => '#6666ff', 'linkVisited' => '#999999', 'linkAction' => '#ff3333',
+    'surface' => '#333333', 'border' => '#9999ff', 'button' => '#6699ff', 'buttonText' => '#ffffff',
     'inputBackground' => '#eeeeee', 'inputText' => '#000000',
-    'threadBackground' => '#001122', 'threadText' => '#ddffee',
-    'noticeBackground' => '#554433', 'replyText' => '#cc88cc',
+    'threadBackground' => '#003366', 'threadText' => '#eeeecc',
+    'noticeBackground' => '#112244', 'replyText' => '#44dd44',
   ];
 
   private PDO $database;
@@ -40,13 +51,21 @@ final class EdaThemeSettings {
     return self::DEFAULT_COLORS;
   }
 
+  /** @return array<string,array<string,string>> */
+  public static function colorPresets(): array {
+    return ['mono' => self::DEFAULT_COLORS, 'dark' => self::DARK_COLORS];
+  }
+
   /** @return array<string,mixed> */
   public function templateData(): array {
-    $colors = $this->colors();
+    $colors = array_replace(self::DEFAULT_COLORS, $this->colors());
     $encoded = json_encode($colors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    $presets = self::colorPresets();
+    $presets_encoded = json_encode($presets, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     return [
       'theme_colors' => $colors,
       'theme_colors_json' => is_string($encoded) ? $encoded : '{}',
+      'theme_color_presets_json' => is_string($presets_encoded) ? $presets_encoded : '{}',
     ];
   }
 

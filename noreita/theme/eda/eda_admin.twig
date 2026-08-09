@@ -49,26 +49,36 @@
       <form id="eda-theme-color-form" action="{{ self }}?mode=admin_theme_settings" method="post">
         <input type="hidden" name="token" value="{{ token }}">
         <p>
-          <label>ページ背景 <input type="color" name="theme_settings[colors][pageBackground]" data-eda-theme-color="pageBackground" value="{{ theme_colors['pageBackground'] ?? '#222244' }}"></label>
-          <label>背景の終端色 <input type="color" name="theme_settings[colors][pageBackgroundEnd]" data-eda-theme-color="pageBackgroundEnd" value="{{ theme_colors['pageBackgroundEnd'] ?? '#000000' }}"></label>
-          <label>本文 <input type="color" name="theme_settings[colors][text]" data-eda-theme-color="text" value="{{ theme_colors['text'] ?? '#eeeeee' }}"></label>
-          <label>リンク <input type="color" name="theme_settings[colors][link]" data-eda-theme-color="link" value="{{ theme_colors['link'] ?? '#eeeeee' }}"></label>
-          <label>訪問済みリンク <input type="color" name="theme_settings[colors][linkVisited]" data-eda-theme-color="linkVisited" value="{{ theme_colors['linkVisited'] ?? '#999999' }}"></label>
-          <label>リンクの強調 <input type="color" name="theme_settings[colors][linkAction]" data-eda-theme-color="linkAction" value="{{ theme_colors['linkAction'] ?? '#cc0000' }}"></label>
+          <label>基準配色
+            <select id="eda-theme-color-preset">
+              <option value="mono">mono（テーマ標準）</option>
+              <option value="dark">dark</option>
+            </select>
+          </label>
+          <button class="button" type="button" id="eda-theme-color-preset-load">フォームへ読み込む</button>
+          <small>読み込み後に「サイトに保存」を押すと、全利用者へ反映します。</small>
         </p>
         <p>
-          <label>記事の背景 <input type="color" name="theme_settings[colors][surface]" data-eda-theme-color="surface" value="{{ theme_colors['surface'] ?? '#112222' }}"></label>
-          <label>枠線 <input type="color" name="theme_settings[colors][border]" data-eda-theme-color="border" value="{{ theme_colors['border'] ?? '#992222' }}"></label>
-          <label>ボタン <input type="color" name="theme_settings[colors][button]" data-eda-theme-color="button" value="{{ theme_colors['button'] ?? '#333355' }}"></label>
-          <label>ボタン文字 <input type="color" name="theme_settings[colors][buttonText]" data-eda-theme-color="buttonText" value="{{ theme_colors['buttonText'] ?? '#ffffff' }}"></label>
-          <label>入力欄の背景 <input type="color" name="theme_settings[colors][inputBackground]" data-eda-theme-color="inputBackground" value="{{ theme_colors['inputBackground'] ?? '#eeeeee' }}"></label>
-          <label>入力欄の文字 <input type="color" name="theme_settings[colors][inputText]" data-eda-theme-color="inputText" value="{{ theme_colors['inputText'] ?? '#000000' }}"></label>
+          <label>ページ背景 <input type="color" name="theme_settings[colors][pageBackground]" data-eda-theme-color="pageBackground" value="{{ theme_colors['pageBackground'] }}"></label>
+          <label>背景の終端色 <input type="color" name="theme_settings[colors][pageBackgroundEnd]" data-eda-theme-color="pageBackgroundEnd" value="{{ theme_colors['pageBackgroundEnd'] }}"></label>
+          <label>本文 <input type="color" name="theme_settings[colors][text]" data-eda-theme-color="text" value="{{ theme_colors['text'] }}"></label>
+          <label>リンク <input type="color" name="theme_settings[colors][link]" data-eda-theme-color="link" value="{{ theme_colors['link'] }}"></label>
+          <label>訪問済みリンク <input type="color" name="theme_settings[colors][linkVisited]" data-eda-theme-color="linkVisited" value="{{ theme_colors['linkVisited'] }}"></label>
+          <label>リンクの強調 <input type="color" name="theme_settings[colors][linkAction]" data-eda-theme-color="linkAction" value="{{ theme_colors['linkAction'] }}"></label>
         </p>
         <p>
-          <label>スレ見出し背景 <input type="color" name="theme_settings[colors][threadBackground]" data-eda-theme-color="threadBackground" value="{{ theme_colors['threadBackground'] ?? '#001122' }}"></label>
-          <label>スレ見出し文字 <input type="color" name="theme_settings[colors][threadText]" data-eda-theme-color="threadText" value="{{ theme_colors['threadText'] ?? '#ddffee' }}"></label>
-          <label>注意表示 <input type="color" name="theme_settings[colors][noticeBackground]" data-eda-theme-color="noticeBackground" value="{{ theme_colors['noticeBackground'] ?? '#554433' }}"></label>
-          <label>レス文字 <input type="color" name="theme_settings[colors][replyText]" data-eda-theme-color="replyText" value="{{ theme_colors['replyText'] ?? '#cc88cc' }}"></label>
+          <label>記事の背景 <input type="color" name="theme_settings[colors][surface]" data-eda-theme-color="surface" value="{{ theme_colors['surface'] }}"></label>
+          <label>枠線 <input type="color" name="theme_settings[colors][border]" data-eda-theme-color="border" value="{{ theme_colors['border'] }}"></label>
+          <label>ボタン <input type="color" name="theme_settings[colors][button]" data-eda-theme-color="button" value="{{ theme_colors['button'] }}"></label>
+          <label>ボタン文字 <input type="color" name="theme_settings[colors][buttonText]" data-eda-theme-color="buttonText" value="{{ theme_colors['buttonText'] }}"></label>
+          <label>入力欄の背景 <input type="color" name="theme_settings[colors][inputBackground]" data-eda-theme-color="inputBackground" value="{{ theme_colors['inputBackground'] }}"></label>
+          <label>入力欄の文字 <input type="color" name="theme_settings[colors][inputText]" data-eda-theme-color="inputText" value="{{ theme_colors['inputText'] }}"></label>
+        </p>
+        <p>
+          <label>スレ見出し背景 <input type="color" name="theme_settings[colors][threadBackground]" data-eda-theme-color="threadBackground" value="{{ theme_colors['threadBackground'] }}"></label>
+          <label>スレ見出し文字 <input type="color" name="theme_settings[colors][threadText]" data-eda-theme-color="threadText" value="{{ theme_colors['threadText'] }}"></label>
+          <label>注意表示 <input type="color" name="theme_settings[colors][noticeBackground]" data-eda-theme-color="noticeBackground" value="{{ theme_colors['noticeBackground'] }}"></label>
+          <label>レス文字 <input type="color" name="theme_settings[colors][replyText]" data-eda-theme-color="replyText" value="{{ theme_colors['replyText'] }}"></label>
         </p>
         <p>
           <button class="button" type="submit" name="operation" value="save">サイトに保存</button>
