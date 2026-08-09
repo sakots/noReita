@@ -4,7 +4,7 @@ return [
   'format' => 1,
   'id' => 'eda',
   'name' => 'eda',
-  'version' => 'lot.260809.2',
+  'version' => 'lot.260809.3',
   'engine' => 'twig',
   'requires' => [
     'php' => '8.1.0',

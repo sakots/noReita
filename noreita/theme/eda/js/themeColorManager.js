@@ -12,6 +12,8 @@
     linkAction: { variable: '--eda-link-action', default: '#ff0000' },
     surface: { variable: '--eda-surface', default: '#eeeeee' },
     border: { variable: '--eda-border', default: '#003366' },
+    buttonBorder: { variable: '--eda-button-border', default: '#3366ff' },
+    buttonBorderInset: { variable: '--eda-button-border-inset', default: '#003366' },
     button: { variable: '--eda-button', default: '#336699' },
     buttonText: { variable: '--eda-button-text', default: '#ffffff' },
     inputBackground: { variable: '--eda-input-background', default: '#ffffff' },
@@ -31,8 +33,8 @@ a:active, a:hover, h1 a:hover { color: var(--eda-link-action, #f00) !important; 
 hr, header, .thread, footer, .res, .res section { border-color: var(--eda-border, #036) !important; }
 header, .thread, footer, figure, .thread img.image, footer img.image { background-color: var(--eda-surface, #eee) !important; }
 input, textarea, select, #appstage .palette .palette_set { color: var(--eda-input-text, #000) !important; background-color: var(--eda-input-background, #fff) !important; }
-input, textarea, select { border-color: var(--eda-page-background, #ccc) var(--eda-border, #036) var(--eda-border, #036) var(--eda-page-background, #ccc) !important; }
-input[type=submit], input[name=upfile], button, .button { color: var(--eda-button-text, #fff) !important; background-color: var(--eda-button, #369) !important; border-color: var(--eda-border, #036) var(--eda-page-background, #ccc) var(--eda-page-background, #ccc) var(--eda-border, #036) !important; }
+input, textarea, select { border-color: var(--eda-button-border-inset, #036) var(--eda-button-border, #36f) var(--eda-button-border, #36f) var(--eda-button-border-inset, #036) !important; }
+input[type=submit], input[name=upfile], button, .button { color: var(--eda-button-text, #fff) !important; background-color: var(--eda-button, #369) !important; border-color: var(--eda-button-border, #36f) var(--eda-button-border-inset, #036) var(--eda-button-border-inset, #036) var(--eda-button-border, #36f) !important; }
 .button a, .button a svg { color: var(--eda-button-text, #fff) !important; fill: var(--eda-button-text, #fff) !important; }
 .oyaname, .resname { border-color: var(--eda-button, #369) !important; }
 .oyaname:hover, .resname:hover, .resma { background-color: var(--eda-page-background, #ccc) !important; }

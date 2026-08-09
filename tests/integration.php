@@ -380,7 +380,9 @@ PHP;
   $theme_colors = [
     'pageBackground' => '#123456', 'pageBackgroundEnd' => '#000000',
     'text' => '#eeeeee', 'link' => '#eeeeee', 'linkVisited' => '#999999', 'linkAction' => '#cc0000',
-    'surface' => '#112222', 'border' => '#992222', 'button' => '#333355', 'buttonText' => '#ffffff',
+    'surface' => '#112222', 'border' => '#992222',
+    'buttonBorder' => '#111111', 'buttonBorderInset' => '#222222',
+    'button' => '#333355', 'buttonText' => '#ffffff',
     'inputBackground' => '#eeeeee', 'inputText' => '#000000',
     'threadBackground' => '#001122', 'threadText' => '#ddffee',
     'noticeBackground' => '#554433', 'replyText' => '#cc88cc',

@@ -9,7 +9,9 @@ final class EdaThemeSettings {
     // Keep these in sync with css/mono/_eda_conf.scss, eda's base stylesheet.
     'pageBackground' => '#cccccc', 'pageBackgroundEnd' => '#cccccc',
     'text' => '#000000', 'link' => '#003366', 'linkVisited' => '#666666', 'linkAction' => '#ff0000',
-    'surface' => '#eeeeee', 'border' => '#003366', 'button' => '#336699', 'buttonText' => '#ffffff',
+    'surface' => '#eeeeee', 'border' => '#003366',
+    'buttonBorder' => '#3366ff', 'buttonBorderInset' => '#003366',
+    'button' => '#336699', 'buttonText' => '#ffffff',
     'inputBackground' => '#ffffff', 'inputText' => '#000000',
     'threadBackground' => '#99ccff', 'threadText' => '#000066',
     'noticeBackground' => '#ffcccc', 'replyText' => '#114411',
@@ -19,7 +21,9 @@ final class EdaThemeSettings {
     // Keep these in sync with css/dark/_eda_conf.scss.
     'pageBackground' => '#111111', 'pageBackgroundEnd' => '#111111',
     'text' => '#fefefe', 'link' => '#6666ff', 'linkVisited' => '#999999', 'linkAction' => '#ff3333',
-    'surface' => '#333333', 'border' => '#9999ff', 'button' => '#6699ff', 'buttonText' => '#ffffff',
+    'surface' => '#333333', 'border' => '#9999ff',
+    'buttonBorder' => '#6666ff', 'buttonBorderInset' => '#000033',
+    'button' => '#6699ff', 'buttonText' => '#ffffff',
     'inputBackground' => '#eeeeee', 'inputText' => '#000000',
     'threadBackground' => '#003366', 'threadText' => '#eeeecc',
     'noticeBackground' => '#112244', 'replyText' => '#44dd44',
@@ -77,7 +81,7 @@ final class EdaThemeSettings {
     if (!is_string($stored) || $stored === '') return [];
     try {
       $decoded = json_decode($stored, true, 32, JSON_THROW_ON_ERROR);
-      return is_array($decoded) ? self::normalizeColors($decoded) : [];
+      return is_array($decoded) ? self::normalizeStoredColors($decoded) : [];
     } catch (Throwable $e) {
       return [];
     }
@@ -121,6 +125,28 @@ final class EdaThemeSettings {
       $value = $colors[$key] ?? null;
       if (!is_string($value) || preg_match('/\A#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\z/D', $value) !== 1) {
         throw new InvalidArgumentException('Invalid theme color setting.');
+      }
+      $value = strtolower($value);
+      $normalized[$key] = strlen($value) === 4
+        ? '#' . $value[1] . $value[1] . $value[2] . $value[2] . $value[3] . $value[3]
+        : $value;
+    }
+    return $normalized;
+  }
+
+  /**
+   * Accept settings created by an older eda theme version. New keys are filled
+   * from the current defaults by templateData(), while invalid data is ignored.
+   *
+   * @param array<string,mixed> $colors
+   * @return array<string,string>
+   */
+  private static function normalizeStoredColors(array $colors): array {
+    if (array_diff(array_keys($colors), array_keys(self::DEFAULT_COLORS)) !== []) return [];
+    $normalized = [];
+    foreach ($colors as $key => $value) {
+      if (!is_string($value) || preg_match('/\A#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\z/D', $value) !== 1) {
+        return [];
       }
       $value = strtolower($value);
       $normalized[$key] = strlen($value) === 4

@@ -187,6 +187,7 @@ smoke_test('eda theme settings database initializes separately and validates sav
     $result = $stored['pageBackground'] === '#123456'
       && $settings->colors() === [] && $version === 1 && $table_exists && $invalid_rejected
       && $defaults['pageBackground'] === '#cccccc' && $defaults['threadBackground'] === '#99ccff'
+      && $defaults['buttonBorder'] === '#3366ff' && $defaults['buttonBorderInset'] === '#003366'
       && $presets['dark']['pageBackground'] === '#111111' && $presets['dark']['threadText'] === '#eeeecc'
       && $initial_template_data['theme_colors']['pageBackground'] === '#cccccc'
       && (fileperms($settings->databaseFile()) & 0777) === 0600;
