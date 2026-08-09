@@ -50,6 +50,7 @@
         </div>
         {% if temp is defined or use_image_upload %}
         <form class="ppost postform" action="{{ self }}?mode=regist" method="post" enctype="multipart/form-data">
+          {% if selected_picfile is defined %}<input type="hidden" name="picfile" value="{{ selected_picfile }}">{% endif %}
           <table>
             <tr>
               <td>name {% if use_name %} * {% endif %}</td>
@@ -73,7 +74,7 @@
               <td>comment {% if use_com %} * {% endif %} </td>
               <td><textarea name="com" cols="48" rows="5" wrap="soft" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};" {% if use_com %} required {% endif %} maxlength="{{ max_com }}"></textarea></td>
             </tr>
-            {% if temp is defined %}
+            {% if selected_picfile is not defined and temp is defined %}
             <tr>
               <td>imgs</td>
               <td>
@@ -87,7 +88,7 @@
               </td>
             </tr>
             {% endif %}
-            {% if use_image_upload %}
+            {% if use_image_upload and selected_picfile is not defined %}
             <tr>
               <td>upload</td>
               <td><input type="file" name="image_upload" accept="image/png,image/jpeg,image/gif,image/webp,image/avif">（PNG / JPEG / GIF / WebP / AVIF、{{ upload_max_kb }}KBまで）</td>

@@ -93,7 +93,7 @@ if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260806) {
 // save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
-if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260716) {
+if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260809) {
   die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
@@ -529,6 +529,14 @@ function regist(): void {
   $uploaded_file = $_FILES['image_upload'] ?? null;
   $has_uploaded_file = $uploaded_file !== null
     && (!is_array($uploaded_file) || ($uploaded_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  $pending_picfile = $_SESSION['pending_picfile'] ?? '';
+  if (is_string($pending_picfile) && $pending_picfile !== '') {
+    if (!ImageService::isSafePostedImageFilename($pending_picfile)
+      || !hash_equals($pending_picfile, (string)$picfile)) {
+      error($en ? 'The selected drawing image is invalid.' : 'お絵かき画像の選択が不正です。', 403);
+      return;
+    }
+  }
 
   // クッキー保存用
   $original_name = $name;
@@ -596,6 +604,7 @@ function regist(): void {
         $image_result['ctype'] = $ctype;
       }
       $service->createPreparedPost($prepared_post, $image_result);
+      unset($_SESSION['pending_picfile']);
 
       $c_pass = $pwd;
       //-- クッキー保存 --
@@ -1467,6 +1476,15 @@ function paint_com(string $tmpmode): void {
       $temp[] = compact('src', 'src_name', 'date', 'tool', 'utime', 'psec');
     }
     $dat['temp'] = $temp;
+    $pending_picfile = $_SESSION['pending_picfile'] ?? '';
+    if (is_string($pending_picfile) && $pending_picfile !== '') {
+      foreach ($temp as $temporary_image) {
+        if (hash_equals((string)$temporary_image['src_name'], $pending_picfile)) {
+          $dat['selected_picfile'] = $pending_picfile;
+          break;
+        }
+      }
+    }
   }
 
   $tmp2 = array();

@@ -2,7 +2,7 @@
 //Petit Note (c)さとぴあ @satopian 2021-2025 MIT License
 //https://paintbbs.sakura.ne.jp/
 
-const SAVE_INC_VER = 20260716; //save.inc.phpのバージョン
+const SAVE_INC_VER = 20260809; //save.inc.phpのバージョン
 
 class image_save{
 
@@ -180,6 +180,8 @@ class image_save{
       $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
     }
     chmod(Config::string('paths.temporary').$this->imgfile.'.dat',Config::int('permissions.private_file'));
+    // 描画直後のコメント入力では、この画像を投稿対象として固定する。
+    $_SESSION['pending_picfile'] = $this->imgfile . '.png';
 
   }
   
