@@ -96,7 +96,7 @@ select {
 	@include txt_box;
 	vertical-align: middle;
 }
-input[type="text"] {
+input[type="text"], input[type="password"], input[type="number"], input[type="color"], input[type="date"], input[type="datetime-local"], input[type="email"], input[type="month"], input[type="search"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], input[type="file"] {
 	@include txt_box;
 }
 input[name="picw"], input[name="pich"], input[name="delno"] {
