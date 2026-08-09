@@ -358,6 +358,7 @@ PHP;
       && $login_attempt_records_after_success === []
       && str_contains($admin_body, 'ADMIN MODE')
       && str_contains($admin_body, 'id="eda-theme-color-form"')
+      && str_contains($admin_body, 'css/eda_admin.css')
       && str_contains($admin_body, 'id="eda-theme-color-preset"')
       && str_contains($admin_body, 'value="dark">dark</option>')
       && str_contains($admin_body, 'themeColorManager.js')

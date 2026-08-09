@@ -4,7 +4,7 @@ return [
   'format' => 1,
   'id' => 'eda',
   'name' => 'eda',
-  'version' => 'lot.260809.1',
+  'version' => 'lot.260809.2',
   'engine' => 'twig',
   'requires' => [
     'php' => '8.1.0',
@@ -18,7 +18,7 @@ return [
     'misskey_note' => 'eda_misskey_note', 'other' => 'eda_other',
   ],
   'assets' => [
-    'css' => ['css/eda_index.min.css', 'luminous/luminous-basic.min.css'],
+    'css' => ['css/eda_index.min.css', 'css/eda_admin.css', 'luminous/luminous-basic.min.css'],
     'javascript' => ['js/appFit.js', 'js/dynamicPalette.js', 'js/sodane.js', 'js/themeColorManager.js', 'luminous/luminous.min.js'],
   ],
 ];
