@@ -29,6 +29,83 @@ final class EdaThemeSettings {
     'noticeBackground' => '#112244', 'replyText' => '#44dd44',
   ];
 
+  private const DEEP_COLORS = [
+    'pageBackground' => '#111111', 'pageBackgroundEnd' => '#111111',
+    'text' => '#fefefe', 'link' => '#fefefe', 'linkVisited' => '#999999', 'linkAction' => '#fefefe',
+    'surface' => '#333333', 'border' => '#339966',
+    'buttonBorder' => '#66cc99', 'buttonBorderInset' => '#006633',
+    'button' => '#339966', 'buttonText' => '#ffffff',
+    'inputBackground' => '#eeeeee', 'inputText' => '#000000',
+    'threadBackground' => '#111111', 'threadText' => '#ffeecc',
+    'noticeBackground' => '#332211', 'replyText' => '#999999',
+  ];
+
+  private const DEV_COLORS = [
+    'pageBackground' => '#112211', 'pageBackgroundEnd' => '#000000',
+    'text' => '#fefefe', 'link' => '#fefefe', 'linkVisited' => '#999999', 'linkAction' => '#fefefe',
+    'surface' => '#182818', 'border' => '#339966',
+    'buttonBorder' => '#66cc99', 'buttonBorderInset' => '#006633',
+    'button' => '#339966', 'buttonText' => '#ffffff',
+    'inputBackground' => '#eeeeee', 'inputText' => '#000000',
+    'threadBackground' => '#181111', 'threadText' => '#ccccee',
+    'noticeBackground' => '#332211', 'replyText' => '#999999',
+  ];
+
+  private const MAYO_COLORS = [
+    'pageBackground' => '#d1ce9e', 'pageBackgroundEnd' => '#d1ce9e',
+    'text' => '#000000', 'link' => '#0000ff', 'linkVisited' => '#666666', 'linkAction' => '#ff3333',
+    'surface' => '#fefefe', 'border' => '#000000',
+    'buttonBorder' => '#ff6666', 'buttonBorderInset' => '#330000',
+    'button' => '#ff9966', 'buttonText' => '#ffffff',
+    'inputBackground' => '#eeeeee', 'inputText' => '#000000',
+    'threadBackground' => '#ff6666', 'threadText' => '#112233',
+    'noticeBackground' => '#ccccff', 'replyText' => '#505544',
+  ];
+
+  private const POP_COLORS = [
+    'pageBackground' => '#226633', 'pageBackgroundEnd' => '#3cb359',
+    'text' => '#000000', 'link' => '#3344ff', 'linkVisited' => '#556644', 'linkAction' => '#ff3322',
+    'surface' => '#ffeedd', 'border' => '#cc1111',
+    'buttonBorder' => '#cc9966', 'buttonBorderInset' => '#663300',
+    'button' => '#996633', 'buttonText' => '#ffffff',
+    'inputBackground' => '#eeeeee', 'inputText' => '#000000',
+    'threadBackground' => '#6666cc', 'threadText' => '#ffccaa',
+    'noticeBackground' => '#dddd55', 'replyText' => '#114411',
+  ];
+
+  private const RED_COLORS = [
+    'pageBackground' => '#cc9999', 'pageBackgroundEnd' => '#eedddd',
+    'text' => '#000000', 'link' => '#000000', 'linkVisited' => '#666666', 'linkAction' => '#ff3322',
+    'surface' => '#fedede', 'border' => '#ff3333',
+    'buttonBorder' => '#99cc66', 'buttonBorderInset' => '#336600',
+    'button' => '#669933', 'buttonText' => '#ffffff',
+    'inputBackground' => '#eedddd', 'inputText' => '#000000',
+    'threadBackground' => '#ffaaaa', 'threadText' => '#113300',
+    'noticeBackground' => '#99bbaa', 'replyText' => '#114411',
+  ];
+
+  private const REITA_COLORS = [
+    'pageBackground' => '#222244', 'pageBackgroundEnd' => '#000000',
+    'text' => '#eeeeee', 'link' => '#4444ff', 'linkVisited' => '#999999', 'linkAction' => '#cc0000',
+    'surface' => '#112222', 'border' => '#992222',
+    'buttonBorder' => '#444466', 'buttonBorderInset' => '#222244',
+    'button' => '#333355', 'buttonText' => '#ffffff',
+    'inputBackground' => '#eeeeee', 'inputText' => '#000000',
+    'threadBackground' => '#001122', 'threadText' => '#ddffee',
+    'noticeBackground' => '#554433', 'replyText' => '#cc88cc',
+  ];
+
+  private const SQL_COLORS = [
+    'pageBackground' => '#ffffef', 'pageBackgroundEnd' => '#ffffef',
+    'text' => '#79160a', 'link' => '#0000ff', 'linkVisited' => '#79160a', 'linkAction' => '#d12d1a',
+    'surface' => '#ffffef', 'border' => '#79160a',
+    'buttonBorder' => '#000000', 'buttonBorderInset' => '#000000',
+    'button' => '#e5e5e5', 'buttonText' => '#000000',
+    'inputBackground' => '#ffffff', 'inputText' => '#000000',
+    'threadBackground' => '#eee0d7', 'threadText' => '#2f7448',
+    'noticeBackground' => '#79aa8a', 'replyText' => '#52745e',
+  ];
+
   private PDO $database;
   private string $database_file;
 
@@ -57,7 +134,17 @@ final class EdaThemeSettings {
 
   /** @return array<string,array<string,string>> */
   public static function colorPresets(): array {
-    return ['mono' => self::DEFAULT_COLORS, 'dark' => self::DARK_COLORS];
+    return [
+      'mono' => self::DEFAULT_COLORS,
+      'dark' => self::DARK_COLORS,
+      'deep' => self::DEEP_COLORS,
+      'dev' => self::DEV_COLORS,
+      'mayo' => self::MAYO_COLORS,
+      'pop' => self::POP_COLORS,
+      'red' => self::RED_COLORS,
+      'reita' => self::REITA_COLORS,
+      'sql' => self::SQL_COLORS,
+    ];
   }
 
   /** @return array<string,mixed> */
@@ -70,6 +157,7 @@ final class EdaThemeSettings {
       'theme_colors' => $colors,
       'theme_colors_json' => is_string($encoded) ? $encoded : '{}',
       'theme_color_presets_json' => is_string($presets_encoded) ? $presets_encoded : '{}',
+      'theme_color_preset_names' => array_keys($presets),
     ];
   }
 

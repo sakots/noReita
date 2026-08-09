@@ -8,7 +8,7 @@
 const THEME_NAME = "eda";
 
 //テーマのバージョン
-const THEME_VER = "lot.260809.3";
+const THEME_VER = "lot.260809.4";
 
 // テンプレートエンジン。Twigテーマでは'twig'に変更します。
 const THEME_TEMPLATE_ENGINE = 'twig';

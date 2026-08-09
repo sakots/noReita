@@ -52,8 +52,9 @@
         <p>
           <label>基準配色
             <select id="eda-theme-color-preset">
-              <option value="mono">mono（テーマ標準）</option>
-              <option value="dark">dark</option>
+              {% for preset_name in theme_color_preset_names %}
+                <option value="{{ preset_name }}">{{ preset_name }}{% if preset_name == 'mono' %}（テーマ標準）{% endif %}</option>
+              {% endfor %}
             </select>
           </label>
           <button class="button" type="button" id="eda-theme-color-preset-load">フォームへ読み込む</button>
