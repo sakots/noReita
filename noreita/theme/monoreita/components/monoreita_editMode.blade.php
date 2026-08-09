@@ -6,7 +6,7 @@
         <table>
           <tr>
             <td>name</td>
-            <td><input type="text" name="name" size="28" autocomplete="section-edit username" value="{{$bbsline['a_name']}}" maxlength="{{$max_name}}"></td>
+            <td><input type="text" name="name" size="28" autocomplete="section-edit username" value="{{$bbsline['input_name'] ?? $bbsline['a_name']}}" maxlength="{{$max_name}}"></td>
           </tr>
           <tr>
             <td>mail</td>
@@ -51,7 +51,7 @@
             </td>
           </tr>
           @endif
-          @if ($use_nsfw === 1 && $bbsline['picfile'] !== '')
+          @if ($use_nsfw && $bbsline['picfile'] !== '')
           <tr>
             <td>NSFW</td>
             <td>
@@ -62,7 +62,7 @@
           @endif
           <tr>
             <td>pass</td>
-            <td><input type="password" name="pwd" size="8" value="{{$pwd_cookie}}" autocomplete="section-edit current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};"></td>
+            <td><input type="password" name="pwd" size="8" value="{{$bbsline['input_password'] ?? $pwd_cookie}}" autocomplete="section-edit current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};"></td>
           </tr>
           <tr>
             <td><input type="submit" name="send" id="send" value="書き込む"></td>

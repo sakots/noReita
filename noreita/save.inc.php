@@ -22,9 +22,6 @@ class image_save{
   //PNG画像データ投稿容量制限KB(chiは含まない)
   defined('PICTURE_MAX_KB') or define('PICTURE_MAX_KB', '40960');//40MBまで
   defined('PSD_MAX_KB') or define('PSD_MAX_KB', '40960');//40MBまで。ただしサーバのPHPの設定によって2MB以下に制限される可能性があります。
-  defined('PERMISSION_FOR_LOG') or define('PERMISSION_FOR_LOG', 0600); //config.phpで未定義なら0600
-  defined('PERMISSION_FOR_DEST') or define('PERMISSION_FOR_DEST', 0644); //config.phpで未定義なら0644
-
   if(($_SERVER["REQUEST_METHOD"]) !== "POST"){
     redirect("./");
   }
@@ -34,7 +31,7 @@ class image_save{
   $this->en= (stripos($lang,'ja')!==0);
 
   $this->imgfile = time().substr(microtime(),2,6);  //画像ファイル名
-  $this->imgfile = is_file(TEMP_DIR.$this->imgfile.'.png') ? ((time()+1).substr(microtime(),2,6)) : $this->imgfile;
+  $this->imgfile = is_file(Config::string('paths.temporary').$this->imgfile.'.png') ? ((time()+1).substr(microtime(),2,6)) : $this->imgfile;
   
   $this->pmax_w= $pmax_w ?? '';
   $this->pmax_h= $pmax_h ?? '';
@@ -177,12 +174,12 @@ class image_save{
     $userdata .= "\n";
     
     // 情報データをファイルに書き込む
-    file_put_contents(TEMP_DIR.$this->imgfile.".dat",$userdata,LOCK_EX);
+    file_put_contents(Config::string('paths.temporary').$this->imgfile.".dat",$userdata,LOCK_EX);
       
-    if(!is_file(TEMP_DIR.$this->imgfile.'.dat')){
+    if(!is_file(Config::string('paths.temporary').$this->imgfile.'.dat')){
       $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
     }
-    chmod(TEMP_DIR.$this->imgfile.'.dat',PERMISSION_FOR_LOG);
+    chmod(Config::string('paths.temporary').$this->imgfile.'.dat',Config::int('permissions.private_file'));
 
   }
   
@@ -204,10 +201,6 @@ class image_save{
       $im_in = @ImageCreateFromPNG($_FILES['picture']['tmp_name']);
       if(!$im_in){
         $this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。");
-      }else{
-        // if(PHP_VERSION_ID < 80000) {//PHP8.0未満の時は
-        //  ImageDestroy($im_in);
-        // }
       }
     }
 
@@ -218,12 +211,12 @@ class image_save{
     //   $this->error_msg($this->en ? "The image dimensions are too large." : "画像のサイズが大きすぎます。");
     // }
 
-    $success = move_uploaded_file($_FILES['picture']['tmp_name'], TEMP_DIR.$this->imgfile.'.png');
+    $success = move_uploaded_file($_FILES['picture']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.png');
     
-    if(!$success||!is_file(TEMP_DIR.$this->imgfile.'.png')) {
+    if(!$success||!is_file(Config::string('paths.temporary').$this->imgfile.'.png')) {
       $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
     }
-    chmod(TEMP_DIR.$this->imgfile.'.png',PERMISSION_FOR_DEST);
+    chmod(Config::string('paths.temporary').$this->imgfile.'.png',Config::int('permissions.public_file'));
   }
 
   private function move_uploaded_chi(): void {
@@ -231,9 +224,9 @@ class image_save{
       if(mime_content_type($_FILES['chibifile']['tmp_name'])==="application/octet-stream"){
         if(!SIZE_CHECK || ($_FILES['chibifile']['size'] < (PSD_MAX_KB * 1024))){
           //chiファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
-          move_uploaded_file($_FILES['chibifile']['tmp_name'], TEMP_DIR.$this->imgfile.'.chi');
-          if(is_file(TEMP_DIR.$this->imgfile.'.chi')){
-            chmod(TEMP_DIR.$this->imgfile.'.chi',PERMISSION_FOR_DEST);
+          move_uploaded_file($_FILES['chibifile']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.chi');
+          if(is_file(Config::string('paths.temporary').$this->imgfile.'.chi')){
+            chmod(Config::string('paths.temporary').$this->imgfile.'.chi',Config::int('permissions.public_file'));
           }
         }
       }
@@ -244,9 +237,9 @@ class image_save{
       if(mime_content_type($_FILES['psd']['tmp_name'])==="image/vnd.adobe.photoshop"){
         if(!SIZE_CHECK || ($_FILES['psd']['size'] < (PSD_MAX_KB * 1024))){
           //PSDファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
-          move_uploaded_file($_FILES['psd']['tmp_name'], TEMP_DIR.$this->imgfile.'.psd');
-          if(is_file(TEMP_DIR.$this->imgfile.'.psd')){
-            chmod(TEMP_DIR.$this->imgfile.'.psd',PERMISSION_FOR_DEST);
+          move_uploaded_file($_FILES['psd']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.psd');
+          if(is_file(Config::string('paths.temporary').$this->imgfile.'.psd')){
+            chmod(Config::string('paths.temporary').$this->imgfile.'.psd',Config::int('permissions.public_file'));
           }
         }
       }
@@ -255,9 +248,9 @@ class image_save{
       if(mime_content_type($_FILES['tgkr']['tmp_name'])==="application/octet-stream"){
         if(!SIZE_CHECK || ($_FILES['tgkr']['size'] < (PSD_MAX_KB * 1024))){
           //PSDファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
-          move_uploaded_file($_FILES['tgkr']['tmp_name'], TEMP_DIR.$this->imgfile.'.tgkr');
-          if(is_file(TEMP_DIR.$this->imgfile.'.tgkr')){
-            chmod(TEMP_DIR.$this->imgfile.'.tgkr',PERMISSION_FOR_DEST);
+          move_uploaded_file($_FILES['tgkr']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.tgkr');
+          if(is_file(Config::string('paths.temporary').$this->imgfile.'.tgkr')){
+            chmod(Config::string('paths.temporary').$this->imgfile.'.tgkr',Config::int('permissions.public_file'));
           }
         }
       }
@@ -268,9 +261,9 @@ class image_save{
       if(mime_content_type($_FILES['pch']['tmp_name'])==="application/octet-stream"){
         if(!SIZE_CHECK || ($_FILES['pch']['size'] < (PSD_MAX_KB * 1024))){
           //PSDファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
-          move_uploaded_file($_FILES['pch']['tmp_name'], TEMP_DIR.$this->imgfile.'.pch');
-          if(is_file(TEMP_DIR.$this->imgfile.'.pch')){
-            chmod(TEMP_DIR.$this->imgfile.'.pch',PERMISSION_FOR_DEST);
+          move_uploaded_file($_FILES['pch']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.pch');
+          if(is_file(Config::string('paths.temporary').$this->imgfile.'.pch')){
+            chmod(Config::string('paths.temporary').$this->imgfile.'.pch',Config::int('permissions.public_file'));
           }
         }
       }

@@ -3,8 +3,9 @@
     "description": "noReita oekaki bulletin board",
     "license": "MIT",
     "require": {
-        "php": ">=7.4",
-        "eftec/bladeone": "4.19.1"
+        "php": ">=8.1",
+        "eftec/bladeone": "4.19.1",
+        "twig/twig": "^3.28"
     },
     "config": {
         "optimize-autoloader": true,

@@ -5,49 +5,26 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v3.7.6 lot.260806.0';
+const REITA_VER = 'v4.0.0 lot.260809.0';
 
-// 言語判定
-$lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
-  ? explode( ',', $http_langs )[0] : '';
-$en = (stripos($lang,'ja')!== 0);
-
-// phpのバージョンが古い場合動かさせない
-$php_ver = PHP_VERSION;
-if (version_compare($php_ver, '7.4.0', '<')) {
-  die($en ? "PHP version 7.4 or higher is required for this program to work. <br>\n(Current PHP version:{$php_ver})" : "PHPバージョン7.4以上が必要です。 <br>\n(現在のPHPバージョン:{$php_ver})");
+// 全エントリーポイント共通の設定・エラー処理を初期化する。
+require_once __DIR__ . '/bootstrap.php';
+try {
+  ApplicationBootstrap::boot(__DIR__);
+} catch (ConfigException $e) {
+  http_response_code(500);
+  die('Configuration error: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
 }
+$en = ApplicationBootstrap::english();
 
-// functions.phpの存在とバージョンを確認
-if (!is_file(__DIR__.'/functions.php')) {
-  die($en ? 'functions.php does not exist.' : 'functions.phpがありません。');
-}
-require_once(__DIR__.'/functions.php');
-if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260728) {
+// functions.phpのバージョンを確認
+if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
   die($en ? 'Please update functions.php to the latest version.' : 'functions.phpを最新版に更新してください。');
 }
 
 // 公開画面へのPHPエラー詳細表示を止め、非公開ログへ記録する。
-if (!is_file(__DIR__ . '/error_handler.inc.php')) {
-  die($en ? 'The error handler is missing.' : 'エラーハンドラーがありません。');
-}
-require_once(__DIR__ . '/error_handler.inc.php');
 if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260805) {
   die($en ? 'Please update the error handler.' : 'エラーハンドラーを最新版に更新してください。');
-}
-ApplicationErrorHandler::install(__DIR__ . '/errorlog');
-
-// コンフィグ
-check_file(__DIR__.'/config.php');
-require(__DIR__ . '/config.php');
-ApplicationErrorHandler::configure(
-  defined('ERROR_LOG_RETENTION_DAYS') ? (int)constant('ERROR_LOG_RETENTION_DAYS') : 30,
-  defined('ERROR_LOG_MAX_BYTES') ? (int)constant('ERROR_LOG_MAX_BYTES') : 5242880,
-  defined('ERROR_LOG_MAX_FILES_PER_DAY') ? (int)constant('ERROR_LOG_MAX_FILES_PER_DAY') : 5
-);
-//コンフィグのバージョンが古くて互換性がない場合動かさせない
-if (!defined('CONF_VER') || CONF_VER < 20260723) {
-  die($en ? 'The configuration file is incompatible. Please reconfigure it.' : 'コンフィグファイルに互換性がないようです。再設定をお願いします。');
 }
 
 // request_security.inc
@@ -88,7 +65,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260806) {
 // post.inc
 check_file(__DIR__.'/post.inc.php');
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260806) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260807) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -123,7 +100,7 @@ if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260716) {
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260716) {
+if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260807) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
@@ -135,18 +112,27 @@ if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260725) {
 }
 
 // テーマ
-require(__DIR__ . '/theme/' . THEME_DIR . '/theme_conf.php');
+$theme_directory = __DIR__ . '/theme/' . Config::string('paths.theme');
+require($theme_directory . '/theme_conf.php');
+require_once __DIR__ . '/theme_manifest.inc.php';
+try {
+  $theme_manifest = ThemeManifest::load($theme_directory);
+  ThemeManifest::assertMatchesRuntime($theme_manifest, ThemeManifest::runtimeMetadata());
+} catch (ThemeManifestException $e) {
+  http_response_code(500);
+  die($en ? 'Theme configuration error: ' . h($e->getMessage()) : 'テーマ設定エラー: ' . h($e->getMessage()));
+}
 
 // タイムゾーン設定
-date_default_timezone_set(DEFAULT_TIMEZONE);
+date_default_timezone_set(Config::string('site.timezone'));
 
 
 // 管理パスが初期値(admin_pass)の場合は動作させない
-if ($admin_pass === 'admin_pass') {
+if (Config::string("admin.password") === 'admin_pass') {
   die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
 }
 
-// Composer dependencies (BladeOne v4.19.1)
+// Composer dependencies (BladeOne / Twig)
 $autoload = __DIR__ . '/vendor/autoload.php';
 if (!is_file($autoload)) {
   die($en
@@ -154,106 +140,111 @@ if (!is_file($autoload)) {
     : 'Composer依存ライブラリがありません。noReitaディレクトリでcomposer installを実行してください。');
 }
 require_once $autoload;
-use eftec\bladeone\BladeOne;
+require_once __DIR__ . '/template_engine.inc.php';
 
-$views = __DIR__ . '/theme/' . THEME_DIR; // テンプレートフォルダ
+$views = $theme_directory; // テンプレートフォルダ
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
-// Bladeキャッシュに必要な場所だけを書き込み可能にする。
-if (!is_dir($cache) && !@mkdir($cache, PERMISSION_FOR_PRIVATE_DIR, true) && !is_dir($cache)) {
-  die($en ? 'Failed to create the Blade cache directory.' : 'Bladeキャッシュディレクトリを作成できません。');
+// テンプレートキャッシュに必要な場所だけを書き込み可能にする。
+if (!is_dir($cache) && !@mkdir($cache, Config::int('permissions.private_directory'), true) && !is_dir($cache)) {
+  die($en ? 'Failed to create the template cache directory.' : 'テンプレートキャッシュディレクトリを作成できません。');
 }
 if (!is_readable($cache) || !is_writable($cache)) {
-  die($en ? 'The Blade cache directory is not readable and writable.'
-    : 'Bladeキャッシュディレクトリを読み書きできません。');
+  die($en ? 'The template cache directory is not readable and writable.'
+    : 'テンプレートキャッシュディレクトリを読み書きできません。');
 }
 
-$blade = new BladeOne($views, $cache, BladeOne::MODE_AUTO); // MODE_DEBUGだと開発モード MODE_AUTOが速い。
-$blade->pipeEnable = true; // パイプのフィルターを使えるようにする
+$theme_template_engine = defined('THEME_TEMPLATE_ENGINE') ? THEME_TEMPLATE_ENGINE : 'blade';
+if (!is_string($theme_template_engine) || !in_array($theme_template_engine, ['blade', 'twig'], true)) {
+  die($en ? 'The theme template engine must be blade or twig.' : 'テーマのテンプレートエンジンはbladeまたはtwigを指定してください。');
+}
+$template_engine = TemplateEngineFactory::create($theme_template_engine, $views, $cache);
 
-$dat = array(); // bladeに格納する変数
+$dat = array(); // テンプレートに格納する変数
 
 // var_dump($_POST);
 
 // 絶対パス取得
-$path = realpath("./") . '/' . IMG_DIR;
-$temp_path = realpath("./") . '/' . TEMP_DIR;
+$path = realpath("./") . '/' . Config::string('paths.images');
+$temp_path = realpath("./") . '/' . Config::string('paths.temporary');
 
 $message = "";
-$self = PHP_SELF;
+$self = Config::string('site.script_name');
 
-$dat['path'] = IMG_DIR;
+$dat['path'] = Config::string('paths.images');
 
-$dat['neo_dir'] = NEO_DIR;
-$dat['chicken_dir'] = CHICKEN_DIR;
-$dat['klecks_dir'] = KLECKS_DIR;
-$dat['tegaki_dir'] = TEGAKI_DIR;
-$dat['axnos_dir'] = AXNOS_DIR;
+$dat['neo_dir'] = Config::string('paths.neo');
+$dat['chicken_dir'] = Config::string('paths.chickenpaint');
+$dat['klecks_dir'] = Config::string('paths.klecks');
+$dat['tegaki_dir'] = Config::string('paths.tegaki');
+$dat['axnos_dir'] = Config::string('paths.axnos');
 
 $dat['ver'] = REITA_VER;
-$dat['base'] = BASE;
-$dat['board_title'] = TITLE;
-$dat['home'] = HOME;
-$dat['self'] = PHP_SELF;
+$dat['base'] = Config::string('site.base_url');
+$dat['board_title'] = Config::string('site.title');
+$dat['home'] = Config::string('site.home_url');
+$dat['self'] = Config::string('site.script_name');
 $dat['message'] = $message;
-$dat['pdef_w'] = PDEF_W;
-$dat['pdef_h'] = PDEF_H;
-$dat['pmax_w'] = PMAX_W;
-$dat['pmax_h'] = PMAX_H;
+$dat['pdef_w'] = Config::int('limits.paint_default_width');
+$dat['pdef_h'] = Config::int('limits.paint_default_height');
+$dat['pmax_w'] = Config::int('limits.paint_max_width');
+$dat['pmax_h'] = Config::int('limits.paint_max_height');
 
-$dat['max_name'] = MAX_NAME;
-$dat['max_email'] = MAX_EMAIL;
-$dat['max_sub'] = MAX_SUB;
-$dat['max_url'] = MAX_URL;
-$dat['max_com'] = MAX_COM;
+$dat['max_name'] = Config::int('limits.name_length');
+$dat['max_email'] = Config::int('limits.email_length');
+$dat['max_sub'] = Config::int('limits.subject_length');
+$dat['max_url'] = Config::int('limits.url_length');
+$dat['max_com'] = Config::int('limits.comment_length');
 
-$dat['theme_dir'] = THEME_DIR;
+$dat['theme_dir'] = Config::string('paths.theme');
 $dat['theme_name'] = THEME_NAME;
 $dat['tver'] = THEME_VER;
 
-$dat['switch_sns'] = SWITCH_SNS;
+$dat['switch_sns'] = Config::bool('features.share_details');
 
-$dat['use_chicken'] = USE_CHICKENPAINT;
-$dat['use_klecks'] = USE_KLECKS;
-$dat['use_tegaki'] = USE_TEGAKI;
-$dat['use_axnos'] = USE_AXNOS;
+$dat['use_chicken'] = Config::bool('features.chickenpaint');
+$dat['use_klecks'] = Config::bool('features.klecks');
+$dat['use_tegaki'] = Config::bool('features.tegaki');
+$dat['use_axnos'] = Config::bool('features.axnos');
 
-$dat['select_palettes'] = USE_SELECT_PALETTES;
-$dat['pallets_dat'] = $pallets_dat;
+$dat['select_palettes'] = Config::bool('features.select_palettes');
+$dat['pallets_dat'] = Config::array("drawing.palettes");
 
-$dat['display_id'] = DISP_ID;
+$dat['display_id'] = Config::bool('features.display_id');
 $dat['updatemark'] = UPDATE_MARK;
-$dat['use_resub'] = USE_RESUB;
+$dat['use_resub'] = Config::bool('features.reply_subject');
 
-$dat['useanime'] = USE_ANIME;
-$dat['defanime'] = DEF_ANIME;
-$dat['use_continue'] = USE_CONTINUE;
-$dat['newpost_nopassword'] = !CONTINUE_PASS;
+$dat['useanime'] = Config::bool('features.animation');
+$dat['defanime'] = Config::bool('features.animation_default');
+$dat['use_continue'] = Config::bool('features.continue_drawing');
+$dat['newpost_nopassword'] = !Config::bool('features.continue_password');
 
-$dat['use_name'] = USE_NAME;
-$dat['use_com'] = USE_COM;
-$dat['use_sub'] = USE_SUB;
+$dat['use_name'] = Config::bool('features.require_name');
+$dat['use_com'] = Config::bool('features.require_comment');
+$dat['use_sub'] = Config::bool('features.require_subject');
 
-$dat['addinfo'] = $addinfo;
+$dat['addinfo'] = Config::array("board.additional_info");
 
-$dat['display_painttime'] = DSP_PAINTTIME;
+$dat['display_painttime'] = Config::bool('features.display_paint_time');
+$dat['search_criteria'] = [
+  'query' => '', 'target' => 'author', 'match' => 'partial', 'post_type' => 'all',
+  'image' => 'any', 'nsfw' => 'any', 'sort' => 'newest',
+];
 
-$dat['share_button'] = SHARE_BUTTON;
+$dat['share_button'] = Config::bool('features.share_button');
 
-$dat['use_hashtag'] = USE_HASHTAG;
-
-defined('ADMIN_CAP') or define('ADMIN_CAP', '(ではない)');
-defined('ADMIN_SESSION_LIFETIME') or define('ADMIN_SESSION_LIFETIME', 1800);
-defined('SESSION_FILE_LIFETIME') or define('SESSION_FILE_LIFETIME', 86400);
-defined('ADMIN_LOGIN_MAX_FAILURES') or define('ADMIN_LOGIN_MAX_FAILURES', 5);
-defined('ADMIN_LOGIN_WINDOW') or define('ADMIN_LOGIN_WINDOW', 900);
-defined('ADMIN_LOGIN_LOCKOUT') or define('ADMIN_LOGIN_LOCKOUT', 900);
-defined('ADMIN_THREADS_PER_PAGE') or define('ADMIN_THREADS_PER_PAGE', 50);
-
+$dat['use_hashtag'] = Config::bool('features.hashtag');
 
 $dat['sodane'] = SODANE;
 
-$dat['use_oekaki_reply'] = USE_OEKAKI_REPLY;
+$dat['use_oekaki_reply'] = Config::bool('features.oekaki_reply');
+$dat['use_image_upload'] = Config::bool('features.image_upload');
+$dat['diary_mode'] = Config::bool('features.diary_mode');
+$dat['can_create_thread'] = diary_post_allowed(false);
+$dat['can_post_reply'] = diary_post_allowed(true);
+$dat['upload_max_kb'] = Config::int('limits.upload_kb');
+$dat['upload_max_width'] = Config::int('limits.image_width');
+$dat['upload_max_height'] = Config::int('limits.image_height');
 
 $dat['theme_name'] = THEME_NAME;
 
@@ -264,25 +255,30 @@ define('CRYPT_IV', 'T3pkYxNyjN7Wz3pu'); //半角英数16文字
 //テーマがXHTMLか設定されてないなら
 defined('TH_XHTML') or define('TH_XHTML', 0);
 
-//日付フォーマット
-defined('DATE_FORMAT') or define('DATE_FORMAT', 'Y/m/d H:i:s');
-
-//NSFW画像機能を使う
-defined('USE_NSFW') or define('USE_NSFW', 1);
-$dat['use_nsfw'] = USE_NSFW;
+$dat['use_nsfw'] = Config::bool('features.nsfw');
 
 //データベース接続PDO
-const DB_FILE = __DIR__ . '/' . DB_NAME . '.db';
-const DB_PDO = 'sqlite:' . DB_FILE;
-
-defined("SNS_WINDOW_WIDTH") or define("SNS_WINDOW_WIDTH","600");
-defined("SNS_WINDOW_HEIGHT") or define("SNS_WINDOW_HEIGHT","600");
+define('DB_FILE', __DIR__ . '/' . Config::string('database.name') . '.db');
+define('DB_PDO', 'sqlite:' . DB_FILE);
 
 //misskey
-$dat['use_misskey_note'] = USE_MISSKEY_NOTE;
+$dat['use_misskey_note'] = Config::bool('features.misskey_note');
 
 //初期設定
 init();
+
+$dat['theme_settings'] = [];
+$dat['theme_settings_json'] = '{}';
+try {
+  $theme_settings = theme_settings_provider();
+  if ($theme_settings !== null) {
+    $template_data = $theme_settings->templateData();
+    if (!is_array($template_data)) throw new RuntimeException('Theme settings template data is invalid.');
+    $dat = array_merge($dat, $template_data);
+  }
+} catch (Throwable $e) {
+  error($en ? 'Theme settings initialization failed.' : 'テーマ設定の初期化に失敗しました。', 500, $e);
+}
 
 del_temp();
 
@@ -344,10 +340,16 @@ switch ($mode) {
   case 'sodane': // そうだね
     return sodane();
   case 'paint':
+    if (!diary_post_allowed((string)filter_input(INPUT_POST, 'resto') !== '')) {
+      error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
+    }
     return paint_form("", filter_input_data('POST','modid',FILTER_VALIDATE_INT));
   case 'piccom':
     return paint_com("");
   case 'pictmp':
+    if (!diary_post_allowed(false)) {
+      error($en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
+    }
     return paint_com("tmp");
   case 'anime':
     return open_pch($sp ?? "");
@@ -355,7 +357,7 @@ switch ($mode) {
     return in_continue();
   case 'contpaint':
     $type = filter_input(INPUT_POST, 'type');
-    if (CONTINUE_PASS || $type === 'rep') usrchk();
+    if (Config::bool('features.continue_password') || $type === 'rep') usrchk();
     return paint_form($type, filter_input_data('POST','modid',FILTER_VALIDATE_INT));
   case 'picrep':
     return picreplace();
@@ -381,6 +383,8 @@ switch ($mode) {
     return admin_delete();
   case 'admin_manage':
     return admin_manage();
+  case 'admin_theme_settings':
+    return admin_theme_settings();
   case 'admin_post':
     return admin_post();
   case 'admin_edit':
@@ -412,14 +416,14 @@ function init(): void {
   $initializer = new ApplicationInitializer(
     DB_PDO, DB_FILE, __DIR__ . '/backup', __DIR__,
     [
-      __DIR__ . '/' . IMG_DIR => PERMISSION_FOR_DIR,
-      __DIR__ . '/' . TEMP_DIR => PERMISSION_FOR_DIR,
-      __DIR__ . '/' . THUMB_DIR => PERMISSION_FOR_DIR,
-      __DIR__ . '/thumbnail' => PERMISSION_FOR_DIR,
-      __DIR__ . '/session' => PERMISSION_FOR_PRIVATE_DIR,
-      __DIR__ . '/cache' => PERMISSION_FOR_PRIVATE_DIR,
-      __DIR__ . '/backup' => PERMISSION_FOR_PRIVATE_DIR,
-      __DIR__ . '/errorlog' => PERMISSION_FOR_PRIVATE_DIR,
+      __DIR__ . '/' . Config::string('paths.images') => Config::int('permissions.public_directory'),
+      __DIR__ . '/' . Config::string('paths.temporary') => Config::int('permissions.public_directory'),
+      __DIR__ . '/' . Config::string('paths.thumbnails') => Config::int('permissions.public_directory'),
+      __DIR__ . '/thumbnail' => Config::int('permissions.public_directory'),
+      __DIR__ . '/session' => Config::int('permissions.private_directory'),
+      __DIR__ . '/cache' => Config::int('permissions.private_directory'),
+      __DIR__ . '/backup' => Config::int('permissions.private_directory'),
+      __DIR__ . '/errorlog' => Config::int('permissions.private_directory'),
     ],
   );
   $initializer->sendSecurityHeaders();
@@ -428,9 +432,9 @@ function init(): void {
     $initializer->migrateDatabase();
     $initializer->secureDatabaseFile();
     $recovery = (new PostService(
-      new BoardRepository(), '', __DIR__ . '/' . IMG_DIR, PDEF_W, PERMISSION_FOR_DEST,
+      new BoardRepository(), '', __DIR__ . '/' . Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'),
       __DIR__ . '/backup/delete-staging', __DIR__ . '/backup/delete-quarantine',
-      defined('DELETE_QUARANTINE_RETENTION_DAYS') ? (int)constant('DELETE_QUARANTINE_RETENTION_DAYS') : 30
+      Config::int('maintenance.delete_quarantine_days')
     ))->recoverInterruptedDeletions();
     if (array_sum($recovery) > 0) {
       ApplicationErrorHandler::reportMessage(
@@ -445,23 +449,22 @@ function init(): void {
 }
 
 function show_share_server_form(): void {
-  global $servers, $blade, $dat;
+  global $template_engine, $dat;
 
-  $configured_servers = isset($servers) && is_array($servers) ? $servers : null;
-  $dat['servers'] = ShareService::servers($configured_servers);
+  $dat['servers'] = ShareService::servers(Config::array('social.servers'));
   $dat['encoded_t'] = (string)filter_input_data('GET', 'encoded_t');
   $dat['encoded_u'] = (string)filter_input_data('GET', 'encoded_u');
   $dat['sns_server_radio_cookie'] = (string)filter_input_data('COOKIE', 'sns_server_radio_cookie');
   $dat['sns_server_direct_input_cookie'] = (string)filter_input_data('COOKIE', 'sns_server_direct_input_cookie');
   $dat['admin_pass'] = null;
   $dat['token'] = RequestSecurity::csrfToken();
-  echo $blade->run(SET_SHARE_SERVER, $dat);
+  echo $template_engine->render(SET_SHARE_SERVER, $dat);
 }
 
 function submit_share_server(): void {
   global $en;
 
-  if (CHECK_CSRF_TOKEN) {
+  if (Config::bool('features.csrf')) {
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
     } catch (RequestSecurityException $e) {
@@ -494,14 +497,14 @@ function submit_share_server(): void {
 // 投稿があればデータベースへ保存する
 /* 記事書き込み スレ立てとリプライ */
 function regist(): void {
-  global $badip, $admin_pass, $admin_name, $en;
+  global $en;
   global $req_method;
   global $dat;
 
   $dat['en'] = $en;
 
   // CSRFトークンをチェック
-  if (CHECK_CSRF_TOKEN) {
+  if (Config::bool('features.csrf')) {
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
     } catch (RequestSecurityException $e) {
@@ -510,6 +513,10 @@ function regist(): void {
   }
 
   $input = PostValidator::inputFromHttp();
+  if (!diary_post_allowed($input['resto'] !== '')) {
+    error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
+    return;
+  }
   $sub = $input['sub'];
   $name = $input['name'];
   $mail = $input['mail'];
@@ -519,6 +526,9 @@ function regist(): void {
   $pwd = $input['pwd'];
   $pal = $input['pal'];
   $nsfw_flag = $input['nsfw_flag'];
+  $uploaded_file = $_FILES['image_upload'] ?? null;
+  $has_uploaded_file = $uploaded_file !== null
+    && (!is_array($uploaded_file) || ($uploaded_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
 
   // クッキー保存用
   $original_name = $name;
@@ -526,24 +536,47 @@ function regist(): void {
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
   try {
-    $rules = PostValidator::configuredRules($en, $req_method, $host, $badip, $admin_pass, (bool)USE_COM);
+    $rules = PostValidator::configuredRules($en, $req_method, $host, Config::array("spam.bad_hosts"), Config::string("admin.password"), (bool)Config::bool('features.require_comment'));
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
     error($e->getMessage(), $e->getCode() ?: 400);
     return;
   }
+  if ($has_uploaded_file && !Config::bool('features.image_upload')) {
+    error($en ? 'Image uploads are disabled.' : '画像アップロードは無効です。', 403);
+    return;
+  }
+  if ($has_uploaded_file && $picfile) {
+    error($en ? 'Choose either a drawing image or an uploaded image.' : 'お絵かき画像とアップロード画像を同時に投稿することはできません。', 400);
+    return;
+  }
   //セキュリティ関連ここまで
 
+  $uploaded_image = null;
   try {
     $repository = new BoardRepository();
     if (isset($_POST["send"])) {
-      $service = new PostService($repository, $admin_pass, IMG_DIR);
+      $service = new PostService($repository, Config::string("admin.password"), Config::string('paths.images'));
+      if ($has_uploaded_file) {
+        if (!is_array($uploaded_file)) {
+          throw new ImageUploadException('Invalid uploaded file.', 400);
+        }
+        $uploaded_image = ImageService::storeUploadedImage(
+          $uploaded_file, Config::string('paths.images'), Config::int('limits.upload_kb'),
+          Config::int('limits.image_width'), Config::int('limits.image_height'),
+          Config::int('limits.paint_default_width'), Config::bool('features.nsfw') && $nsfw_flag === '1',
+          Config::int('permissions.public_file')
+        );
+        $input['picfile'] = $uploaded_image['picfile'];
+        $picfile = $uploaded_image['picfile'];
+      }
       try {
         $prepared_post = $service->prepareNewPost($input, $host, [
-          'default_name' => DEF_NAME, 'default_comment' => DEF_COM, 'default_subject' => DEF_SUB,
-          'admin_name' => $admin_name, 'admin_cap' => ADMIN_CAP,
+          'default_name' => Config::string('board.default_name'), 'default_comment' => Config::string('board.default_comment'), 'default_subject' => Config::string('board.default_subject'),
+          'admin_name' => Config::string("admin.name"), 'admin_cap' => Config::string('admin.cap'),
         ]);
       } catch (DuplicatePostException $e) {
+        if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
         error($en ? 'Duplicate post?' : '二重投稿ですか ?', 409);
         return;
       }
@@ -552,11 +585,13 @@ function regist(): void {
         'img_w' => 0, 'img_h' => 0, 'pchfile' => '', 'psec' => 0, 'utime' => '',
         'tool' => '', 'thumbnail' => '', 'nsfw' => false, 'ctype' => null,
       ];
-      if ($picfile) {
+      if (is_array($uploaded_image)) {
+        $image_result = $uploaded_image;
+      } elseif ($picfile) {
         $ctype = PostInput::ctypeFromHttp();
         $image_result = ImageService::finalizeNewPost(
-          TEMP_DIR, IMG_DIR, (string)$picfile, $ctype, (bool)DSP_PAINTTIME, PDEF_W,
-          USE_NSFW === 1 && $nsfw_flag === '1', PERMISSION_FOR_DEST
+          Config::string('paths.temporary'), Config::string('paths.images'), (string)$picfile, $ctype, (bool)Config::bool('features.display_paint_time'), Config::int('limits.paint_default_width'),
+          Config::bool('features.nsfw') && $nsfw_flag === '1', Config::int('permissions.public_file')
         );
         $image_result['ctype'] = $ctype;
       }
@@ -572,16 +607,20 @@ function regist(): void {
         list($c_name, $c_cookie) = $cookie;
         $c_name = (string)$c_name;
         $c_cookie = (string)$c_cookie;
-        setcookie($c_name, $c_cookie, time() + (SAVE_COOKIE * 24 * 3600),"","",$https_only,true);
+        setcookie($c_name, $c_cookie, time() + (Config::int('board.cookie_days') * 24 * 3600),"","",$https_only,true);
       }
 
       $dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
     }
+  } catch (ImageUploadException $e) {
+    if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
+    error($en ? $e->getMessage() : '画像ファイルを受け付けられませんでした。', $e->getCode() ?: 400, $e);
   } catch (Throwable $e) {
+    if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $pictmp, $picfile, $mode);
-  //header('Location:'.PHP_SELF);
+  //header('Location:'.Config::string('site.script_name'));
   //ログ行数オーバー処理
   //スレ数カウント
   $th_cnt = 0;
@@ -592,12 +631,12 @@ function regist(): void {
     error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
-  if ($th_cnt > MAX_THREAD) {
+  if ($th_cnt > Config::int('board.max_threads')) {
     logdel();
   }
 
   //そろそろ消えるスレッドのフラグを設定
-  $th_id = (int)round(MAX_THREAD * LOG_LIMIT / 100); //閾値 … 新しい方からこの件数以降がもうすぐ消える
+  $th_id = (int)round(Config::int('board.max_threads') * Config::int('board.log_warning_percent') / 100); //閾値 … 新しい方からこの件数以降がもうすぐ消える
   if ($th_cnt > $th_id) {
     // そろそろ消えるスレッドにshdフラグを設定
     try {
@@ -608,8 +647,7 @@ function regist(): void {
   }
 
   // そろそろ消えるスレッドの情報をテンプレートに渡す
-  $dat['log_limit'] = LOG_LIMIT;
-  $dat['MAX_THREAD'] = MAX_THREAD;
+  $dat['log_limit'] = Config::int('board.log_warning_percent');
   $dat['th_cnt'] = $th_cnt;
   $dat['th_id'] = $th_id;
   $dat['will_delete_count'] = max(0, $th_cnt - $th_id);
@@ -619,10 +657,10 @@ function regist(): void {
 
 //通常表示モード
 function def(): void {
-  global $dat, $blade;
+  global $dat, $template_engine;
   global $en;
-  $dsp_res = DSP_RES;
-  $page_def = PAGE_DEF;
+  $dsp_res = Config::int('board.replies_shown');
+  $page_def = Config::int('board.page_size');
 
   $start = 0;
 
@@ -636,12 +674,12 @@ function def(): void {
     error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
-  if ($th_cnt > MAX_THREAD) {
+  if ($th_cnt > Config::int('board.max_threads')) {
     logdel();
   }
 
   //古いスレのレスボタンを表示しない
-  $elapsed_time = ELAPSED_DAYS * 86400; //デフォルトの1年だと31536000
+  $elapsed_time = Config::int('board.elapsed_reply_days') * 86400; //デフォルトの1年だと31536000
   $nowtime = time(); //いまのunixタイムスタンプを取得
   //あとはテーマ側で計算する
   $dat['nowtime'] = $nowtime;
@@ -694,7 +732,7 @@ function def(): void {
 
     $i = 0;
     $j = 0;
-    while ($i < PAGE_DEF) {
+    while ($i < Config::int('board.page_size')) {
       $bbsline = $posts[$i] ?? false;
       if (empty($bbsline)) {
         break;
@@ -723,8 +761,8 @@ function def(): void {
         }
         if (empty($res)) { //レスがなくなったら
           $bbsline['res_num'] = $j; //スレのレス数
-          $bbsline['res_d_su'] = $j - DSP_RES; //スレのレス省略数
-          if ($j > DSP_RES) { //スレのレス数が規定より多いと
+          $bbsline['res_d_su'] = $j - Config::int('board.replies_shown'); //スレのレス省略数
+          if ($j > Config::int('board.replies_shown')) { //スレのレス数が規定より多いと
             $bbsline['rflag'] = true; //省略フラグtrue
           } else {
             $bbsline['rflag'] = false; //省略フラグfalse
@@ -740,13 +778,13 @@ function def(): void {
         $res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
 
         //オートリンク
-        if (AUTOLINK) $res['com'] = auto_link($res['com']);
+        if (Config::bool('features.autolink')) $res['com'] = auto_link($res['com']);
         //画像URLにサムネイルを追加
-        if (EXTERNAL_IMAGE_THUMB) {
+        if (Config::bool('features.external_image_thumbnail')) {
           $res['com'] = external_image_service()->addThumbnailLinks($res['com']);
         }
         //ハッシュタグ
-        if (USE_HASHTAG) $res['com'] = hashtag_link($res['com']);
+        if (Config::bool('features.hashtag')) $res['com'] = hashtag_link($res['com']);
         //空行を縮める
         $res['com'] = preg_replace('/(\n|\r|\r\n|\n\r){3,}/us', "\n\n", $res['com']);
         //<br>に
@@ -754,8 +792,8 @@ function def(): void {
         //引用の色
         $res['com'] = quote($res['com']);
         //日付をUNIX時間に変換して設定どおりにフォーマット
-        $res['created'] = date(DATE_FORMAT, strtotime($res['created']));
-        $res['modified'] = date(DATE_FORMAT, strtotime($res['modified']));
+        $res['created'] = date(Config::string('board.date_format'), strtotime($res['created']));
+        $res['modified'] = date(Config::string('board.date_format'), strtotime($res['modified']));
         $bbsline['res'][$j] = $res;
         $j++;
       }
@@ -766,13 +804,13 @@ function def(): void {
       $bbsline['com'] = htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5);
 
       //オートリンク
-      if (AUTOLINK) $bbsline['com'] = auto_link($bbsline['com']);
+      if (Config::bool('features.autolink')) $bbsline['com'] = auto_link($bbsline['com']);
       //画像URLにサムネイルを追加
-      if (EXTERNAL_IMAGE_THUMB) {
+      if (Config::bool('features.external_image_thumbnail')) {
         $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
       }
       //ハッシュタグ
-      if (USE_HASHTAG) $bbsline['com'] = hashtag_link($bbsline['com']);
+      if (Config::bool('features.hashtag')) $bbsline['com'] = hashtag_link($bbsline['com']);
       //空行を縮める
       $bbsline['com'] = preg_replace('/(\n|\r|\r\n){3,}/us', "\n\n", $bbsline['com']);
       //<br>に
@@ -780,11 +818,11 @@ function def(): void {
       //引用の色
       $bbsline['com'] = quote($bbsline['com']);
       $bbsline['past'] = strtotime($bbsline['created']);
-      $bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
-      $bbsline['modified'] = date(DATE_FORMAT, strtotime($bbsline['modified']));
+      $bbsline['created'] = date(Config::string('board.date_format'), strtotime($bbsline['created']));
+      $bbsline['modified'] = date(Config::string('board.date_format'), strtotime($bbsline['modified']));
 
-      $bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.TITLE);
-      $bbsline['encoded_u'] = urlencode(BASE.'?resno='.$bbsline['tid']);
+      $bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.Config::string('site.title'));
+      $bbsline['encoded_u'] = urlencode(Config::string('site.base_url').'?resno='.$bbsline['tid']);
 
       // そろそろ消えるスレッドのフラグを設定
       $bbsline['will_delete'] = ($bbsline['shd'] === '1');
@@ -793,10 +831,10 @@ function def(): void {
       $i++;
     }
 
-    $dat['dsp_res'] = DSP_RES;
-    $dat['path'] = IMG_DIR;
+    $dat['dsp_res'] = Config::int('board.replies_shown');
+    $dat['path'] = Config::string('paths.images');
 
-    echo $blade->run(MAINFILE, $dat);
+    echo $template_engine->render(MAINFILE, $dat);
   } catch (PDOException $e) {
     error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
@@ -804,52 +842,29 @@ function def(): void {
 
 //カタログモード
 function catalog(): void {
-  global $blade, $dat;
-  $page_def = CATALOG_N;
+  global $template_engine, $dat;
+  $page_def = Config::int('board.catalog_size');
 
   $start = 0;
 
   //ページング
   try {
     $repository = new BoardRepository();
-    if (isset($_GET['page']) && is_numeric($_GET['page'])) {
-      $page = $_GET['page'];
-      $page = max($page, 1);
-    } else {
-      $page = 1;
-    }
-    $start = $page_def * ($page - 1);
-
-    //最大何ページあるのか
     $th_cnt = $repository->countVisibleImages();
-    $max_page = floor($th_cnt / $page_def) + 1;
-    //最後にスレ数0のページができたら表示しない処理
-    if (($th_cnt % $page_def) == 0) {
-      $max_page = $max_page - 1;
-      //ただしそれが1ページ目なら困るから表示
-      $max_page = max($max_page, 1);
-    }
-    $dat['max_page'] = $max_page;
-
-    //リンク作成用
-    $dat['nowpage'] = $page;
-    $p = 1;
-    $pp = array();
-    $paging = array();
-    while ($p <= $max_page) {
-      $paging[($p)] = compact('p');
-      $pp[] = $paging;
-      $p++;
-    }
-    $dat['paging'] = $paging;
-    $dat['pp'] = $pp;
-
-    $dat['back'] = ($page - 1);
-
-    $dat['next'] = ($page + 1);
+    $page_value = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $pagination = catalog_paging($th_cnt, $page_def, $page_value === false || $page_value === null ? 1 : $page_value);
+    $start = $pagination['start'];
+    $dat['max_page'] = $pagination['max_page'];
+    $dat['nowpage'] = $pagination['page'];
+    $dat['paging'] = $pagination['paging'];
+    $dat['pp'] = $pagination['pp'];
+    $dat['back'] = $pagination['back'];
+    $dat['next'] = $pagination['next'];
+    $dat['catalog_paging_query'] = 'mode=catalog';
+    $dat['catalog_paging_enabled'] = true;
 
   } catch (PDOException $e) {
-    error(LANG === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   //読み込み
@@ -860,7 +875,7 @@ function catalog(): void {
     $oya = array();
 
     $i = 0;
-    while ($i < CATALOG_N) {
+    while ($i < Config::int('board.catalog_size')) {
       $bbsline = $posts[$i] ?? false;
       if (empty($bbsline)) {
         break;
@@ -872,41 +887,67 @@ function catalog(): void {
     }
 
     $dat['oya'] = $oya;
-    $dat['path'] = IMG_DIR;
+    $dat['path'] = Config::string('paths.images');
 
     //$smarty->debugging = true;
     $dat['catalogmode'] = 'catalog';
-    echo $blade->run(CATALOGFILE, $dat);
+    echo $template_engine->render(CATALOGFILE, $dat);
   } catch (PDOException $e) {
-    error(LANG === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
-//検索モード 現在全件表示のみ対応
+/** @return array{page:int,max_page:int,start:int,paging:array<int,array{p:int}>,pp:array<int,array<int,array{p:int}>>,back:int,next:int} */
+function catalog_paging(int $total, int $per_page, int $requested_page): array {
+  if ($per_page < 1) throw new InvalidArgumentException('Invalid catalog page size.');
+  $max_page = max(1, (int)ceil($total / $per_page));
+  $page = min(max($requested_page, 1), $max_page);
+  $paging = [];
+  $pp = [];
+  for ($p = 1; $p <= $max_page; $p++) {
+    $paging[$p] = compact('p');
+    $pp[] = $paging;
+  }
+  return [
+    'page' => $page, 'max_page' => $max_page, 'start' => $per_page * ($page - 1),
+    'paging' => $paging, 'pp' => $pp, 'back' => $page - 1, 'next' => $page + 1,
+  ];
+}
+
+/** @return array<string,string> */
+function public_search_criteria(): array {
+  $query = (string)filter_input(INPUT_GET, 'search');
+  $target = filter_input(INPUT_GET, 'target');
+  $legacy_tag = filter_input(INPUT_GET, 'tag');
+  $legacy_similar = filter_input(INPUT_GET, 'similar');
+  if (!is_string($target) || $target === '') {
+    return PublicPostSearch::normalize([
+      'query' => $query,
+      'target' => $legacy_tag === 'tag' ? 'comment' : 'author',
+      'match' => $legacy_tag === 'tag' || $legacy_similar === 'similar' ? 'partial' : 'exact',
+      // Legacy author search showed image posts only.
+      'image' => $legacy_tag === 'tag' ? 'any' : 'with',
+    ]);
+  }
+  return PublicPostSearch::normalize([
+    'query' => $query, 'target' => $target, 'match' => filter_input(INPUT_GET, 'match'),
+    'post_type' => filter_input(INPUT_GET, 'post_type'), 'image' => filter_input(INPUT_GET, 'image'),
+    'nsfw' => filter_input(INPUT_GET, 'nsfw'), 'sort' => filter_input(INPUT_GET, 'sort'),
+  ]);
+}
+
+//検索モード
 function search(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
 
-  $search_f = (string)filter_input(INPUT_GET, 'search');
-  $search = $search_f;
-  //部分一致検索
-  $similar =  filter_input(INPUT_GET, 'similar');
-  //本文検索
-  $tag = filter_input(INPUT_GET, 'tag');
-
-  //読み込み
   try {
+    $criteria = public_search_criteria();
     $repository = new BoardRepository();
-    //全スレッド取得
-    //まずtagがあれば全文検索
-    if ($tag == 'tag') {
-      $posts = $repository->searchComments($search);
-      $dat['catalogmode'] = 'hashsearch';
-      $dat['tag'] = $search_f;
-    } else {
-      $posts = $repository->searchAuthors($search, $similar === 'similar');
-      $dat['catalogmode'] = 'search';
-      $dat['author'] = $search_f;
-    }
+    $page_value = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $pagination = catalog_paging(
+      $repository->countPublicSearch($criteria), Config::int('board.catalog_size'), $page_value === false || $page_value === null ? 1 : $page_value
+    );
+    $posts = $repository->searchVisiblePosts($criteria, $pagination['start'], Config::int('board.catalog_size'));
 
     $oya = array();
     $ko = array();
@@ -925,12 +966,25 @@ function search(): void {
 
     $dat['oya'] = $oya;
     $dat['ko'] = $ko;
-    $dat['path'] = IMG_DIR;
-
-    $dat['s_result'] = $i;
-    echo $blade->run(CATALOGFILE, $dat);
+    $dat['path'] = Config::string('paths.images');
+    $dat['catalogmode'] = 'search';
+    $dat['search_term'] = $criteria['query'];
+    $dat['search_label'] = PublicPostSearch::label($criteria);
+    $dat['s_result'] = $repository->countPublicSearch($criteria);
+    $dat['search_criteria'] = $criteria;
+    $dat['catalog_paging_query'] = 'mode=search&' . PublicPostSearch::queryString($criteria);
+    $dat['catalog_paging_enabled'] = true;
+    $dat['max_page'] = $pagination['max_page'];
+    $dat['nowpage'] = $pagination['page'];
+    $dat['paging'] = $pagination['paging'];
+    $dat['pp'] = $pagination['pp'];
+    $dat['back'] = $pagination['back'];
+    $dat['next'] = $pagination['next'];
+    echo $template_engine->render(CATALOGFILE, $dat);
+  } catch (InvalidArgumentException $e) {
+    error(Config::string('site.language') === 'English' ? 'Invalid search criteria.' : '検索条件が不正です。', 400, $e);
   } catch (PDOException $e) {
-    error(LANG === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -962,36 +1016,36 @@ function sodane(): void {
       header('Content-Type: application/json');
       echo json_encode([
         'success' => false,
-        'error' => ApplicationErrorHandler::publicMessage($error_id, LANG === 'English')
+        'error' => ApplicationErrorHandler::publicMessage($error_id, Config::string('site.language') === 'English')
       ]);
       return;
     } else {
-      error(LANG === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+      error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     }
   }
 
   // 通常のリクエストの場合は従来通りリダイレクト
-  header('Location:' . PHP_SELF);
+  header('Location:' . Config::string('site.script_name'));
   def();
 }
 
 //レス画面
 function res(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
   $resno = filter_input(INPUT_GET, 'res',FILTER_VALIDATE_INT);
   $uuid = trim((string)filter_input(INPUT_GET, 'uuid'));
 
   //csrfトークンをセット
   $dat['token'] = '';
-  if (CHECK_CSRF_TOKEN) {
+  if (Config::bool('features.csrf')) {
     $token = RequestSecurity::csrfToken();
     $_SESSION['token'] = $token;
     $dat['token'] = $token;
   }
 
   //古いスレのレスフォームを表示しない
-  $elapsed_time = ELAPSED_DAYS * 86400; //デフォルトの1年だと31536000
+  $elapsed_time = Config::int('board.elapsed_reply_days') * 86400; //デフォルトの1年だと31536000
   $nowtime = time(); //いまのunixタイムスタンプを取得
   //あとはテーマ側で計算する
   $dat['elapsed_time'] = $elapsed_time;
@@ -1021,11 +1075,11 @@ function res(): void {
         $res['thumb_avif'] = '';
         $res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
 
-        if (AUTOLINK) {
+        if (Config::bool('features.autolink')) {
           $res['com'] = auto_link($res['com']);
         }
         //ハッシュタグ
-        if (USE_HASHTAG) {
+        if (Config::bool('features.hashtag')) {
           $res['com'] = hashtag_link($res['com']);
         }
         //空行を縮める
@@ -1036,8 +1090,8 @@ function res(): void {
         $res['com'] = quote($res['com']);
         //日付をUNIX時間に
         $bbsline['past'] = strtotime($bbsline['created']); // このスレは古いので用
-        $res['created'] = date(DATE_FORMAT, strtotime($res['created']));
-        $res['modified'] = date(DATE_FORMAT, strtotime($res['modified']));
+        $res['created'] = date(Config::string('board.date_format'), strtotime($res['created']));
+        $res['modified'] = date(Config::string('board.date_format'), strtotime($res['modified']));
         $ko[] = $res;
         //投稿者名取得
         if (!in_array($res['a_name'], $r_res_name)) { //重複除外
@@ -1050,13 +1104,13 @@ function res(): void {
       }
       $bbsline['com'] = htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5);
 
-      if (AUTOLINK) {
+      if (Config::bool('features.autolink')) {
         $bbsline['com'] = auto_link($bbsline['com']);
       }
       //画像URLにサムネイルを追加
       $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
       //ハッシュタグ
-      if (USE_HASHTAG) {
+      if (Config::bool('features.hashtag')) {
         $bbsline['com'] = hashtag_link($bbsline['com']);
       }
       //空行を縮める
@@ -1067,8 +1121,8 @@ function res(): void {
       $bbsline['com'] = quote($bbsline['com']);
       //日付をUNIX時間に
       $bbsline['past'] = strtotime($bbsline['created']); //古いので用
-      $bbsline['created'] = date(DATE_FORMAT, strtotime($bbsline['created']));
-      $bbsline['modified'] = date(DATE_FORMAT, strtotime($bbsline['modified']));
+      $bbsline['created'] = date(Config::string('board.date_format'), strtotime($bbsline['created']));
+      $bbsline['modified'] = date(Config::string('board.date_format'), strtotime($bbsline['modified']));
       if (!in_array($bbsline['a_name'], $r_res_name)) {
         $r_res_name[] = $bbsline['a_name'];
       }
@@ -1080,8 +1134,8 @@ function res(): void {
       $resname = implode(A_NAME_SAN . ' ', $r_res_name);
       $dat['resname'] = $resname;
 
-      $bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.TITLE);
-      $bbsline['encoded_u'] = urlencode(BASE.'?resno='.$bbsline['tid']);
+      $bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.Config::string('site.title'));
+      $bbsline['encoded_u'] = urlencode(Config::string('site.base_url').'?resno='.$bbsline['tid']);
 
       $oya[] = $bbsline;
 
@@ -1093,17 +1147,16 @@ function res(): void {
     error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
-  $dat['path'] = IMG_DIR;
+  $dat['path'] = Config::string('paths.images');
 
-  echo $blade->run(RESFILE, $dat);
+  echo $template_engine->render(RESFILE, $dat);
 }
 
 //お絵描き画面
 function paint_form(string $rep, ?int $reply_to): void {
   global $message, $usercode, $quality, $qualitys, $no;
   global $mode, $ctype, $pch, $type;
-  global $blade, $dat;
-  global $pallets_dat;
+  global $template_engine, $dat;
 
   $pwd = (string)filter_input(INPUT_POST, 'pwd');
   $imgfile = filter_input(INPUT_POST, 'img');
@@ -1123,8 +1176,8 @@ function paint_form(string $rep, ?int $reply_to): void {
 
   if ($mode === "contpaint" && (!$picw || !$pich)) {
     $imgfile = filter_input(INPUT_POST, 'img'); // 先にimgfileを取得
-    if ($imgfile && is_file(IMG_DIR . $imgfile)) {
-      list($picw, $pich) = getimagesize(IMG_DIR . $imgfile); //キャンバスサイズ
+    if ($imgfile && is_file(Config::string('paths.images') . $imgfile)) {
+      list($picw, $pich) = getimagesize(Config::string('paths.images') . $imgfile); //キャンバスサイズ
     }
   }
 
@@ -1133,8 +1186,8 @@ function paint_form(string $rep, ?int $reply_to): void {
 
   if ($picw < 300) $picw = 300;
   if ($pich < 300) $pich = 300;
-  if ($picw > PMAX_W) $picw = PMAX_W;
-  if ($pich > PMAX_H) $pich = PMAX_H;
+  if ($picw > Config::int('limits.paint_max_width')) $picw = Config::int('limits.paint_max_width');
+  if ($pich > Config::int('limits.paint_max_height')) $pich = Config::int('limits.paint_max_height');
 
   $dat['picw'] = $picw;
   $dat['pich'] = $pich;
@@ -1149,12 +1202,12 @@ function paint_form(string $rep, ?int $reply_to): void {
   $dat['w'] = $ww;
   $dat['h'] = $hh;
 
-  $dat['undo'] = UNDO;
-  $dat['undo_in_mg'] = UNDO_IN_MG;
+  $dat['undo'] = Config::int('limits.undo');
+  $dat['undo_in_mg'] = Config::int('limits.undo_group');
 
-  $dat['useanime'] = USE_ANIME;
+  $dat['useanime'] = Config::bool('features.animation');
 
-  $dat['path'] = IMG_DIR;
+  $dat['path'] = Config::string('paths.images');
 
   $dat['stime'] = time();
 
@@ -1171,7 +1224,7 @@ function paint_form(string $rep, ?int $reply_to): void {
       $pch = filter_input(INPUT_POST, 'pch');
       if ($pch) {
         $pch_filename = pathinfo($pch, PATHINFO_FILENAME);
-        if (is_file(IMG_DIR . $pch_filename . '.pch') || is_file(IMG_DIR . $pch_filename . '.spch') || is_file(IMG_DIR . $pch_filename . '.chi')) {
+        if (is_file(Config::string('paths.images') . $pch_filename . '.pch') || is_file(Config::string('paths.images') . $pch_filename . '.spch') || is_file(Config::string('paths.images') . $pch_filename . '.chi')) {
           $ctype = 'pch'; // 動画ファイルが存在する場合
         } else {
           $ctype = 'img'; // 動画ファイルが存在しない場合
@@ -1189,35 +1242,35 @@ function paint_form(string $rep, ?int $reply_to): void {
     $dat['no'] = $no;
     $dat['pwd'] = $pwd_f;
     $dat['ctype'] = $ctype;
-    if (is_file(IMG_DIR . $pch . '.pch')) {
+    if (is_file(Config::string('paths.images') . $pch . '.pch')) {
       $dat['useneo'] = true;
-    } elseif (is_file(IMG_DIR . $pch . '.spch')) {
+    } elseif (is_file(Config::string('paths.images') . $pch . '.spch')) {
       $dat['useneo'] = false;
       $dat['use_shi_painter'] = true;
     }
-    if ((C_SECURITY_CLICK || C_SECURITY_TIMER) && SECURITY_URL) {
+    if ((Config::string('security.continue_click_count') || Config::string('security.continue_timer')) && Config::string('security.failure_url')) {
       $dat['security'] = true;
-      $dat['security_click'] = C_SECURITY_CLICK;
-      $dat['security_timer'] = C_SECURITY_TIMER;
+      $dat['security_click'] = Config::string('security.continue_click_count');
+      $dat['security_timer'] = Config::string('security.continue_timer');
     }
   } else {
-    if ((SECURITY_CLICK || SECURITY_TIMER) && SECURITY_URL) {
+    if ((Config::string('security.click_count') || Config::string('security.timer')) && Config::string('security.failure_url')) {
       $dat['security'] = true;
-      $dat['security_click'] = SECURITY_CLICK;
-      $dat['security_timer'] = SECURITY_TIMER;
+      $dat['security_click'] = Config::string('security.click_count');
+      $dat['security_timer'] = Config::string('security.timer');
     }
     $dat['newpaint'] = true;
   }
-  $dat['security_url'] = SECURITY_URL;
+  $dat['security_url'] = Config::string('security.failure_url');
 
   //パレット設定
   //初期パレット
   $lines = array();
   $initial_palette = 'Palettes[0] = "#000000\n#FFFFFF\n#B47575\n#888888\n#FA9696\n#C096C0\n#FFB6FF\n#8080FF\n#25C7C9\n#E7E58D\n#E7962D\n#99CB7B\n#FCECE2\n#F9DDCF";';
-  foreach ($pallets_dat as $p_value) {
+  foreach (Config::array("drawing.palettes") as $p_value) {
     if ($p_value[1] == filter_input(INPUT_POST, 'palettes')) { // キーと入力された値が同じなら
       $set_palettec = $p_value[1];
-      setcookie("palettec", $set_palettec, time() + (86400 * SAVE_COOKIE)); // Cookie保存
+      setcookie("palettec", $set_palettec, time() + (86400 * Config::int('board.cookie_days'))); // Cookie保存
       if (is_array($p_value)) {
         $lines = file($p_value[1]);
       } else {
@@ -1255,7 +1308,7 @@ function paint_form(string $rep, ?int $reply_to): void {
   $dat['palsize'] = $count_dyn_p;
 
   //パスワード暗号化
-  $pwd_f = openssl_encrypt($pwd, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //暗号化
+  $pwd_f = openssl_encrypt($pwd, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV); //暗号化
   $pwd_f = bin2hex($pwd_f); //16進数に
   $arr_dyn_p=[];
   foreach ($DynP as $p) {
@@ -1265,13 +1318,13 @@ function paint_form(string $rep, ?int $reply_to): void {
 
   if ($ctype == 'pch' || $ctype == 'spch') {
     $pchfile = filter_input(INPUT_POST, 'pch');
-    $dat['pchfile'] = IMG_DIR . $pchfile;
+    $dat['pchfile'] = Config::string('paths.images') . $pchfile;
   } elseif ($ctype == 'img') {
     $dat['animeform'] = false;
     $dat['anime'] = false;
     $dat['useanime'] = false; // 動画機能を無効化
     $imgfile = filter_input(INPUT_POST, 'img');
-    $dat['imgfile'] = IMG_DIR . $imgfile;
+    $dat['imgfile'] = Config::string('paths.images') . $imgfile;
     // 画像から続きを描く場合はpchfileを設定しない
     $dat['pchfile'] = null;
   } else {
@@ -1321,38 +1374,38 @@ function paint_form(string $rep, ?int $reply_to): void {
   }
   //出力
   if ($tool === 'chicken' || $tool === 'klecks' || $tool === 'tegaki' || $tool === 'axnos') {
-    echo $blade->run(PAINTFILE_BE, $dat);
+    echo $template_engine->render(PAINTFILE_BE, $dat);
   } elseif ($tool === 'shi' || $tool === 'neo') {
-    echo $blade->run(PAINTFILE, $dat);
+    echo $template_engine->render(PAINTFILE, $dat);
   } else {
-    echo $blade->run(PAINTFILE, $dat);
+    echo $template_engine->render(PAINTFILE, $dat);
   }
 }
 
 //アニメ再生
 
 function open_pch(string $sp = ""): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
 
   $pch = (string)filter_input(INPUT_GET, 'pch');
   try {
-    $playback = ImageService::animationPlaybackData(IMG_DIR, $pch, (int)($sp ?: PCH_SPEED));
+    $playback = ImageService::animationPlaybackData(Config::string('paths.images'), $pch, (int)($sp ?: Config::int('drawing.animation_speed')));
   } catch (Throwable $e) {
     ApplicationErrorHandler::reportThrowable($e, 'animation-open-error');
-    error(LANG === 'English' ? 'Failed to open animation.' : '動画を開けませんでした。', 404);
+    error(Config::string('site.language') === 'English' ? 'Failed to open animation.' : '動画を開けませんでした。', 404);
     return;
   }
   $template = $playback['template_type'] === 'tegaki' ? ANIMEFILE_TEGAKI : ANIMEFILE;
   unset($playback['template_type']);
   $dat = array_merge($dat, $playback);
 
-  echo $blade->run($template, $dat);
+  echo $template_engine->render($template, $dat);
 }
 
 //お絵かき投稿
 function paint_com(string $tmpmode): void {
   global $usercode, $ptime;
-  global $blade, $dat;
+  global $template_engine, $dat;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
   $resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
@@ -1368,7 +1421,7 @@ function paint_com(string $tmpmode): void {
 
   //csrfトークンをセット
   $dat['token'] = '';
-  if (CHECK_CSRF_TOKEN) {
+  if (Config::bool('features.csrf')) {
     $token = RequestSecurity::csrfToken();
     $_SESSION['token'] = $token;
     $dat['token'] = $token;
@@ -1388,7 +1441,7 @@ function paint_com(string $tmpmode): void {
   //var_dump($_POST);
   $userip = RequestInfo::clientIp();
   $tmp = [];
-  foreach (ImageService::listTemporaryImages(TEMP_DIR) as $temporary_image) {
+  foreach (ImageService::listTemporaryImages(Config::string('paths.temporary')) as $temporary_image) {
     if ($temporary_image['user_code'] === $usercode || $temporary_image['ip'] === $userip) {
       if (!empty($dat['exclude_temp_images'])) continue;
       $tmp[] = $temporary_image;
@@ -1405,7 +1458,7 @@ function paint_com(string $tmpmode): void {
     $pictmp = 2;
     $temp = array();
     foreach ($tmp as $temporary_image) {
-      $src = TEMP_DIR . $temporary_image['filename'];
+      $src = Config::string('paths.temporary') . $temporary_image['filename'];
       $src_name = $temporary_image['filename'];
       $date = gmdate("Y/m/d H:i", filemtime($src) + 9 * 60 * 60);
       $tool = $temporary_image['tool'];
@@ -1419,12 +1472,12 @@ function paint_com(string $tmpmode): void {
   $tmp2 = array();
   $dat['tmp'] = $tmp2;
 
-  echo $blade->run(PICFILE, $dat);
+  echo $template_engine->render(PICFILE, $dat);
 }
 
 //コンティニュー画面in
 function in_continue(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
 
   $no = trim((string)filter_input(INPUT_GET, 'no')); // 画像ファイル名なので文字列として取得
@@ -1441,7 +1494,7 @@ function in_continue(): void {
     error($en ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500, $e);
     return;
   }
-  if (empty($oya) || !is_file(IMG_DIR . $no) || !is_readable(IMG_DIR . $no)) {
+  if (empty($oya) || !is_file(Config::string('paths.images') . $no) || !is_readable(Config::string('paths.images') . $no)) {
     error($en ? 'The image does not exist.' : '画像が存在しません。', 404);
     return;
   }
@@ -1459,7 +1512,7 @@ function in_continue(): void {
   //コンティニュー時は削除キーを常に表示
   $dat['passflag'] = true;
   //新規投稿で削除キー不要の時 true
-  if (!CONTINUE_PASS) $dat['newpost_nopassword'] = true;
+  if (!Config::bool('features.continue_password')) $dat['newpost_nopassword'] = true;
 
   try {
     $continue_posts = [];
@@ -1469,13 +1522,13 @@ function in_continue(): void {
     }
     $dat['oya'] = $continue_posts;
     $hist_ope = pathinfo($no, PATHINFO_FILENAME); //拡張子除去
-    $hist_filename = IMG_DIR . $hist_ope;
+    $hist_filename = Config::string('paths.images') . $hist_ope;
     
     // データベースからctypeを取得
     $db_ctype = $continue_posts[0]['ctype'] ?? null;
     
     if (is_file($hist_filename . '.pch')) {
-      //$pchfile = IMG_DIR.$pch;
+      //$pchfile = Config::string('paths.images').$pch;
       $dat['tool'] = 'neo'; //拡張子がpchのときはNEO
       $dat['useshi'] = false;
       $dat['useneo'] = true;
@@ -1516,13 +1569,12 @@ function in_continue(): void {
     error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500, $e);
   }
 
-  echo $blade->run(OTHERFILE, $dat);
+  echo $template_engine->render(OTHERFILE, $dat);
 }
 
 //削除くん
 
 function delmode(): void {
-  global $admin_pass;
   global $dat;
   global $en;
 
@@ -1536,14 +1588,14 @@ function delmode(): void {
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
-    if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+    if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
       error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
     }
-    $p_pwd = $admin_pass;
+    $p_pwd = Config::string("admin.password");
   }
 
   try {
-    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST);
+    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
     $result = $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
     $dat['message'] = $result === 'hidden'
       ? ($en ? 'Post hidden.' : '非表示にしました。')
@@ -1560,14 +1612,14 @@ function delmode(): void {
   }
   //変数クリア
   unset($delno, $delt);
-  //header('Location:'.PHP_SELF);
+  //header('Location:'.Config::string('site.script_name'));
   ok($en ? 'Successfully deleted. Switching screen.' : '削除しました。画面を切り替えます。');
 }
 
 //画像差し替え
 function picreplace(): void {
   global $type;
-  global $path, $badip;
+  global $path;
   global $en;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
@@ -1582,7 +1634,7 @@ function picreplace(): void {
     error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
   }
   $pwd_bin = hex2bin($pwd); //バイナリに
-  $pwd_f = $pwd_bin === false ? false : openssl_decrypt($pwd_bin, CRYPT_METHOD, CRYPT_PASS, true, CRYPT_IV); //復号化
+  $pwd_f = $pwd_bin === false ? false : openssl_decrypt($pwd_bin, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV); //復号化
   if ($pwd_f === false) {
     error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
   }
@@ -1591,11 +1643,11 @@ function picreplace(): void {
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
 
-  foreach ($badip as $value) { //拒絶host
+  foreach (Config::array("spam.bad_hosts") as $value) { //拒絶host
     if (preg_match("/$value$/i", $host)) error($en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。', 403);
   }
 
-  $temporary_image = ImageService::findTemporaryImageByReplacementCode(TEMP_DIR, (string)$repcode);
+  $temporary_image = ImageService::findTemporaryImageByReplacementCode(Config::string('paths.temporary'), (string)$repcode);
   if ($temporary_image === null) {
     error($en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。', 404);
   }
@@ -1613,8 +1665,8 @@ function picreplace(): void {
     // $flag = false;
     if (password_verify($pwd_f, $msg_d["pwd"])) {
       $replacement = ImageService::replacePostedFiles(
-        TEMP_DIR, IMG_DIR, $filename, $imgext, (int)$stime,
-        (string)$msg_d['picfile'], (string)$msg_d['pchfile'], PERMISSION_FOR_DEST
+        Config::string('paths.temporary'), Config::string('paths.images'), $filename, $imgext, (int)$stime,
+        (string)$msg_d['picfile'], (string)$msg_d['pchfile'], Config::int('permissions.public_file')
       );
       $new_picfile = $replacement['picfile'];
       $new_pchfile = $replacement['pchfile'];
@@ -1630,7 +1682,7 @@ function picreplace(): void {
       $id = gen_id($host, $utime ?? time());
 
       //nsfw
-      if (USE_NSFW == 1 && $nsfw_flag == 1) {
+      if (Config::bool('features.nsfw') && $nsfw_flag == 1) {
         $nsfw = true;
       } else {
         $nsfw = false;
@@ -1638,15 +1690,15 @@ function picreplace(): void {
 
       // 続き描きでは新しい画像から必ずサムネイルを作り直す。
       $thumbnail = ImageService::refreshNsfwThumbnail(
-        IMG_DIR, $new_picfile, (string)($msg_d['thumbnail'] ?? ''), $nsfw,
-        PDEF_W, PERMISSION_FOR_DEST, true, false
+        Config::string('paths.images'), $new_picfile, (string)($msg_d['thumbnail'] ?? ''), $nsfw,
+        Config::int('limits.paint_default_width'), Config::int('permissions.public_file'), true, false
       );
       if ($thumbnail !== '') {
-        $replacement['created_files'][] = rtrim(IMG_DIR, '/\\') . DIRECTORY_SEPARATOR . $thumbnail;
+        $replacement['created_files'][] = rtrim(Config::string('paths.images'), '/\\') . DIRECTORY_SEPARATOR . $thumbnail;
       }
       $old_thumbnail = basename((string)($msg_d['thumbnail'] ?? ''));
       if ($old_thumbnail !== '' && $old_thumbnail !== $thumbnail) {
-        $old_thumbnail_path = rtrim(IMG_DIR, '/\\') . DIRECTORY_SEPARATOR . $old_thumbnail;
+        $old_thumbnail_path = rtrim(Config::string('paths.images'), '/\\') . DIRECTORY_SEPARATOR . $old_thumbnail;
         if (is_file($old_thumbnail_path)) $replacement['old_files'][] = $old_thumbnail_path;
       }
 
@@ -1668,13 +1720,12 @@ function picreplace(): void {
 
 //編集モードくん入口
 function editform(?int $authorized_post_id = null, ?string $authorized_password = null): void {
-  global $admin_pass;
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
 
   //csrfトークンをセット
   $dat['token'] = '';
-  if (CHECK_CSRF_TOKEN) {
+  if (Config::bool('features.csrf')) {
     $token = RequestSecurity::csrfToken();
     $_SESSION['token'] = $token;
     $dat['token'] = $token;
@@ -1690,7 +1741,7 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
 
   //記事呼び出し
   try {
-    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR);
+    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'));
     $authorization = $service->authorize((int)$edit_no, (string)$post_pwd);
     $msg = $authorization['post'];
     if ($authorization['role'] === 'owner') {
@@ -1698,10 +1749,18 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     } else {
       $dat['message'] = $en ? 'Administrator editing mode...' : '管理者編集モード...';
     }
+    $msg['input_name'] = PostService::nameForEdit(
+      (string)$msg['a_name'], (string)($dat['name_cookie'] ?? ''), $authorization['role'] === 'owner'
+    );
+    // 続き描きや所有者編集で認証済みの投稿パスワードを使う。
+    // 別投稿で保存されたCookieのパスワードでは、画像だけ更新され本文編集が失敗し得る。
+    $msg['input_password'] = $authorization['role'] === 'owner'
+      ? (string)$post_pwd
+      : (string)($dat['pwd_cookie'] ?? '');
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
-    echo $blade->run(OTHERFILE, $dat);
+    echo $template_engine->render(OTHERFILE, $dat);
   } catch (PostNotFoundException $e) {
     error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
   } catch (PostAuthorizationException $e) {
@@ -1713,14 +1772,12 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
 
 //編集モードくん本体
 function editexec(): void {
-  global $badip;
-  global $admin_pass;
   global $req_method;
   global $dat;
   global $en;
 
   //CSRFトークンをチェック
-  if (CHECK_CSRF_TOKEN) {
+  if (Config::bool('features.csrf')) {
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
     } catch (RequestSecurityException $e) {
@@ -1739,12 +1796,12 @@ function editexec(): void {
   $picfile = (string)$input['picfile'];
   $pwd = $input['pwd'];
   $sodane = $input['sodane'];
-  $edit_nsfw = USE_NSFW === 1 && $input['nsfw_flag'] === '1';
+  $edit_nsfw = Config::bool('features.nsfw') && $input['nsfw_flag'] === '1';
 
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
   try {
-    $rules = PostValidator::configuredRules($en, $req_method, $host, $badip, $admin_pass, true);
+    $rules = PostValidator::configuredRules($en, $req_method, $host, Config::array("spam.bad_hosts"), Config::string("admin.password"), true);
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
     error($e->getMessage(), $e->getCode() ?: 400);
@@ -1753,11 +1810,18 @@ function editexec(): void {
   //↑セキュリティ関連ここまで
 
   try {
-    $service = new PostService(new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST);
-    $service->edit((int)$e_no, $pwd, [
+    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
+    $edit_role = $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
     ]);
+    if ($edit_role === 'owner') {
+      $https_only = (bool)($_SERVER['HTTPS'] ?? '');
+      setcookie(
+        'name_c', $name, time() + (Config::int('board.cookie_days') * 24 * 3600),
+        '', '', $https_only, true
+      );
+    }
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
   } catch (PostNotFoundException $e) {
     error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
@@ -1770,25 +1834,25 @@ function editexec(): void {
     return;
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $resto, $pictmp, $picfile, $mode);
-  //header('Location:'.PHP_SELF);
+  //header('Location:'.Config::string('site.script_name'));
   ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }
 
 //管理モードin
 function admin_in(): void {
-  global $admin_pass, $blade, $dat;
+  global $template_engine, $dat;
   admin_no_store();
-  if (AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
-    redirect(PHP_SELF . '?mode=admin');
+  if (AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
+    redirect(Config::string('site.script_name') . '?mode=admin');
   }
   $dat['othermode'] = 'admin_in';
   $dat['token'] = RequestSecurity::csrfToken();
 
-  echo $blade->run(OTHERFILE, $dat);
+  echo $template_engine->render(OTHERFILE, $dat);
 }
 
 function admin_login(): void {
-  global $admin_pass, $en;
+  global $en;
   admin_no_store();
   try {
     RequestSecurity::assertCurrentCsrfRequest($en);
@@ -1799,11 +1863,11 @@ function admin_login(): void {
   $client_ip = is_string($client_ip) ? $client_ip : 'unknown';
   $limiter = new AdminLoginRateLimiter(
     __DIR__ . '/session',
-    $admin_pass,
-    ADMIN_LOGIN_MAX_FAILURES,
-    ADMIN_LOGIN_WINDOW,
-    ADMIN_LOGIN_LOCKOUT,
-    PERMISSION_FOR_LOG
+    Config::string("admin.password"),
+    Config::int('admin.login.max_failures'),
+    Config::int('admin.login.window'),
+    Config::int('admin.login.lockout'),
+    Config::int('permissions.private_file')
   );
   $retry_after = 0;
   try {
@@ -1819,7 +1883,7 @@ function admin_login(): void {
       : '管理者ログインの試行回数が多すぎます。時間をおいて再試行してください。', 429);
   }
   $password = (string)filter_input_data('POST', 'adminpass');
-  if (!AdminAuth::login($password, $admin_pass)) {
+  if (!AdminAuth::login($password, Config::string("admin.password"))) {
     $retry_after = 0;
     try {
       $retry_after = $limiter->recordFailure($client_ip);
@@ -1838,7 +1902,7 @@ function admin_login(): void {
   } catch (Throwable $e) {
     error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
-  redirect(PHP_SELF . '?mode=admin');
+  redirect(Config::string('site.script_name') . '?mode=admin');
 }
 
 function admin_logout(): void {
@@ -1850,7 +1914,7 @@ function admin_logout(): void {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
   AdminAuth::logout();
-  redirect(PHP_SELF . '?mode=admin_in');
+  redirect(Config::string('site.script_name') . '?mode=admin_in');
 }
 
 function admin_delete(): void {
@@ -1858,14 +1922,14 @@ function admin_delete(): void {
 }
 
 function admin_manage(?string $forced_operation = null): void {
-  global $admin_pass, $en;
+  global $en;
   admin_no_store();
   try {
     RequestSecurity::assertCurrentCsrfRequest($en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
-  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+  if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
 
@@ -1878,7 +1942,7 @@ function admin_manage(?string $forced_operation = null): void {
   try {
     /** @var AdminPostManagementService $service */
     $service = new PostService(
-      new BoardRepository(), $admin_pass, IMG_DIR, PDEF_W, PERMISSION_FOR_DEST
+      new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file')
     );
     if ($operation === 'delete') {
       $count = $service->deleteManyAsAdmin($selected);
@@ -1900,7 +1964,71 @@ function admin_manage(?string $forced_operation = null): void {
   } catch (Throwable $e) {
     error($en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500, $e);
   }
-  redirect(PHP_SELF . '?mode=admin');
+  redirect(Config::string('site.script_name') . '?mode=admin');
+}
+
+/** @return object|null Theme providers implement templateData(), save(array), and reset(). */
+function theme_settings_provider(): ?object {
+  global $theme_directory;
+
+  if (!defined('THEME_SETTINGS_CLASS')) return null;
+  $class = constant('THEME_SETTINGS_CLASS');
+  if (!is_string($class) || $class === '' || !class_exists($class)) {
+    throw new RuntimeException('Theme settings provider is unavailable.');
+  }
+  $provider = new $class(
+    $theme_directory, Config::int('database.busy_timeout'), Config::int('permissions.private_file')
+  );
+  foreach (['templateData', 'save', 'reset'] as $method) {
+    if (!method_exists($provider, $method)) {
+      throw new RuntimeException('Theme settings provider has an invalid interface.');
+    }
+  }
+  return $provider;
+}
+
+function admin_theme_settings(): void {
+  global $en;
+
+  admin_no_store();
+  $settings = null;
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  require_admin_session();
+  try {
+    $settings = theme_settings_provider();
+  } catch (Throwable $e) {
+    error($en ? 'Theme settings are unavailable.' : 'テーマ設定を利用できません。', 500, $e);
+    return;
+  }
+  if ($settings === null) {
+    error($en ? 'Theme color settings are unavailable for this theme.' : 'このテーマでは配色設定を利用できません。', 404);
+    return;
+  }
+
+  $operation = (string)filter_input_data('POST', 'operation');
+  if (!in_array($operation, ['save', 'reset'], true)) {
+    error($en ? 'Invalid theme settings operation.' : 'テーマ設定の操作が不正です。', 400);
+  }
+  try {
+    if ($operation === 'reset') {
+      $settings->reset();
+      $_SESSION['theme_settings_message'] = $en ? 'Theme settings were reset.' : 'テーマ標準の設定に戻しました。';
+    } else {
+      $values = $_POST['theme_settings'] ?? null;
+      if (!is_array($values)) throw new InvalidArgumentException('Invalid theme settings.');
+      $settings->save($values);
+      $_SESSION['theme_settings_message'] = $en ? 'Theme settings were saved.' : 'テーマ設定をサイト全体に保存しました。';
+    }
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Invalid theme settings values.' : 'テーマ設定の値が不正です。', 400);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to save theme settings.' : 'テーマ設定を保存できませんでした。', 500, $e);
+  }
+  redirect(Config::string('site.script_name') . '?mode=admin');
 }
 
 function admin_no_store(): void {
@@ -1921,17 +2049,25 @@ function admin_post_id(): int {
 }
 
 function require_admin_session(): void {
-  global $admin_pass;
   global $en;
 
   admin_no_store();
-  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+  if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
 }
 
+function diary_post_allowed(bool $is_reply): bool {
+  return DiaryPostPolicy::allows(
+    Config::bool('features.diary_mode'),
+    Config::bool('features.diary_allow_public_replies'),
+    AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime')),
+    $is_reply
+  );
+}
+
 function admin_post(): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
 
   require_admin_session();
@@ -1960,41 +2096,40 @@ function admin_post(): void {
     $dat['admin_parent'] = $parent;
     $dat['admin_replies'] = $replies;
     $dat['admin_pic_url'] = $picfile !== '' && $picfile === (string)$post['picfile']
-      && is_file(IMG_DIR . $picfile) ? IMG_DIR . $picfile : '';
+      && is_file(Config::string('paths.images') . $picfile) ? Config::string('paths.images') . $picfile : '';
     $dat['admin_thumbnail_url'] = $thumbnail !== '' && $thumbnail === (string)$post['thumbnail']
-      && is_file(IMG_DIR . $thumbnail) ? IMG_DIR . $thumbnail : '';
+      && is_file(Config::string('paths.images') . $thumbnail) ? Config::string('paths.images') . $thumbnail : '';
     $dat['admin_pch_playback_url'] = $pchfile !== '' && $pchfile === (string)$post['pchfile']
-      && is_file(IMG_DIR . $pchfile)
-      ? PHP_SELF . '?mode=anime&pch=' . rawurlencode($pchfile)
+      && is_file(Config::string('paths.images') . $pchfile)
+      ? Config::string('site.script_name') . '?mode=anime&pch=' . rawurlencode($pchfile)
       : '';
     $dat['token'] = RequestSecurity::csrfToken();
-    echo $blade->run(ADMINPOSTFILE, $dat);
+    echo $template_engine->render(ADMINPOSTFILE, $dat);
   } catch (Throwable $e) {
     error($en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500, $e);
   }
 }
 
 function admin_edit(): void {
-  global $admin_pass;
-
   require_admin_session();
-  editform(admin_post_id(), $admin_pass);
+  editform(admin_post_id(), Config::string("admin.password"));
 }
 
 //管理モード
 function admin(): void {
-  global $admin_pass;
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
 
   admin_no_store();
-  if (!AdminAuth::isAuthenticated($admin_pass, ADMIN_SESSION_LIFETIME)) {
+  if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
-  $dat['path'] = IMG_DIR;
+  $dat['path'] = Config::string('paths.images');
   $dat['token'] = RequestSecurity::csrfToken();
   $dat['message'] = isset($_SESSION['admin_message']) ? (string)$_SESSION['admin_message'] : '';
   unset($_SESSION['admin_message']);
+  $dat['theme_settings_message'] = isset($_SESSION['theme_settings_message']) ? (string)$_SESSION['theme_settings_message'] : '';
+  unset($_SESSION['theme_settings_message']);
 
   $filters = [];
   try {
@@ -2028,7 +2163,7 @@ function admin(): void {
     }
     $page = (int)$validated_page;
   }
-  $per_page = max(1, min(100, (int)ADMIN_THREADS_PER_PAGE));
+  $per_page = max(1, min(100, (int)Config::int('admin.threads_per_page')));
 
   try {
     $repository = new BoardRepository();
@@ -2036,7 +2171,7 @@ function admin(): void {
     $cached_usage = $_SESSION['admin_image_usage'] ?? null;
     if (!is_array($cached_usage) || !isset($cached_usage['measured_at'], $cached_usage['files'], $cached_usage['bytes'])
       || (int)$cached_usage['measured_at'] < time() - 300) {
-      $usage = ImageService::directoryUsage(IMG_DIR);
+      $usage = ImageService::directoryUsage(Config::string('paths.images'));
       $cached_usage = $usage + ['measured_at' => time()];
       $_SESSION['admin_image_usage'] = $cached_usage;
     }
@@ -2076,7 +2211,7 @@ function admin(): void {
     $dat['admin_range_start'] = $total_threads === 0 ? 0 : $offset + 1;
     $dat['admin_range_end'] = $offset + count($oya);
     $dat['admin_page_posts'] = count($oya) + array_sum(array_map('count', $ko));
-    echo $blade->run(ADMINFILE, $dat);
+    echo $template_engine->render(ADMINFILE, $dat);
   } catch (Throwable $e) {
     error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500, $e);
   }
@@ -2106,7 +2241,7 @@ function usrchk(): void {
 
 //OK画面
 function ok(string $mes): void {
-  global $blade, $dat;
+  global $template_engine, $dat;
   $dat['okmes'] = $mes;
   $dat['othermode'] = 'ok';
   $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
@@ -2114,7 +2249,7 @@ function ok(string $mes): void {
   if($http_x_requested_with || $async_flag){
     die("OK!\n$mes");
   }
-  echo $blade->run(OTHERFILE, $dat);
+  echo $template_engine->render(OTHERFILE, $dat);
 }
 
 //Asyncリクエストの時は処理を中断
@@ -2130,12 +2265,12 @@ function check_AsyncRequest($picfile=''): void {
 
 /* テンポラリ内のゴミ除去 */
 function del_temp(): void {
-  ImageService::cleanupTemporaryFiles(TEMP_DIR, TEMP_LIMIT);
+  ImageService::cleanupTemporaryFiles(Config::string('paths.temporary'), Config::int('limits.temporary_days'));
 }
 
 //古い外部画像サムネイルの削除
 function clean_old_thumbnails(): void {
-  if (!defined('EXTERNAL_IMAGE_THUMB_DAYS') || EXTERNAL_IMAGE_THUMB_DAYS <= 0) {
+  if (Config::int('limits.external_thumbnail_days') <= 0) {
     return;
   }
   $thumbnail_dir = __DIR__ . '/thumbnail/';
@@ -2147,7 +2282,7 @@ function clean_old_thumbnails(): void {
     $file_path = $thumbnail_dir . $file;
     if (!is_dir($file_path) && preg_match('/_thumb\.(jpg|png|gif|webp|avif)$/', $file)) {
       $lapse = time() - filemtime($file_path);
-      if ($lapse > (EXTERNAL_IMAGE_THUMB_DAYS * 24 * 3600)) {
+      if ($lapse > (Config::int('limits.external_thumbnail_days') * 24 * 3600)) {
         safe_unlink($file_path);
       }
     }
@@ -2190,7 +2325,7 @@ function logdel(): void {
 
     $del_id = (int)$msg["tid"]; //消す行のスレ番号
     $msg_pic = $msg["picfile"]; //画像の名前取得できた
-    ImageService::deleteRelatedFiles(IMG_DIR, (string)$msg_pic);
+    ImageService::deleteRelatedFiles(Config::string('paths.images'), (string)$msg_pic);
 
     $repository->deletePost($del_id, true);
   } catch (PDOException $e) {
@@ -2201,7 +2336,7 @@ function logdel(): void {
 //エラー画面
 function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   global $db;
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $en;
   if ($status < 400 || $status > 599) $status = 500;
   if ($status >= 500) {
@@ -2219,15 +2354,15 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   if($http_x_requested_with || $async_flag){
     die("error\n$mes");
   }
-  if (!isset($blade)) die($mes);
-  echo $blade->run(OTHERFILE, $dat);
+  if (!isset($template_engine)) die($mes);
+  echo $template_engine->render(OTHERFILE, $dat);
   exit;
 }
 
 //画像差し替え失敗
 function error2(): void {
   global $db;
-  global $blade, $dat;
+  global $template_engine, $dat;
   global $self;
   global $en;
   http_response_code(500);
@@ -2239,6 +2374,6 @@ function error2(): void {
   if($http_x_requested_with || $async_flag){
     die($en ? "error?\nImage not found. There might be a failure in the posting.<a href=\"{{$self}}?mode=piccom\">Uploaded images</a> might still be available." : "error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
   }
-  echo $blade->run(OTHERFILE, $dat);
+  echo $template_engine->render(OTHERFILE, $dat);
   exit;
 }

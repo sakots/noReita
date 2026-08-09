@@ -12,7 +12,7 @@ final class RequestSecurity {
 
     $session_directory = __DIR__ . '/session/';
     $session_file_lifetime = self::sessionFileLifetime();
-    session_name(defined('SESSION_NAME') ? SESSION_NAME : 'noreita_session');
+    session_name(Config::string('security.session_name'));
     session_save_path($session_directory);
     ini_set('session.use_strict_mode', '1');
     ini_set('session.gc_maxlifetime', (string)$session_file_lifetime);
@@ -102,9 +102,9 @@ final class RequestSecurity {
   }
 
   private static function sessionFileLifetime(): int {
-    $lifetime = defined('SESSION_FILE_LIFETIME') ? constant('SESSION_FILE_LIFETIME') : 86400;
+    $lifetime = Config::int('security.session_file_lifetime');
     if (!is_int($lifetime) || $lifetime < 60 || $lifetime > 31536000) {
-      throw new RuntimeException('SESSION_FILE_LIFETIME must be between 60 and 31536000 seconds.');
+      throw new RuntimeException('security.session_file_lifetime must be between 60 and 31536000 seconds.');
     }
     return $lifetime;
   }

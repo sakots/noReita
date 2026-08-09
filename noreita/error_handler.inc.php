@@ -263,11 +263,12 @@ final class ApplicationErrorHandler {
 
   private static function redact(string $value): string {
     $secrets = [];
-    foreach (['admin_pass', 'second_pass'] as $name) {
+    foreach (['second_pass'] as $name) {
       if (isset($GLOBALS[$name]) && is_string($GLOBALS[$name])) $secrets[] = $GLOBALS[$name];
     }
-    foreach (['CRYPT_PASS'] as $name) {
-      if (defined($name) && is_string(constant($name))) $secrets[] = constant($name);
+    if (class_exists('Config', false) && Config::isLoaded()) {
+      $secrets[] = Config::string('admin.password');
+      $secrets[] = Config::string('security.paint_password');
     }
     if (isset($_SESSION) && is_array($_SESSION)) {
       foreach (['accessToken', 'sns_api_session_id', 'token'] as $name) {

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <title>{{ board_title }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% include 'components/eda_headCss.twig' %}
+</head>
+
+<body>
+  <header id="header">
+    <h1><a href="{{ self }}">{{ board_title }}</a></h1>
+    <div>
+      <a href="{{ home }}" target="_top">[ホーム]</a>
+      <a href="{{ self }}?mode=admin_in">[管理モード]</a>
+    </div>
+    <hr>
+    <div>
+      <section>
+        <p class="top menu">
+          <a href="{{ self }}">[通常モード]</a>
+          <a href="{{ self }}?mode=pictmp">[投稿途中の絵]</a>
+          <a href="#footer">[↓]</a>
+        </p>
+      </section>
+      <section>
+        <p class="sysmsg">{{ message ?? '' }}</p>
+      </section>
+    </div>
+    <hr>
+    <div>
+      <section class="epost">
+        {% include 'components/eda_picpostForm.twig' %} <!-- 投稿フォーム -->
+        {% include 'components/eda_info.twig' %} <!-- お絵かき掲示板の説明 -->
+      </section>
+      <hr>
+      {% if catalogmode == 'catalog' %}
+        <p>カタログモード</p>
+      {% endif %}
+      {% if catalogmode == 'search' %}
+        <p>検索結果 - {{ search_label }}「{{ search_term }}」- {{ s_result }}件</p>
+      {% endif %}
+      {% if catalog_paging_enabled %}
+      <hr>
+      {% include 'components/eda_pagingCatalogMode.twig' %} <!-- カタログモードのページング -->
+      {% endif %}
+    </div>
+  </header>
+  <main>
+    <div class="thread" id="catalog">
+      {% if oya is not empty %}
+        {% for bbsline in oya %}
+          <div>
+            <div>
+              {% if bbsline['picfile'] %}
+                <p>
+                  <a href="{{ self }}?mode=res&amp;res={{ bbsline['tid'] }}" title="{{ bbsline['sub'] }} (by {{ bbsline['a_name'] }})">{% if bbsline['thumb'] %}<img src="{{ path }}{{ bbsline['thumb'] }}" alt="{{ bbsline['sub'] }} (by {{ bbsline['a_name'] }})" loading="lazy">{% else %}<img src="{{ path }}{{ bbsline['picfile'] }}" alt="{{ bbsline['sub'] }} (by {{ bbsline['a_name'] }})" loading="lazy">{% endif %}</a>
+                </p>
+              {% else %}
+                <p>
+                  <a href="{{ self }}?mode=res&amp;res={{ bbsline['tid'] }}" title="{{ bbsline['sub'] }} (by {{ bbsline['a_name'] }})">{{ bbsline['sub'] }} (by {{ bbsline['a_name'] }})</a>
+                </p>
+              {% endif %}
+              <p>
+                [{{ bbsline['tid'] }}]
+              </p>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% if ko is not empty %}
+        {% for res in ko %}
+        <div>
+          <div>
+            {% if res['picfile'] %}
+              <p>
+                <a href="{{ self }}?mode=res&amp;res={{ res['parent'] }}" title="{{ res['sub'] }} (by {{ res['a_name'] }})">{% if res['thumb'] %}<img src="{{ res['thumb'] }}" alt="{{ res['sub'] }} (by {{ res['a_name'] }})" loading="lazy">{% else %}<img src="{{ path }}{{ res['picfile'] }}" alt="{{ res['sub'] }} (by {{ res['a_name'] }})" loading="lazy">{% endif %}</a>
+              </p>
+            {% else %}
+              <p>
+                <a href="{{ self }}?mode=res&amp;res={{ res['parent'] }}" title="{{ res['sub'] }} (by {{ res['a_name'] }})">{{ mb_substr(res['com'], 0, 30)|raw }}</a>
+              </p>
+            {% endif %}
+            <p>
+              [{{ res['tid'] }}]
+            </p>
+          </div>
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div>
+      <section class="thread">
+        {% if catalog_paging_enabled %}
+          {% include 'components/eda_pagingCatalogMode.twig' %} <!-- カタログモードのページング -->
+          <hr>
+        {% endif %}
+        {% include 'components/eda_searchForm.twig' %} <!-- 検索フォーム -->
+        {% include 'components/eda_deleteForm.twig' %} <!-- 削除フォーム -->
+      </section>
+    </div>
+  </main>
+  <footer id="footer">
+    {% include 'components/eda_footerCopy.twig' %} <!-- コピーライト -->
+  </footer>
+</body>
+
+</html>

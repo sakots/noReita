@@ -146,8 +146,8 @@ function create_res(array $post): array {
       'img_h' => $post['img_h'],
       'tool' => $post['tool'],
       'utime' => $post['utime'],
-      'created' => (!empty($post['created']) && strtotime($post['created'])) ? date(DATE_FORMAT, strtotime($post['created'])) : '',
-      'modified' => (!empty($post['modified']) && strtotime($post['modified'])) ? date(DATE_FORMAT, strtotime($post['modified'])) : '',
+      'created' => (!empty($post['created']) && strtotime($post['created'])) ? date(Config::string('board.date_format'), strtotime($post['created'])) : '',
+      'modified' => (!empty($post['modified']) && strtotime($post['modified'])) ? date(Config::string('board.date_format'), strtotime($post['modified'])) : '',
       'past' => (!empty($post['created']) && strtotime($post['created'])) ? strtotime($post['created']) : 0,
       'parent' => $post['parent'],
       'pwd' => $post['pwd'],
@@ -173,8 +173,8 @@ function create_res(array $post): array {
     }
 
     // 共有用のエンコード
-    $res['encoded_t'] = urlencode('[' . $res['tid'] . ']' . $res['sub'] . ($res['a_name'] ? ' by ' . $res['a_name'] : '') . ' - ' . TITLE);
-    $res['encoded_u'] = urlencode(BASE . '?resno=' . $res['tid']);
+    $res['encoded_t'] = urlencode('[' . $res['tid'] . ']' . $res['sub'] . ($res['a_name'] ? ' by ' . $res['a_name'] : '') . ' - ' . Config::string('site.title'));
+    $res['encoded_u'] = urlencode(Config::string('site.base_url') . '?resno=' . $res['tid']);
 
     return $res;
   } catch (Exception $e) {
@@ -188,7 +188,7 @@ class misskey_note {
   //投稿済みの記事をMisskeyにノートするための前処理
   public static function before_misskey_note(): void {
     global $home, $set_nsfw, $en, $deny_all_posts;
-    global $blade, $dat;
+    global $template_engine, $dat;
     //管理者判定処理
     RequestSecurity::startSession();
     $admin_post = admin_post_valid();
@@ -212,7 +212,7 @@ class misskey_note {
     }
     $dat['post'] = $post;
 
-    $dat['path'] = IMG_DIR;
+    $dat['path'] = Config::string('paths.images');
     $dat['token'] = RequestSecurity::csrfToken();
 
     // nsfw
@@ -225,14 +225,14 @@ class misskey_note {
     $admin_pass = null;
 
     $dat['misskey_mode'] = 'before';
-    echo $blade->run(MISSKEYFILE, $dat);
+    echo $template_engine->render(MISSKEYFILE, $dat);
     exit();
   }
 
   //投稿済みの画像をMisskeyにNoteするための投稿フォーム
   public static function misskey_note_edit_form(): void {
-    global $home, $set_nsfw, $en, $max_kb, $use_upload, $admin, $misskey_servers;
-    global $blade, $dat;
+    global $home, $set_nsfw, $en, $max_kb, $use_upload, $admin;
+    global $template_engine, $dat;
 
     try {
       RequestSecurity::assertCurrentSameOriginRequest($en);
@@ -272,11 +272,11 @@ class misskey_note {
     if (!$post) {
       error($en ? 'The article was not found.' : '記事が見つかりません。', 404);
     }
-    $dat['path'] = IMG_DIR;
+    $dat['path'] = Config::string('paths.images');
     $dat['post'] = $post;
 
     // Misskeyサーバーリストをセット
-    $dat['misskey_servers'] = $misskey_servers;
+    $dat['misskey_servers'] = Config::array('social.misskey_servers');
 
     $dat['nsfw_c'] = (bool)filter_input_data('COOKIE', 'nsfw_c', FILTER_VALIDATE_BOOLEAN);
     $dat['set_nsfw_show_hide'] = (bool)filter_input_data('COOKIE', 'p_n_set_nsfw_show_hide', FILTER_VALIDATE_BOOLEAN);
@@ -296,13 +296,13 @@ class misskey_note {
     // HTML出力
     $dat['misskey_mode'] = 'note_edit_form';
 
-    echo $blade->run(MISSKEYFILE, $dat);
+    echo $template_engine->render(MISSKEYFILE, $dat);
     exit();
   }
 
   //Misskeyに投稿するSESSIONデータを作成
   public static function create_misskey_note_sessiondata(): void {
-    global $en, $usercode, $misskey_servers;
+    global $en, $usercode;
 
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
@@ -424,7 +424,7 @@ class misskey_note {
 
     $_SESSION['sns_api_session_id'] = $sns_api_session_id;
 
-    $encoded_root_url = urlencode(BASE);
+    $encoded_root_url = urlencode(Config::string('site.base_url'));
 
     //別のサーバを選択した時はトークンをクリア
     if (!isset($_SESSION['misskey_server_radio']) ||
@@ -460,7 +460,7 @@ class misskey_note {
         unset($_SESSION['accessToken']); //トークンをクリア
       } else {
         //アプリの認証をスキップするURL
-        $Location = BASE . "connect_misskey_api.php?skip_auth_check=on&s_id={$sns_api_session_id}";
+        $Location = Config::string('site.base_url') . "connect_misskey_api.php?skip_auth_check=on&s_id={$sns_api_session_id}";
       }
     }
 
@@ -469,7 +469,7 @@ class misskey_note {
 
   // Misskeyへの投稿が成功した事を知らせる画面
   public static function misskey_success(): void {
-    global $en, $blade, $dat;
+    global $en, $template_engine, $dat;
     $no = (string)filter_input_data('GET', 'no', FILTER_VALIDATE_INT);
 
     RequestSecurity::startSession();
@@ -481,7 +481,7 @@ class misskey_note {
     $admin_pass = null;
     $dat['misskey_mode'] = 'success';
     $dat['no'] = $no;
-    echo $blade->run(MISSKEYFILE, $dat);
+    echo $template_engine->render(MISSKEYFILE, $dat);
     exit();
   }
 }

@@ -48,7 +48,7 @@
           <p>Not OEKAKI image</p>
           @endif
         </div>
-        @if (isset($temp))
+        @if (isset($temp) || $use_image_upload)
         <form class="ppost postform" action="{{$self}}?mode=regist" method="post" enctype="multipart/form-data">
           <table>
             <tr>
@@ -78,12 +78,19 @@
               <td>imgs</td>
               <td>
                 <select name="picfile">
+                  <option value="">（お絵かき画像を選ばない）</option>
                   @foreach ($temp as $tmp)
                   @if (isset($tmp['src_name'])) <option value="{{$tmp['src_name']}}">{{$tmp['src_name']}}</option>
                   @endif
                   @endforeach
                 </select>
               </td>
+            </tr>
+            @endif
+            @if ($use_image_upload)
+            <tr>
+              <td>upload</td>
+              <td><input type="file" name="image_upload" accept="image/png,image/jpeg,image/gif,image/webp,image/avif">（PNG / JPEG / GIF / WebP / AVIF、{{$upload_max_kb}}KBまで）</td>
             </tr>
             @endif
             <tr>
@@ -93,7 +100,7 @@
                 (記事の編集削除用。英数字で)
               </td>
             </tr>
-            @if ($use_nsfw === 1)
+            @if ($use_nsfw)
             <tr>
               <td>NSFW</td>
               <td>

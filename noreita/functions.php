@@ -1,22 +1,5 @@
 <?php
-const FUNCTIONS_VER = 20260728;
-
-// PHP 8で追加された文字列関数のPHP 7.4向け互換実装
-if (!function_exists('str_contains')) {
-  function str_contains(string $haystack, string $needle): bool {
-    return $needle === '' || strpos($haystack, $needle) !== false;
-  }
-}
-if (!function_exists('str_starts_with')) {
-  function str_starts_with(string $haystack, string $needle): bool {
-    return $needle === '' || strpos($haystack, $needle) === 0;
-  }
-}
-if (!function_exists('str_ends_with')) {
-  function str_ends_with(string $haystack, string $needle): bool {
-    return $needle === '' || substr($haystack, -strlen($needle)) === $needle;
-  }
-}
+const FUNCTIONS_VER = 20260807;
 
 //ページのコンテキストをセッションに保存
 function set_page_context_to_session(): void {
@@ -38,14 +21,15 @@ function set_page_context_to_session(): void {
 
 //管理者パスワードを確認
 function is_admin_pass(string $pwd): bool {
-  global $admin_pass,$second_pass;
+  global $second_pass;
   $pwd=(string)$pwd;
+  $admin_pass = Config::string('admin.password');
   return ($admin_pass && $pwd && $second_pass !== $admin_pass && $pwd === $admin_pass);
 }
 
 // 文字コード変換
 function charconvert(string $str): string {
-  mb_language(LANG);
+  mb_language(Config::string('site.language'));
   return mb_convert_encoding($str, "UTF-8", "auto");
 }
 
@@ -152,7 +136,7 @@ function auto_link(string $proto): string {
 
 /* ハッシュタグリンク */
 function hashtag_link(string $hashtag): string {
-  $self = PHP_SELF;
+  $self = Config::string('site.script_name');
   $pattern = "/(?:^|[^ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9&_\/]+)[#＃]([ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9_]*[ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z]+[ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9_]*)/u";
   $replace = " <a href=\"{$self}?mode=search&amp;tag=tag&amp;search=\\1\">#\\1</a>";
   $hashtag = preg_replace($pattern, $replace, $hashtag);
@@ -177,19 +161,20 @@ function tobr(string $com): string {
 
 /* ID生成 */
 function gen_id(string $userip, string $time): string {
-  if (ID_CYCLE === '0') {
-    return substr(crypt(md5($userip . ID_SEED), 'id'), -8);
-  } elseif (ID_CYCLE === '1') {
-    return substr(crypt(md5($userip . ID_SEED . date("Ymd", $time)), 'id'), -8);
-  } elseif (ID_CYCLE === '2') {
-    $week = ceil(date("d", $time) / 7);
-    return substr(crypt(md5($userip . ID_SEED . date("Ym", $time) . $week), 'id'), -8);
-  } elseif (ID_CYCLE === '3') {
-    return substr(crypt(md5($userip . ID_SEED . date("Ym", $time)), 'id'), -8);
-  } elseif (ID_CYCLE === '4') {
-    return substr(crypt(md5($userip . ID_SEED . date("Y", $time)), 'id'), -8);
+  $timestamp = ctype_digit($time) ? (int)$time : time();
+  if (Config::int('identity.cycle') === 0) {
+    return substr(crypt(md5($userip . Config::string('identity.seed')), 'id'), -8);
+  } elseif (Config::int('identity.cycle') === 1) {
+    return substr(crypt(md5($userip . Config::string('identity.seed') . date("Ymd", $timestamp)), 'id'), -8);
+  } elseif (Config::int('identity.cycle') === 2) {
+    $week = ceil((int)date("d", $timestamp) / 7);
+    return substr(crypt(md5($userip . Config::string('identity.seed') . date("Ym", $timestamp) . $week), 'id'), -8);
+  } elseif (Config::int('identity.cycle') === 3) {
+    return substr(crypt(md5($userip . Config::string('identity.seed') . date("Ym", $timestamp)), 'id'), -8);
+  } elseif (Config::int('identity.cycle') === 4) {
+    return substr(crypt(md5($userip . Config::string('identity.seed') . date("Y", $timestamp)), 'id'), -8);
   } else {
-    return substr(crypt(md5($userip . ID_SEED), 'id'), -8);
+    return substr(crypt(md5($userip . Config::string('identity.seed')), 'id'), -8);
   }
 }
 

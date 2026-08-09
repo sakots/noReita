@@ -1,3 +1,4 @@
+@if (isset($resno) ? $can_post_reply : $can_create_thread)
 <form action="{{$self}}" method="post" enctype="multipart/form-data">
   <p>
     <label>幅：<input class="form" type="number" min="300" max="{{$pmax_w}}" name="picw" value="{{$pdef_w}}" required></label>
@@ -29,10 +30,17 @@
     <label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
     @endif
     <input class="button" type="submit" value="お絵かき">
+    @if ($use_image_upload && !isset($resno))<a href="{{$self}}?mode=pictmp">画像をアップロード</a>@endif
     @if (isset($resno)) <input type="hidden" name="modid" value="{{$resno}}"> @endif
     @if (isset($resno)) <input type="hidden" name="resto" value="{{$resno}}"> @endif
   </p>
   <ul>
     <li>お絵かきできるサイズは幅300～{{$pmax_w}}px、高さ300～{{$pmax_h}}pxです。</li>
+    @if ($use_image_upload)<li>画像アップロードは幅{{$upload_max_width}}px、高さ{{$upload_max_height}}px、{{$upload_max_kb}}KBまでです。</li>@endif
   </ul>
 </form>
+@elseif (isset($resno))
+<p>返信は管理者のみ投稿できます。</p>
+@else
+<p>日記モードでは新規投稿は管理者のみです。</p>
+@endif

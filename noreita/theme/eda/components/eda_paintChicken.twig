@@ -1,0 +1,25 @@
+<section id="cp">
+  <div id="chickenpaint-parent"></div>
+  <p></p>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      new ChickenPaint({
+        uiElem: document.getElementById("chickenpaint-parent"),
+        canvasWidth: {{ picw }},
+        canvasHeight: {{ pich }},
+
+        {% if imgfile is defined %} loadImageUrl: "{{ imgfile }}", {% endif %}
+        {% if pchfile is defined %} loadChibiFileUrl: "{{ pchfile }}", {% endif %}
+        saveUrl: "{{ self }}?mode=saveimage&tool=chi&stime={{ stime }}{% if repcode is defined %}&repcode={{ repcode }}{% endif %}{{ (resto is defined  and  resto != null) ? '&resto='.resto : ''|raw }}",
+        postUrl: "{{ self }}?mode={{ mode|raw }}&stime={{ stime }}{% if resto is defined  and  resto != null %}&resto={{ resto }}{% endif %}",
+        exitUrl: "{{ self }}" + (resto ? "?resto=" + resto : ""),
+
+        allowDownload: true,
+        resourcesRoot: "{{ chicken_dir }}",
+        disableBootstrapAPI: true,
+        fullScreenMode: "force"
+
+      });
+    })
+  </script>
+</section>

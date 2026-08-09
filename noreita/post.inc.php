@@ -1,12 +1,18 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260806;
+const POST_INC_VER = 20260807;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
 final class PostAuthorizationException extends RuntimeException {}
 final class DuplicatePostException extends RuntimeException {}
+
+final class DiaryPostPolicy {
+  public static function allows(bool $diary_mode, bool $allow_public_replies, bool $is_admin, bool $is_reply): bool {
+    return !$diary_mode || $is_admin || ($is_reply && $allow_public_replies);
+  }
+}
 
 interface AdminPostManagementService {
   public function deleteManyAsAdmin(array $post_ids): int;
@@ -59,9 +65,13 @@ final class PostService implements AdminPostManagementService {
     throw new PostAuthorizationException('Invalid password.');
   }
 
-  public function edit(int $post_id, string $password, array $values): void {
+  public function edit(int $post_id, string $password, array $values): string {
     $authorization = $this->authorize($post_id, $password);
     $post = $authorization['post'];
+    $submitted_name = (string)($values['name'] ?? '');
+    $values['name'] = hash_equals((string)$post['a_name'], $submitted_name)
+      ? $submitted_name
+      : generate_trip($submitted_name);
     $values['pwdh'] = (string)$post['pwd'];
     $values['nsfw'] = (int)$post['nsfw'];
     $values['thumbnail'] = (string)($post['thumbnail'] ?? '');
@@ -76,6 +86,12 @@ final class PostService implements AdminPostManagementService {
       $values['nsfw'] = (int)$nsfw;
     }
     $this->repository->updateContent($post_id, $values);
+    return $authorization['role'];
+  }
+
+  public static function nameForEdit(string $stored_name, string $saved_name, bool $is_owner): string {
+    if (!$is_owner || $saved_name === '') return $stored_name;
+    return hash_equals($stored_name, generate_trip($saved_name)) ? $saved_name : $stored_name;
   }
 
   public function delete(int $post_id, string $password, bool $delete_as_admin): string {
@@ -302,21 +318,21 @@ final class PostValidator {
       'request_method' => $request_method,
       'host' => $host,
       'blocked_hosts' => $blocked_hosts,
-      'require_name' => (bool)USE_NAME,
+      'require_name' => Config::bool('features.require_name'),
       'require_comment' => $require_comment,
-      'require_subject' => (bool)USE_SUB,
-      'max_comment' => (int)MAX_COM,
-      'max_name' => (int)MAX_NAME,
-      'max_email' => (int)MAX_EMAIL,
-      'max_subject' => (int)MAX_SUB,
-      'max_url' => (int)MAX_URL,
-      'japanese_filter' => (bool)USE_JAPANESEFILTER,
-      'deny_comment_urls' => (bool)DENY_COMMENTS_URL,
+      'require_subject' => Config::bool('features.require_subject'),
+      'max_comment' => Config::int('limits.comment_length'),
+      'max_name' => Config::int('limits.name_length'),
+      'max_email' => Config::int('limits.email_length'),
+      'max_subject' => Config::int('limits.subject_length'),
+      'max_url' => Config::int('limits.url_length'),
+      'japanese_filter' => Config::bool('features.japanese_filter'),
+      'deny_comment_urls' => Config::bool('features.deny_comment_urls'),
       'admin_pass' => $admin_pass,
-      'bad_strings' => $GLOBALS['badstring'] ?? [],
-      'bad_names' => $GLOBALS['badname'] ?? [],
-      'bad_strings_a' => $GLOBALS['badstr_A'] ?? [],
-      'bad_strings_b' => $GLOBALS['badstr_B'] ?? [],
+      'bad_strings' => Config::array('spam.bad_strings'),
+      'bad_names' => Config::array('spam.bad_names'),
+      'bad_strings_a' => Config::array('spam.bad_strings_a'),
+      'bad_strings_b' => Config::array('spam.bad_strings_b'),
     ];
   }
 

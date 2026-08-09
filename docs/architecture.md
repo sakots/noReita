@@ -4,7 +4,11 @@
 
 `index.php`はリクエストの受け取りと画面遷移を担当します。投稿入力の取得と検証は`post.inc.php`の`PostValidator`へ追加してください。DB接続や画像ファイル操作を追加する場合は、直接実装せず以下の層へ追加してください。
 
-外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定しています。
+外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定し、Twig 3も同梱します。
+
+`template_engine.inc.php`が画面描画の共通入口です。`TemplateEngine`を通して論理テンプレート名とデータ配列を渡し、テーマの`theme_conf.php`にある`THEME_TEMPLATE_ENGINE`定数で`blade`または`twig`を選択します。定数がない既存テーマは互換性のため`blade`として扱います。BladeOneは従来どおり`.blade.php`、Twigは同名の`.twig`をテーマディレクトリから読み込みます。Twig選択時に`.twig`がない画面は`.blade.php`へフォールバックするため、テーマを稼働させたまま1画面ずつ移行できます。Twigの自動エスケープを有効にしているため、HTMLを出力する値はTwigテンプレート側で必要な箇所だけ`|raw`を明示してください。
+
+`theme_manifest.inc.php`はテーマのマニフェストを検証し、`ThemeDiagnostics`が必須テンプレート、コンポーネント参照、アセット、Twig構文を診断します。テーマ作成者は`theme_manifest.php`でテーマID、バージョン、使用エンジン、必要なPHP、テンプレート、アセットを宣言します。`plugins/check-theme.php`は読み取り専用のCLI自己診断です。
 
 `PostValidator`は必須項目、文字数、NGワード、日本語フィルター、コメントURL、拒否ホストを画面描画から独立して検証します。
 
@@ -34,9 +38,14 @@
 
 `initialization.inc.php`の`ApplicationInitializer`がセキュリティヘッダー、実行時ディレクトリの準備、DBマイグレーション、DBファイルの権限設定を担当します。起動時のファイル環境処理は`index.php`へ直接追加せず、このクラスへ追加してください。
 
+`bootstrap.php`はすべてのHTTP・CLIエントリーポイントに共通する起動処理です。
+`config.php`の既定値と任意の`config.local.php`を読み込み、`Config`で検証した後に
+エラー処理とタイムゾーンを設定します。設定参照には`Config::string()`、
+`Config::int()`、`Config::bool()`、`Config::array()`を使用します。
+
 ## データベース
 
-`database.inc.php`がSQLite接続、投稿リポジトリ、スキーママイグレーションを担当します。接続時に例外モード、WAL、`busy_timeout`を設定し、通常処理、DB移行、Misskey連携で同じ設定を使用します。既定では別処理の書き込みロックが解除されるまで最大5秒待ちます。待機時間は`config.php`の`DB_BUSY_TIMEOUT`で0～60000ミリ秒の範囲に変更できます。
+`database.inc.php`がSQLite接続、投稿リポジトリ、スキーママイグレーションを担当します。接続時に例外モード、WAL、`busy_timeout`を設定し、通常処理、DB移行、Misskey連携で同じ設定を使用します。既定では別処理の書き込みロックが解除されるまで最大5秒待ちます。待機時間は`config.local.php`の`database.busy_timeout`で0～60000ミリ秒の範囲に変更できます。
 
 - `Database::connect()`：共通のPDO接続とWAL・ロック待機設定
 - `BoardRepository`：投稿の取得、検索、削除、非表示化

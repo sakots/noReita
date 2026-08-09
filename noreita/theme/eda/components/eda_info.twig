@@ -1,0 +1,8 @@
+<ul>
+  <li>iPadやスマートフォンでも描けるお絵かき掲示板です。</li>
+  {% for info in addinfo %}
+    {% if info[loop.index0] is not empty %}
+    <li>{{ addinfo[loop.index0]|raw }}</li>
+    {% endif %}
+  {% endfor %}
+</ul>

@@ -51,7 +51,7 @@ function copy_tree(string $source, string $destination): void {
   }
   $skip = ['backup', 'cache', 'errorlog', 'img', 'session', 'temp', 'thumb', 'thumbnail', 'tmp'];
   foreach (new DirectoryIterator($source) as $item) {
-    if ($item->isDot() || in_array($item->getFilename(), $skip, true) || $item->getFilename() === 'config.php') {
+    if ($item->isDot() || in_array($item->getFilename(), $skip, true) || $item->getFilename() === 'config.local.php') {
       continue;
     }
     $target = $destination . DIRECTORY_SEPARATOR . $item->getFilename();
@@ -100,7 +100,14 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
   ]);
   if ($post !== null) {
     curl_setopt($curl, CURLOPT_POST, true);
-    curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($post));
+    $is_multipart = false;
+    foreach ($post as $value) {
+      if ($value instanceof CURLFile) {
+        $is_multipart = true;
+        break;
+      }
+    }
+    curl_setopt($curl, CURLOPT_POSTFIELDS, $is_multipart ? $post : http_build_query($post));
   }
   $body = curl_exec($curl);
   $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
@@ -125,18 +132,48 @@ function cookie_value(string $cookie_jar, string $name): ?string {
   return null;
 }
 
+function replace_cookie_value(string $cookie_jar, string $name, string $value): bool {
+  $lines = file($cookie_jar, FILE_IGNORE_NEW_LINES) ?: [];
+  $replaced = false;
+  foreach ($lines as &$line) {
+    $prefix = str_starts_with($line, '#HttpOnly_') ? '#HttpOnly_' : '';
+    $record = $prefix !== '' ? substr($line, strlen($prefix)) : $line;
+    if ($record === '' || ($record[0] ?? '') === '#') continue;
+    $fields = explode("\t", $record);
+    if (count($fields) < 7 || $fields[5] !== $name) continue;
+    $fields[6] = $value;
+    $line = $prefix . implode("\t", $fields);
+    $replaced = true;
+  }
+  unset($line);
+  return $replaced && file_put_contents($cookie_jar, implode(PHP_EOL, $lines) . PHP_EOL) !== false;
+}
+
 try {
   copy_tree($source, $webroot);
-  $config = file_get_contents($webroot . '/config.example.php');
-  if ($config === false) throw new RuntimeException('Could not read config.example.php');
-  $config = str_replace("\$admin_pass = 'admin_pass';", "\$admin_pass = 'integration-admin-pass';", $config);
-  $config = str_replace("const BASE = 'https://example.com/noreita/';", "const BASE = 'http://localhost/';", $config);
-  $config = str_replace('const EXTERNAL_IMAGE_THUMB = 1;', 'const EXTERNAL_IMAGE_THUMB = 0;', $config);
-  $config = str_replace('const USE_MISSKEY_NOTE = 1;', 'const USE_MISSKEY_NOTE = 0;', $config);
-  $config = str_replace('const ADMIN_THREADS_PER_PAGE = 50;', 'const ADMIN_THREADS_PER_PAGE = 1;', $config);
-  $config = str_replace('const ADMIN_LOGIN_MAX_FAILURES = 5;', 'const ADMIN_LOGIN_MAX_FAILURES = 3;', $config);
-  if (file_put_contents($webroot . '/config.php', $config) === false) {
-    throw new RuntimeException('Could not create test config.php');
+  $config_local = <<<'PHP'
+<?php
+return [
+  'admin' => [
+    'password' => 'integration-admin-pass',
+    'threads_per_page' => 1,
+    'login' => ['max_failures' => 3],
+  ],
+  'site' => ['base_url' => 'http://localhost/'],
+  'paths' => ['theme' => 'eda'],
+  'features' => [
+    'external_image_thumbnail' => false,
+    'misskey_note' => false,
+  ],
+];
+PHP;
+  if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
+    throw new RuntimeException('Could not create test config.local.php');
+  }
+  $theme_config_file = $webroot . '/theme/eda/theme_conf.php';
+  $theme_config = file_get_contents($theme_config_file);
+  if (!is_string($theme_config) || !str_contains($theme_config, "const THEME_TEMPLATE_ENGINE = 'twig';")) {
+    throw new RuntimeException('The integration-test theme must select Twig.');
   }
   $error_probe = <<<'PHP'
 <?php
@@ -187,8 +224,10 @@ PHP;
   }
 
   $protected_probes = [
-    'config.php' => 'integration-admin-pass',
+    'config.php' => 'admin_pass',
+    'config.local.php' => 'integration-admin-pass',
     'reita.db' => 'SQLite format',
+    'theme/eda/theme_settings.db' => 'SQLite format',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
     'cache/http-access-probe.bladec' => 'blade-cache-secret',
@@ -207,7 +246,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 6 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 8 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -268,9 +307,12 @@ PHP;
   });
 
   // pictmp initializes the CSRF token in the same session used for posting.
-  [$status] = http_request($base_url . '?mode=pictmp', $cookie_jar);
+  [$status, $pictmp_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
+  integration_test('image upload form is available when enabled', static function () use ($status, $pictmp_body): bool {
+    return $status === 200 && str_contains($pictmp_body, 'name="image_upload"');
+  });
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_detail_unauthorized_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
@@ -315,6 +357,16 @@ PHP;
     return $admin_login_status === 302 && $admin_status === 200
       && $login_attempt_records_after_success === []
       && str_contains($admin_body, 'ADMIN MODE')
+      && str_contains($admin_body, 'id="eda-theme-color-form"')
+      && str_contains($admin_body, 'css/eda_admin.css')
+      && str_contains($admin_body, 'id="eda-theme-color-preset"')
+      && str_contains($admin_body, 'value="dark">dark</option>')
+      && str_contains($admin_body, 'themeColorManager.js')
+      && str_contains($admin_body, 'EDA_THEME_COLOR_PRESETS')
+      && str_contains($admin_body, 'css/mono/eda.min.css')
+      && !str_contains($admin_body, 'switchcss.js')
+      && !str_contains($admin_body, 'css/reita/eda.min.css')
+      && str_contains($admin_body, 'mode=admin_theme_settings')
       && str_contains($admin_body, '基本統計')
       && str_contains($admin_body, '総投稿数')
       && str_contains($admin_body, '画像ディレクトリ:')
@@ -323,6 +375,39 @@ PHP;
       && str_contains($admin_body, 'value="hide"')
       && str_contains($admin_body, 'value="show"')
       && str_contains($admin_body, 'value="delete"');
+  });
+
+  $theme_colors = [
+    'pageBackground' => '#123456', 'pageBackgroundEnd' => '#000000',
+    'text' => '#eeeeee', 'link' => '#eeeeee', 'linkVisited' => '#999999', 'linkAction' => '#cc0000',
+    'surface' => '#112222', 'border' => '#992222',
+    'buttonBorder' => '#111111', 'buttonBorderInset' => '#222222',
+    'button' => '#333355', 'buttonText' => '#ffffff',
+    'inputBackground' => '#eeeeee', 'inputText' => '#000000',
+    'threadBackground' => '#001122', 'threadText' => '#ddffee',
+    'noticeBackground' => '#554433', 'replyText' => '#cc88cc',
+  ];
+  [$theme_save_status] = http_request($base_url . '?mode=admin_theme_settings', $cookie_jar, [
+    'operation' => 'save', 'theme_settings' => ['colors' => $theme_colors], 'token' => $token,
+  ]);
+  $theme_database = new PDO('sqlite:' . $webroot . '/theme/eda/theme_settings.db');
+  $stored_theme_colors = (string)$theme_database->query(
+    "SELECT value FROM theme_settings WHERE setting_key = 'colors'"
+  )->fetchColumn();
+  [$theme_render_status, $theme_render_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$theme_reset_status] = http_request($base_url . '?mode=admin_theme_settings', $cookie_jar, [
+    'operation' => 'reset', 'token' => $token,
+  ]);
+  $theme_color_rows_after_reset = (int)$theme_database->query('SELECT COUNT(*) FROM theme_settings')->fetchColumn();
+  integration_test('administrator saves eda theme colors in the separate theme database', static function () use (
+    $theme_save_status, $stored_theme_colors, $theme_render_status, $theme_render_body,
+    $theme_reset_status, $theme_color_rows_after_reset
+  ): bool {
+    return $theme_save_status === 302
+      && str_contains($stored_theme_colors, '"pageBackground":"#123456"')
+      && $theme_render_status === 200 && str_contains($theme_render_body, '"pageBackground":"#123456"')
+      && $theme_reset_status === 302
+      && $theme_color_rows_after_reset === 0;
   });
 
   [$admin_empty_operation_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
@@ -373,18 +458,24 @@ PHP;
   });
 
   $marker = 'integration-' . bin2hex(random_bytes(6));
+  $raw_trip_name = "Integration O'Brien#integration-trip";
   [$post_status, $post_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
-    'mode' => 'regist', 'send' => '1', 'name' => "Integration O'Brien", 'mail' => '', 'url' => '',
+    'mode' => 'regist', 'send' => '1', 'name' => $raw_trip_name, 'mail' => '', 'url' => '',
     'sub' => "Integration's subject", 'com' => "結合テスト user's {$marker}", 'pwd' => 'delete-pass',
     'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
   ]);
 
   $db = new PDO('sqlite:' . $webroot . '/reita.db');
   $row = $db->query('SELECT tid, a_name, sub, com FROM board_log ORDER BY tid DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-  integration_test('post is stored through HTTP', static function () use ($status, $post_status, $row, $marker): bool {
+  integration_test('post stores a displayed trip while retaining its original name in the cookie', static function () use (
+    $status, $post_status, $row, $marker, $cookie_jar, $raw_trip_name
+  ): bool {
     return $status === 200 && $post_status === 200 && is_array($row)
-      && $row['a_name'] === "Integration O'Brien" && $row['sub'] === "Integration's subject"
-      && $row['com'] === "結合テスト user's {$marker}";
+      && str_starts_with((string)$row['a_name'], "Integration O'Brien ◆")
+      && !str_contains((string)$row['a_name'], '#integration-trip')
+      && $row['sub'] === "Integration's subject"
+      && $row['com'] === "結合テスト user's {$marker}"
+      && urldecode((string)cookie_value($cookie_jar, 'name_c')) === $raw_trip_name;
   });
 
   $search_term = "user's {$marker}";
@@ -393,7 +484,48 @@ PHP;
     return $search_status === 200 && str_contains($search_body, $marker) && str_contains($search_body, '1件');
   });
 
+  [$public_search_status, $public_search_body] = http_request(
+    $base_url . '?mode=search&target=all&match=partial&post_type=thread&image=any&nsfw=safe&sort=newest&search=' . rawurlencode($marker),
+    $cookie_jar
+  );
+  [$empty_public_search_status] = http_request($base_url . '?mode=search&target=all&search=', $cookie_jar);
+  integration_test('public search filters targets and rejects an empty query', static function () use (
+    $public_search_status, $public_search_body, $empty_public_search_status, $marker
+  ): bool {
+    return $public_search_status === 200 && $empty_public_search_status === 400
+      && str_contains($public_search_body, '検索結果 - すべて')
+      && str_contains($public_search_body, $marker)
+      && str_contains($public_search_body, 'name="post_type"')
+      && str_contains($public_search_body, 'value="thread" selected');
+  });
+
   $post_id = (int)($row['tid'] ?? 0);
+  [$owner_edit_form_status, $owner_edit_form_body] = http_request($base_url . '?mode=edit', $cookie_jar, [
+    'mode' => 'edit', 'delno' => (string)$post_id, 'pwd' => 'delete-pass',
+  ]);
+  preg_match('/<input[^>]+name="name"[^>]+value="([^"]*)"/i', $owner_edit_form_body, $owner_name_match);
+  integration_test('owner edit form restores the pre-trip name', static function () use (
+    $owner_edit_form_status, $owner_name_match, $raw_trip_name
+  ): bool {
+    return $owner_edit_form_status === 200
+      && html_entity_decode((string)($owner_name_match[1] ?? ''), ENT_QUOTES, 'UTF-8') === $raw_trip_name;
+  });
+  [$trip_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => $raw_trip_name, 'mail' => '', 'url' => '',
+    'sub' => "Integration's subject", 'com' => "結合テスト user's {$marker}", 'pwd' => 'delete-pass',
+    'sodane' => '0', 'token' => $token,
+  ]);
+  $trip_name_after_edit = (string)$db->query(
+    'SELECT a_name FROM board_log WHERE tid = ' . $post_id
+  )->fetchColumn();
+  integration_test('owner edit converts the retained raw name back to a displayed trip', static function () use (
+    $trip_edit_status, $trip_name_after_edit, $cookie_jar, $raw_trip_name
+  ): bool {
+    return $trip_edit_status === 200
+      && str_starts_with($trip_name_after_edit, "Integration O'Brien ◆")
+      && !str_contains($trip_name_after_edit, '#integration-trip')
+      && urldecode((string)cookie_value($cookie_jar, 'name_c')) === $raw_trip_name;
+  });
   [$admin_manage_csrf_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => 'invalid-token',
   ]);
@@ -606,6 +738,9 @@ PHP;
     'image-pass', 'aes-128-cbc', '0qYzf1x6nyN4gS1', OPENSSL_RAW_DATA, 'T3pkYxNyjN7Wz3pu'
   );
   if ($encrypted_password === false) throw new RuntimeException('Could not encrypt replacement password');
+  if (!replace_cookie_value($cookie_jar, 'pwd_cookie', 'another-post-pass')) {
+    throw new RuntimeException('Could not prepare a mismatched saved password');
+  }
   [$replacement_status, $replacement_body] = http_request(
     $base_url . '?mode=picrep&no=' . $image_post_id . '&repcode=' . rawurlencode($replacement_code)
       . '&pwd=' . bin2hex($encrypted_password) . '&stime=300',
@@ -628,8 +763,35 @@ PHP;
       && is_file($webroot . '/img/' . $replacement_thumbnail)
       && !is_file($webroot . '/img/' . $continued_from_thumbnail)
       && str_contains($replacement_body, 'action="index.php?mode=editexec"')
+      && preg_match('/name="pwd"[^>]+value="image-pass"/', $replacement_body) === 1
       && str_contains($replacement_body, 'src="img/' . $replacement_thumbnail . '"')
       && str_contains($replacement_body, 'id="edit_nsfw"');
+  });
+
+  preg_match('/name="token" value="([^"]+)"/', $replacement_body, $replacement_token_match);
+  $replacement_edit_token = html_entity_decode(
+    (string)($replacement_token_match[1] ?? ''), ENT_QUOTES, 'UTF-8'
+  );
+  $continued_subject = 'Continued drawing subject ' . $marker;
+  $continued_comment = "続き描き後に更新した本文です\n{$marker}";
+  [$continued_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Continued artist#trip-key',
+    'mail' => 'continued@example.com', 'url' => 'https://example.com/continued',
+    'sub' => $continued_subject, 'com' => $continued_comment, 'pwd' => 'image-pass',
+    'sodane' => '0', 'nsfw' => '0', 'token' => $replacement_edit_token,
+  ]);
+  $continued_content = $db->query(
+    'SELECT a_name, mail, a_url, sub, com FROM board_log WHERE tid = ' . $image_post_id
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('comment fields submitted after continued drawing are stored', static function () use (
+    $continued_edit_status, $continued_content, $continued_subject, $continued_comment
+  ): bool {
+    return $continued_edit_status === 200 && is_array($continued_content)
+      && str_starts_with((string)$continued_content['a_name'], 'Continued artist ◆')
+      && $continued_content['mail'] === 'continued@example.com'
+      && $continued_content['a_url'] === 'https://example.com/continued'
+      && $continued_content['sub'] === $continued_subject
+      && $continued_content['com'] === $continued_comment;
   });
 
   [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);
@@ -740,6 +902,31 @@ PHP;
     return $empty_status === 200 && str_contains($empty_body, '0件');
   });
 
+  $upload_source = $root . '/direct-upload.png';
+  $upload_png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL0XQAAAABJRU5ErkJggg==', true);
+  if ($upload_png === false || file_put_contents($upload_source, $upload_png) === false) {
+    throw new RuntimeException('Could not create direct upload image.');
+  }
+  $upload_marker = 'direct-upload-' . bin2hex(random_bytes(6));
+  [$direct_upload_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
+    'sub' => 'Direct image upload', 'com' => "画像アップロード {$upload_marker}", 'pwd' => 'upload-delete-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+    'image_upload' => new CURLFile($upload_source, 'image/png', 'untrusted-client-name.png'),
+  ]);
+  $upload_row_statement = $db->prepare('SELECT picfile, img_w, img_h, tool, thumbnail FROM board_log WHERE com = :comment LIMIT 1');
+  $upload_row_statement->execute([':comment' => "画像アップロード {$upload_marker}"]);
+  $upload_row = $upload_row_statement->fetch(PDO::FETCH_ASSOC);
+  integration_test('direct image upload uses an oekaki-style generated filename', static function () use (
+    $direct_upload_status, $upload_row, $webroot
+  ): bool {
+    return $direct_upload_status === 200 && is_array($upload_row)
+      && preg_match('/^\\d{16}\\.png$/D', (string)$upload_row['picfile']) === 1
+      && (int)$upload_row['img_w'] === 1 && (int)$upload_row['img_h'] === 1
+      && $upload_row['tool'] === 'Upload' && $upload_row['thumbnail'] === ''
+      && is_file($webroot . '/img/' . $upload_row['picfile']);
+  });
+
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
   [$admin_after_logout_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_detail_after_logout_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
@@ -796,6 +983,144 @@ PHP;
       && !str_contains($responses, $rate_limit_password)
       && !str_contains($rate_limit_log, $rate_limit_password);
   });
+
+  $diary_config_local = str_replace(
+    "    'misskey_note' => false,",
+    "    'misskey_note' => false,\n    'diary_mode' => true,\n    'diary_allow_public_replies' => false,",
+    $config_local
+  );
+  if ($diary_config_local === $config_local
+    || file_put_contents($webroot . '/config.local.php', $diary_config_local) === false) {
+    throw new RuntimeException('Could not enable diary mode for the HTTP test.');
+  }
+
+  if (is_resource($process)) {
+    proc_terminate($process);
+    proc_close($process);
+    $process = null;
+  }
+  $diary_socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
+  if ($diary_socket === false) throw new RuntimeException("Could not reserve diary test port: {$error_message}");
+  $diary_address = stream_socket_get_name($diary_socket, false);
+  fclose($diary_socket);
+  $diary_port = (int)substr(strrchr((string)$diary_address, ':'), 1);
+  $diary_base_url = "http://127.0.0.1:{$diary_port}/index.php";
+  $process = proc_open(
+    [PHP_BINARY, '-S', "127.0.0.1:{$diary_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [STDIN, $log, $log],
+    $pipes,
+    $webroot
+  );
+  if (!is_resource($process)) throw new RuntimeException('Could not start diary-mode PHP server.');
+  $diary_ready = false;
+  for ($attempt = 0; $attempt < 50; $attempt++) {
+    usleep(100000);
+    try {
+      [$diary_startup_status] = http_request($diary_base_url, $root . '/diary-ready-cookies.txt');
+      if ($diary_startup_status === 200) {
+        $diary_ready = true;
+        break;
+      }
+    } catch (Throwable $ignored) {
+    }
+  }
+  if (!$diary_ready) throw new RuntimeException('Diary-mode PHP server did not become ready.');
+
+  $diary_cookie_jar = $root . DIRECTORY_SEPARATOR . 'diary-cookies.txt';
+  [$diary_form_status, $diary_form_body] = http_request($diary_base_url, $diary_cookie_jar);
+  http_request($diary_base_url . '?mode=admin_in', $diary_cookie_jar);
+  $diary_session_id = cookie_value($diary_cookie_jar, 'noreita_session');
+  $diary_token = $diary_session_id === null ? '' : hash('sha256', $diary_session_id);
+  $diary_parent_statement = $db->prepare('SELECT tid FROM board_log WHERE com = :comment LIMIT 1');
+  $diary_parent_statement->execute([':comment' => "画像アップロード {$upload_marker}"]);
+  $diary_parent_id = (int)$diary_parent_statement->fetchColumn();
+  [$diary_new_post_status] = http_request($diary_base_url . '?mode=regist', $diary_cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'public diary visitor', 'mail' => '', 'url' => '',
+    'sub' => 'Denied diary post', 'com' => 'This new post must be rejected.', 'pwd' => 'public-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_token,
+  ]);
+  [$diary_upload_form_status] = http_request($diary_base_url . '?mode=pictmp', $diary_cookie_jar);
+  [$diary_reply_denied_status] = http_request($diary_base_url . '?mode=reply', $diary_cookie_jar, [
+    'mode' => 'reply', 'send' => '1', 'resto' => (string)$diary_parent_id,
+    'name' => 'public diary visitor', 'mail' => '', 'url' => '', 'sub' => '',
+    'com' => 'This reply must be rejected.', 'pwd' => 'public-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_token,
+  ]);
+  integration_test('diary mode rejects public new posts, uploads, and replies when replies are disabled', static function () use (
+    $diary_form_status, $diary_form_body, $diary_new_post_status, $diary_upload_form_status, $diary_reply_denied_status
+  ): bool {
+    return $diary_form_status === 200
+      && $diary_new_post_status === 403
+      && $diary_upload_form_status === 403
+      && $diary_reply_denied_status === 403;
+  });
+
+  // OPcacheが秒単位の更新時刻で設定ファイルを検出する環境でも、次の設定を読み直せるようにします。
+  sleep(1);
+  $diary_replies_config = str_replace(
+    "    'diary_allow_public_replies' => false,",
+    "    'diary_allow_public_replies' => true,",
+    $diary_config_local
+  );
+  if ($diary_replies_config === $diary_config_local
+    || file_put_contents($webroot . '/config.local.php', $diary_replies_config) === false) {
+    throw new RuntimeException('Could not enable public diary replies for the HTTP test.');
+  }
+  if (is_resource($process)) {
+    proc_terminate($process);
+    proc_close($process);
+    $process = null;
+  }
+  $diary_replies_socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
+  if ($diary_replies_socket === false) throw new RuntimeException("Could not reserve diary reply test port: {$error_message}");
+  $diary_replies_address = stream_socket_get_name($diary_replies_socket, false);
+  fclose($diary_replies_socket);
+  $diary_replies_port = (int)substr(strrchr((string)$diary_replies_address, ':'), 1);
+  $diary_replies_url = "http://127.0.0.1:{$diary_replies_port}/index.php";
+  $process = proc_open(
+    [PHP_BINARY, '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [STDIN, $log, $log],
+    $pipes,
+    $webroot
+  );
+  if (!is_resource($process)) throw new RuntimeException('Could not restart PHP server for public diary replies.');
+  $diary_replies_ready = false;
+  for ($attempt = 0; $attempt < 50; $attempt++) {
+    usleep(100000);
+    try {
+      [$diary_replies_startup_status] = http_request($diary_replies_url, $root . '/diary-replies-ready-cookies.txt');
+      if ($diary_replies_startup_status === 200) {
+        $diary_replies_ready = true;
+        break;
+      }
+    } catch (Throwable $ignored) {
+    }
+  }
+  if (!$diary_replies_ready) throw new RuntimeException('Public-reply diary PHP server did not become ready.');
+  $diary_replies_cookie_jar = $root . DIRECTORY_SEPARATOR . 'diary-replies-cookies.txt';
+  http_request($diary_replies_url . '?mode=admin_in', $diary_replies_cookie_jar);
+  $diary_replies_session_id = cookie_value($diary_replies_cookie_jar, 'noreita_session');
+  $diary_replies_token = $diary_replies_session_id === null ? '' : hash('sha256', $diary_replies_session_id);
+  $diary_reply_marker = '日記返信-' . bin2hex(random_bytes(6));
+  [$diary_reply_allowed_status, $diary_reply_allowed_body] = http_request($diary_replies_url . '?mode=reply', $diary_replies_cookie_jar, [
+    'mode' => 'reply', 'send' => '1', 'resto' => (string)$diary_parent_id,
+    'name' => 'public diary visitor', 'mail' => '', 'url' => '', 'sub' => '',
+    'com' => $diary_reply_marker, 'pwd' => 'public-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_replies_token,
+  ]);
+  [$diary_new_post_still_denied_status] = http_request($diary_replies_url . '?mode=regist', $diary_replies_cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'public diary visitor', 'mail' => '', 'url' => '',
+    'sub' => 'Still denied diary post', 'com' => 'This new post must still be rejected.', 'pwd' => 'public-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_replies_token,
+  ]);
+  integration_test('diary mode can allow public replies without allowing new posts', static function () use (
+    $diary_reply_allowed_status, $diary_reply_allowed_body, $diary_new_post_still_denied_status
+  ): bool {
+    return $diary_reply_allowed_status === 200
+      && (str_contains($diary_reply_allowed_body, '書き込みに成功しました。')
+        || str_contains($diary_reply_allowed_body, 'Successfully posted.'))
+      && $diary_new_post_still_denied_status === 403;
+  });
 } catch (Throwable $e) {
   echo "FAIL: integration setup ({$e->getMessage()})\n";
   $failed++;
@@ -805,6 +1130,11 @@ PHP;
 } finally {
   if ($failed > 0 && is_file($server_log)) {
     echo "--- server log ---\n" . file_get_contents($server_log) . "\n";
+  }
+  if ($failed > 0) {
+    foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $application_log) {
+      echo "--- application error log ---\n" . file_get_contents($application_log) . "\n";
+    }
   }
   if (is_resource($process)) {
     proc_terminate($process);

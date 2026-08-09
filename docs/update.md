@@ -4,46 +4,36 @@
 
 ## 更新前にバックアップするもの・上書きしてはいけないもの
 
-- config.php
+- `config.local.php`
 - SQLiteデータベース（*.dbファイル）
 - 投稿画像
 - サムネイル
 - セッションなど
 
-プログラム本体を更新するときは、新規ファイルの`noreita/error_handler.inc.php`と
-`noreita/errorlog/.htaccess`もアップロードしてください。FTPソフトで隠しファイルを
-転送しない設定になっている場合は、`.htaccess`を個別に確認してください。
+`config.php`はv4から配布既定値となり、更新時に上書きします。設置者固有の設定は
+`config.local.php`だけに記述してください。新しい既定項目は更新された`config.php`から
+自動的に取り込まれ、localにある項目だけが上書きされます。
 
-## `config.example.php`に設定項目が増えた場合の反映方法
+プログラム本体を更新するときは`.htaccess`もアップロードしてください。FTPソフトで
+隠しファイルを転送しない設定になっている場合は個別に確認してください。
 
-新しく増えた設定を末尾等に追加してください
+## v3の`config.php`からv4へ移行
 
-v3.7.4ではSQLiteのロック待機時間を指定する設定が追加されました。既存の`config.php`へ追加しなくても既定値の5000ミリ秒で動作します。変更する場合は次を追加してください。
+更新前に現在のv3 `config.php`を掲示板ディレクトリ外へバックアップし、v4の変換ツールを
+ローカルまたはCLIが使えるサーバーで実行します。
 
-```php
-const DB_BUSY_TIMEOUT = 5000;
+```bash
+php scripts/migrate-config-v3.php \
+  --source=/path/to/backup/config.php \
+  --output=/path/to/v4/noreita/config.local.php
 ```
 
-古いPHPセッションファイルの保持時間も設定できます。既存の`config.php`に追加しない場合は、既定値の86400秒（24時間）で動作します。
+先に結果だけ確認する場合は`--dry-run`を使用します。変換元は信頼済みPHPとして実行されます。
+生成された`config.local.php`を確認し、v4の`config.php`、`bootstrap.php`、
+`config_loader.inc.php`と一緒に配置してください。既存ファイルは`--force`なしでは上書きしません。
 
-```php
-const SESSION_FILE_LIFETIME = 86400;
-```
-
-v3.7.6ではPHPエラーログの保持期間と容量上限を設定できます。既存の`config.php`へ
-追加しない場合も、30日、1ファイル5 MiB、1日5ファイルの既定値で動作します。
-
-```php
-const ERROR_LOG_RETENTION_DAYS = 30;
-const ERROR_LOG_MAX_BYTES = 5242880;
-const ERROR_LOG_MAX_FILES_PER_DAY = 5;
-```
-
-削除復旧データの隔離期間も設定できます。追加しない場合は30日です。
-
-```php
-const DELETE_QUARANTINE_RETENTION_DAYS = 30;
-```
+Gitで更新する場合、旧版で未追跡だった`noreita/config.php`が残っているとv4の追跡ファイルと
+衝突します。変換・バックアップ後に旧ファイルを設置場所から退避してから更新してください。
 
 ## DB移行スクリプトが必要なバージョン
 
@@ -71,12 +61,12 @@ composer install --working-dir=noreita --no-dev --prefer-dist
 scripts/integration-test.sh
 ```
 
-このテストは一時ディレクトリと一時SQLite DBを使用し、設置済み掲示板の`config.php`やDBは変更しません。
+このテストは一時ディレクトリと一時SQLite DBを使用し、設置済み掲示板の`config.local.php`やDBは変更しません。
 
 更新後に`noreita/errorlog/`へブラウザーでアクセスし、403になることも確認してください。
 PHPエラーの調査方法は[エラー調査手順](errors.md)を参照してください。
 
-GitHub Actionsでは、PHP 7.4、8.0、8.3の各環境で`composer.lock`から依存ライブラリを配置し、このHTTP結合テストを自動実行します。
+GitHub Actionsでは、PHP 8.1、8.2、8.3、8.4、8.5の各環境で`composer.lock`から依存ライブラリを配置し、このHTTP結合テストを自動実行します。
 
 ## 不具合時の元バージョンへの戻し方
 

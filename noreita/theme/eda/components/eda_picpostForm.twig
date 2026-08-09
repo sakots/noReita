@@ -1,0 +1,46 @@
+{% if resno is defined ? can_post_reply : can_create_thread %}
+<form action="{{ self }}" method="post" enctype="multipart/form-data">
+  <p>
+    <label>幅：<input class="form" type="number" min="300" max="{{ pmax_w }}" name="picw" value="{{ pdef_w }}" required></label>
+    <label>高さ：<input class="form" type="number" min="300" max="{{ pmax_h }}" name="pich" value="{{ pdef_h }}" required></label>
+    <input type="hidden" name="mode" value="paint">
+    <label for="tools">ツール</label>
+    <select name="tools" id="tools" onchange="togglePaletteVisibility()">
+      <option value="neo">PaintBBS NEO</option>
+      {% if use_chicken %}<option value="chicken">litaChix</option> {% endif %}
+      {% if use_klecks %}<option value="klecks">Klecks</option> {% endif %}
+      {% if use_tegaki %}<option value="tegaki">Tegaki.js</option> {% endif %}
+      {% if use_axnos %}<option value="axnos">AxnosPaint</option> {% endif %}
+    </select>
+    <span id="palette-container" style="display: none;">
+      <label for="palettes">パレット</label>
+      {% if select_palettes %}
+      <select name="palettes" id="palettes">
+        {% for palette in pallets_dat %}
+        <option value="{{ pallets_dat[loop.index0][1] }}" id="{{ loop.index0 }}">{{ pallets_dat[loop.index0][0] }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <select name="palettes" id="palettes">
+        <option value="neo" id="0">標準</option>
+      </select>
+      {% endif %}
+    </span>
+    {% if useanime %}
+    <label><input type="checkbox" value="true" name="anime" title="動画記録" {% if defanime %} checked {% endif %}>アニメーション記録</label>
+    {% endif %}
+    <input class="button" type="submit" value="お絵かき">
+    {% if use_image_upload and resno is not defined %}<a href="{{ self }}?mode=pictmp">画像をアップロード</a>{% endif %}
+    {% if resno is defined %} <input type="hidden" name="modid" value="{{ resno }}"> {% endif %}
+    {% if resno is defined %} <input type="hidden" name="resto" value="{{ resno }}"> {% endif %}
+  </p>
+  <ul>
+    <li>お絵かきできるサイズは幅300～{{ pmax_w }}px、高さ300～{{ pmax_h }}pxです。</li>
+    {% if use_image_upload %}<li>画像アップロードは幅{{ upload_max_width }}px、高さ{{ upload_max_height }}px、{{ upload_max_kb }}KBまでです。</li>{% endif %}
+  </ul>
+</form>
+{% elseif resno is defined %}
+<p>返信は管理者のみ投稿できます。</p>
+{% else %}
+<p>日記モードでは新規投稿は管理者のみです。</p>
+{% endif %}

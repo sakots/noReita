@@ -1,0 +1,36 @@
+<section>
+  {% include 'components/eda_threadOyaName.twig' with {'bbsline' : bbsline} %}
+  {% if bbsline['picfile'] %}
+    {% include 'components/eda_threadOyaPicfile.twig' with {'bbsline' : bbsline} %}
+  {% endif %}
+  <div class="item_comment">
+    <p class="comment oya">
+      {{ bbsline['com']|raw }}
+    </p>
+    {% if bbsline['rflag'] is not empty %}
+      <div class="res">
+        <p class="limit">
+          レス{{ bbsline['res_d_su'] }}件省略。すべて見るには
+          <a href="{{ self }}?mode=res&amp;res={{ bbsline['tid'] }}">
+            {% if elapsed_time == 0  or  nowtime - bbsline['past'] < elapsed_time %} 返信 {% else %} すべて見る {% endif %}
+          </a>
+          を押してください。
+        </p>
+      </div>
+    {% endif %}
+    {% if bbsline['res'] is not empty %}
+      {% for res in bbsline['res'] %}
+        {% if not res['resno'] is defined  or  res['resno'] > bbsline['res_d_su'] %}
+          <section class="res">
+            {% include 'components/eda_threadRepName.twig' with {'res' : res} %}
+            {% if res['picfile'] %}
+              {% include 'components/eda_threadRepPicfile.twig' with {'res' : res} %}
+            {% endif %}
+            <p class="comment">{{ res['com']|raw }}</p>
+          </section>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  </div>
+  {% include 'components/eda_threadFooter.twig' with {'bbsline' : bbsline} %}
+</section>

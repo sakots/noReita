@@ -1,16 +1,20 @@
 <?php
 declare(strict_types=1);
 
-const LANG = 'Japanese';
-const PHP_SELF = 'index.php';
-const PMAX_W = 800;
-const PMAX_H = 800;
 const PTIME_D = '日';
 const PTIME_H = '時間';
 const PTIME_M = '分';
 const PTIME_S = '秒';
-const ID_CYCLE = '0';
-const ID_SEED = 'smoke-test-seed';
+
+require_once dirname(__DIR__) . '/noreita/config_loader.inc.php';
+require_once dirname(__DIR__) . '/noreita/bootstrap.php';
+require_once dirname(__DIR__) . '/noreita/vendor/autoload.php';
+$config_defaults = require dirname(__DIR__) . '/noreita/config.php';
+Config::initializeForTesting($config_defaults, [
+  'admin' => ['password' => 'smoke-test-admin'],
+  'site' => ['base_url' => 'https://smoke.example/'],
+  'identity' => ['cycle' => 0, 'seed' => 'smoke-test-seed'],
+]);
 
 require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/error_handler.inc.php';
@@ -20,10 +24,14 @@ require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/external_image.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
 require_once dirname(__DIR__) . '/noreita/initialization.inc.php';
+require_once dirname(__DIR__) . '/noreita/theme/eda/theme_settings.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 require_once dirname(__DIR__) . '/noreita/share.inc.php';
+require_once dirname(__DIR__) . '/noreita/template_engine.inc.php';
+require_once dirname(__DIR__) . '/noreita/theme_manifest.inc.php';
 require_once dirname(__DIR__) . '/plugins/check-image-consistency.php';
+require_once dirname(__DIR__) . '/scripts/migrate-config-v3.php';
 
 $passed = 0;
 $failed = 0;
@@ -43,6 +51,93 @@ function smoke_test(string $name, callable $test): void {
   }
 }
 
+smoke_test('minimum PHP version is 8.1', static function (): bool {
+  return NOREITA_MIN_PHP_VERSION === '8.1.0'
+    && NOREITA_MIN_PHP_VERSION_ID === 80100
+    && PHP_VERSION_ID >= NOREITA_MIN_PHP_VERSION_ID;
+});
+
+smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
+  $views = $root . DIRECTORY_SEPARATOR . 'views';
+  $cache = $root . DIRECTORY_SEPARATOR . 'cache';
+  if (!mkdir($views, 0700, true) || !mkdir($cache, 0700, true)) return false;
+  try {
+    if (file_put_contents($views . DIRECTORY_SEPARATOR . 'sample.blade.php', 'Hello {{ $name }}') === false
+      || file_put_contents($views . DIRECTORY_SEPARATOR . 'sample.twig', 'Hello {{ name }}') === false
+      || file_put_contents($views . DIRECTORY_SEPARATOR . 'fallback.blade.php', 'Fallback {{ $name }}') === false) return false;
+    $blade = TemplateEngineFactory::create('blade', $views, $cache);
+    $twig = TemplateEngineFactory::create('twig', $views, $cache);
+    try {
+      TemplateEngineFactory::create('unknown', $views, $cache);
+      return false;
+    } catch (InvalidArgumentException $e) {
+      // Expected: only configured engines may be selected.
+    }
+    return $blade->render('sample', ['name' => 'BladeOne']) === 'Hello BladeOne'
+      && $twig->render('sample', ['name' => 'Twig']) === 'Hello Twig'
+      && $twig->render('fallback', ['name' => 'BladeOne']) === 'Fallback BladeOne';
+  } finally {
+    if (is_dir($root)) {
+      $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      );
+      foreach ($iterator as $item) {
+        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+      }
+      rmdir($root);
+    }
+  }
+});
+
+smoke_test('eda Twig theme templates compile', static function (): bool {
+  $views = dirname(__DIR__) . '/noreita/theme/eda';
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_eda_twig_' . bin2hex(random_bytes(8));
+  $cache = $root . DIRECTORY_SEPARATOR . 'cache';
+  if (!is_dir($views) || !mkdir($cache, 0700, true)) return false;
+  try {
+    $engine = TemplateEngineFactory::create('twig', $views, $cache);
+    if (!$engine instanceof TwigTemplateEngine) return false;
+    $count = 0;
+    $prefix = strlen($views) + 1;
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($views, FilesystemIterator::SKIP_DOTS)) as $file) {
+      $path = $file->getPathname();
+      if (!$file->isFile() || !str_ends_with($path, '.twig')) continue;
+      $engine->validate(substr($path, $prefix, -5));
+      $count++;
+    }
+    return $count > 0;
+  } finally {
+    if (is_dir($root)) {
+      $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      );
+      foreach ($iterator as $item) {
+        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+      }
+      rmdir($root);
+    }
+  }
+});
+
+smoke_test('theme manifests and diagnostics detect theme integrity problems', static function (): bool {
+  $eda = dirname(__DIR__) . '/noreita/theme/eda';
+  $manifest = ThemeManifest::load($eda);
+  $runtime = [
+    'id' => $manifest['id'], 'version' => $manifest['version'], 'engine' => $manifest['engine'],
+    'templates' => $manifest['templates'],
+  ];
+  $report = ThemeDiagnostics::inspect($eda, $manifest, $runtime);
+  if ($report['summary']['errors'] !== 0 || $report['summary']['templates_checked'] !== 13) return false;
+  $invalid = $manifest;
+  $invalid['assets']['css'][] = 'css/missing-theme-asset.css';
+  $invalid_report = ThemeDiagnostics::inspect($eda, $invalid, $runtime);
+  return $invalid_report['summary']['errors'] > 0
+    && in_array('missing_asset', array_column($invalid_report['issues'], 'code'), true);
+});
+
 smoke_test('required PHP extensions', static function (): bool {
   foreach (['curl', 'gd', 'mbstring', 'pdo_sqlite'] as $extension) {
     if (!extension_loaded($extension)) {
@@ -50,6 +145,128 @@ smoke_test('required PHP extensions', static function (): bool {
     }
   }
   return true;
+});
+
+smoke_test('configuration overrides defaults and replaces list values', static function (): bool {
+  $defaults = require dirname(__DIR__) . '/noreita/config.php';
+  $resolved = Config::resolve($defaults, [
+    'admin' => ['password' => 'configured-admin', 'login' => ['max_failures' => 9]],
+    'site' => ['base_url' => 'https://configured.example/'],
+    'features' => [
+      'nsfw' => false,
+      'image_upload' => false,
+      'diary_mode' => true,
+      'diary_allow_public_replies' => false,
+    ],
+    'social' => ['servers' => [['Local', 'https://social.example']]],
+  ]);
+  return $resolved['admin']['name'] === '管理人'
+    && $resolved['admin']['login']['max_failures'] === 9
+    && $resolved['features']['nsfw'] === false
+    && $resolved['features']['image_upload'] === false
+    && $resolved['features']['diary_mode'] === true
+    && $resolved['features']['diary_allow_public_replies'] === false
+    && $resolved['social']['servers'] === [['Local', 'https://social.example']];
+});
+
+smoke_test('diary posting policy restricts new posts and can allow public replies', static function (): bool {
+  return DiaryPostPolicy::allows(false, false, false, false)
+    && !DiaryPostPolicy::allows(true, true, false, false)
+    && DiaryPostPolicy::allows(true, true, false, true)
+    && !DiaryPostPolicy::allows(true, false, false, true)
+    && DiaryPostPolicy::allows(true, false, true, false);
+});
+
+smoke_test('eda theme settings database initializes separately and validates saved colors', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_theme_settings_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $settings = new EdaThemeSettings($directory);
+    $defaults = EdaThemeSettings::defaults();
+    $presets = EdaThemeSettings::colorPresets();
+    $initial_template_data = $settings->templateData();
+    $colors = $defaults;
+    $colors['pageBackground'] = '#123456';
+    $settings->saveColors($colors);
+    $stored = $settings->colors();
+    $database = new PDO('sqlite:' . $settings->databaseFile());
+    $version = (int)$database->query('PRAGMA user_version')->fetchColumn();
+    $table_exists = $database->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='theme_settings'")->fetchColumn() !== false;
+    $invalid_rejected = false;
+    try {
+      $settings->saveColors(['pageBackground' => 'invalid']);
+    } catch (InvalidArgumentException $e) {
+      $invalid_rejected = true;
+    }
+    $settings->resetColors();
+    $result = $stored['pageBackground'] === '#123456'
+      && $settings->colors() === [] && $version === 1 && $table_exists && $invalid_rejected
+      && $defaults['pageBackground'] === '#cccccc' && $defaults['threadBackground'] === '#99ccff'
+      && $defaults['buttonBorder'] === '#3366ff' && $defaults['buttonBorderInset'] === '#003366'
+      && array_keys($presets) === ['mono', 'dark', 'deep', 'dev', 'mayo', 'pop', 'red', 'reita', 'sql']
+      && $presets['dark']['pageBackground'] === '#111111' && $presets['dark']['threadText'] === '#eeeecc'
+      && $presets['sql']['pageBackground'] === '#ffffef' && $presets['pop']['pageBackgroundEnd'] === '#3cb359'
+      && $initial_template_data['theme_colors']['pageBackground'] === '#cccccc'
+      && (fileperms($settings->databaseFile()) & 0777) === 0600;
+    $database = null;
+    unset($settings);
+    return $result;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . 'theme_settings.db*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges', static function (): bool {
+  $defaults = require dirname(__DIR__) . '/noreita/config.php';
+  $invalid = [
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'unknown' => true],
+    ['admin' => ['password' => 'configured-admin', 'threads_per_page' => '50'], 'site' => ['base_url' => 'https://configured.example/']],
+    ['admin' => ['password' => 'configured-admin', 'threads_per_page' => 101], 'site' => ['base_url' => 'https://configured.example/']],
+    ['admin' => ['password' => 'admin_pass'], 'site' => ['base_url' => 'https://configured.example/']],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://example.com/noreita/']],
+  ];
+  foreach ($invalid as $override) {
+    try {
+      Config::resolve($defaults, $override);
+      return false;
+    } catch (ConfigException $e) {
+      if (str_contains($e->getMessage(), 'configured-admin')) return false;
+    }
+  }
+  return true;
+});
+
+smoke_test('v3 configuration is converted to a validated local override', static function (): bool {
+  $file = tempnam(sys_get_temp_dir(), 'noreita_v3_config_');
+  if ($file === false) return false;
+  $source = <<<'PHP'
+<?php
+$admin_pass = 'migrated-admin';
+$admin_name = '旧管理人';
+$servers = [['移行先', 'https://social.example']];
+const BASE = 'https://board.example/';
+const ID_SEED = 'migrated-id-seed';
+const CRYPT_PASS = 'migrated-paint-key';
+const USE_NSFW = 0;
+const SNS_WINDOW_WIDTH = '720';
+PHP;
+  try {
+    if (file_put_contents($file, $source) === false) return false;
+    $defaults = require dirname(__DIR__) . '/noreita/config.php';
+    $overrides = migration_convert(migration_read_legacy($file), $defaults);
+    $resolved = Config::resolve($defaults, $overrides);
+    return $resolved['admin']['password'] === 'migrated-admin'
+      && $resolved['admin']['name'] === '旧管理人'
+      && $resolved['site']['base_url'] === 'https://board.example/'
+      && $resolved['features']['nsfw'] === false
+      && $resolved['social']['window_width'] === 720
+      && $resolved['social']['servers'] === [['移行先', 'https://social.example']];
+  } finally {
+    if (is_file($file)) unlink($file);
+  }
 });
 
 smoke_test('error logs rotate at capacity and expired files are cleaned safely', static function (): bool {
@@ -111,13 +328,16 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'mod_authz_core.c')
     || !str_contains($root_rule, 'Require all denied')
     || !str_contains($root_rule, 'Deny from all')
-    || !str_contains($root_rule, '^config\\.php$')
+    || !str_contains($root_rule, '^config(?:\\.[a-z0-9_-]+)*\\.php$')
     || !str_contains($root_rule, 'json|db')
     || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
     || preg_match('/<\\/files>/i', $root_rule) === 1
     || preg_match('/<files\\s+~/i', $root_rule) === 1) {
     return false;
   }
+  $ignore = file_get_contents(dirname(__DIR__) . '/.gitignore');
+  if (!is_string($ignore) || !str_contains($ignore, 'config.local.php')
+    || preg_match('/^config\.php$/m', $ignore) === 1) return false;
   foreach (['session', 'cache', 'backup', 'errorlog'] as $directory) {
     $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");
     if (!is_string($rule)
@@ -688,7 +908,7 @@ smoke_test('post service centralizes edit and delete authorization', static func
     }
 
     $new_input = [
-      'name' => '投稿者', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
+      'name' => '投稿者#trip-secret', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
       'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,
       'resto' => '', 'modid' => '',
     ];
@@ -701,7 +921,15 @@ smoke_test('post service centralizes edit and delete authorization', static func
       'pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0, 'utime' => '',
       'tool' => '', 'nsfw' => false, 'ctype' => null, 'thumbnail' => '',
     ]);
-    if (($repository->findPost($new_id)['sub'] ?? '') !== '新規題名') return false;
+    $new_post = $repository->findPost($new_id);
+    $trip_name = generate_trip('投稿者#trip-secret');
+    if (($new_post['sub'] ?? '') !== '新規題名'
+      || ($new_post['a_name'] ?? '') !== $trip_name
+      || PostService::nameForEdit($trip_name, '投稿者#trip-secret', true) !== '投稿者#trip-secret'
+      || PostService::nameForEdit($trip_name, '別人#trip-secret', true) !== $trip_name
+      || PostService::nameForEdit($trip_name, '投稿者#trip-secret', false) !== $trip_name) {
+      return false;
+    }
     try {
       $service->prepareNewPost($new_input, 'new.example.com', $settings);
       return false;

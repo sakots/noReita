@@ -1,7 +1,6 @@
 # noReita
 
-![php](https://img.shields.io/badge/php-7.4-green.svg)
-![php](https://img.shields.io/badge/php-8.x-green.svg)
+![php](https://img.shields.io/badge/php-%3E%3D8.1-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
 ![version](https://img.shields.io/github/v/release/sakots/noReita)
@@ -9,9 +8,6 @@
 ![License](https://img.shields.io/github/license/sakots/noReita)
 
 ## 概要
-
-[Reactでお絵描き掲示板を作ろうとした](https://github.com/sakots/Reita)けど、あれ、jsxの中身に配列を送ってコンパイルして…って無理じゃね？
-ってなったので諦めて、[ROIS](https://github.com/sakots/ROIS) から改良したものがこちらになります。
 
 Reactで絵板を作れなかったので、noReita。
 Codex使用。
@@ -21,13 +17,9 @@ Codex使用。
 [Litachix](https://github.com/satopian/ChickenPaint_Be)、
 Tegaki.jsとAxnosPaintを使えます。
 
-データベースを使ってるので検索が強いです。ハッシュタグも使えます。
+簡易的なデータベースを使ってるので検索が強いです。ハッシュタグも使えます。
 
-## ROISとの互換性
-
-ないです。
-
-BladeOneとSQLiteは使っていますが、データベースの形式を変えました。
+v4ではテンプレート移行に向けてTwig 3をComposer依存関係へ追加しています。
 
 ## noReita v2以前との互換
 
@@ -35,8 +27,20 @@ BladeOneとSQLiteは使っていますが、データベースの形式を変え
 
 ## 設置
 
-`config.example.php`を`config.php`に名称変更し、その管理者パスワードをテキストエディタ(VSCodeなど)で編集してください。
-初期設定のままだと動かないようにしています。
+`config.php`は配布する既定値です。`noreita/config.local.example.php`を
+`config.local.php`という名前でコピーし、設置者固有の値へ書き換えてください。
+最低限、掲示板の公開URLと管理者パスワードを設定します。
+
+```php
+<?php
+return [
+  'admin' => ['password' => '推測されにくい管理者パスワード'],
+  'site' => ['base_url' => 'https://example.com/noreita/'],
+];
+```
+
+`config.local.php`はGit管理とプログラム更新の上書き対象から除外されます。
+設定の型、必須値、範囲、URL、パス、権限は起動時に検証されます。
 
 [リリース](https://github.com/sakots/noReita/releases/latest) からダウンロードして、
 FTPソフトをつかってサーバーにアップロードするだけです。簡単。
@@ -45,6 +49,48 @@ FTPソフトをつかってサーバーにアップロードするだけです�
 
 管理者ログインが試行回数制限で拒否された場合は、[管理者ログインのロック解除手順](docs/admin-login.md)を参照してください。
 
+### 画像アップロード
+
+投稿フォームでは、お絵かきに加えてPNG、JPEG、GIF、WebP、AVIF画像を直接アップロードできます。
+保存名はお絵かき画像と同じ「時刻＋マイクロ秒」の自動生成名となり、元のファイル名は保存しません。
+無効化や上限の変更は`config.local.php`で行えます。
+
+```php
+<?php
+return [
+  'features' => ['image_upload' => false],
+  'limits' => ['upload_kb' => 2000, 'image_width' => 800, 'image_height' => 800],
+];
+```
+
+### 日記モード
+
+管理者だけが新規投稿できる日記として運用するには、`config.local.php`で`diary_mode`を有効にします。管理者は管理モードへログインしてから通常の投稿フォームを使います。一般利用者の返信を許可するかも、同じ設定で選べます。
+
+```php
+<?php
+return [
+  'features' => [
+    'diary_mode' => true,
+    // true: 一般利用者も返信可 / false: 返信も管理者のみ
+    'diary_allow_public_replies' => true,
+  ],
+];
+```
+
+日記モードでは、投稿フォームや返信リンクも設定に応じて非表示になります。直接リクエストによる投稿もサーバー側で拒否するため、画面表示だけを変更する機能ではありません。
+
+### edaテーマの配色管理
+
+edaテーマでは、管理画面の「テーマカラー」から配色をサイト全体へ保存できます。
+配色は投稿DBとは別の`noreita/theme/eda/theme_settings.db`に保存され、v3から更新した既存サイトでも最初の起動時に自動作成されます。テーマディレクトリはPHPから書き込み可能にしてください。DBファイルはHTTPアクセスを拒否し、権限は`0600`に設定されます。
+
+## 各お絵かきアプリのURL
+
+noReita v4から、デフォルトの状態ではアプリは配布ではなく[https://oekakibbs.moe/apps/](https://oekakibbs.moe/apps/) を参照するようにしました。
+これによりお絵かきアプリの更新のみでのnoReitaのアップデートはなくなります。
+サーバーの負荷によっては今後また配布形式に切り替える可能性もあります。
+
 ## サンプル/サポート
 
 [SABRINA NO REITA](https://oekakibbs.moe)
@@ -52,6 +98,20 @@ FTPソフトをつかってサーバーにアップロードするだけです�
 ## テーマ
 
 テーマ機能で見た目を変えることができます。作り方とかまたこんど書きたい。
+
+テーマのマニフェストと自己診断は[テーマ開発ガイド](docs/themes.md)を参照してください。
+
+画面描画に使うエンジンはテーマ側の`theme_conf.php`で決めます。Twigへ移行した
+テーマでは、次の定数を`twig`へ変更してください。
+
+```php
+const THEME_TEMPLATE_ENGINE = 'twig';
+```
+
+テンプレート名は共通で、BladeOneは`monoreita_main.blade.php`、Twigは
+`monoreita_main.twig`のようにテーマディレクトリへ配置します。Twigを選択しても、
+まだ`.twig`がない画面は従来の`.blade.php`へ自動的にフォールバックするため、
+テーマを止めずに1画面ずつ移行できます。
 
 ## 同梱のパレットについて
 
@@ -64,10 +124,21 @@ FTPソフトをつかってサーバーにアップロードするだけです�
 
 [こちらで「やこうさんパレット」が配布されています](https://github.com/satopian/potiboard_plugin)
 
-使用する場合は、`config.php`内の`$pallets_dat`の列に、
+使用する場合は、`config.local.php`で`drawing.palettes`を上書きします。
 
-```config.php
-$pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マンセルHV/C','p_munsellHVC.txt'],['マンセルV2','p_munsell_V2_.txt'],['やこうさん','palette.dat']);
+```php
+<?php
+return [
+  'drawing' => [
+    'palettes' => [
+      ['標準', 'palette.txt'],
+      ['PCCS_HSL', 'p_PCCS.txt'],
+      ['マンセルHV/C', 'p_munsellHVC.txt'],
+      ['マンセルV2', 'p_munsell_V2_.txt'],
+      ['やこうさん', 'palette.dat'],
+    ],
+  ],
+];
 ```
 
 などと加えてください。
@@ -75,6 +146,25 @@ $pallets_dat = array(['標準','palette.txt'],['PCCS_HSL','p_PCCS.txt'],['マン
 ## 履歴
 
 [すべての履歴はこちら](changelog.md)
+
+### [2026/08/09] v4.0.0
+
+- 検索機能強化
+- 画像アップロード機能を追加
+- 日記モード実装
+- テーママニフェストとテンプレート・アセット・Twig構文の自己診断を追加
+- テーマ側でBladeOneとTwigを切り替えられるテンプレートエンジン抽象化を追加
+- Twig 3.28をComposer依存関係へ追加
+- 動作要件をPHP 8.1以上へ変更し、PHP 8.1～8.5をCIで検証
+- 続き描き後などの投稿者編集画面で、トリップ変換前の名前を保持するように修正
+- 続き描き後の本文編集に、対象記事で認証済みのパスワードを引き継ぐように修正
+- `config.php`をGit管理する配布既定値の配列へ変更
+- 設置者固有の部分上書きを`config.local.php`へ分離し、Git管理対象外に設定
+- 設定の型、必須値、値域、URL、相対パス、権限、リスト構造を起動時に検証
+- 設定参照を旧PHP定数・グローバル変数から型別`Config`アクセサーへ移行
+- index、Misskeyコールバック、CLI、同梱プラグインの設定初期化を統一
+- v3 `config.php`から`config.local.php`を生成する`scripts/migrate-config-v3.php`を追加
+- Apache、nginx向け文書、HTTP結合テストでlocal設定のアクセス拒否を追加
 
 ### [2026/08/06] v3.7.6
 

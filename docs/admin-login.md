@@ -6,7 +6,7 @@
 
 画面に表示された時間、または`Retry-After`ヘッダーで示された秒数を待ってから、正しい管理者パスでログインしてください。初期設定の拒否時間は15分です。
 
-拒否時間は`config.php`の`ADMIN_LOGIN_LOCKOUT`で秒単位に設定されています。ロック中に正しい管理者パスを入力しても解除されません。
+拒否時間は`config.local.php`の`admin.login.lockout`で秒単位に設定されています。ロック中に正しい管理者パスを入力しても解除されません。
 
 ## すぐに解除する必要がある場合
 
@@ -28,15 +28,15 @@ find noreita/session -maxdepth 1 -type f -name 'admin-login-*.json' -delete
 
 - `noreita/session/.htaccess`
 - `noreita/session/sess_*`などのPHPセッションファイル
-- `config.php`
+- `config.local.php`
 
 削除後、管理者ログイン画面を開き直して正しい管理者パスでログインしてください。削除した試行記録は、次にログインへ失敗したときに自動作成されます。
 
 ## 繰り返しロックされる場合
 
 - ブラウザやパスワード管理ソフトに古い管理者パスが保存されていないか確認してください。
-- `config.php`の管理者パスを確認してください。
+- `config.local.php`の`admin.password`を確認してください。
 - 管理者パスを変更した場合、既存の管理者ログインセッションは無効になります。
 - 身に覚えのない試行が続く場合は、試行回数制限を無効化せず、サーバーのアクセスログも確認してください。
 
-`ADMIN_LOGIN_MAX_FAILURES`、`ADMIN_LOGIN_WINDOW`、`ADMIN_LOGIN_LOCKOUT`を極端に小さい値へ変更すると、総当たり攻撃への耐性が下がります。
+`admin.login.max_failures`、`admin.login.window`、`admin.login.lockout`を極端に小さい値へ変更すると、総当たり攻撃への耐性が下がります。

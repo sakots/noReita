@@ -7,7 +7,7 @@
 </FilesMatch>
 
 # 設定、DB、ログ、メタデータをHTTPから保護する。
-<FilesMatch "(?i)(^config\.php$|\.(?:ini|log|dat|json|db)$)">
+<FilesMatch "(?i)(^config(?:\.[a-z0-9_-]+)*\.php$|\.(?:ini|log|dat|json|db)$)">
   # Apache 2.4以降
   <IfModule mod_authz_core.c>
     Require all denied
