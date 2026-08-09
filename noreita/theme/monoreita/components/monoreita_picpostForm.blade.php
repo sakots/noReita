@@ -29,7 +29,7 @@
     <label><input type="checkbox" value="true" name="anime" title="動画記録" @if ($defanime) checked @endif>アニメーション記録</label>
     @endif
     <input class="button" type="submit" value="お絵かき">
-    @if ($use_image_upload)<a href="{{$self}}?mode=pictmp">画像をアップロード</a>@endif
+    @if ($use_image_upload && !isset($resno))<a href="{{$self}}?mode=pictmp">画像をアップロード</a>@endif
     @if (isset($resno)) <input type="hidden" name="modid" value="{{$resno}}"> @endif
     @if (isset($resno)) <input type="hidden" name="resto" value="{{$resno}}"> @endif
   </p>
