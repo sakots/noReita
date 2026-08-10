@@ -36,7 +36,7 @@ return [
 
   'features' => [
     // ブラウザからの画像アップロードを無効にする場合はfalseにします。
-    'image_upload' => true,
+    'image_upload' => false,
     // 日記モードでは新規投稿を管理者ログイン中の利用者だけに限定します。
     'diary_mode' => false,
     // 日記モード中に一般利用者からの返信を許可する場合はtrueにします。
