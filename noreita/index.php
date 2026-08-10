@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.0.1 lot.260809.1';
+const REITA_VER = 'v4.0.2 lot.260810.0';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -531,10 +531,24 @@ function regist(): void {
     && (!is_array($uploaded_file) || ($uploaded_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
   $pending_picfile = $_SESSION['pending_picfile'] ?? '';
   if (is_string($pending_picfile) && $pending_picfile !== '') {
-    if (!ImageService::isSafePostedImageFilename($pending_picfile)
-      || !hash_equals($pending_picfile, (string)$picfile)) {
-      error($en ? 'The selected drawing image is invalid.' : 'お絵かき画像の選択が不正です。', 403);
-      return;
+    $pending_metadata = ImageService::parseTemporaryMetadata(
+      rtrim(Config::string('paths.temporary'), '/\\') . DIRECTORY_SEPARATOR
+      . pathinfo($pending_picfile, PATHINFO_FILENAME) . '.dat'
+    );
+    $pending_image_exists = ImageService::isSafePostedImageFilename($pending_picfile)
+      && is_file(Config::string('paths.temporary') . $pending_picfile)
+      && is_array($pending_metadata)
+      && hash_equals((string)$pending_metadata['filename'], $pending_picfile);
+    if (!$pending_image_exists) {
+      unset($_SESSION['pending_picfile']);
+      ApplicationErrorHandler::reportMessage('Discarded an unavailable pending drawing image.', 'pending-image-reset');
+    } else {
+      if (!hash_equals($pending_picfile, (string)$picfile)) {
+        ApplicationErrorHandler::reportMessage('Normalized a pending drawing image selection.', 'pending-image-selection');
+      }
+      // 画面の古いキャッシュやPOST値の改変に影響されず、直前に描いた画像を投稿する。
+      $input['picfile'] = $pending_picfile;
+      $picfile = $pending_picfile;
     }
   }
 
@@ -1478,11 +1492,17 @@ function paint_com(string $tmpmode): void {
     $dat['temp'] = $temp;
     $pending_picfile = $_SESSION['pending_picfile'] ?? '';
     if (is_string($pending_picfile) && $pending_picfile !== '') {
+      $pending_image_found = false;
       foreach ($temp as $temporary_image) {
         if (hash_equals((string)$temporary_image['src_name'], $pending_picfile)) {
           $dat['selected_picfile'] = $pending_picfile;
+          $pending_image_found = true;
           break;
         }
+      }
+      if (!$pending_image_found) {
+        unset($_SESSION['pending_picfile']);
+        ApplicationErrorHandler::reportMessage('Discarded an unavailable pending drawing image.', 'pending-image-reset');
       }
     }
   }
@@ -2357,10 +2377,9 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   global $template_engine, $dat;
   global $en;
   if ($status < 400 || $status > 599) $status = 500;
+  // 4xxも含め、利用者へエラー画面を返すすべての異常を記録する。
+  $error_id = ApplicationErrorHandler::reportHttpError($status, strip_tags($mes), $cause);
   if ($status >= 500) {
-    $error_id = $cause !== null
-      ? ApplicationErrorHandler::reportThrowable($cause)
-      : ApplicationErrorHandler::reportMessage(strip_tags($mes));
     $mes = h(ApplicationErrorHandler::publicMessage($error_id, $en));
   }
   http_response_code($status);

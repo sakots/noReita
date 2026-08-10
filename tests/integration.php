@@ -453,8 +453,16 @@ PHP;
     'sns_server_direct_input' => '', 'encoded_t' => $share_title, 'encoded_u' => $share_target,
     'token' => 'invalid-token',
   ]);
-  integration_test('invalid CSRF token is rejected through HTTP', static function () use ($invalid_csrf_status, $invalid_csrf_body): bool {
-    return $invalid_csrf_status === 403 && str_contains($invalid_csrf_body, 'CSRF token mismatch');
+  $http_error_log_contents = '';
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $http_error_log_contents .= (string)file_get_contents($error_log_file);
+  }
+  integration_test('invalid CSRF token is rejected and logged through HTTP', static function () use (
+    $invalid_csrf_status, $invalid_csrf_body, $http_error_log_contents
+  ): bool {
+    return $invalid_csrf_status === 403 && str_contains($invalid_csrf_body, 'CSRF token mismatch')
+      && str_contains($http_error_log_contents, '"type":"http-client-error"')
+      && str_contains($http_error_log_contents, '"http_status":403');
   });
 
   $marker = 'integration-' . bin2hex(random_bytes(6));

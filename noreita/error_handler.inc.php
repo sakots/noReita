@@ -180,6 +180,24 @@ final class ApplicationErrorHandler {
     ]);
   }
 
+  public static function reportHttpError(int $status, string $message, ?Throwable $cause = null): string {
+    $record = [
+      'type' => $status >= 500 ? 'http-server-error' : 'http-client-error',
+      'http_status' => $status,
+      'message' => $message,
+    ];
+    if ($cause !== null) {
+      $record += [
+        'exception' => get_class($cause),
+        'code' => $cause->getCode(),
+        'file' => $cause->getFile(),
+        'line' => $cause->getLine(),
+        'trace' => $cause->getTraceAsString(),
+      ];
+    }
+    return self::writeRecord($record);
+  }
+
   public static function publicMessage(string $error_id, bool $english): string {
     $date = substr($error_id, 0, 8);
     return $english
