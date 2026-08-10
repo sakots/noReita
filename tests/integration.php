@@ -162,6 +162,7 @@ return [
   'site' => ['base_url' => 'http://localhost/'],
   'paths' => ['theme' => 'eda'],
   'features' => [
+    'image_upload' => true,
     'external_image_thumbnail' => false,
     'misskey_note' => false,
   ],
@@ -198,7 +199,8 @@ PHP;
   $log = fopen($server_log, 'ab');
   if ($log === false) throw new RuntimeException('Could not create server log');
   $process = proc_open(
-    [PHP_BINARY, '-S', "127.0.0.1:{$port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+      '-S', "127.0.0.1:{$port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
     $webroot
@@ -1014,7 +1016,8 @@ PHP;
   $diary_port = (int)substr(strrchr((string)$diary_address, ':'), 1);
   $diary_base_url = "http://127.0.0.1:{$diary_port}/index.php";
   $process = proc_open(
-    [PHP_BINARY, '-S', "127.0.0.1:{$diary_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+      '-S', "127.0.0.1:{$diary_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
     $webroot
@@ -1086,7 +1089,8 @@ PHP;
   $diary_replies_port = (int)substr(strrchr((string)$diary_replies_address, ':'), 1);
   $diary_replies_url = "http://127.0.0.1:{$diary_replies_port}/index.php";
   $process = proc_open(
-    [PHP_BINARY, '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+      '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
     $webroot
