@@ -989,6 +989,87 @@ PHP;
       && is_file($webroot . '/img/' . $upload_row['picfile']);
   });
 
+  $monoreita_config_local = str_replace(
+    "'paths' => ['theme' => 'eda'],",
+    "'paths' => ['theme' => 'monoreita'],",
+    $config_local
+  );
+  if ($monoreita_config_local === $config_local
+    || file_put_contents($webroot . '/config.local.php', $monoreita_config_local) === false) {
+    throw new RuntimeException('Could not select the monoreita theme for the HTTP test.');
+  }
+  if (is_resource($process)) {
+    proc_terminate($process);
+    proc_close($process);
+    $process = null;
+  }
+  $monoreita_socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
+  if ($monoreita_socket === false) throw new RuntimeException("Could not reserve monoreita test port: {$error_message}");
+  $monoreita_address = stream_socket_get_name($monoreita_socket, false);
+  fclose($monoreita_socket);
+  $monoreita_port = (int)substr(strrchr((string)$monoreita_address, ':'), 1);
+  $monoreita_base_url = "http://127.0.0.1:{$monoreita_port}/index.php";
+  $process = proc_open(
+    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+      '-S', "127.0.0.1:{$monoreita_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [STDIN, $log, $log],
+    $pipes,
+    $webroot
+  );
+  if (!is_resource($process)) throw new RuntimeException('Could not start monoreita PHP server.');
+  $monoreita_ready = false;
+  for ($attempt = 0; $attempt < 50; $attempt++) {
+    usleep(100000);
+    try {
+      [$monoreita_startup_status] = http_request($monoreita_base_url, $root . '/monoreita-ready-cookies.txt');
+      if ($monoreita_startup_status === 200) {
+        $monoreita_ready = true;
+        break;
+      }
+    } catch (Throwable $ignored) {
+    }
+  }
+  if (!$monoreita_ready) throw new RuntimeException('Monoreita PHP server did not become ready.');
+  $monoreita_cookie_jar = $root . '/monoreita-cookies.txt';
+  [$monoreita_login_form_status, $monoreita_login_form_body] = http_request(
+    $monoreita_base_url . '?mode=admin_in', $monoreita_cookie_jar
+  );
+  $monoreita_session_id = cookie_value($monoreita_cookie_jar, 'noreita_session');
+  $monoreita_token = $monoreita_session_id === null ? '' : hash('sha256', $monoreita_session_id);
+  [$monoreita_login_status] = http_request($monoreita_base_url . '?mode=admin_login', $monoreita_cookie_jar, [
+    'adminpass' => 'integration-admin-pass', 'token' => $monoreita_token,
+  ]);
+  [$monoreita_admin_status, $monoreita_admin_body] = http_request(
+    $monoreita_base_url . '?mode=admin', $monoreita_cookie_jar
+  );
+  [$monoreita_errorlog_status, $monoreita_errorlog_body] = http_request(
+    $monoreita_base_url . '?mode=admin_errorlog', $monoreita_cookie_jar
+  );
+  [$monoreita_temporary_status, $monoreita_temporary_body] = http_request(
+    $monoreita_base_url . '?mode=admin_temporary_images', $monoreita_cookie_jar
+  );
+  integration_test('monoreita renders administrator pages through BladeOne over HTTP', static function () use (
+    $monoreita_login_form_status, $monoreita_login_form_body, $monoreita_login_status,
+    $monoreita_admin_status, $monoreita_admin_body, $monoreita_errorlog_status, $monoreita_errorlog_body,
+    $monoreita_temporary_status, $monoreita_temporary_body
+  ): bool {
+    return $monoreita_login_form_status === 200
+      && str_contains($monoreita_login_form_body, 'mode=admin_login')
+      && $monoreita_login_status === 302
+      && $monoreita_admin_status === 200
+      && str_contains($monoreita_admin_body, 'theme/monoreita/css/monoreita_index.min.css')
+      && str_contains($monoreita_admin_body, 'mode=admin_errorlog')
+      && str_contains($monoreita_admin_body, 'mode=admin_temporary_images')
+      && !str_contains($monoreita_admin_body, '{{')
+      && $monoreita_errorlog_status === 200
+      && str_contains($monoreita_errorlog_body, '管理者向けエラーログ')
+      && !str_contains($monoreita_errorlog_body, '@foreach')
+      && $monoreita_temporary_status === 200
+      && str_contains($monoreita_temporary_body, '一時画像の管理')
+      && str_contains($monoreita_temporary_body, 'mode=admin_temporary_images_manage');
+  });
+  $base_url = $monoreita_base_url;
+
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
   [$admin_after_logout_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_detail_after_logout_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
