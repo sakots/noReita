@@ -130,7 +130,7 @@ smoke_test('theme manifests and diagnostics detect theme integrity problems', st
     'templates' => $manifest['templates'],
   ];
   $report = ThemeDiagnostics::inspect($eda, $manifest, $runtime);
-  if ($report['summary']['errors'] !== 0 || $report['summary']['templates_checked'] !== 13) return false;
+  if ($report['summary']['errors'] !== 0 || $report['summary']['templates_checked'] !== 15) return false;
   $invalid = $manifest;
   $invalid['assets']['css'][] = 'css/missing-theme-asset.css';
   $invalid_report = ThemeDiagnostics::inspect($eda, $invalid, $runtime);
@@ -322,6 +322,105 @@ smoke_test('error logs rotate at capacity and expired files are cleaned safely',
   }
 });
 
+smoke_test('administrator error log reader only reads valid records from named log files', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_error_reader_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $client = json_encode([
+      'timestamp' => '2026-08-11T10:00:00+09:00', 'error_id' => '20260811100000-client',
+      'type' => 'http-client-error', 'http_status' => 403, 'request_method' => 'GET',
+      'request_path' => '/noreita/', 'message' => 'Forbidden',
+    ], JSON_UNESCAPED_SLASHES);
+    $server = json_encode([
+      'timestamp' => '2026-08-11T10:01:00+09:00', 'error_id' => '20260811100100-server',
+      'type' => 'http-server-error', 'http_status' => 500, 'request_method' => 'POST',
+      'request_path' => '/noreita/', 'message' => 'Internal error',
+    ], JSON_UNESCAPED_SLASHES);
+    if (!is_string($client) || !is_string($server)
+      || file_put_contents($directory . '/error-20260811.log', "not json\n" . $client . "\n") === false
+      || file_put_contents($directory . '/error-20260811.1.log', $server . "\n") === false
+      || file_put_contents($directory . '/unrelated.log', $server . "\n") === false) {
+      return false;
+    }
+    $all = ErrorLogReader::read($directory, '20260811');
+    $client_only = ErrorLogReader::read($directory, '20260811', 'all', '4xx');
+    return ErrorLogReader::availableDates($directory) === ['20260811']
+      && $all['total'] === 2
+      && count($all['records']) === 2
+      && $all['records'][0]['error_id'] === '20260811100100-server'
+      && $all['types'] === ['http-client-error', 'http-server-error']
+      && $client_only['total'] === 1
+      && $client_only['records'][0]['http_status'] === 403
+      && ErrorLogReader::read($directory, '../20260811')['total'] === 0;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('legacy administrator audits remain readable from error logs', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_audit_logs_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $record = [
+      'timestamp' => '2026-08-11T10:02:00+09:00', 'error_id' => '20260811100200-audit',
+      'type' => 'admin-audit', 'audit_action' => 'temporary-images-delete',
+      'files' => 3, 'images' => 1, 'message' => 'Administrator action: temporary-images-delete files=3 images=1',
+    ];
+    $line = json_encode($record, JSON_UNESCAPED_SLASHES);
+    if (!is_string($line) || file_put_contents($directory . '/error-20260811.log', $line . "\n") === false) return false;
+    $result = ErrorLogReader::read($directory, '20260811', 'admin-audit');
+    return $result['total'] === 1 && count($result['records']) === 1
+      && $result['records'][0]['type'] === 'admin-audit'
+      && str_contains((string)$result['records'][0]['message'], 'temporary-images-delete')
+      && !str_contains((string)$result['records'][0]['message'], 'password=');
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('administrator audits have independent storage and capacity', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_split_logs_' . bin2hex(random_bytes(8));
+  $error_directory = $root . DIRECTORY_SEPARATOR . 'errorlog';
+  $audit_directory = $root . DIRECTORY_SEPARATOR . 'auditlog';
+  if (!mkdir($error_directory, 0700, true) || !mkdir($audit_directory, 0700, true)) return false;
+  try {
+    $audit_record = json_encode([
+      'timestamp' => '2026-08-11T10:03:00+09:00', 'error_id' => '20260811100300-audit',
+      'type' => 'admin-audit', 'audit_action' => 'login',
+      'message' => 'Administrator action: login',
+    ], JSON_UNESCAPED_SLASHES);
+    if (!is_string($audit_record)
+      || !ErrorLogStorage::append($error_directory, '20260811', "12345\n", 6, 1)
+      || ErrorLogStorage::append($error_directory, '20260811', "full\n", 6, 1)
+      || !ErrorLogStorage::append($audit_directory, '20260811', $audit_record . "\n", 2048, 1, 'audit')) {
+      return false;
+    }
+    $audit = AuditLogReader::read($audit_directory, '20260811');
+    return is_file($error_directory . '/error-20260811.log')
+      && is_file($audit_directory . '/audit-20260811.log')
+      && !is_file($error_directory . '/audit-20260811.log')
+      && !is_file($audit_directory . '/error-20260811.log')
+      && AuditLogReader::availableDates($audit_directory) === ['20260811']
+      && $audit['total'] === 1
+      && $audit['records'][0]['type'] === 'admin-audit'
+      && str_contains((string)$audit['records'][0]['message'], 'login');
+  } finally {
+    foreach ([$error_directory, $audit_directory] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+        if (is_file($file)) unlink($file);
+      }
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 smoke_test('private files and directories ship Apache access denial rules', static function (): bool {
   $root_rule = file_get_contents(dirname(__DIR__) . '/noreita/.htaccess');
   if (!is_string($root_rule)
@@ -338,7 +437,7 @@ smoke_test('private files and directories ship Apache access denial rules', stat
   $ignore = file_get_contents(dirname(__DIR__) . '/.gitignore');
   if (!is_string($ignore) || !str_contains($ignore, 'config.local.php')
     || preg_match('/^config\.php$/m', $ignore) === 1) return false;
-  foreach (['session', 'cache', 'backup', 'errorlog'] as $directory) {
+  foreach (['session', 'cache', 'backup', 'errorlog', 'auditlog', 'tmp'] as $directory) {
     $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");
     if (!is_string($rule)
       || !str_contains($rule, 'Require all denied')
@@ -652,7 +751,7 @@ smoke_test('application initialization prepares runtime state', static function 
   ];
   try {
     $initializer = new ApplicationInitializer(
-      'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories
+      'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories, 0600, $public_temp
     );
     $initializer->prepareDirectories();
     $initializer->migrateDatabase();
@@ -682,6 +781,7 @@ smoke_test('application initialization prepares runtime state', static function 
       && !array_filter(array_keys($directories), static fn(string $directory): bool => !is_dir($directory))
       && (fileperms($public_image) & 0777) === 0755
       && (fileperms($public_temp) & 0777) === 0755
+      && str_contains((string)file_get_contents($public_temp . DIRECTORY_SEPARATOR . '.htaccess'), 'Require all denied')
       && (fileperms($private_session) & 0777) === 0700
       && (fileperms($database_file) & 0777) === 0600;
   } finally {
@@ -692,7 +792,11 @@ smoke_test('application initialization prepares runtime state', static function 
     if (is_dir($backup_dir)) rmdir($backup_dir);
     if (is_dir($private_session)) rmdir($private_session);
     if (is_dir($root . DIRECTORY_SEPARATOR . 'nested')) rmdir($root . DIRECTORY_SEPARATOR . 'nested');
-    foreach ([$public_image, $public_temp] as $directory) if (is_dir($directory)) rmdir($directory);
+    foreach ([$public_image, $public_temp] as $directory) {
+      $rule = $directory . DIRECTORY_SEPARATOR . '.htaccess';
+      if (is_file($rule)) unlink($rule);
+      if (is_dir($directory)) rmdir($directory);
+    }
     if (is_dir($root)) rmdir($root);
   }
 });
@@ -1037,6 +1141,27 @@ smoke_test('temporary images are parsed, found, and cleaned up', static function
       || $images[0]['paint_seconds'] !== 60 || $images[0]['tool'] !== 'neo'
       || $found === null || $found['base_name'] !== '200'
       || ImageService::findTemporaryImageByReplacementCode($directory, 'missing') !== null) {
+      return false;
+    }
+
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '100.pch', 'animation');
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '100.psd', 'working data');
+    touch($directory . DIRECTORY_SEPARATOR . '100.png', $now - 86401);
+    $entries = ImageService::temporaryImageEntries($directory, 1, $now);
+    $entries_by_filename = [];
+    foreach ($entries as $entry) $entries_by_filename[$entry['filename']] = $entry;
+    $owner_image = ImageService::authorizedTemporaryImage($directory, '100.png', 'user-a', false);
+    $other_user_image = ImageService::authorizedTemporaryImage($directory, '100.png', 'user-b', false);
+    $admin_image = ImageService::authorizedTemporaryImage($directory, '100.png', '', true);
+    $work_file = ImageService::authorizedTemporaryImage($directory, '100.pch', 'user-a', false);
+    $deleted = ImageService::deleteTemporaryImages($directory, ['100.png', '../invalid.png']);
+    if (count($entries) !== 2 || !isset($entries_by_filename['100.png']) || !$entries_by_filename['100.png']['expired']
+      || $entries_by_filename['100.png']['related_files'] !== 4 || $deleted['images'] !== 1 || $deleted['files'] !== 4
+      || $deleted['skipped'] !== 0 || is_file($directory . DIRECTORY_SEPARATOR . '100.png')
+      || is_file($directory . DIRECTORY_SEPARATOR . '100.dat') || is_file($directory . DIRECTORY_SEPARATOR . '100.pch')
+      || is_file($directory . DIRECTORY_SEPARATOR . '100.psd')
+      || !is_array($owner_image) || $owner_image['mime_type'] !== 'image/png'
+      || $other_user_image !== null || !is_array($admin_image) || $work_file !== null) {
       return false;
     }
 

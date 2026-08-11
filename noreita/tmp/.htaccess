@@ -1,0 +1,10 @@
+# 投稿前の一時画像・動画・作業ファイルへの直接HTTPアクセスを拒否する。
+# 表示は index.php?mode=temporary_image の権限確認を通す。
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+  Order Allow,Deny
+  Deny from all
+</IfModule>

@@ -66,6 +66,12 @@ const ADMINFILE = "eda_admin";
 //管理モードの記事詳細テンプレートファイル
 const ADMINPOSTFILE = "eda_admin_post";
 
+//管理モードのエラーログテンプレートファイル
+const ADMINERRORLOGFILE = "eda_admin_errorlog";
+
+//管理モードの一時画像管理テンプレートファイル
+const ADMINTEMPORARYFILE = "eda_admin_temporary_images";
+
 //SNSシェア選択のテンプレートファイル
 const SET_SHARE_SERVER = "eda_sns_share";
 

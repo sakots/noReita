@@ -63,7 +63,7 @@ scripts/integration-test.sh
 
 このテストは一時ディレクトリと一時SQLite DBを使用し、設置済み掲示板の`config.local.php`やDBは変更しません。
 
-更新後に`noreita/errorlog/`へブラウザーでアクセスし、403になることも確認してください。
+更新後に`noreita/errorlog/`、`noreita/auditlog/`、`noreita/tmp/`へブラウザーでアクセスし、403になることも確認してください。
 PHPエラーの調査方法は[エラー調査手順](errors.md)を参照してください。
 
 GitHub Actionsでは、PHP 8.1、8.2、8.3、8.4、8.5の各環境で`composer.lock`から依存ライブラリを配置し、このHTTP結合テストを自動実行します。

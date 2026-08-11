@@ -9,7 +9,7 @@ $top_level = strtolower((string)($segments[0] ?? ''));
 $basename = strtolower(basename($path));
 $extension = strtolower(pathinfo($basename, PATHINFO_EXTENSION));
 
-$protected_directory = in_array($top_level, ['session', 'cache', 'backup', 'errorlog'], true);
+$protected_directory = in_array($top_level, ['session', 'cache', 'backup', 'errorlog', 'auditlog', 'tmp'], true);
 $protected_file = preg_match('/\Aconfig(?:\.[a-z0-9_-]+)*\.php\z/i', $basename) === 1
   || in_array($extension, ['ini', 'log', 'dat', 'json', 'db'], true)
   || preg_match('/\.db-(?:wal|shm|journal)\z/i', $basename) === 1;

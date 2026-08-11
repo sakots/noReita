@@ -1,13 +1,14 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260808;
+const IMAGE_INC_VER = 20260811;
 
 final class ImageUploadException extends RuntimeException {
 }
 
 final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
+  private const TEMPORARY_RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'psd', 'tgkr'];
   private const PLAYABLE_ANIMATION_EXTENSIONS = ['pch', 'spch', 'tgkr'];
 
   public static function isSafePostedImageFilename(string $filename): bool {
@@ -55,7 +56,7 @@ final class ImageService {
   }
 
   public static function parseTemporaryMetadata(string $metadata_file): ?array {
-    if (!is_file($metadata_file) || !is_readable($metadata_file)
+    if (is_link($metadata_file) || !is_file($metadata_file) || !is_readable($metadata_file)
       || strtolower(pathinfo($metadata_file, PATHINFO_EXTENSION)) !== 'dat') {
       return null;
     }
@@ -96,7 +97,9 @@ final class ImageService {
     foreach ($files as $file) {
       if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) !== 'dat') continue;
       $metadata = self::parseTemporaryMetadata($temp_dir . $file);
-      if ($metadata === null || !is_file($temp_dir . $metadata['filename'])) continue;
+      if ($metadata === null) continue;
+      $image_path = $temp_dir . $metadata['filename'];
+      if (is_link($image_path) || !is_file($image_path)) continue;
       $images[] = $metadata;
     }
     usort($images, static fn(array $a, array $b): int => strcmp($a['filename'], $b['filename']));
@@ -109,6 +112,110 @@ final class ImageService {
       if (hash_equals($image['replacement_code'], $replacement_code)) return $image;
     }
     return null;
+  }
+
+  /**
+   * Return a pending image only when it belongs to the requesting user or an administrator.
+   * Replay and work files are deliberately never returned by this method.
+   *
+   * @return array{path:string,mime_type:string}|null
+   */
+  public static function authorizedTemporaryImage(
+    string $temp_dir, string $filename, string $user_code, bool $is_administrator
+  ): ?array {
+    if (!self::isSafePostedImageFilename($filename)) return null;
+
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $base_name = pathinfo($filename, PATHINFO_FILENAME);
+    $metadata = self::parseTemporaryMetadata($temp_dir . $base_name . '.dat');
+    if ($metadata === null || !hash_equals((string)$metadata['filename'], $filename)) return null;
+    if (!$is_administrator && ($user_code === ''
+      || !hash_equals((string)$metadata['user_code'], $user_code))) {
+      return null;
+    }
+
+    $path = $temp_dir . $filename;
+    if (is_link($path) || !is_file($path) || !is_readable($path)) return null;
+    $mime_types = [
+      'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif',
+      'webp' => 'image/webp', 'avif' => 'image/avif',
+    ];
+    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    if (!isset($mime_types[$extension])) return null;
+
+    return ['path' => $path, 'mime_type' => $mime_types[$extension]];
+  }
+
+  /**
+   * Return valid pending images with only the operational data required by the administrator.
+   *
+   * @return array<int,array<string,int|string|bool>>
+   */
+  public static function temporaryImageEntries(string $temp_dir, int $limit_days, ?int $now = null): array {
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $now ??= time();
+    $entries = [];
+    foreach (self::listTemporaryImages($temp_dir) as $image) {
+      $image_path = $temp_dir . $image['filename'];
+      $modified = @filemtime($image_path);
+      if ($modified === false) continue;
+      $related = self::temporaryRelatedFilePaths($temp_dir, (string)$image['base_name']);
+      $bytes = 0;
+      foreach ($related as $path) {
+        $size = @filesize($path);
+        if ($size !== false && $size > 0) $bytes += $size;
+      }
+      $age = max(0, $now - $modified);
+      $entries[] = [
+        'filename' => (string)$image['filename'],
+        'tool' => (string)$image['tool'],
+        'resto' => (string)$image['resto'],
+        'paint_time' => (string)$image['paint_time'],
+        'modified_at' => $modified,
+        'age_seconds' => $age,
+        'expired' => $age > max(0, $limit_days) * 86400,
+        'related_files' => count($related),
+        'related_bytes' => $bytes,
+      ];
+    }
+    usort($entries, static fn(array $left, array $right): int => $right['modified_at'] <=> $left['modified_at']
+      ?: strcmp((string)$left['filename'], (string)$right['filename']));
+    return $entries;
+  }
+
+  /**
+   * Delete selected pending images and their known related files. Selection is accepted only
+   * when the image has matching, valid .dat metadata in the temporary directory.
+   *
+   * @param array<int,mixed> $filenames
+   * @return array{images:int,files:int,skipped:int}
+   */
+  public static function deleteTemporaryImages(string $temp_dir, array $filenames): array {
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $selected = [];
+    foreach ($filenames as $filename) {
+      if (!is_string($filename) || !self::isSafePostedImageFilename($filename)) continue;
+      $selected[$filename] = true;
+    }
+    $result = ['images' => 0, 'files' => 0, 'skipped' => 0];
+    foreach (array_keys($selected) as $filename) {
+      $base_name = pathinfo($filename, PATHINFO_FILENAME);
+      $metadata = self::parseTemporaryMetadata($temp_dir . $base_name . '.dat');
+      if ($metadata === null || !hash_equals((string)$metadata['filename'], $filename)) {
+        $result['skipped']++;
+        continue;
+      }
+      $removed_image = false;
+      foreach (self::temporaryRelatedFilePaths($temp_dir, $base_name) as $path) {
+        if (safe_unlink($path)) {
+          $result['files']++;
+          if (basename($path) === $filename) $removed_image = true;
+        }
+      }
+      if ($removed_image) $result['images']++;
+      else $result['skipped']++;
+    }
+    return $result;
   }
 
   public static function cleanupTemporaryFiles(string $temp_dir, int $limit_days, ?int $now = null): int {
@@ -128,6 +235,17 @@ final class ImageService {
       if (($expired || $expired_upload) && safe_unlink($path)) $deleted++;
     }
     return $deleted;
+  }
+
+  /** @return array<int,string> */
+  private static function temporaryRelatedFilePaths(string $temp_dir, string $base_name): array {
+    if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_-]{0,127}\z/D', $base_name) !== 1) return [];
+    $paths = [];
+    foreach (self::TEMPORARY_RELATED_EXTENSIONS as $extension) {
+      $path = $temp_dir . $base_name . '.' . $extension;
+      if (is_file($path) && !is_link($path)) $paths[] = $path;
+    }
+    return $paths;
   }
 
   public static function animationPlaybackData(string $image_dir, string $animation_name, int $speed): array {

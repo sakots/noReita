@@ -49,7 +49,7 @@ function copy_tree(string $source, string $destination): void {
   if (!is_dir($destination) && !mkdir($destination, 0700, true) && !is_dir($destination)) {
     throw new RuntimeException("Could not create {$destination}");
   }
-  $skip = ['backup', 'cache', 'errorlog', 'img', 'session', 'temp', 'thumb', 'thumbnail', 'tmp'];
+  $skip = ['auditlog', 'backup', 'cache', 'errorlog', 'img', 'session', 'temp', 'thumb', 'thumbnail', 'tmp'];
   foreach (new DirectoryIterator($source) as $item) {
     if ($item->isDot() || in_array($item->getFilename(), $skip, true) || $item->getFilename() === 'config.local.php') {
       continue;
@@ -157,6 +157,7 @@ return [
   'admin' => [
     'password' => 'integration-admin-pass',
     'threads_per_page' => 1,
+    'temporary_images_per_page' => 1,
     'login' => ['max_failures' => 3],
   ],
   'site' => ['base_url' => 'http://localhost/'],
@@ -234,6 +235,7 @@ PHP;
     'backup/http-access-probe.db' => 'backup-secret',
     'cache/http-access-probe.bladec' => 'blade-cache-secret',
     'errorlog/http-access-probe.log' => 'error-log-secret',
+    'auditlog/http-access-probe.log' => 'audit-log-secret',
   ];
   foreach ($protected_probes as $relative_path => $secret) {
     $probe_path = $webroot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative_path);
@@ -248,7 +250,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 8 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 9 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -317,16 +319,23 @@ PHP;
   });
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$admin_errorlog_unauthorized_status] = http_request($base_url . '?mode=admin_errorlog', $cookie_jar);
+  [$admin_auditlog_unauthorized_status] = http_request($base_url . '?mode=admin_auditlog', $cookie_jar);
+  [$admin_temporary_images_unauthorized_status] = http_request($base_url . '?mode=admin_temporary_images', $cookie_jar);
   [$admin_detail_unauthorized_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
   [$admin_edit_unauthorized_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
   [$admin_manage_unauthorized_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'hide', 'delno' => ['1'], 'token' => $token,
   ]);
   integration_test('administration routes require a login session', static function () use (
-    $admin_unauthorized_status, $admin_detail_unauthorized_status,
+    $admin_unauthorized_status, $admin_errorlog_unauthorized_status, $admin_auditlog_unauthorized_status,
+    $admin_temporary_images_unauthorized_status, $admin_detail_unauthorized_status,
     $admin_edit_unauthorized_status, $admin_manage_unauthorized_status
   ): bool {
     return $admin_unauthorized_status === 403
+      && $admin_errorlog_unauthorized_status === 403
+      && $admin_auditlog_unauthorized_status === 403
+      && $admin_temporary_images_unauthorized_status === 403
       && $admin_detail_unauthorized_status === 403
       && $admin_edit_unauthorized_status === 403
       && $admin_manage_unauthorized_status === 403;
@@ -373,10 +382,48 @@ PHP;
       && str_contains($admin_body, '総投稿数')
       && str_contains($admin_body, '画像ディレクトリ:')
       && str_contains($admin_body, 'mode=admin_logout')
+      && str_contains($admin_body, 'mode=admin_errorlog')
+      && str_contains($admin_body, 'mode=admin_auditlog')
+      && str_contains($admin_body, 'mode=admin_temporary_images')
       && str_contains($admin_body, 'mode=admin_manage')
       && str_contains($admin_body, 'value="hide"')
       && str_contains($admin_body, 'value="show"')
       && str_contains($admin_body, 'value="delete"');
+  });
+
+  [$admin_errorlog_status, $admin_errorlog_body] = http_request(
+    $base_url . '?mode=admin_errorlog&log_status=4xx', $cookie_jar
+  );
+  integration_test('administrator can view filtered error logs without exposing files directly', static function () use (
+    $admin_errorlog_status, $admin_errorlog_body
+  ): bool {
+    return $admin_errorlog_status === 200
+      && str_contains($admin_errorlog_body, '管理者向けエラーログ')
+      && str_contains($admin_errorlog_body, 'http-client-error')
+      && str_contains($admin_errorlog_body, '403');
+  });
+
+  [$admin_auditlog_status, $admin_auditlog_body] = http_request(
+    $base_url . '?mode=admin_auditlog', $cookie_jar
+  );
+  $error_storage = '';
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_file) {
+    $error_storage .= (string)file_get_contents($error_file);
+  }
+  $audit_storage = '';
+  foreach (glob($webroot . '/auditlog/audit-*.log') ?: [] as $audit_file) {
+    $audit_storage .= (string)file_get_contents($audit_file);
+  }
+  integration_test('administrator audits use storage independent from HTTP error logs', static function () use (
+    $admin_auditlog_status, $admin_auditlog_body, $error_storage, $audit_storage
+  ): bool {
+    return $admin_auditlog_status === 200
+      && str_contains($admin_auditlog_body, '管理操作の監査ログ')
+      && str_contains($admin_auditlog_body, 'Administrator action: login')
+      && str_contains($audit_storage, '"type":"admin-audit"')
+      && str_contains($audit_storage, '"audit_action":"login"')
+      && !str_contains($audit_storage, '"type":"http-client-error"')
+      && !str_contains($error_storage, '"type":"admin-audit"');
   });
 
   $theme_colors = [
@@ -670,6 +717,107 @@ PHP;
       && !is_file($webroot . '/tmp/' . $image_base . '.dat');
   });
 
+  $admin_temporary_base = 'admin-temp-' . bin2hex(random_bytes(6));
+  $admin_temporary_name = $admin_temporary_base . '.png';
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_name, $png);
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_base . '.pch', 'temporary animation');
+  $admin_temporary_second_base = 'admin-temp-second-' . bin2hex(random_bytes(6));
+  $admin_temporary_second_name = $admin_temporary_second_base . '.png';
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_second_name, $png);
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_second_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
+  touch($webroot . '/tmp/' . $admin_temporary_name, time());
+  touch($webroot . '/tmp/' . $admin_temporary_second_name, time() - 1);
+  [$admin_temporary_page_one_status, $admin_temporary_page_one_body] = http_request(
+    $base_url . '?mode=admin_temporary_images&page=1', $cookie_jar
+  );
+  [$admin_temporary_page_two_status, $admin_temporary_page_two_body] = http_request(
+    $base_url . '?mode=admin_temporary_images&page=2', $cookie_jar
+  );
+  [$admin_temporary_invalid_page_status] = http_request(
+    $base_url . '?mode=admin_temporary_images&page=invalid', $cookie_jar
+  );
+  [$admin_temporary_missing_page_status] = http_request(
+    $base_url . '?mode=admin_temporary_images&page=99', $cookie_jar
+  );
+  [$admin_temporary_delete_status] = http_request($base_url . '?mode=admin_temporary_images_manage', $cookie_jar, [
+    'operation' => 'delete_selected', 'temporary_image' => [$admin_temporary_name], 'token' => $token,
+  ]);
+  $audit_log = '';
+  foreach (glob($webroot . '/auditlog/audit-*.log') ?: [] as $audit_file) {
+    $contents = file_get_contents($audit_file);
+    if (is_string($contents)) $audit_log .= $contents;
+  }
+  integration_test('administrator manages pending images without accepting arbitrary files', static function () use (
+    $admin_temporary_page_one_status, $admin_temporary_page_one_body,
+    $admin_temporary_page_two_status, $admin_temporary_page_two_body,
+    $admin_temporary_invalid_page_status, $admin_temporary_missing_page_status, $admin_temporary_delete_status,
+    $admin_temporary_name, $admin_temporary_second_name, $admin_temporary_base, $webroot, $audit_log
+  ): bool {
+    return $admin_temporary_page_one_status === 200
+      && str_contains($admin_temporary_page_one_body, '一時画像の管理')
+      && str_contains($admin_temporary_page_one_body, $admin_temporary_name)
+      && !str_contains($admin_temporary_page_one_body, $admin_temporary_second_name)
+      && str_contains($admin_temporary_page_one_body, 'name="temporary_image[]"')
+      && str_contains($admin_temporary_page_one_body, 'mode=temporary_image')
+      && str_contains($admin_temporary_page_one_body, '1 / 2 ページ')
+      && $admin_temporary_page_two_status === 200
+      && str_contains($admin_temporary_page_two_body, $admin_temporary_second_name)
+      && !str_contains($admin_temporary_page_two_body, $admin_temporary_name)
+      && str_contains($admin_temporary_page_two_body, '2 / 2 ページ')
+      && $admin_temporary_invalid_page_status === 400
+      && $admin_temporary_missing_page_status === 404
+      && $admin_temporary_delete_status === 302
+      && !is_file($webroot . '/tmp/' . $admin_temporary_name)
+      && !is_file($webroot . '/tmp/' . $admin_temporary_base . '.dat')
+      && !is_file($webroot . '/tmp/' . $admin_temporary_base . '.pch')
+      && str_contains($audit_log, '"type":"admin-audit"')
+      && str_contains($audit_log, '"audit_action":"temporary-images-delete"')
+      && str_contains($audit_log, '"images":1')
+      && !str_contains($audit_log, $admin_temporary_name);
+  });
+
+  $temporary_owner_cookie_jar = $root . '/temporary-image-owner-cookies.txt';
+  http_request($base_url, $temporary_owner_cookie_jar);
+  $temporary_owner_code = cookie_value($temporary_owner_cookie_jar, 'usercode');
+  if ($temporary_owner_code === null || $temporary_owner_code === '') {
+    throw new RuntimeException('Could not create a temporary-image owner session.');
+  }
+  $temporary_private_base = 'private-temp-' . bin2hex(random_bytes(6));
+  $temporary_private_name = $temporary_private_base . '.png';
+  file_put_contents($webroot . '/tmp/' . $temporary_private_name, $png);
+  file_put_contents(
+    $webroot . '/tmp/' . $temporary_private_base . '.dat',
+    "127.0.0.1\tlocalhost\tagent\t.png\t{$temporary_owner_code}\t\t100\t160\t0\tneo"
+  );
+  file_put_contents($webroot . '/tmp/' . $temporary_private_base . '.psd', 'private working data');
+  $temporary_image_url = $base_url . '?mode=temporary_image&file=' . rawurlencode($temporary_private_name);
+  [$temporary_owner_status, $temporary_owner_body, , $temporary_owner_headers] = http_request(
+    $temporary_image_url, $temporary_owner_cookie_jar
+  );
+  $temporary_guest_cookie_jar = $root . '/temporary-image-guest-cookies.txt';
+  [$temporary_guest_status, $temporary_guest_body] = http_request($temporary_image_url, $temporary_guest_cookie_jar);
+  [$temporary_admin_status, $temporary_admin_body] = http_request($temporary_image_url, $cookie_jar);
+  [$temporary_direct_status, $temporary_direct_body] = http_request(
+    $origin_url . '/tmp/' . rawurlencode($temporary_private_name), $temporary_guest_cookie_jar
+  );
+  [$temporary_work_status, $temporary_work_body] = http_request(
+    $base_url . '?mode=temporary_image&file=' . rawurlencode($temporary_private_base . '.psd'), $temporary_owner_cookie_jar
+  );
+  integration_test('temporary images require owner or administrator authorization over HTTP', static function () use (
+    $temporary_owner_status, $temporary_owner_body, $temporary_owner_headers,
+    $temporary_guest_status, $temporary_guest_body, $temporary_admin_status, $temporary_admin_body,
+    $temporary_direct_status, $temporary_direct_body, $temporary_work_status, $temporary_work_body, $png
+  ): bool {
+    return $temporary_owner_status === 200 && $temporary_owner_body === $png
+      && ($temporary_owner_headers['content-type'] ?? '') === 'image/png'
+      && str_contains((string)($temporary_owner_headers['cache-control'] ?? ''), 'no-store')
+      && $temporary_guest_status === 404 && !str_contains($temporary_guest_body, 'PNG')
+      && $temporary_admin_status === 200 && $temporary_admin_body === $png
+      && $temporary_direct_status === 403 && !str_contains($temporary_direct_body, 'PNG')
+      && $temporary_work_status === 404 && !str_contains($temporary_work_body, 'private working data');
+  });
+
   $image_post_id = (int)($image_row['tid'] ?? 0);
   [$image_admin_detail_status, $image_admin_detail_body] = http_request(
     $base_url . '?mode=admin_post&id=' . $image_post_id, $cookie_jar
@@ -937,16 +1085,107 @@ PHP;
       && is_file($webroot . '/img/' . $upload_row['picfile']);
   });
 
+  $monoreita_config_local = str_replace(
+    "'paths' => ['theme' => 'eda'],",
+    "'paths' => ['theme' => 'monoreita'],",
+    $config_local
+  );
+  if ($monoreita_config_local === $config_local
+    || file_put_contents($webroot . '/config.local.php', $monoreita_config_local) === false) {
+    throw new RuntimeException('Could not select the monoreita theme for the HTTP test.');
+  }
+  if (is_resource($process)) {
+    proc_terminate($process);
+    proc_close($process);
+    $process = null;
+  }
+  $monoreita_socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
+  if ($monoreita_socket === false) throw new RuntimeException("Could not reserve monoreita test port: {$error_message}");
+  $monoreita_address = stream_socket_get_name($monoreita_socket, false);
+  fclose($monoreita_socket);
+  $monoreita_port = (int)substr(strrchr((string)$monoreita_address, ':'), 1);
+  $monoreita_base_url = "http://127.0.0.1:{$monoreita_port}/index.php";
+  $process = proc_open(
+    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+      '-S', "127.0.0.1:{$monoreita_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+    [STDIN, $log, $log],
+    $pipes,
+    $webroot
+  );
+  if (!is_resource($process)) throw new RuntimeException('Could not start monoreita PHP server.');
+  $monoreita_ready = false;
+  for ($attempt = 0; $attempt < 50; $attempt++) {
+    usleep(100000);
+    try {
+      [$monoreita_startup_status] = http_request($monoreita_base_url, $root . '/monoreita-ready-cookies.txt');
+      if ($monoreita_startup_status === 200) {
+        $monoreita_ready = true;
+        break;
+      }
+    } catch (Throwable $ignored) {
+    }
+  }
+  if (!$monoreita_ready) throw new RuntimeException('Monoreita PHP server did not become ready.');
+  $monoreita_cookie_jar = $root . '/monoreita-cookies.txt';
+  [$monoreita_login_form_status, $monoreita_login_form_body] = http_request(
+    $monoreita_base_url . '?mode=admin_in', $monoreita_cookie_jar
+  );
+  $monoreita_session_id = cookie_value($monoreita_cookie_jar, 'noreita_session');
+  $monoreita_token = $monoreita_session_id === null ? '' : hash('sha256', $monoreita_session_id);
+  [$monoreita_login_status] = http_request($monoreita_base_url . '?mode=admin_login', $monoreita_cookie_jar, [
+    'adminpass' => 'integration-admin-pass', 'token' => $monoreita_token,
+  ]);
+  [$monoreita_admin_status, $monoreita_admin_body] = http_request(
+    $monoreita_base_url . '?mode=admin', $monoreita_cookie_jar
+  );
+  [$monoreita_errorlog_status, $monoreita_errorlog_body] = http_request(
+    $monoreita_base_url . '?mode=admin_errorlog', $monoreita_cookie_jar
+  );
+  [$monoreita_auditlog_status, $monoreita_auditlog_body] = http_request(
+    $monoreita_base_url . '?mode=admin_auditlog', $monoreita_cookie_jar
+  );
+  [$monoreita_temporary_status, $monoreita_temporary_body] = http_request(
+    $monoreita_base_url . '?mode=admin_temporary_images', $monoreita_cookie_jar
+  );
+  integration_test('monoreita renders administrator pages through BladeOne over HTTP', static function () use (
+    $monoreita_login_form_status, $monoreita_login_form_body, $monoreita_login_status,
+    $monoreita_admin_status, $monoreita_admin_body, $monoreita_errorlog_status, $monoreita_errorlog_body,
+    $monoreita_auditlog_status, $monoreita_auditlog_body,
+    $monoreita_temporary_status, $monoreita_temporary_body
+  ): bool {
+    return $monoreita_login_form_status === 200
+      && str_contains($monoreita_login_form_body, 'mode=admin_login')
+      && $monoreita_login_status === 302
+      && $monoreita_admin_status === 200
+      && str_contains($monoreita_admin_body, 'theme/monoreita/css/monoreita_index.min.css')
+      && str_contains($monoreita_admin_body, 'mode=admin_errorlog')
+      && str_contains($monoreita_admin_body, 'mode=admin_auditlog')
+      && str_contains($monoreita_admin_body, 'mode=admin_temporary_images')
+      && !str_contains($monoreita_admin_body, '{{')
+      && $monoreita_errorlog_status === 200
+      && str_contains($monoreita_errorlog_body, '管理者向けエラーログ')
+      && !str_contains($monoreita_errorlog_body, '@foreach')
+      && $monoreita_auditlog_status === 200
+      && str_contains($monoreita_auditlog_body, '管理操作の監査ログ')
+      && !str_contains($monoreita_auditlog_body, '@foreach')
+      && $monoreita_temporary_status === 200
+      && str_contains($monoreita_temporary_body, '一時画像の管理')
+      && str_contains($monoreita_temporary_body, 'mode=admin_temporary_images_manage');
+  });
+  $base_url = $monoreita_base_url;
+
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
   [$admin_after_logout_status] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$admin_auditlog_after_logout_status] = http_request($base_url . '?mode=admin_auditlog', $cookie_jar);
   [$admin_detail_after_logout_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
   [$admin_edit_after_logout_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
   integration_test('administrator logout destroys access to every administration screen', static function () use (
-    $admin_logout_status, $admin_after_logout_status,
+    $admin_logout_status, $admin_after_logout_status, $admin_auditlog_after_logout_status,
     $admin_detail_after_logout_status, $admin_edit_after_logout_status
   ): bool {
     return $admin_logout_status === 302
       && $admin_after_logout_status === 403
+      && $admin_auditlog_after_logout_status === 403
       && $admin_detail_after_logout_status === 403
       && $admin_edit_after_logout_status === 403;
   });

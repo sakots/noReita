@@ -25,21 +25,21 @@ composer install --working-dir=noreita --no-dev --prefer-dist
 
 `.htaccess`が有効なApacheまたはApache互換サーバーを想定しています。
 
-ルートの`.htaccess`は`config.php`、`config.local.php`、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`は各ディレクトリ全体を拒否します。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
+ルートの`.htaccess`は`config.php`、`config.local.php`、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
 
-FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後にルート、`session/`、`cache/`、`backup/`、`errorlog/`の各`.htaccess`が存在することを確認してください。これらを削除したり、非公開ファイルだけを別の公開ディレクトリへ移動したりしないでください。
+FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後にルート、`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`の各`.htaccess`が存在することを確認してください。これらを削除したり、非公開ファイルだけを別の公開ディレクトリへ移動したりしないでください。
 
-`.htaccess`が禁止されているサーバーでは、サーバー管理画面またはApache本体の設定で設定ファイル、DB、`session/`、`cache/`、`backup/`、`errorlog/`へのアクセスを拒否する必要があります。
+`.htaccess`が禁止されているサーバーでは、サーバー管理画面またはApache本体の設定で設定ファイル、DB、`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`へのアクセスを拒否する必要があります。特に`tmp/`は一時画像を直接公開してはいけません。
 
 ## nginxを使う場合のDB・設定ファイル保護
 
-nginxは`.htaccess`を使用しません。`session/`、`cache/`、`backup/`、`errorlog/`、データベース、`config.php`、`config.local.php`へのアクセス拒否をnginx側で設定する必要があります。
+nginxは`.htaccess`を使用しません。`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`、データベース、`config.php`、`config.local.php`へのアクセス拒否をnginx側で設定する必要があります。
 
 ## 必要な書き込み権限
 
 初期設定では、ブラウザから配信する画像・動画ファイルを`0644`、公開ディレクトリを`0755`に設定します。PHPが設置ユーザーの権限で動作する一般的なレンタルサーバーを想定しています。
 
-`session/`、`cache/`、`backup/`、`errorlog/`は`0700`、DB・ログ・DBバックアップは`0600`で管理します。これらを`0777`や`0666`に変更しないでください。
+`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`は`0700`、DB・ログ・DBバックアップは`0600`で管理します。これらを`0777`や`0666`に変更しないでください。
 
 `session/`内のPHPセッションファイルは、最終更新から`security.session_file_lifetime`を過ぎるとアクセス時に確率的に削除されます。既定の保持時間は24時間で、現在使用中またはロック中のセッションは削除対象外です。
 

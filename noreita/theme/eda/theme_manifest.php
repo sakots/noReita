@@ -14,7 +14,7 @@ return [
     'main' => 'eda_main', 'response' => 'eda_res', 'paint' => 'eda_paint',
     'paint_backend' => 'eda_be', 'animation' => 'eda_anime', 'tegaki_animation' => 'eda_tgkr_view',
     'image_post' => 'eda_picpost', 'catalog' => 'eda_catalog', 'admin' => 'eda_admin',
-    'admin_post' => 'eda_admin_post', 'share_server' => 'eda_sns_share',
+    'admin_post' => 'eda_admin_post', 'admin_errorlog' => 'eda_admin_errorlog', 'admin_temporary_images' => 'eda_admin_temporary_images', 'share_server' => 'eda_sns_share',
     'misskey_note' => 'eda_misskey_note', 'other' => 'eda_other',
   ],
   'assets' => [

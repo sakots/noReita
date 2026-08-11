@@ -33,13 +33,16 @@ final class ApplicationBootstrap {
     }
     require_once $functions;
     require_once $error_handler;
-    ApplicationErrorHandler::install($root . '/errorlog');
+    ApplicationErrorHandler::install($root . '/errorlog', $root . '/auditlog');
 
     Config::load($root);
     ApplicationErrorHandler::configure(
       Config::int('error_log.retention_days'),
       Config::int('error_log.max_bytes'),
-      Config::int('error_log.max_files_per_day')
+      Config::int('error_log.max_files_per_day'),
+      Config::int('audit_log.retention_days'),
+      Config::int('audit_log.max_bytes'),
+      Config::int('audit_log.max_files_per_day')
     );
     date_default_timezone_set(Config::string('site.timezone'));
     self::$booted = true;

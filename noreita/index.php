@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.0.2 lot.260810.0';
+const REITA_VER = 'v4.1.0 lot.260811.0';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -23,7 +23,7 @@ if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
 }
 
 // 公開画面へのPHPエラー詳細表示を止め、非公開ログへ記録する。
-if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260805) {
+if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260811) {
   die($en ? 'Please update the error handler.' : 'エラーハンドラーを最新版に更新してください。');
 }
 
@@ -58,7 +58,7 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260726) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260806) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260811) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
@@ -385,6 +385,16 @@ switch ($mode) {
     return admin_manage();
   case 'admin_theme_settings':
     return admin_theme_settings();
+  case 'admin_errorlog':
+    return admin_errorlog();
+  case 'admin_auditlog':
+    return admin_auditlog();
+  case 'admin_temporary_images':
+    return admin_temporary_images();
+  case 'admin_temporary_images_manage':
+    return admin_temporary_images_manage();
+  case 'temporary_image':
+    return temporary_image();
   case 'admin_post':
     return admin_post();
   case 'admin_edit':
@@ -424,7 +434,10 @@ function init(): void {
       __DIR__ . '/cache' => Config::int('permissions.private_directory'),
       __DIR__ . '/backup' => Config::int('permissions.private_directory'),
       __DIR__ . '/errorlog' => Config::int('permissions.private_directory'),
+      __DIR__ . '/auditlog' => Config::int('permissions.private_directory'),
     ],
+    0600,
+    __DIR__ . '/' . Config::string('paths.temporary'),
   );
   $initializer->sendSecurityHeaders();
   try {
@@ -1465,7 +1478,7 @@ function paint_com(string $tmpmode): void {
   $userip = RequestInfo::clientIp();
   $tmp = [];
   foreach (ImageService::listTemporaryImages(Config::string('paths.temporary')) as $temporary_image) {
-    if ($temporary_image['user_code'] === $usercode || $temporary_image['ip'] === $userip) {
+    if (hash_equals((string)$temporary_image['user_code'], (string)$usercode)) {
       if (!empty($dat['exclude_temp_images'])) continue;
       $tmp[] = $temporary_image;
     }
@@ -1481,9 +1494,11 @@ function paint_com(string $tmpmode): void {
     $pictmp = 2;
     $temp = array();
     foreach ($tmp as $temporary_image) {
-      $src = Config::string('paths.temporary') . $temporary_image['filename'];
+      $image_path = Config::string('paths.temporary') . $temporary_image['filename'];
+      $src = temporary_image_url((string)$temporary_image['filename']);
       $src_name = $temporary_image['filename'];
-      $date = gmdate("Y/m/d H:i", filemtime($src) + 9 * 60 * 60);
+      $modified = filemtime($image_path);
+      $date = gmdate("Y/m/d H:i", ($modified === false ? time() : $modified) + 9 * 60 * 60);
       $tool = $temporary_image['tool'];
       $utime = $temporary_image['paint_time'];
       $psec = $temporary_image['paint_seconds'];
@@ -1511,6 +1526,38 @@ function paint_com(string $tmpmode): void {
   $dat['tmp'] = $tmp2;
 
   echo $template_engine->render(PICFILE, $dat);
+}
+
+function temporary_image_url(string $filename): string {
+  return Config::string('site.script_name') . '?mode=temporary_image&file=' . rawurlencode($filename);
+}
+
+/** Serve the PNG/JPEG/GIF/WebP/AVIF preview of a pending drawing after authorization. */
+function temporary_image(): void {
+  global $usercode;
+
+  $filename = (string)filter_input_data('GET', 'file');
+  $is_administrator = AdminAuth::isAuthenticated(
+    Config::string('admin.password'), Config::int('admin.session_lifetime')
+  );
+  $image = ImageService::authorizedTemporaryImage(
+    Config::string('paths.temporary'), $filename, (string)$usercode, $is_administrator
+  );
+  if ($image === null) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=UTF-8');
+    header('Cache-Control: no-store, private');
+    exit('Not Found');
+  }
+
+  $size = @filesize($image['path']);
+  header('Content-Type: ' . $image['mime_type']);
+  header('X-Content-Type-Options: nosniff');
+  header('Cache-Control: no-store, private');
+  header('Content-Disposition: inline; filename="' . rawurlencode($filename) . '"');
+  if ($size !== false) header('Content-Length: ' . $size);
+  readfile($image['path']);
+  exit;
 }
 
 //コンティニュー画面in
@@ -1853,6 +1900,9 @@ function editexec(): void {
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
     ]);
+    if ($edit_role === 'admin') {
+      ApplicationErrorHandler::reportAdminAudit('post-edit', ['posts' => 1]);
+    }
     if ($edit_role === 'owner') {
       $https_only = (bool)($_SERVER['HTTPS'] ?? '');
       setcookie(
@@ -1940,6 +1990,7 @@ function admin_login(): void {
   } catch (Throwable $e) {
     error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
+  ApplicationErrorHandler::reportAdminAudit('login');
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
 
@@ -1951,6 +2002,7 @@ function admin_logout(): void {
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
+  ApplicationErrorHandler::reportAdminAudit('logout');
   AdminAuth::logout();
   redirect(Config::string('site.script_name') . '?mode=admin_in');
 }
@@ -1985,12 +2037,14 @@ function admin_manage(?string $forced_operation = null): void {
     if ($operation === 'delete') {
       $count = $service->deleteManyAsAdmin($selected);
       unset($_SESSION['admin_image_usage']);
+      ApplicationErrorHandler::reportAdminAudit('post-delete', ['posts' => $count]);
       $_SESSION['admin_message'] = $en
         ? "{$count} selected post(s) were deleted."
         : "選択した{$count}件の記事を完全削除しました。";
     } else {
       $hidden = $operation === 'hide';
       $count = $service->setVisibilityManyAsAdmin($selected, $hidden);
+      ApplicationErrorHandler::reportAdminAudit($hidden ? 'post-hide' : 'post-show', ['posts' => $count]);
       $_SESSION['admin_message'] = $en
         ? "{$count} selected post(s) were " . ($hidden ? 'hidden.' : 'made visible.')
         : "選択した{$count}件の記事を" . ($hidden ? '非表示にしました。' : '再表示しました。');
@@ -2054,11 +2108,13 @@ function admin_theme_settings(): void {
   try {
     if ($operation === 'reset') {
       $settings->reset();
+      ApplicationErrorHandler::reportAdminAudit('theme-settings-reset');
       $_SESSION['theme_settings_message'] = $en ? 'Theme settings were reset.' : 'テーマ標準の設定に戻しました。';
     } else {
       $values = $_POST['theme_settings'] ?? null;
       if (!is_array($values)) throw new InvalidArgumentException('Invalid theme settings.');
       $settings->save($values);
+      ApplicationErrorHandler::reportAdminAudit('theme-settings-save');
       $_SESSION['theme_settings_message'] = $en ? 'Theme settings were saved.' : 'テーマ設定をサイト全体に保存しました。';
     }
   } catch (InvalidArgumentException $e) {
@@ -2093,6 +2149,174 @@ function require_admin_session(): void {
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
+}
+
+// 管理者向けエラーログ閲覧
+function admin_errorlog(): void {
+  global $template_engine, $dat;
+  global $en;
+
+  require_admin_session();
+  $dates = ErrorLogReader::availableDates(__DIR__ . '/errorlog');
+  $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
+  if ($date_input !== '' && !in_array($date_input, $dates, true)) {
+    error($en ? 'The requested error log date does not exist.' : '指定されたエラーログの日付は存在しません。', 404);
+  }
+  $date = $date_input !== '' ? $date_input : ($dates[0] ?? '');
+  $type = (string)(filter_input_data('GET', 'log_type') ?? 'all');
+  $status_group = (string)(filter_input_data('GET', 'log_status') ?? 'all');
+  if (!in_array($status_group, ['all', '4xx', '5xx'], true)
+    || ($type !== 'all' && preg_match('/\A[a-z][a-z0-9-]{0,63}\z/D', $type) !== 1)) {
+    error($en ? 'Invalid error log filter.' : 'エラーログの絞り込み条件が不正です。', 400);
+  }
+
+  try {
+    $result = $date === ''
+      ? ['records' => [], 'total' => 0, 'types' => []]
+      : ErrorLogReader::read(__DIR__ . '/errorlog', $date, $type, $status_group);
+    $dat['admin_errorlog_dates'] = $dates;
+    $dat['admin_errorlog_date'] = $date;
+    $dat['admin_errorlog_type'] = $type;
+    $dat['admin_errorlog_status'] = $status_group;
+    $dat['admin_errorlog_types'] = $result['types'];
+    $dat['admin_errorlog_records'] = $result['records'];
+    $dat['admin_errorlog_total'] = $result['total'];
+    $dat['admin_errorlog_limit'] = 100;
+    $dat['admin_log_is_audit'] = false;
+    $dat['admin_log_mode'] = 'admin_errorlog';
+    $dat['token'] = RequestSecurity::csrfToken();
+    echo $template_engine->render(ADMINERRORLOGFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load the error log.' : 'エラーログの読み込みに失敗しました。', 500, $e);
+  }
+}
+
+// 管理者向け監査ログ閲覧
+function admin_auditlog(): void {
+  global $template_engine, $dat;
+  global $en;
+
+  require_admin_session();
+  $dates = AuditLogReader::availableDates(__DIR__ . '/auditlog');
+  $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
+  if ($date_input !== '' && !in_array($date_input, $dates, true)) {
+    error($en ? 'The requested audit log date does not exist.' : '指定された監査ログの日付は存在しません。', 404);
+  }
+  $date = $date_input !== '' ? $date_input : ($dates[0] ?? '');
+
+  try {
+    $result = $date === ''
+      ? ['records' => [], 'total' => 0, 'types' => []]
+      : AuditLogReader::read(__DIR__ . '/auditlog', $date);
+    $dat['admin_errorlog_dates'] = $dates;
+    $dat['admin_errorlog_date'] = $date;
+    $dat['admin_errorlog_type'] = 'all';
+    $dat['admin_errorlog_status'] = 'all';
+    $dat['admin_errorlog_types'] = $result['types'];
+    $dat['admin_errorlog_records'] = $result['records'];
+    $dat['admin_errorlog_total'] = $result['total'];
+    $dat['admin_errorlog_limit'] = 100;
+    $dat['admin_log_is_audit'] = true;
+    $dat['admin_log_mode'] = 'admin_auditlog';
+    $dat['token'] = RequestSecurity::csrfToken();
+    echo $template_engine->render(ADMINERRORLOGFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load the audit log.' : '監査ログの読み込みに失敗しました。', 500, $e);
+  }
+}
+
+// 管理者向け一時画像管理
+function admin_temporary_images(): void {
+  global $template_engine, $dat;
+  global $en;
+
+  require_admin_session();
+  $page_input = filter_input_data('GET', 'page');
+  $page = 1;
+  if ($page_input !== null && $page_input !== '') {
+    $validated_page = filter_var($page_input, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if ($validated_page === false) {
+      error($en ? 'Invalid temporary image page number.' : '一時画像一覧のページ番号が不正です。', 400);
+    }
+    $page = (int)$validated_page;
+  }
+  try {
+    $temporary_images = ImageService::temporaryImageEntries(
+      Config::string('paths.temporary'), Config::int('limits.temporary_days')
+    );
+    $total = count($temporary_images);
+    $per_page = Config::int('admin.temporary_images_per_page');
+    $total_pages = max(1, (int)ceil($total / $per_page));
+    if ($page > $total_pages) {
+      error($en ? 'The temporary image page does not exist.' : '指定された一時画像一覧のページはありません。', 404);
+    }
+    $offset = ($page - 1) * $per_page;
+    $temporary_images = array_slice($temporary_images, $offset, $per_page);
+    foreach ($temporary_images as &$temporary_image) {
+      $temporary_image['url'] = temporary_image_url((string)$temporary_image['filename']);
+      $temporary_image['modified'] = date(Config::string('board.date_format'), (int)$temporary_image['modified_at']);
+      $temporary_image['size'] = ImageService::formatBytes((int)$temporary_image['related_bytes']);
+    }
+    unset($temporary_image);
+    $dat['admin_temporary_images'] = $temporary_images;
+    $dat['admin_temporary_images_total'] = $total;
+    $dat['admin_temporary_images_per_page'] = $per_page;
+    $dat['admin_temporary_images_page'] = $page;
+    $dat['admin_temporary_images_total_pages'] = $total_pages;
+    $dat['admin_temporary_images_range_start'] = $total === 0 ? 0 : $offset + 1;
+    $dat['admin_temporary_images_range_end'] = $offset + count($temporary_images);
+    $dat['admin_temporary_images_message'] = isset($_SESSION['admin_temporary_images_message'])
+      ? (string)$_SESSION['admin_temporary_images_message'] : '';
+    unset($_SESSION['admin_temporary_images_message']);
+    $dat['temporary_days'] = Config::int('limits.temporary_days');
+    $dat['token'] = RequestSecurity::csrfToken();
+    echo $template_engine->render(ADMINTEMPORARYFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load temporary images.' : '一時画像の読み込みに失敗しました。', 500, $e);
+  }
+}
+
+function admin_temporary_images_manage(): void {
+  global $en;
+
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  require_admin_session();
+  $operation = (string)filter_input_data('POST', 'operation');
+  try {
+    if ($operation === 'delete_selected') {
+      $selected = filter_input_data('POST', 'temporary_image');
+      if (!is_array($selected) || $selected === []) {
+        throw new InvalidArgumentException('No temporary image was selected.');
+      }
+      $result = ImageService::deleteTemporaryImages(Config::string('paths.temporary'), $selected);
+      ApplicationErrorHandler::reportAdminAudit('temporary-images-delete', [
+        'files' => $result['files'], 'images' => $result['images'], 'skipped' => $result['skipped'],
+      ]);
+      $_SESSION['admin_temporary_images_message'] = $en
+        ? "Deleted {$result['images']} pending image(s) and {$result['files']} file(s)."
+        : "一時画像{$result['images']}件と関連ファイル{$result['files']}件を削除しました。";
+    } elseif ($operation === 'cleanup_expired') {
+      $files = ImageService::cleanupTemporaryFiles(
+        Config::string('paths.temporary'), Config::int('limits.temporary_days')
+      );
+      ApplicationErrorHandler::reportAdminAudit('temporary-images-cleanup', ['files' => $files]);
+      $_SESSION['admin_temporary_images_message'] = $en
+        ? "Deleted {$files} expired temporary file(s)."
+        : "期限切れの一時ファイル{$files}件を削除しました。";
+    } else {
+      throw new InvalidArgumentException('Invalid temporary image operation.');
+    }
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Invalid temporary image operation.' : '一時画像の管理操作が不正です。', 400);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to manage temporary images.' : '一時画像の管理に失敗しました。', 500, $e);
+  }
+  redirect(Config::string('site.script_name') . '?mode=admin_temporary_images');
 }
 
 function diary_post_allowed(bool $is_reply): bool {

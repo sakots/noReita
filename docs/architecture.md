@@ -32,7 +32,7 @@
 
 ## エラー処理
 
-`error_handler.inc.php`の`ApplicationErrorHandler`がPHPのWarning、未捕捉例外、Fatal errorを処理します。公開画面には照合用エラーIDだけを表示し、詳細はHTTPアクセスを拒否した`errorlog/`へ日付別JSON Lines形式で記録します。500応答を追加する場合は内部例外のメッセージを画面へ連結せず、`error()`の第3引数へ例外を渡してください。
+`error_handler.inc.php`の`ApplicationErrorHandler`がPHPのWarning、未捕捉例外、Fatal errorを処理します。公開画面には照合用エラーIDだけを表示し、詳細はHTTPアクセスを拒否した`errorlog/`へ日付別JSON Lines形式で記録します。成功した管理操作は独立した`auditlog/`へ記録するため、外部から増やせる4xxログがエラーログの容量上限に達しても監査ログの保存枠には影響しません。500応答を追加する場合は内部例外のメッセージを画面へ連結せず、`error()`の第3引数へ例外を渡してください。
 
 ## アプリケーション初期化
 
@@ -70,9 +70,12 @@
 - アップロード画像の検証
 - サムネイル生成
 - 投稿に関連する画像・動画ファイルの一括削除
+- 投稿前の一時画像の一覧、期限判定、関連ファイルを含む安全な削除
 
 画像形式や関連ファイルを追加するときは、`index.php`ではなく`ImageService`を更新します。
 
 `thumbnail.inc.php`はGDを使った画像変換処理を担当し、`ImageService`と`ExternalImageService`から利用されます。
+
+管理者は`mode=admin_temporary_images`から、投稿前の一時画像を確認できます。保存日時の新しい順にページ分割し、1ページあたりの表示数は`admin.temporary_images_per_page`（既定50）で設定できます。選択削除は有効な`.dat`メタデータと一致する画像だけを対象にし、画像・動画・作業データを同じベース名でまとめて削除します。期限切れの一時ファイルは、設定された`limits.temporary_days`に従って一括整理できます。一時領域`tmp/`は`.htaccess`で直接取得を拒否し、プレビューは`mode=temporary_image`を経由します。この入口は同じ`usercode`の投稿者か管理者セッションにだけ画像を返し、動画・PSDなどの作業ファイルは返しません。
 
 `external_image.inc.php`の`ExternalImageService`は、本文中の外部画像URLの抽出、サムネイルキャッシュの生成と表示、安全な外部画像取得を担当します。外部取得ではTLS検証、公開IPだけへの接続、リダイレクト先の再検証、容量・画像形式・画像寸法の制限を行います。

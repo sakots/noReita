@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>一時画像の管理 - {{$board_title}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  @include('components.monoreita_headCss')
+</head>
+<body>
+  <header id="header">
+    <h1><a href="{{$self}}">{{$board_title}}</a></h1>
+    <p class="top menu"><a href="{{$self}}?mode=admin">[管理画面へ戻る]</a> <a href="{{$self}}">[掲示板]</a></p>
+    <hr>
+    <section class="epost">
+      <p>ADMIN MODE / 一時画像の管理</p>
+      <form action="{{$self}}?mode=admin_logout" method="post">
+        <input type="hidden" name="token" value="{{$token}}">
+        <input class="button" type="submit" value="ログアウト">
+      </form>
+    </section>
+  </header>
+  <main>
+    <section class="thread">
+      <h2>一時画像の管理</h2>
+      <p class="sysmsg">{{$admin_temporary_images_message}}</p>
+      <p>投稿前の画像を確認・削除できます。期限切れは {{$temporary_days}} 日を過ぎたファイルです。新しい順に1ページ {{$admin_temporary_images_per_page}} 件ずつ表示します。</p>
+      <nav aria-label="一時画像一覧ページ">
+        <p>
+          {{$admin_temporary_images_range_start}}～{{$admin_temporary_images_range_end}} 件（全{{$admin_temporary_images_total}}件） / {{$admin_temporary_images_page}} / {{$admin_temporary_images_total_pages}} ページ
+          @if ($admin_temporary_images_page > 1)
+            <a href="{{$self}}?mode=admin_temporary_images&amp;page={{$admin_temporary_images_page - 1}}">[前へ]</a>
+          @endif
+          @if ($admin_temporary_images_page < $admin_temporary_images_total_pages)
+            <a href="{{$self}}?mode=admin_temporary_images&amp;page={{$admin_temporary_images_page + 1}}">[次へ]</a>
+          @endif
+        </p>
+      </nav>
+      <form action="{{$self}}?mode=admin_temporary_images_manage" method="post">
+        <input type="hidden" name="token" value="{{$token}}">
+        <p>
+          <button class="button" type="submit" name="operation" value="delete_selected"
+            onclick="return confirm('選択した一時画像と関連ファイルを削除します。投稿前の画像は復元できません。よろしいですか？');">選択した画像を削除</button>
+          <button class="button" type="submit" name="operation" value="cleanup_expired"
+            onclick="return confirm('期限切れの一時ファイルを削除します。よろしいですか？');">期限切れの一時ファイルを削除</button>
+        </p>
+        @if (empty($admin_temporary_images))
+          <p>管理対象の一時画像はありません。</p>
+        @else
+          <p>{{$admin_temporary_images_range_start}}～{{$admin_temporary_images_range_end}} 件を表示しています。</p>
+          <table class="delfo">
+            <tr><th><input type="checkbox" id="temporary-image-select-all" aria-label="すべて選択"></th><th>画像</th><th>ファイル</th><th>保存日時</th><th>情報</th><th>状態</th></tr>
+            @foreach ($admin_temporary_images as $image)
+              <tr>
+                <td><input type="checkbox" name="temporary_image[]" value="{{$image['filename']}}" aria-label="{{$image['filename']}}を選択"></td>
+                <td><a href="{{$image['url']}}" target="_blank" rel="noopener"><img src="{{$image['url']}}" alt="{{$image['filename']}}" style="max-width:160px;max-height:120px;"></a></td>
+                <td>{{$image['filename']}}</td>
+                <td>{{$image['modified']}}</td>
+                <td>{{$image['tool']}} / 関連 {{$image['related_files']}} ファイル / {{$image['size']}}@if ($image['resto'] !== '')<br>返信先 No.{{$image['resto']}}@endif @if ($image['paint_time'] !== '')<br>描画 {{$image['paint_time']}}@endif</td>
+                <td>@if ($image['expired'])期限切れ@else 保存中 @endif</td>
+              </tr>
+            @endforeach
+          </table>
+        @endif
+      </form>
+      <nav aria-label="一時画像一覧ページ">
+        <p>
+          @if ($admin_temporary_images_page > 1)
+            <a href="{{$self}}?mode=admin_temporary_images&amp;page={{$admin_temporary_images_page - 1}}">[前へ]</a>
+          @endif
+          {{$admin_temporary_images_page}} / {{$admin_temporary_images_total_pages}}
+          @if ($admin_temporary_images_page < $admin_temporary_images_total_pages)
+            <a href="{{$self}}?mode=admin_temporary_images&amp;page={{$admin_temporary_images_page + 1}}">[次へ]</a>
+          @endif
+        </p>
+      </nav>
+    </section>
+  </main>
+  <footer id="footer">@include('components.monoreita_footerCopy')</footer>
+  <script>
+    document.getElementById('temporary-image-select-all')?.addEventListener('change', function () {
+      document.querySelectorAll('input[name="temporary_image[]"]').forEach((checkbox) => { checkbox.checked = this.checked; });
+    });
+  </script>
+</body>
+</html>
