@@ -1859,6 +1859,9 @@ function editexec(): void {
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
     ]);
+    if ($edit_role === 'admin') {
+      ApplicationErrorHandler::reportAdminAudit('post-edit', ['posts' => 1]);
+    }
     if ($edit_role === 'owner') {
       $https_only = (bool)($_SERVER['HTTPS'] ?? '');
       setcookie(
@@ -1946,6 +1949,7 @@ function admin_login(): void {
   } catch (Throwable $e) {
     error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
+  ApplicationErrorHandler::reportAdminAudit('login');
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
 
@@ -1957,6 +1961,7 @@ function admin_logout(): void {
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
+  ApplicationErrorHandler::reportAdminAudit('logout');
   AdminAuth::logout();
   redirect(Config::string('site.script_name') . '?mode=admin_in');
 }
@@ -1991,12 +1996,14 @@ function admin_manage(?string $forced_operation = null): void {
     if ($operation === 'delete') {
       $count = $service->deleteManyAsAdmin($selected);
       unset($_SESSION['admin_image_usage']);
+      ApplicationErrorHandler::reportAdminAudit('post-delete', ['posts' => $count]);
       $_SESSION['admin_message'] = $en
         ? "{$count} selected post(s) were deleted."
         : "選択した{$count}件の記事を完全削除しました。";
     } else {
       $hidden = $operation === 'hide';
       $count = $service->setVisibilityManyAsAdmin($selected, $hidden);
+      ApplicationErrorHandler::reportAdminAudit($hidden ? 'post-hide' : 'post-show', ['posts' => $count]);
       $_SESSION['admin_message'] = $en
         ? "{$count} selected post(s) were " . ($hidden ? 'hidden.' : 'made visible.')
         : "選択した{$count}件の記事を" . ($hidden ? '非表示にしました。' : '再表示しました。');
@@ -2060,11 +2067,13 @@ function admin_theme_settings(): void {
   try {
     if ($operation === 'reset') {
       $settings->reset();
+      ApplicationErrorHandler::reportAdminAudit('theme-settings-reset');
       $_SESSION['theme_settings_message'] = $en ? 'Theme settings were reset.' : 'テーマ標準の設定に戻しました。';
     } else {
       $values = $_POST['theme_settings'] ?? null;
       if (!is_array($values)) throw new InvalidArgumentException('Invalid theme settings.');
       $settings->save($values);
+      ApplicationErrorHandler::reportAdminAudit('theme-settings-save');
       $_SESSION['theme_settings_message'] = $en ? 'Theme settings were saved.' : 'テーマ設定をサイト全体に保存しました。';
     }
   } catch (InvalidArgumentException $e) {
@@ -2189,6 +2198,9 @@ function admin_temporary_images_manage(): void {
         throw new InvalidArgumentException('No temporary image was selected.');
       }
       $result = ImageService::deleteTemporaryImages(Config::string('paths.temporary'), $selected);
+      ApplicationErrorHandler::reportAdminAudit('temporary-images-delete', [
+        'files' => $result['files'], 'images' => $result['images'], 'skipped' => $result['skipped'],
+      ]);
       $_SESSION['admin_temporary_images_message'] = $en
         ? "Deleted {$result['images']} pending image(s) and {$result['files']} file(s)."
         : "一時画像{$result['images']}件と関連ファイル{$result['files']}件を削除しました。";
@@ -2196,6 +2208,7 @@ function admin_temporary_images_manage(): void {
       $files = ImageService::cleanupTemporaryFiles(
         Config::string('paths.temporary'), Config::int('limits.temporary_days')
       );
+      ApplicationErrorHandler::reportAdminAudit('temporary-images-cleanup', ['files' => $files]);
       $_SESSION['admin_temporary_images_message'] = $en
         ? "Deleted {$files} expired temporary file(s)."
         : "期限切れの一時ファイル{$files}件を削除しました。";

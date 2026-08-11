@@ -360,6 +360,30 @@ smoke_test('administrator error log reader only reads valid records from named l
   }
 });
 
+smoke_test('administrator audit records are visible through the safe log reader', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_audit_logs_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $record = [
+      'timestamp' => '2026-08-11T10:02:00+09:00', 'error_id' => '20260811100200-audit',
+      'type' => 'admin-audit', 'audit_action' => 'temporary-images-delete',
+      'files' => 3, 'images' => 1, 'message' => 'Administrator action: temporary-images-delete files=3 images=1',
+    ];
+    $line = json_encode($record, JSON_UNESCAPED_SLASHES);
+    if (!is_string($line) || file_put_contents($directory . '/error-20260811.log', $line . "\n") === false) return false;
+    $result = ErrorLogReader::read($directory, '20260811', 'admin-audit');
+    return $result['total'] === 1 && count($result['records']) === 1
+      && $result['records'][0]['type'] === 'admin-audit'
+      && str_contains((string)$result['records'][0]['message'], 'temporary-images-delete')
+      && !str_contains((string)$result['records'][0]['message'], 'password=');
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('private files and directories ship Apache access denial rules', static function (): bool {
   $root_rule = file_get_contents(dirname(__DIR__) . '/noreita/.htaccess');
   if (!is_string($root_rule)

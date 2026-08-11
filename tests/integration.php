@@ -699,9 +699,14 @@ PHP;
   [$admin_temporary_delete_status] = http_request($base_url . '?mode=admin_temporary_images_manage', $cookie_jar, [
     'operation' => 'delete_selected', 'temporary_image' => [$admin_temporary_name], 'token' => $token,
   ]);
+  $audit_log = '';
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $audit_file) {
+    $contents = file_get_contents($audit_file);
+    if (is_string($contents)) $audit_log .= $contents;
+  }
   integration_test('administrator manages pending images without accepting arbitrary files', static function () use (
     $admin_temporary_page_status, $admin_temporary_page_body, $admin_temporary_delete_status,
-    $admin_temporary_name, $admin_temporary_base, $webroot
+    $admin_temporary_name, $admin_temporary_base, $webroot, $audit_log
   ): bool {
     return $admin_temporary_page_status === 200
       && str_contains($admin_temporary_page_body, '一時画像の管理')
@@ -710,7 +715,11 @@ PHP;
       && $admin_temporary_delete_status === 302
       && !is_file($webroot . '/tmp/' . $admin_temporary_name)
       && !is_file($webroot . '/tmp/' . $admin_temporary_base . '.dat')
-      && !is_file($webroot . '/tmp/' . $admin_temporary_base . '.pch');
+      && !is_file($webroot . '/tmp/' . $admin_temporary_base . '.pch')
+      && str_contains($audit_log, '"type":"admin-audit"')
+      && str_contains($audit_log, '"audit_action":"temporary-images-delete"')
+      && str_contains($audit_log, '"images":1')
+      && !str_contains($audit_log, $admin_temporary_name);
   });
 
   $image_post_id = (int)($image_row['tid'] ?? 0);

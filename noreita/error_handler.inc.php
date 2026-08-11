@@ -313,6 +313,28 @@ final class ApplicationErrorHandler {
     ]);
   }
 
+  /**
+   * Record a successful state-changing administrator action without retaining its target data.
+   *
+   * @param array<string,int> $counts
+   */
+  public static function reportAdminAudit(string $action, array $counts = []): string {
+    if (preg_match('/\A[a-z][a-z0-9-]{0,63}\z/D', $action) !== 1) $action = 'invalid-action';
+    $normalized = [];
+    foreach ($counts as $name => $count) {
+      if (!is_string($name) || preg_match('/\A[a-z][a-z0-9-]{0,31}\z/D', $name) !== 1) continue;
+      $normalized[$name] = max(0, min(1000000, (int)$count));
+    }
+    ksort($normalized, SORT_STRING);
+    $message = 'Administrator action: ' . $action;
+    foreach ($normalized as $name => $count) $message .= ' ' . $name . '=' . $count;
+    return self::writeRecord([
+      'type' => 'admin-audit',
+      'audit_action' => $action,
+      'message' => $message,
+    ] + $normalized);
+  }
+
   public static function reportHttpError(int $status, string $message, ?Throwable $cause = null): string {
     $record = [
       'type' => $status >= 500 ? 'http-server-error' : 'http-client-error',
