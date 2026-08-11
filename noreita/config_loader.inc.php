@@ -203,6 +203,7 @@ final class Config {
       'admin.login.window' => [1, 31536000],
       'admin.login.lockout' => [1, 31536000],
       'admin.threads_per_page' => [1, 100],
+      'admin.temporary_images_per_page' => [1, 100],
       'security.session_file_lifetime' => [60, 31536000],
       'identity.cycle' => [0, 4],
       'board.log_warning_percent' => [0, 100],

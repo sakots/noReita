@@ -24,7 +24,18 @@
     <section class="thread">
       <h2>一時画像の管理</h2>
       <p class="sysmsg">{{ admin_temporary_images_message }}</p>
-      <p>投稿前の画像を確認・削除できます。期限切れは {{ temporary_days }} 日を過ぎたファイルです。表示は新しい順に最大 {{ admin_temporary_images_limit }} 件です。</p>
+      <p>投稿前の画像を確認・削除できます。期限切れは {{ temporary_days }} 日を過ぎたファイルです。新しい順に1ページ {{ admin_temporary_images_per_page }} 件ずつ表示します。</p>
+      <nav aria-label="一時画像一覧ページ">
+        <p>
+          {{ admin_temporary_images_range_start }}～{{ admin_temporary_images_range_end }} 件（全{{ admin_temporary_images_total }}件） / {{ admin_temporary_images_page }} / {{ admin_temporary_images_total_pages }} ページ
+          {% if admin_temporary_images_page > 1 %}
+            <a href="{{ self }}?mode=admin_temporary_images&amp;page={{ admin_temporary_images_page - 1 }}">[前へ]</a>
+          {% endif %}
+          {% if admin_temporary_images_page < admin_temporary_images_total_pages %}
+            <a href="{{ self }}?mode=admin_temporary_images&amp;page={{ admin_temporary_images_page + 1 }}">[次へ]</a>
+          {% endif %}
+        </p>
+      </nav>
       <form action="{{ self }}?mode=admin_temporary_images_manage" method="post">
         <input type="hidden" name="token" value="{{ token }}">
         <p>
@@ -36,7 +47,7 @@
         {% if admin_temporary_images is empty %}
           <p>管理対象の一時画像はありません。</p>
         {% else %}
-          <p>{{ admin_temporary_images_total }} 件中 {{ admin_temporary_images|length }} 件を表示しています。</p>
+          <p>{{ admin_temporary_images_range_start }}～{{ admin_temporary_images_range_end }} 件を表示しています。</p>
           <table class="delfo">
             <tr><th><input type="checkbox" id="temporary-image-select-all" aria-label="すべて選択"></th><th>画像</th><th>ファイル</th><th>保存日時</th><th>情報</th><th>状態</th></tr>
             {% for image in admin_temporary_images %}
@@ -52,6 +63,17 @@
           </table>
         {% endif %}
       </form>
+      <nav aria-label="一時画像一覧ページ">
+        <p>
+          {% if admin_temporary_images_page > 1 %}
+            <a href="{{ self }}?mode=admin_temporary_images&amp;page={{ admin_temporary_images_page - 1 }}">[前へ]</a>
+          {% endif %}
+          {{ admin_temporary_images_page }} / {{ admin_temporary_images_total_pages }}
+          {% if admin_temporary_images_page < admin_temporary_images_total_pages %}
+            <a href="{{ self }}?mode=admin_temporary_images&amp;page={{ admin_temporary_images_page + 1 }}">[次へ]</a>
+          {% endif %}
+        </p>
+      </nav>
     </section>
   </main>
   <footer id="footer">{% include 'components/eda_footerCopy.twig' %}</footer>

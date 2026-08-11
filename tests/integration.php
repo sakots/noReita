@@ -157,6 +157,7 @@ return [
   'admin' => [
     'password' => 'integration-admin-pass',
     'threads_per_page' => 1,
+    'temporary_images_per_page' => 1,
     'login' => ['max_failures' => 3],
   ],
   'site' => ['base_url' => 'http://localhost/'],
@@ -693,8 +694,23 @@ PHP;
   file_put_contents($webroot . '/tmp/' . $admin_temporary_name, $png);
   file_put_contents($webroot . '/tmp/' . $admin_temporary_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
   file_put_contents($webroot . '/tmp/' . $admin_temporary_base . '.pch', 'temporary animation');
-  [$admin_temporary_page_status, $admin_temporary_page_body] = http_request(
-    $base_url . '?mode=admin_temporary_images', $cookie_jar
+  $admin_temporary_second_base = 'admin-temp-second-' . bin2hex(random_bytes(6));
+  $admin_temporary_second_name = $admin_temporary_second_base . '.png';
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_second_name, $png);
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_second_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
+  touch($webroot . '/tmp/' . $admin_temporary_name, time());
+  touch($webroot . '/tmp/' . $admin_temporary_second_name, time() - 1);
+  [$admin_temporary_page_one_status, $admin_temporary_page_one_body] = http_request(
+    $base_url . '?mode=admin_temporary_images&page=1', $cookie_jar
+  );
+  [$admin_temporary_page_two_status, $admin_temporary_page_two_body] = http_request(
+    $base_url . '?mode=admin_temporary_images&page=2', $cookie_jar
+  );
+  [$admin_temporary_invalid_page_status] = http_request(
+    $base_url . '?mode=admin_temporary_images&page=invalid', $cookie_jar
+  );
+  [$admin_temporary_missing_page_status] = http_request(
+    $base_url . '?mode=admin_temporary_images&page=99', $cookie_jar
   );
   [$admin_temporary_delete_status] = http_request($base_url . '?mode=admin_temporary_images_manage', $cookie_jar, [
     'operation' => 'delete_selected', 'temporary_image' => [$admin_temporary_name], 'token' => $token,
@@ -705,13 +721,23 @@ PHP;
     if (is_string($contents)) $audit_log .= $contents;
   }
   integration_test('administrator manages pending images without accepting arbitrary files', static function () use (
-    $admin_temporary_page_status, $admin_temporary_page_body, $admin_temporary_delete_status,
-    $admin_temporary_name, $admin_temporary_base, $webroot, $audit_log
+    $admin_temporary_page_one_status, $admin_temporary_page_one_body,
+    $admin_temporary_page_two_status, $admin_temporary_page_two_body,
+    $admin_temporary_invalid_page_status, $admin_temporary_missing_page_status, $admin_temporary_delete_status,
+    $admin_temporary_name, $admin_temporary_second_name, $admin_temporary_base, $webroot, $audit_log
   ): bool {
-    return $admin_temporary_page_status === 200
-      && str_contains($admin_temporary_page_body, '一時画像の管理')
-      && str_contains($admin_temporary_page_body, $admin_temporary_name)
-      && str_contains($admin_temporary_page_body, 'name="temporary_image[]"')
+    return $admin_temporary_page_one_status === 200
+      && str_contains($admin_temporary_page_one_body, '一時画像の管理')
+      && str_contains($admin_temporary_page_one_body, $admin_temporary_name)
+      && !str_contains($admin_temporary_page_one_body, $admin_temporary_second_name)
+      && str_contains($admin_temporary_page_one_body, 'name="temporary_image[]"')
+      && str_contains($admin_temporary_page_one_body, '1 / 2 ページ')
+      && $admin_temporary_page_two_status === 200
+      && str_contains($admin_temporary_page_two_body, $admin_temporary_second_name)
+      && !str_contains($admin_temporary_page_two_body, $admin_temporary_name)
+      && str_contains($admin_temporary_page_two_body, '2 / 2 ページ')
+      && $admin_temporary_invalid_page_status === 400
+      && $admin_temporary_missing_page_status === 404
       && $admin_temporary_delete_status === 302
       && !is_file($webroot . '/tmp/' . $admin_temporary_name)
       && !is_file($webroot . '/tmp/' . $admin_temporary_base . '.dat')

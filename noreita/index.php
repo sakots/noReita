@@ -2154,12 +2154,27 @@ function admin_temporary_images(): void {
   global $en;
 
   require_admin_session();
+  $page_input = filter_input_data('GET', 'page');
+  $page = 1;
+  if ($page_input !== null && $page_input !== '') {
+    $validated_page = filter_var($page_input, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if ($validated_page === false) {
+      error($en ? 'Invalid temporary image page number.' : '一時画像一覧のページ番号が不正です。', 400);
+    }
+    $page = (int)$validated_page;
+  }
   try {
     $temporary_images = ImageService::temporaryImageEntries(
       Config::string('paths.temporary'), Config::int('limits.temporary_days')
     );
     $total = count($temporary_images);
-    $temporary_images = array_slice($temporary_images, 0, 200);
+    $per_page = Config::int('admin.temporary_images_per_page');
+    $total_pages = max(1, (int)ceil($total / $per_page));
+    if ($page > $total_pages) {
+      error($en ? 'The temporary image page does not exist.' : '指定された一時画像一覧のページはありません。', 404);
+    }
+    $offset = ($page - 1) * $per_page;
+    $temporary_images = array_slice($temporary_images, $offset, $per_page);
     foreach ($temporary_images as &$temporary_image) {
       $temporary_image['url'] = Config::string('paths.temporary') . $temporary_image['filename'];
       $temporary_image['modified'] = date(Config::string('board.date_format'), (int)$temporary_image['modified_at']);
@@ -2168,7 +2183,11 @@ function admin_temporary_images(): void {
     unset($temporary_image);
     $dat['admin_temporary_images'] = $temporary_images;
     $dat['admin_temporary_images_total'] = $total;
-    $dat['admin_temporary_images_limit'] = 200;
+    $dat['admin_temporary_images_per_page'] = $per_page;
+    $dat['admin_temporary_images_page'] = $page;
+    $dat['admin_temporary_images_total_pages'] = $total_pages;
+    $dat['admin_temporary_images_range_start'] = $total === 0 ? 0 : $offset + 1;
+    $dat['admin_temporary_images_range_end'] = $offset + count($temporary_images);
     $dat['admin_temporary_images_message'] = isset($_SESSION['admin_temporary_images_message'])
       ? (string)$_SESSION['admin_temporary_images_message'] : '';
     unset($_SESSION['admin_temporary_images_message']);
