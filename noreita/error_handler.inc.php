@@ -9,13 +9,15 @@ final class ErrorLogStorage {
     string $date,
     string $line,
     int $max_bytes,
-    int $max_files
+    int $max_files,
+    string $prefix = 'error'
   ): bool {
-    if ($directory === '' || $max_bytes < 1 || $max_files < 1 || strlen($line) > $max_bytes) return false;
+    if ($directory === '' || $max_bytes < 1 || $max_files < 1 || strlen($line) > $max_bytes
+      || preg_match('/\A[a-z][a-z0-9-]{0,31}\z/D', $prefix) !== 1) return false;
 
     for ($index = 0; $index < $max_files; $index++) {
       $suffix = $index === 0 ? '' : '.' . $index;
-      $path = $directory . DIRECTORY_SEPARATOR . 'error-' . $date . $suffix . '.log';
+      $path = $directory . DIRECTORY_SEPARATOR . $prefix . '-' . $date . $suffix . '.log';
       $handle = @fopen($path, 'c+b');
       if ($handle === false) continue;
       try {
@@ -45,18 +47,20 @@ final class ErrorLogStorage {
     string $directory,
     int $retention_days,
     int $limit = 20,
-    ?int $now = null
+    ?int $now = null,
+    string $prefix = 'error'
   ): int {
-    if ($directory === '' || $retention_days < 1 || $limit < 1 || !is_dir($directory)) return 0;
+    if ($directory === '' || $retention_days < 1 || $limit < 1 || !is_dir($directory)
+      || preg_match('/\A[a-z][a-z0-9-]{0,31}\z/D', $prefix) !== 1) return 0;
     $now = $now ?? time();
     $cutoff = $now - ($retention_days * 86400);
     $today = date('Ymd', $now);
     $removed = 0;
-    $files = glob($directory . DIRECTORY_SEPARATOR . 'error-*.log') ?: [];
+    $files = glob($directory . DIRECTORY_SEPARATOR . $prefix . '-*.log') ?: [];
     sort($files, SORT_STRING);
     foreach ($files as $path) {
       $name = basename($path);
-      if (!preg_match('/^error-(\d{8})(?:\.\d+)?\.log$/D', $name, $matches)
+      if (!preg_match('/^' . preg_quote($prefix, '/') . '-(\d{8})(?:\.\d+)?\.log$/D', $name, $matches)
         || $matches[1] === $today
         || (int)(@filemtime($path) ?: $now) >= $cutoff) {
         continue;
@@ -79,13 +83,13 @@ final class ErrorLogReader {
   private const MAX_FIELD_LENGTH = 4000;
 
   /** @return array<int,string> */
-  public static function availableDates(string $directory): array {
-    if (!is_dir($directory)) return [];
+  public static function availableDates(string $directory, string $prefix = 'error'): array {
+    if (!is_dir($directory) || !self::isValidPrefix($prefix)) return [];
     $dates = [];
     $entries = scandir($directory);
     if ($entries === false) return [];
     foreach ($entries as $name) {
-      if (!preg_match('/^error-(\d{8})(?:\.\d+)?\.log$/D', $name, $matches)
+      if (!preg_match('/^' . preg_quote($prefix, '/') . '-(\d{8})(?:\.\d+)?\.log$/D', $name, $matches)
         || !self::isValidDate($matches[1])) {
         continue;
       }
@@ -106,10 +110,11 @@ final class ErrorLogReader {
     string $date,
     string $type = 'all',
     string $status_group = 'all',
-    int $limit = self::MAX_RECORDS
+    int $limit = self::MAX_RECORDS,
+    string $prefix = 'error'
   ): array {
     if (!self::isValidDate($date) || !in_array($status_group, ['all', '4xx', '5xx'], true)
-      || ($type !== 'all' && !self::isValidType($type))) {
+      || ($type !== 'all' && !self::isValidType($type)) || !self::isValidPrefix($prefix)) {
       return ['records' => [], 'total' => 0, 'types' => []];
     }
     $limit = max(1, min(self::MAX_RECORDS, $limit));
@@ -117,7 +122,7 @@ final class ErrorLogReader {
     $types = [];
     $total = 0;
 
-    foreach (self::filesForDate($directory, $date) as $path) {
+    foreach (self::filesForDate($directory, $date, $prefix) as $path) {
       $handle = @fopen($path, 'rb');
       if ($handle === false) continue;
       try {
@@ -156,13 +161,17 @@ final class ErrorLogReader {
     return preg_match('/\A[a-z][a-z0-9-]{0,63}\z/D', $type) === 1;
   }
 
+  private static function isValidPrefix(string $prefix): bool {
+    return preg_match('/\A[a-z][a-z0-9-]{0,31}\z/D', $prefix) === 1;
+  }
+
   /** @return array<int,string> */
-  private static function filesForDate(string $directory, string $date): array {
+  private static function filesForDate(string $directory, string $date, string $prefix): array {
     if (!is_dir($directory)) return [];
     $entries = scandir($directory);
     if ($entries === false) return [];
     $files = [];
-    $pattern = '/^error-' . preg_quote($date, '/') . '(?:\.(\d+))?\.log$/D';
+    $pattern = '/^' . preg_quote($prefix, '/') . '-' . preg_quote($date, '/') . '(?:\.(\d+))?\.log$/D';
     foreach ($entries as $name) {
       if (preg_match($pattern, $name, $matches) !== 1) continue;
       $path = $directory . DIRECTORY_SEPARATOR . $name;
@@ -206,21 +215,40 @@ final class ErrorLogReader {
   }
 }
 
+/** Read administrator audit records from their independent storage. */
+final class AuditLogReader {
+  /** @return array<int,string> */
+  public static function availableDates(string $directory): array {
+    return ErrorLogReader::availableDates($directory, 'audit');
+  }
+
+  /** @return array{records:array<int,array<string,int|string>>,total:int,types:array<int,string>} */
+  public static function read(string $directory, string $date, int $limit = 100): array {
+    return ErrorLogReader::read($directory, $date, 'all', 'all', $limit, 'audit');
+  }
+}
+
 final class ApplicationErrorHandler {
   private const DEFAULT_RETENTION_DAYS = 30;
   private const DEFAULT_MAX_BYTES = 5242880;
   private const DEFAULT_MAX_FILES_PER_DAY = 5;
   private static string $log_directory = '';
+  private static string $audit_directory = '';
   private static bool $installed = false;
   private static bool $rendering = false;
   private static int $retention_days = self::DEFAULT_RETENTION_DAYS;
   private static int $max_bytes = self::DEFAULT_MAX_BYTES;
   private static int $max_files_per_day = self::DEFAULT_MAX_FILES_PER_DAY;
+  private static int $audit_retention_days = 365;
+  private static int $audit_max_bytes = self::DEFAULT_MAX_BYTES;
+  private static int $audit_max_files_per_day = self::DEFAULT_MAX_FILES_PER_DAY;
 
-  public static function install(string $log_directory): void {
+  public static function install(string $log_directory, ?string $audit_directory = null): void {
     if (self::$installed) return;
     self::$log_directory = rtrim($log_directory, '/\\');
-    self::prepareLogDirectory();
+    self::$audit_directory = rtrim($audit_directory ?? dirname(self::$log_directory) . '/auditlog', '/\\');
+    self::prepareLogDirectory(self::$log_directory);
+    self::prepareLogDirectory(self::$audit_directory);
 
     error_reporting(E_ALL);
     ini_set('display_errors', '0');
@@ -234,12 +262,25 @@ final class ApplicationErrorHandler {
     self::$installed = true;
   }
 
-  public static function configure(int $retention_days, int $max_bytes, int $max_files_per_day): void {
+  public static function configure(
+    int $retention_days,
+    int $max_bytes,
+    int $max_files_per_day,
+    int $audit_retention_days = 365,
+    int $audit_max_bytes = self::DEFAULT_MAX_BYTES,
+    int $audit_max_files_per_day = self::DEFAULT_MAX_FILES_PER_DAY
+  ): void {
     self::$retention_days = max(1, min(3650, $retention_days));
     self::$max_bytes = max(65536, min(104857600, $max_bytes));
     self::$max_files_per_day = max(1, min(100, $max_files_per_day));
+    self::$audit_retention_days = max(1, min(3650, $audit_retention_days));
+    self::$audit_max_bytes = max(65536, min(104857600, $audit_max_bytes));
+    self::$audit_max_files_per_day = max(1, min(100, $audit_max_files_per_day));
     try {
-      if (random_int(1, 100) === 1) self::cleanupLogs();
+      if (random_int(1, 100) === 1) {
+        self::cleanupLogs();
+        self::cleanupAuditLogs();
+      }
     } catch (Throwable $e) {
       // ログ整理に失敗してもアプリケーション処理は継続する。
     }
@@ -247,6 +288,12 @@ final class ApplicationErrorHandler {
 
   public static function cleanupLogs(?int $now = null, int $limit = 20): int {
     return ErrorLogStorage::cleanup(self::$log_directory, self::$retention_days, $limit, $now);
+  }
+
+  public static function cleanupAuditLogs(?int $now = null, int $limit = 20): int {
+    return ErrorLogStorage::cleanup(
+      self::$audit_directory, self::$audit_retention_days, $limit, $now, 'audit'
+    );
   }
 
   public static function handleError(
@@ -328,7 +375,7 @@ final class ApplicationErrorHandler {
     ksort($normalized, SORT_STRING);
     $message = 'Administrator action: ' . $action;
     foreach ($normalized as $name => $count) $message .= ' ' . $name . '=' . $count;
-    return self::writeRecord([
+    return self::writeAuditRecord([
       'type' => 'admin-audit',
       'audit_action' => $action,
       'message' => $message,
@@ -378,7 +425,7 @@ final class ApplicationErrorHandler {
       . '","message":"Failed to encode error details."}')
       . PHP_EOL;
 
-    self::prepareLogDirectory();
+    self::prepareLogDirectory(self::$log_directory);
     $written = ErrorLogStorage::append(
       self::$log_directory,
       date('Ymd'),
@@ -392,10 +439,43 @@ final class ApplicationErrorHandler {
     return $error_id;
   }
 
-  private static function prepareLogDirectory(): void {
-    if (self::$log_directory === '') return;
-    if (!is_dir(self::$log_directory)) @mkdir(self::$log_directory, 0700, true);
-    if (is_dir(self::$log_directory)) @chmod(self::$log_directory, 0700);
+  private static function writeAuditRecord(array $details): string {
+    $audit_id = self::newErrorId();
+    $record = [
+      'timestamp' => date(DATE_ATOM),
+      'date' => date('Ymd'),
+      'error_id' => $audit_id,
+      'php_version' => PHP_VERSION,
+      'request_method' => (string)($_SERVER['REQUEST_METHOD'] ?? ''),
+      'request_path' => self::requestPath(),
+    ] + $details;
+    $record = self::redactRecord($record);
+    $json = json_encode($record, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $line = (is_string($json) ? $json : '{"date":"' . date('Ymd') . '","error_id":"' . $audit_id
+      . '","type":"admin-audit","message":"Failed to encode audit details."}') . PHP_EOL;
+
+    self::prepareLogDirectory(self::$audit_directory);
+    $written = ErrorLogStorage::append(
+      self::$audit_directory,
+      date('Ymd'),
+      $line,
+      self::$audit_max_bytes,
+      self::$audit_max_files_per_day,
+      'audit'
+    );
+    if (!$written) {
+      self::writeRecord([
+        'type' => 'audit-log-write-error',
+        'message' => 'Failed to write an administrator audit record.',
+      ]);
+    }
+    return $audit_id;
+  }
+
+  private static function prepareLogDirectory(string $directory): void {
+    if ($directory === '') return;
+    if (!is_dir($directory)) @mkdir($directory, 0700, true);
+    if (is_dir($directory)) @chmod($directory, 0700);
   }
 
   private static function renderPublicError(string $error_id): void {

@@ -360,7 +360,7 @@ smoke_test('administrator error log reader only reads valid records from named l
   }
 });
 
-smoke_test('administrator audit records are visible through the safe log reader', static function (): bool {
+smoke_test('legacy administrator audits remain readable from error logs', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_audit_logs_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
   try {
@@ -384,6 +384,43 @@ smoke_test('administrator audit records are visible through the safe log reader'
   }
 });
 
+smoke_test('administrator audits have independent storage and capacity', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_split_logs_' . bin2hex(random_bytes(8));
+  $error_directory = $root . DIRECTORY_SEPARATOR . 'errorlog';
+  $audit_directory = $root . DIRECTORY_SEPARATOR . 'auditlog';
+  if (!mkdir($error_directory, 0700, true) || !mkdir($audit_directory, 0700, true)) return false;
+  try {
+    $audit_record = json_encode([
+      'timestamp' => '2026-08-11T10:03:00+09:00', 'error_id' => '20260811100300-audit',
+      'type' => 'admin-audit', 'audit_action' => 'login',
+      'message' => 'Administrator action: login',
+    ], JSON_UNESCAPED_SLASHES);
+    if (!is_string($audit_record)
+      || !ErrorLogStorage::append($error_directory, '20260811', "12345\n", 6, 1)
+      || ErrorLogStorage::append($error_directory, '20260811', "full\n", 6, 1)
+      || !ErrorLogStorage::append($audit_directory, '20260811', $audit_record . "\n", 2048, 1, 'audit')) {
+      return false;
+    }
+    $audit = AuditLogReader::read($audit_directory, '20260811');
+    return is_file($error_directory . '/error-20260811.log')
+      && is_file($audit_directory . '/audit-20260811.log')
+      && !is_file($error_directory . '/audit-20260811.log')
+      && !is_file($audit_directory . '/error-20260811.log')
+      && AuditLogReader::availableDates($audit_directory) === ['20260811']
+      && $audit['total'] === 1
+      && $audit['records'][0]['type'] === 'admin-audit'
+      && str_contains((string)$audit['records'][0]['message'], 'login');
+  } finally {
+    foreach ([$error_directory, $audit_directory] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+        if (is_file($file)) unlink($file);
+      }
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 smoke_test('private files and directories ship Apache access denial rules', static function (): bool {
   $root_rule = file_get_contents(dirname(__DIR__) . '/noreita/.htaccess');
   if (!is_string($root_rule)
@@ -400,7 +437,7 @@ smoke_test('private files and directories ship Apache access denial rules', stat
   $ignore = file_get_contents(dirname(__DIR__) . '/.gitignore');
   if (!is_string($ignore) || !str_contains($ignore, 'config.local.php')
     || preg_match('/^config\.php$/m', $ignore) === 1) return false;
-  foreach (['session', 'cache', 'backup', 'errorlog', 'tmp'] as $directory) {
+  foreach (['session', 'cache', 'backup', 'errorlog', 'auditlog', 'tmp'] as $directory) {
     $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");
     if (!is_string($rule)
       || !str_contains($rule, 'Require all denied')

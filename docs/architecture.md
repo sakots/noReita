@@ -32,7 +32,7 @@
 
 ## エラー処理
 
-`error_handler.inc.php`の`ApplicationErrorHandler`がPHPのWarning、未捕捉例外、Fatal errorを処理します。公開画面には照合用エラーIDだけを表示し、詳細はHTTPアクセスを拒否した`errorlog/`へ日付別JSON Lines形式で記録します。500応答を追加する場合は内部例外のメッセージを画面へ連結せず、`error()`の第3引数へ例外を渡してください。
+`error_handler.inc.php`の`ApplicationErrorHandler`がPHPのWarning、未捕捉例外、Fatal errorを処理します。公開画面には照合用エラーIDだけを表示し、詳細はHTTPアクセスを拒否した`errorlog/`へ日付別JSON Lines形式で記録します。成功した管理操作は独立した`auditlog/`へ記録するため、外部から増やせる4xxログがエラーログの容量上限に達しても監査ログの保存枠には影響しません。500応答を追加する場合は内部例外のメッセージを画面へ連結せず、`error()`の第3引数へ例外を渡してください。
 
 ## アプリケーション初期化
 

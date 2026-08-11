@@ -49,7 +49,7 @@ function copy_tree(string $source, string $destination): void {
   if (!is_dir($destination) && !mkdir($destination, 0700, true) && !is_dir($destination)) {
     throw new RuntimeException("Could not create {$destination}");
   }
-  $skip = ['backup', 'cache', 'errorlog', 'img', 'session', 'temp', 'thumb', 'thumbnail', 'tmp'];
+  $skip = ['auditlog', 'backup', 'cache', 'errorlog', 'img', 'session', 'temp', 'thumb', 'thumbnail', 'tmp'];
   foreach (new DirectoryIterator($source) as $item) {
     if ($item->isDot() || in_array($item->getFilename(), $skip, true) || $item->getFilename() === 'config.local.php') {
       continue;
@@ -235,6 +235,7 @@ PHP;
     'backup/http-access-probe.db' => 'backup-secret',
     'cache/http-access-probe.bladec' => 'blade-cache-secret',
     'errorlog/http-access-probe.log' => 'error-log-secret',
+    'auditlog/http-access-probe.log' => 'audit-log-secret',
   ];
   foreach ($protected_probes as $relative_path => $secret) {
     $probe_path = $webroot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative_path);
@@ -249,7 +250,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 8 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 9 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -319,6 +320,7 @@ PHP;
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_errorlog_unauthorized_status] = http_request($base_url . '?mode=admin_errorlog', $cookie_jar);
+  [$admin_auditlog_unauthorized_status] = http_request($base_url . '?mode=admin_auditlog', $cookie_jar);
   [$admin_temporary_images_unauthorized_status] = http_request($base_url . '?mode=admin_temporary_images', $cookie_jar);
   [$admin_detail_unauthorized_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
   [$admin_edit_unauthorized_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
@@ -326,11 +328,13 @@ PHP;
     'operation' => 'hide', 'delno' => ['1'], 'token' => $token,
   ]);
   integration_test('administration routes require a login session', static function () use (
-    $admin_unauthorized_status, $admin_errorlog_unauthorized_status, $admin_temporary_images_unauthorized_status, $admin_detail_unauthorized_status,
+    $admin_unauthorized_status, $admin_errorlog_unauthorized_status, $admin_auditlog_unauthorized_status,
+    $admin_temporary_images_unauthorized_status, $admin_detail_unauthorized_status,
     $admin_edit_unauthorized_status, $admin_manage_unauthorized_status
   ): bool {
     return $admin_unauthorized_status === 403
       && $admin_errorlog_unauthorized_status === 403
+      && $admin_auditlog_unauthorized_status === 403
       && $admin_temporary_images_unauthorized_status === 403
       && $admin_detail_unauthorized_status === 403
       && $admin_edit_unauthorized_status === 403
@@ -379,6 +383,7 @@ PHP;
       && str_contains($admin_body, '画像ディレクトリ:')
       && str_contains($admin_body, 'mode=admin_logout')
       && str_contains($admin_body, 'mode=admin_errorlog')
+      && str_contains($admin_body, 'mode=admin_auditlog')
       && str_contains($admin_body, 'mode=admin_temporary_images')
       && str_contains($admin_body, 'mode=admin_manage')
       && str_contains($admin_body, 'value="hide"')
@@ -396,6 +401,29 @@ PHP;
       && str_contains($admin_errorlog_body, '管理者向けエラーログ')
       && str_contains($admin_errorlog_body, 'http-client-error')
       && str_contains($admin_errorlog_body, '403');
+  });
+
+  [$admin_auditlog_status, $admin_auditlog_body] = http_request(
+    $base_url . '?mode=admin_auditlog', $cookie_jar
+  );
+  $error_storage = '';
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_file) {
+    $error_storage .= (string)file_get_contents($error_file);
+  }
+  $audit_storage = '';
+  foreach (glob($webroot . '/auditlog/audit-*.log') ?: [] as $audit_file) {
+    $audit_storage .= (string)file_get_contents($audit_file);
+  }
+  integration_test('administrator audits use storage independent from HTTP error logs', static function () use (
+    $admin_auditlog_status, $admin_auditlog_body, $error_storage, $audit_storage
+  ): bool {
+    return $admin_auditlog_status === 200
+      && str_contains($admin_auditlog_body, '管理操作の監査ログ')
+      && str_contains($admin_auditlog_body, 'Administrator action: login')
+      && str_contains($audit_storage, '"type":"admin-audit"')
+      && str_contains($audit_storage, '"audit_action":"login"')
+      && !str_contains($audit_storage, '"type":"http-client-error"')
+      && !str_contains($error_storage, '"type":"admin-audit"');
   });
 
   $theme_colors = [
@@ -716,7 +744,7 @@ PHP;
     'operation' => 'delete_selected', 'temporary_image' => [$admin_temporary_name], 'token' => $token,
   ]);
   $audit_log = '';
-  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $audit_file) {
+  foreach (glob($webroot . '/auditlog/audit-*.log') ?: [] as $audit_file) {
     $contents = file_get_contents($audit_file);
     if (is_string($contents)) $audit_log .= $contents;
   }
@@ -1113,12 +1141,16 @@ PHP;
   [$monoreita_errorlog_status, $monoreita_errorlog_body] = http_request(
     $monoreita_base_url . '?mode=admin_errorlog', $monoreita_cookie_jar
   );
+  [$monoreita_auditlog_status, $monoreita_auditlog_body] = http_request(
+    $monoreita_base_url . '?mode=admin_auditlog', $monoreita_cookie_jar
+  );
   [$monoreita_temporary_status, $monoreita_temporary_body] = http_request(
     $monoreita_base_url . '?mode=admin_temporary_images', $monoreita_cookie_jar
   );
   integration_test('monoreita renders administrator pages through BladeOne over HTTP', static function () use (
     $monoreita_login_form_status, $monoreita_login_form_body, $monoreita_login_status,
     $monoreita_admin_status, $monoreita_admin_body, $monoreita_errorlog_status, $monoreita_errorlog_body,
+    $monoreita_auditlog_status, $monoreita_auditlog_body,
     $monoreita_temporary_status, $monoreita_temporary_body
   ): bool {
     return $monoreita_login_form_status === 200
@@ -1127,11 +1159,15 @@ PHP;
       && $monoreita_admin_status === 200
       && str_contains($monoreita_admin_body, 'theme/monoreita/css/monoreita_index.min.css')
       && str_contains($monoreita_admin_body, 'mode=admin_errorlog')
+      && str_contains($monoreita_admin_body, 'mode=admin_auditlog')
       && str_contains($monoreita_admin_body, 'mode=admin_temporary_images')
       && !str_contains($monoreita_admin_body, '{{')
       && $monoreita_errorlog_status === 200
       && str_contains($monoreita_errorlog_body, '管理者向けエラーログ')
       && !str_contains($monoreita_errorlog_body, '@foreach')
+      && $monoreita_auditlog_status === 200
+      && str_contains($monoreita_auditlog_body, '管理操作の監査ログ')
+      && !str_contains($monoreita_auditlog_body, '@foreach')
       && $monoreita_temporary_status === 200
       && str_contains($monoreita_temporary_body, '一時画像の管理')
       && str_contains($monoreita_temporary_body, 'mode=admin_temporary_images_manage');
@@ -1140,14 +1176,16 @@ PHP;
 
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
   [$admin_after_logout_status] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$admin_auditlog_after_logout_status] = http_request($base_url . '?mode=admin_auditlog', $cookie_jar);
   [$admin_detail_after_logout_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
   [$admin_edit_after_logout_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
   integration_test('administrator logout destroys access to every administration screen', static function () use (
-    $admin_logout_status, $admin_after_logout_status,
+    $admin_logout_status, $admin_after_logout_status, $admin_auditlog_after_logout_status,
     $admin_detail_after_logout_status, $admin_edit_after_logout_status
   ): bool {
     return $admin_logout_status === 302
       && $admin_after_logout_status === 403
+      && $admin_auditlog_after_logout_status === 403
       && $admin_detail_after_logout_status === 403
       && $admin_edit_after_logout_status === 403;
   });

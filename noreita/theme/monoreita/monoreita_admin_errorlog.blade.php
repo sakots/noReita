@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>エラーログ - {{$board_title}}</title>
+  <title>@if ($admin_log_is_audit ?? false)監査ログ@else エラーログ @endif - {{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   @include('components.monoreita_headCss')
 </head>
@@ -17,7 +17,7 @@
     </p>
     <hr>
     <section class="epost">
-      <p>ADMIN MODE / エラーログ</p>
+      <p>ADMIN MODE / @if ($admin_log_is_audit ?? false)監査ログ@else エラーログ @endif</p>
       <form action="{{$self}}?mode=admin_logout" method="post">
         <input type="hidden" name="token" value="{{$token}}">
         <input class="button" type="submit" value="ログアウト">
@@ -27,10 +27,11 @@
 
   <main>
     <section class="thread">
-      <h2>管理者向けエラーログ</h2>
+      <h2>@if ($admin_log_is_audit ?? false)管理操作の監査ログ@else 管理者向けエラーログ @endif</h2>
       <p>ログファイル自体は公開せず、この画面から最新 {{$admin_errorlog_limit}} 件までを確認できます。</p>
+      <p>@if ($admin_log_is_audit ?? false)<a href="{{$self}}?mode=admin_errorlog">[エラーログを表示]</a>@else <a href="{{$self}}?mode=admin_auditlog">[監査ログを表示]</a> @endif</p>
       <form action="{{$self}}" method="get">
-        <input type="hidden" name="mode" value="admin_errorlog">
+        <input type="hidden" name="mode" value="{{$admin_log_mode ?? 'admin_errorlog'}}">
         <p>
           <label>日付
             <select class="form" name="log_date">
@@ -39,7 +40,7 @@
               @endforeach
             </select>
           </label>
-          <label>種別
+          @if (!($admin_log_is_audit ?? false))<label>種別
             <select class="form" name="log_type">
               <option value="all" @if ($admin_errorlog_type === 'all') selected @endif>すべて</option>
               @foreach ($admin_errorlog_types as $type)
@@ -53,7 +54,7 @@
               <option value="4xx" @if ($admin_errorlog_status === '4xx') selected @endif>4xx</option>
               <option value="5xx" @if ($admin_errorlog_status === '5xx') selected @endif>5xx</option>
             </select>
-          </label>
+          </label>@endif
           <button class="button" type="submit">絞り込む</button>
         </p>
       </form>
@@ -61,7 +62,7 @@
 
     <section class="thread">
       @if ($admin_errorlog_date === '')
-        <p>表示できるエラーログはありません。</p>
+        <p>表示できる@if ($admin_log_is_audit ?? false)監査ログ@else エラーログ @endifはありません。</p>
       @else
         <p>{{$admin_errorlog_date}} の該当 {{$admin_errorlog_total}} 件のうち、新しい順に {{count($admin_errorlog_records)}} 件を表示しています。</p>
         @if (empty($admin_errorlog_records))

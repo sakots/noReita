@@ -387,6 +387,8 @@ switch ($mode) {
     return admin_theme_settings();
   case 'admin_errorlog':
     return admin_errorlog();
+  case 'admin_auditlog':
+    return admin_auditlog();
   case 'admin_temporary_images':
     return admin_temporary_images();
   case 'admin_temporary_images_manage':
@@ -432,6 +434,7 @@ function init(): void {
       __DIR__ . '/cache' => Config::int('permissions.private_directory'),
       __DIR__ . '/backup' => Config::int('permissions.private_directory'),
       __DIR__ . '/errorlog' => Config::int('permissions.private_directory'),
+      __DIR__ . '/auditlog' => Config::int('permissions.private_directory'),
     ],
     0600,
     __DIR__ . '/' . Config::string('paths.temporary'),
@@ -2179,10 +2182,46 @@ function admin_errorlog(): void {
     $dat['admin_errorlog_records'] = $result['records'];
     $dat['admin_errorlog_total'] = $result['total'];
     $dat['admin_errorlog_limit'] = 100;
+    $dat['admin_log_is_audit'] = false;
+    $dat['admin_log_mode'] = 'admin_errorlog';
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINERRORLOGFILE, $dat);
   } catch (Throwable $e) {
     error($en ? 'Failed to load the error log.' : 'エラーログの読み込みに失敗しました。', 500, $e);
+  }
+}
+
+// 管理者向け監査ログ閲覧
+function admin_auditlog(): void {
+  global $template_engine, $dat;
+  global $en;
+
+  require_admin_session();
+  $dates = AuditLogReader::availableDates(__DIR__ . '/auditlog');
+  $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
+  if ($date_input !== '' && !in_array($date_input, $dates, true)) {
+    error($en ? 'The requested audit log date does not exist.' : '指定された監査ログの日付は存在しません。', 404);
+  }
+  $date = $date_input !== '' ? $date_input : ($dates[0] ?? '');
+
+  try {
+    $result = $date === ''
+      ? ['records' => [], 'total' => 0, 'types' => []]
+      : AuditLogReader::read(__DIR__ . '/auditlog', $date);
+    $dat['admin_errorlog_dates'] = $dates;
+    $dat['admin_errorlog_date'] = $date;
+    $dat['admin_errorlog_type'] = 'all';
+    $dat['admin_errorlog_status'] = 'all';
+    $dat['admin_errorlog_types'] = $result['types'];
+    $dat['admin_errorlog_records'] = $result['records'];
+    $dat['admin_errorlog_total'] = $result['total'];
+    $dat['admin_errorlog_limit'] = 100;
+    $dat['admin_log_is_audit'] = true;
+    $dat['admin_log_mode'] = 'admin_auditlog';
+    $dat['token'] = RequestSecurity::csrfToken();
+    echo $template_engine->render(ADMINERRORLOGFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load the audit log.' : '監査ログの読み込みに失敗しました。', 500, $e);
   }
 }
 

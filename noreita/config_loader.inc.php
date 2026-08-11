@@ -213,6 +213,8 @@ final class Config {
       'limits.paint_default_height' => [1, 10000],
       'error_log.max_bytes' => [1024, 1073741824],
       'error_log.max_files_per_day' => [1, 1000],
+      'audit_log.max_bytes' => [1024, 1073741824],
+      'audit_log.max_files_per_day' => [1, 1000],
     ];
     foreach ($ranges as $key => $range) {
       $value = self::valueAt($values, $key);
@@ -225,7 +227,7 @@ final class Config {
       'board.cookie_days', 'limits.external_thumbnail_days', 'limits.upload_kb',
       'limits.image_width', 'limits.image_height', 'limits.name_length', 'limits.email_length',
       'limits.subject_length', 'limits.url_length', 'limits.comment_length', 'limits.temporary_days',
-      'limits.undo', 'limits.undo_group', 'error_log.retention_days',
+      'limits.undo', 'limits.undo_group', 'error_log.retention_days', 'audit_log.retention_days',
       'maintenance.delete_quarantine_days',
     ] as $key) {
       if (self::valueAt($values, $key) < 0) {
