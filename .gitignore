@@ -34,5 +34,10 @@ noreita/backup/*
 noreita/errorlog/*
 !noreita/errorlog/.htaccess
 
+# 一時画像は非公開。Apacheの拒否設定だけを配布する。
+!noreita/tmp/
+noreita/tmp/*
+!noreita/tmp/.htaccess
+
 # v4の既定値config.phpは配布対象。設置者固有設定だけを除外する。
 config.local.php

@@ -731,6 +731,7 @@ PHP;
       && str_contains($admin_temporary_page_one_body, $admin_temporary_name)
       && !str_contains($admin_temporary_page_one_body, $admin_temporary_second_name)
       && str_contains($admin_temporary_page_one_body, 'name="temporary_image[]"')
+      && str_contains($admin_temporary_page_one_body, 'mode=temporary_image')
       && str_contains($admin_temporary_page_one_body, '1 / 2 ページ')
       && $admin_temporary_page_two_status === 200
       && str_contains($admin_temporary_page_two_body, $admin_temporary_second_name)
@@ -746,6 +747,47 @@ PHP;
       && str_contains($audit_log, '"audit_action":"temporary-images-delete"')
       && str_contains($audit_log, '"images":1')
       && !str_contains($audit_log, $admin_temporary_name);
+  });
+
+  $temporary_owner_cookie_jar = $root . '/temporary-image-owner-cookies.txt';
+  http_request($base_url, $temporary_owner_cookie_jar);
+  $temporary_owner_code = cookie_value($temporary_owner_cookie_jar, 'usercode');
+  if ($temporary_owner_code === null || $temporary_owner_code === '') {
+    throw new RuntimeException('Could not create a temporary-image owner session.');
+  }
+  $temporary_private_base = 'private-temp-' . bin2hex(random_bytes(6));
+  $temporary_private_name = $temporary_private_base . '.png';
+  file_put_contents($webroot . '/tmp/' . $temporary_private_name, $png);
+  file_put_contents(
+    $webroot . '/tmp/' . $temporary_private_base . '.dat',
+    "127.0.0.1\tlocalhost\tagent\t.png\t{$temporary_owner_code}\t\t100\t160\t0\tneo"
+  );
+  file_put_contents($webroot . '/tmp/' . $temporary_private_base . '.psd', 'private working data');
+  $temporary_image_url = $base_url . '?mode=temporary_image&file=' . rawurlencode($temporary_private_name);
+  [$temporary_owner_status, $temporary_owner_body, , $temporary_owner_headers] = http_request(
+    $temporary_image_url, $temporary_owner_cookie_jar
+  );
+  $temporary_guest_cookie_jar = $root . '/temporary-image-guest-cookies.txt';
+  [$temporary_guest_status, $temporary_guest_body] = http_request($temporary_image_url, $temporary_guest_cookie_jar);
+  [$temporary_admin_status, $temporary_admin_body] = http_request($temporary_image_url, $cookie_jar);
+  [$temporary_direct_status, $temporary_direct_body] = http_request(
+    $origin_url . '/tmp/' . rawurlencode($temporary_private_name), $temporary_guest_cookie_jar
+  );
+  [$temporary_work_status, $temporary_work_body] = http_request(
+    $base_url . '?mode=temporary_image&file=' . rawurlencode($temporary_private_base . '.psd'), $temporary_owner_cookie_jar
+  );
+  integration_test('temporary images require owner or administrator authorization over HTTP', static function () use (
+    $temporary_owner_status, $temporary_owner_body, $temporary_owner_headers,
+    $temporary_guest_status, $temporary_guest_body, $temporary_admin_status, $temporary_admin_body,
+    $temporary_direct_status, $temporary_direct_body, $temporary_work_status, $temporary_work_body, $png
+  ): bool {
+    return $temporary_owner_status === 200 && $temporary_owner_body === $png
+      && ($temporary_owner_headers['content-type'] ?? '') === 'image/png'
+      && str_contains((string)($temporary_owner_headers['cache-control'] ?? ''), 'no-store')
+      && $temporary_guest_status === 404 && !str_contains($temporary_guest_body, 'PNG')
+      && $temporary_admin_status === 200 && $temporary_admin_body === $png
+      && $temporary_direct_status === 403 && !str_contains($temporary_direct_body, 'PNG')
+      && $temporary_work_status === 404 && !str_contains($temporary_work_body, 'private working data');
   });
 
   $image_post_id = (int)($image_row['tid'] ?? 0);

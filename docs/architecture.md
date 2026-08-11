@@ -76,6 +76,6 @@
 
 `thumbnail.inc.php`はGDを使った画像変換処理を担当し、`ImageService`と`ExternalImageService`から利用されます。
 
-管理者は`mode=admin_temporary_images`から、投稿前の一時画像を確認できます。保存日時の新しい順にページ分割し、1ページあたりの表示数は`admin.temporary_images_per_page`（既定50）で設定できます。選択削除は有効な`.dat`メタデータと一致する画像だけを対象にし、画像・動画・作業データを同じベース名でまとめて削除します。期限切れの一時ファイルは、設定された`limits.temporary_days`に従って一括整理できます。
+管理者は`mode=admin_temporary_images`から、投稿前の一時画像を確認できます。保存日時の新しい順にページ分割し、1ページあたりの表示数は`admin.temporary_images_per_page`（既定50）で設定できます。選択削除は有効な`.dat`メタデータと一致する画像だけを対象にし、画像・動画・作業データを同じベース名でまとめて削除します。期限切れの一時ファイルは、設定された`limits.temporary_days`に従って一括整理できます。一時領域`tmp/`は`.htaccess`で直接取得を拒否し、プレビューは`mode=temporary_image`を経由します。この入口は同じ`usercode`の投稿者か管理者セッションにだけ画像を返し、動画・PSDなどの作業ファイルは返しません。
 
 `external_image.inc.php`の`ExternalImageService`は、本文中の外部画像URLの抽出、サムネイルキャッシュの生成と表示、安全な外部画像取得を担当します。外部取得ではTLS検証、公開IPだけへの接続、リダイレクト先の再検証、容量・画像形式・画像寸法の制限を行います。

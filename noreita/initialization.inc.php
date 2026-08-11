@@ -10,6 +10,19 @@ final class ApplicationInitializer {
   private string $application_root;
   private array $directories;
   private int $database_permission;
+  private ?string $temporary_directory;
+  private const TEMPORARY_ACCESS_DENY_RULE = <<<'HTACCESS'
+# 投稿前の一時画像・動画・作業ファイルへの直接HTTPアクセスを拒否する。
+# 表示は index.php?mode=temporary_image の権限確認を通す。
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+  Order Allow,Deny
+  Deny from all
+</IfModule>
+HTACCESS;
 
   public function __construct(
     string $database_dsn,
@@ -17,7 +30,8 @@ final class ApplicationInitializer {
     string $backup_dir,
     string $application_root,
     array $directories,
-    int $database_permission = 0600
+    int $database_permission = 0600,
+    ?string $temporary_directory = null
   ) {
     $this->database_dsn = $database_dsn;
     $this->database_file = $database_file;
@@ -25,6 +39,7 @@ final class ApplicationInitializer {
     $this->application_root = $application_root;
     $this->directories = $directories;
     $this->database_permission = $database_permission;
+    $this->temporary_directory = $temporary_directory;
   }
 
   public static function securityHeaders(): array {
@@ -71,6 +86,9 @@ final class ApplicationInitializer {
         throw new RuntimeException("Directory is not readable and writable: {$directory}");
       }
     }
+    if ($this->temporary_directory !== null) {
+      $this->installTemporaryAccessDenyRule($this->temporary_directory);
+    }
   }
 
   public function secureDatabaseFile(): void {
@@ -102,6 +120,38 @@ final class ApplicationInitializer {
     if ($unexpected !== 0) {
       $kind = $directory ? 'directory' : 'file';
       throw new RuntimeException("Failed to secure {$kind} permissions: {$path}");
+    }
+  }
+
+  private function installTemporaryAccessDenyRule(string $directory): void {
+    $directory = rtrim($directory, '/\\');
+    $root = realpath($this->application_root);
+    $real_directory = realpath($directory);
+    if ($root === false || $real_directory === false || !is_dir($real_directory)
+      || !str_starts_with($real_directory . DIRECTORY_SEPARATOR, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)) {
+      throw new RuntimeException('Temporary directory is outside the application directory.');
+    }
+
+    $rule_file = $real_directory . DIRECTORY_SEPARATOR . '.htaccess';
+    if (is_link($rule_file)) {
+      throw new RuntimeException('Temporary directory access rule must not be a symbolic link.');
+    }
+    $expected = self::TEMPORARY_ACCESS_DENY_RULE . PHP_EOL;
+    $current = is_file($rule_file) ? @file_get_contents($rule_file) : false;
+    if ($current === false) {
+      $temporary = @tempnam($real_directory, '.temporary-access-');
+      if ($temporary === false || @file_put_contents($temporary, $expected, LOCK_EX) === false
+        || !@chmod($temporary, 0644) || !@rename($temporary, $rule_file)) {
+        if (is_string($temporary) && is_file($temporary)) @unlink($temporary);
+        throw new RuntimeException('Failed to install temporary directory access rule.');
+      }
+    } elseif (str_replace("\r\n", "\n", $current) !== $expected) {
+      // 設置者の独自設定を上書きして公開状態に戻さない。安全な規則が必須であることを明示する。
+      throw new RuntimeException('Temporary directory access rule is invalid.');
+    }
+    clearstatcache(true, $rule_file);
+    if (!is_file($rule_file) || !is_readable($rule_file)) {
+      throw new RuntimeException('Temporary directory access rule is not readable.');
     }
   }
 }

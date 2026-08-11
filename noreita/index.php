@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.0.2 lot.260810.0';
+const REITA_VER = 'v4.1.0 lot.260811.0';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -391,6 +391,8 @@ switch ($mode) {
     return admin_temporary_images();
   case 'admin_temporary_images_manage':
     return admin_temporary_images_manage();
+  case 'temporary_image':
+    return temporary_image();
   case 'admin_post':
     return admin_post();
   case 'admin_edit':
@@ -431,6 +433,8 @@ function init(): void {
       __DIR__ . '/backup' => Config::int('permissions.private_directory'),
       __DIR__ . '/errorlog' => Config::int('permissions.private_directory'),
     ],
+    0600,
+    __DIR__ . '/' . Config::string('paths.temporary'),
   );
   $initializer->sendSecurityHeaders();
   try {
@@ -1471,7 +1475,7 @@ function paint_com(string $tmpmode): void {
   $userip = RequestInfo::clientIp();
   $tmp = [];
   foreach (ImageService::listTemporaryImages(Config::string('paths.temporary')) as $temporary_image) {
-    if ($temporary_image['user_code'] === $usercode || $temporary_image['ip'] === $userip) {
+    if (hash_equals((string)$temporary_image['user_code'], (string)$usercode)) {
       if (!empty($dat['exclude_temp_images'])) continue;
       $tmp[] = $temporary_image;
     }
@@ -1487,9 +1491,11 @@ function paint_com(string $tmpmode): void {
     $pictmp = 2;
     $temp = array();
     foreach ($tmp as $temporary_image) {
-      $src = Config::string('paths.temporary') . $temporary_image['filename'];
+      $image_path = Config::string('paths.temporary') . $temporary_image['filename'];
+      $src = temporary_image_url((string)$temporary_image['filename']);
       $src_name = $temporary_image['filename'];
-      $date = gmdate("Y/m/d H:i", filemtime($src) + 9 * 60 * 60);
+      $modified = filemtime($image_path);
+      $date = gmdate("Y/m/d H:i", ($modified === false ? time() : $modified) + 9 * 60 * 60);
       $tool = $temporary_image['tool'];
       $utime = $temporary_image['paint_time'];
       $psec = $temporary_image['paint_seconds'];
@@ -1517,6 +1523,38 @@ function paint_com(string $tmpmode): void {
   $dat['tmp'] = $tmp2;
 
   echo $template_engine->render(PICFILE, $dat);
+}
+
+function temporary_image_url(string $filename): string {
+  return Config::string('site.script_name') . '?mode=temporary_image&file=' . rawurlencode($filename);
+}
+
+/** Serve the PNG/JPEG/GIF/WebP/AVIF preview of a pending drawing after authorization. */
+function temporary_image(): void {
+  global $usercode;
+
+  $filename = (string)filter_input_data('GET', 'file');
+  $is_administrator = AdminAuth::isAuthenticated(
+    Config::string('admin.password'), Config::int('admin.session_lifetime')
+  );
+  $image = ImageService::authorizedTemporaryImage(
+    Config::string('paths.temporary'), $filename, (string)$usercode, $is_administrator
+  );
+  if ($image === null) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=UTF-8');
+    header('Cache-Control: no-store, private');
+    exit('Not Found');
+  }
+
+  $size = @filesize($image['path']);
+  header('Content-Type: ' . $image['mime_type']);
+  header('X-Content-Type-Options: nosniff');
+  header('Cache-Control: no-store, private');
+  header('Content-Disposition: inline; filename="' . rawurlencode($filename) . '"');
+  if ($size !== false) header('Content-Length: ' . $size);
+  readfile($image['path']);
+  exit;
 }
 
 //コンティニュー画面in
@@ -2176,7 +2214,7 @@ function admin_temporary_images(): void {
     $offset = ($page - 1) * $per_page;
     $temporary_images = array_slice($temporary_images, $offset, $per_page);
     foreach ($temporary_images as &$temporary_image) {
-      $temporary_image['url'] = Config::string('paths.temporary') . $temporary_image['filename'];
+      $temporary_image['url'] = temporary_image_url((string)$temporary_image['filename']);
       $temporary_image['modified'] = date(Config::string('board.date_format'), (int)$temporary_image['modified_at']);
       $temporary_image['size'] = ImageService::formatBytes((int)$temporary_image['related_bytes']);
     }

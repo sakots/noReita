@@ -115,6 +115,38 @@ final class ImageService {
   }
 
   /**
+   * Return a pending image only when it belongs to the requesting user or an administrator.
+   * Replay and work files are deliberately never returned by this method.
+   *
+   * @return array{path:string,mime_type:string}|null
+   */
+  public static function authorizedTemporaryImage(
+    string $temp_dir, string $filename, string $user_code, bool $is_administrator
+  ): ?array {
+    if (!self::isSafePostedImageFilename($filename)) return null;
+
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $base_name = pathinfo($filename, PATHINFO_FILENAME);
+    $metadata = self::parseTemporaryMetadata($temp_dir . $base_name . '.dat');
+    if ($metadata === null || !hash_equals((string)$metadata['filename'], $filename)) return null;
+    if (!$is_administrator && ($user_code === ''
+      || !hash_equals((string)$metadata['user_code'], $user_code))) {
+      return null;
+    }
+
+    $path = $temp_dir . $filename;
+    if (is_link($path) || !is_file($path) || !is_readable($path)) return null;
+    $mime_types = [
+      'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif',
+      'webp' => 'image/webp', 'avif' => 'image/avif',
+    ];
+    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    if (!isset($mime_types[$extension])) return null;
+
+    return ['path' => $path, 'mime_type' => $mime_types[$extension]];
+  }
+
+  /**
    * Return valid pending images with only the operational data required by the administrator.
    *
    * @return array<int,array<string,int|string|bool>>

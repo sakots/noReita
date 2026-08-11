@@ -400,7 +400,7 @@ smoke_test('private files and directories ship Apache access denial rules', stat
   $ignore = file_get_contents(dirname(__DIR__) . '/.gitignore');
   if (!is_string($ignore) || !str_contains($ignore, 'config.local.php')
     || preg_match('/^config\.php$/m', $ignore) === 1) return false;
-  foreach (['session', 'cache', 'backup', 'errorlog'] as $directory) {
+  foreach (['session', 'cache', 'backup', 'errorlog', 'tmp'] as $directory) {
     $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");
     if (!is_string($rule)
       || !str_contains($rule, 'Require all denied')
@@ -714,7 +714,7 @@ smoke_test('application initialization prepares runtime state', static function 
   ];
   try {
     $initializer = new ApplicationInitializer(
-      'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories
+      'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories, 0600, $public_temp
     );
     $initializer->prepareDirectories();
     $initializer->migrateDatabase();
@@ -744,6 +744,7 @@ smoke_test('application initialization prepares runtime state', static function 
       && !array_filter(array_keys($directories), static fn(string $directory): bool => !is_dir($directory))
       && (fileperms($public_image) & 0777) === 0755
       && (fileperms($public_temp) & 0777) === 0755
+      && str_contains((string)file_get_contents($public_temp . DIRECTORY_SEPARATOR . '.htaccess'), 'Require all denied')
       && (fileperms($private_session) & 0777) === 0700
       && (fileperms($database_file) & 0777) === 0600;
   } finally {
@@ -754,7 +755,11 @@ smoke_test('application initialization prepares runtime state', static function 
     if (is_dir($backup_dir)) rmdir($backup_dir);
     if (is_dir($private_session)) rmdir($private_session);
     if (is_dir($root . DIRECTORY_SEPARATOR . 'nested')) rmdir($root . DIRECTORY_SEPARATOR . 'nested');
-    foreach ([$public_image, $public_temp] as $directory) if (is_dir($directory)) rmdir($directory);
+    foreach ([$public_image, $public_temp] as $directory) {
+      $rule = $directory . DIRECTORY_SEPARATOR . '.htaccess';
+      if (is_file($rule)) unlink($rule);
+      if (is_dir($directory)) rmdir($directory);
+    }
     if (is_dir($root)) rmdir($root);
   }
 });
@@ -1108,12 +1113,18 @@ smoke_test('temporary images are parsed, found, and cleaned up', static function
     $entries = ImageService::temporaryImageEntries($directory, 1, $now);
     $entries_by_filename = [];
     foreach ($entries as $entry) $entries_by_filename[$entry['filename']] = $entry;
+    $owner_image = ImageService::authorizedTemporaryImage($directory, '100.png', 'user-a', false);
+    $other_user_image = ImageService::authorizedTemporaryImage($directory, '100.png', 'user-b', false);
+    $admin_image = ImageService::authorizedTemporaryImage($directory, '100.png', '', true);
+    $work_file = ImageService::authorizedTemporaryImage($directory, '100.pch', 'user-a', false);
     $deleted = ImageService::deleteTemporaryImages($directory, ['100.png', '../invalid.png']);
     if (count($entries) !== 2 || !isset($entries_by_filename['100.png']) || !$entries_by_filename['100.png']['expired']
       || $entries_by_filename['100.png']['related_files'] !== 4 || $deleted['images'] !== 1 || $deleted['files'] !== 4
       || $deleted['skipped'] !== 0 || is_file($directory . DIRECTORY_SEPARATOR . '100.png')
       || is_file($directory . DIRECTORY_SEPARATOR . '100.dat') || is_file($directory . DIRECTORY_SEPARATOR . '100.pch')
-      || is_file($directory . DIRECTORY_SEPARATOR . '100.psd')) {
+      || is_file($directory . DIRECTORY_SEPARATOR . '100.psd')
+      || !is_array($owner_image) || $owner_image['mime_type'] !== 'image/png'
+      || $other_user_image !== null || !is_array($admin_image) || $work_file !== null) {
       return false;
     }
 
