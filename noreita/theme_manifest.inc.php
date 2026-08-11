@@ -19,6 +19,7 @@ final class ThemeManifest {
     'catalog' => 'CATALOGFILE',
     'admin' => 'ADMINFILE',
     'admin_post' => 'ADMINPOSTFILE',
+    'admin_errorlog' => 'ADMINERRORLOGFILE',
     'share_server' => 'SET_SHARE_SERVER',
     'misskey_note' => 'MISSKEYFILE',
     'other' => 'OTHERFILE',

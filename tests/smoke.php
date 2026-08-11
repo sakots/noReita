@@ -130,7 +130,7 @@ smoke_test('theme manifests and diagnostics detect theme integrity problems', st
     'templates' => $manifest['templates'],
   ];
   $report = ThemeDiagnostics::inspect($eda, $manifest, $runtime);
-  if ($report['summary']['errors'] !== 0 || $report['summary']['templates_checked'] !== 13) return false;
+  if ($report['summary']['errors'] !== 0 || $report['summary']['templates_checked'] !== 14) return false;
   $invalid = $manifest;
   $invalid['assets']['css'][] = 'css/missing-theme-asset.css';
   $invalid_report = ThemeDiagnostics::inspect($eda, $invalid, $runtime);
@@ -315,6 +315,44 @@ smoke_test('error logs rotate at capacity and expired files are cleaned safely',
       flock($locked_handle, LOCK_UN);
       fclose($locked_handle);
     }
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('administrator error log reader only reads valid records from named log files', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_error_reader_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $client = json_encode([
+      'timestamp' => '2026-08-11T10:00:00+09:00', 'error_id' => '20260811100000-client',
+      'type' => 'http-client-error', 'http_status' => 403, 'request_method' => 'GET',
+      'request_path' => '/noreita/', 'message' => 'Forbidden',
+    ], JSON_UNESCAPED_SLASHES);
+    $server = json_encode([
+      'timestamp' => '2026-08-11T10:01:00+09:00', 'error_id' => '20260811100100-server',
+      'type' => 'http-server-error', 'http_status' => 500, 'request_method' => 'POST',
+      'request_path' => '/noreita/', 'message' => 'Internal error',
+    ], JSON_UNESCAPED_SLASHES);
+    if (!is_string($client) || !is_string($server)
+      || file_put_contents($directory . '/error-20260811.log', "not json\n" . $client . "\n") === false
+      || file_put_contents($directory . '/error-20260811.1.log', $server . "\n") === false
+      || file_put_contents($directory . '/unrelated.log', $server . "\n") === false) {
+      return false;
+    }
+    $all = ErrorLogReader::read($directory, '20260811');
+    $client_only = ErrorLogReader::read($directory, '20260811', 'all', '4xx');
+    return ErrorLogReader::availableDates($directory) === ['20260811']
+      && $all['total'] === 2
+      && count($all['records']) === 2
+      && $all['records'][0]['error_id'] === '20260811100100-server'
+      && $all['types'] === ['http-client-error', 'http-server-error']
+      && $client_only['total'] === 1
+      && $client_only['records'][0]['http_status'] === 403
+      && ErrorLogReader::read($directory, '../20260811')['total'] === 0;
+  } finally {
     foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
       if (is_file($file)) unlink($file);
     }

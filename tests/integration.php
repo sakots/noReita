@@ -317,16 +317,18 @@ PHP;
   });
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$admin_errorlog_unauthorized_status] = http_request($base_url . '?mode=admin_errorlog', $cookie_jar);
   [$admin_detail_unauthorized_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
   [$admin_edit_unauthorized_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
   [$admin_manage_unauthorized_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'hide', 'delno' => ['1'], 'token' => $token,
   ]);
   integration_test('administration routes require a login session', static function () use (
-    $admin_unauthorized_status, $admin_detail_unauthorized_status,
+    $admin_unauthorized_status, $admin_errorlog_unauthorized_status, $admin_detail_unauthorized_status,
     $admin_edit_unauthorized_status, $admin_manage_unauthorized_status
   ): bool {
     return $admin_unauthorized_status === 403
+      && $admin_errorlog_unauthorized_status === 403
       && $admin_detail_unauthorized_status === 403
       && $admin_edit_unauthorized_status === 403
       && $admin_manage_unauthorized_status === 403;
@@ -373,10 +375,23 @@ PHP;
       && str_contains($admin_body, '総投稿数')
       && str_contains($admin_body, '画像ディレクトリ:')
       && str_contains($admin_body, 'mode=admin_logout')
+      && str_contains($admin_body, 'mode=admin_errorlog')
       && str_contains($admin_body, 'mode=admin_manage')
       && str_contains($admin_body, 'value="hide"')
       && str_contains($admin_body, 'value="show"')
       && str_contains($admin_body, 'value="delete"');
+  });
+
+  [$admin_errorlog_status, $admin_errorlog_body] = http_request(
+    $base_url . '?mode=admin_errorlog&log_status=4xx', $cookie_jar
+  );
+  integration_test('administrator can view filtered error logs without exposing files directly', static function () use (
+    $admin_errorlog_status, $admin_errorlog_body
+  ): bool {
+    return $admin_errorlog_status === 200
+      && str_contains($admin_errorlog_body, '管理者向けエラーログ')
+      && str_contains($admin_errorlog_body, 'http-client-error')
+      && str_contains($admin_errorlog_body, '403');
   });
 
   $theme_colors = [

@@ -1,7 +1,7 @@
 <?php
 // error_handler.inc.php for noReita (C) sakots 2026 MIT License
 
-const ERROR_HANDLER_INC_VER = 20260805;
+const ERROR_HANDLER_INC_VER = 20260811;
 
 final class ErrorLogStorage {
   public static function append(
@@ -70,6 +70,139 @@ final class ErrorLogStorage {
       if ($removed >= $limit) break;
     }
     return $removed;
+  }
+}
+
+/** Read the application's JSON Lines logs without exposing their filesystem paths. */
+final class ErrorLogReader {
+  private const MAX_RECORDS = 100;
+  private const MAX_FIELD_LENGTH = 4000;
+
+  /** @return array<int,string> */
+  public static function availableDates(string $directory): array {
+    if (!is_dir($directory)) return [];
+    $dates = [];
+    $entries = scandir($directory);
+    if ($entries === false) return [];
+    foreach ($entries as $name) {
+      if (!preg_match('/^error-(\d{8})(?:\.\d+)?\.log$/D', $name, $matches)
+        || !self::isValidDate($matches[1])) {
+        continue;
+      }
+      $path = $directory . DIRECTORY_SEPARATOR . $name;
+      if (is_link($path) || !is_file($path) || !is_readable($path)) continue;
+      $dates[$matches[1]] = true;
+    }
+    $dates = array_map(static fn($date): string => (string)$date, array_keys($dates));
+    rsort($dates, SORT_STRING);
+    return $dates;
+  }
+
+  /**
+   * @return array{records:array<int,array<string,int|string>>,total:int,types:array<int,string>}
+   */
+  public static function read(
+    string $directory,
+    string $date,
+    string $type = 'all',
+    string $status_group = 'all',
+    int $limit = self::MAX_RECORDS
+  ): array {
+    if (!self::isValidDate($date) || !in_array($status_group, ['all', '4xx', '5xx'], true)
+      || ($type !== 'all' && !self::isValidType($type))) {
+      return ['records' => [], 'total' => 0, 'types' => []];
+    }
+    $limit = max(1, min(self::MAX_RECORDS, $limit));
+    $records = [];
+    $types = [];
+    $total = 0;
+
+    foreach (self::filesForDate($directory, $date) as $path) {
+      $handle = @fopen($path, 'rb');
+      if ($handle === false) continue;
+      try {
+        if (!@flock($handle, LOCK_SH)) continue;
+        while (($line = fgets($handle)) !== false) {
+          $decoded = json_decode($line, true);
+          if (!is_array($decoded)) continue;
+          $record = self::displayRecord($decoded);
+          if ($record === null) continue;
+          $types[(string)$record['type']] = true;
+          if (($type !== 'all' && $record['type'] !== $type)
+            || !self::matchesStatusGroup($record, $status_group)) {
+            continue;
+          }
+          $total++;
+          $records[] = $record;
+          if (count($records) > $limit) array_shift($records);
+        }
+      } finally {
+        @flock($handle, LOCK_UN);
+        @fclose($handle);
+      }
+    }
+    $records = array_reverse($records);
+    $types = array_keys($types);
+    sort($types, SORT_STRING);
+    return ['records' => $records, 'total' => $total, 'types' => $types];
+  }
+
+  private static function isValidDate(string $date): bool {
+    if (preg_match('/\A(\d{4})(\d{2})(\d{2})\z/D', $date, $matches) !== 1) return false;
+    return checkdate((int)$matches[2], (int)$matches[3], (int)$matches[1]);
+  }
+
+  private static function isValidType(string $type): bool {
+    return preg_match('/\A[a-z][a-z0-9-]{0,63}\z/D', $type) === 1;
+  }
+
+  /** @return array<int,string> */
+  private static function filesForDate(string $directory, string $date): array {
+    if (!is_dir($directory)) return [];
+    $entries = scandir($directory);
+    if ($entries === false) return [];
+    $files = [];
+    $pattern = '/^error-' . preg_quote($date, '/') . '(?:\.(\d+))?\.log$/D';
+    foreach ($entries as $name) {
+      if (preg_match($pattern, $name, $matches) !== 1) continue;
+      $path = $directory . DIRECTORY_SEPARATOR . $name;
+      if (is_link($path) || !is_file($path) || !is_readable($path)) continue;
+      $files[] = ['path' => $path, 'index' => isset($matches[1]) ? (int)$matches[1] : 0];
+    }
+    usort($files, static fn(array $left, array $right): int => $left['index'] <=> $right['index']);
+    return array_column($files, 'path');
+  }
+
+  /** @param array<string,mixed> $record
+   * @return array<string,int|string>|null */
+  private static function displayRecord(array $record): ?array {
+    $type = isset($record['type']) && is_string($record['type']) ? $record['type'] : '';
+    if (!self::isValidType($type)) return null;
+    $status = isset($record['http_status']) ? filter_var($record['http_status'], FILTER_VALIDATE_INT) : false;
+    if ($status === false || $status < 100 || $status > 599) $status = 0;
+    return [
+      'timestamp' => self::field($record, 'timestamp', 64),
+      'error_id' => self::field($record, 'error_id', 64),
+      'type' => $type,
+      'http_status' => $status,
+      'request_method' => self::field($record, 'request_method', 16),
+      'request_path' => self::field($record, 'request_path', 1024),
+      'message' => self::field($record, 'message', self::MAX_FIELD_LENGTH),
+    ];
+  }
+
+  /** @param array<string,mixed> $record */
+  private static function field(array $record, string $key, int $limit): string {
+    if (!isset($record[$key]) || !is_scalar($record[$key])) return '';
+    return mb_substr((string)$record[$key], 0, $limit);
+  }
+
+  /** @param array<string,int|string> $record */
+  private static function matchesStatusGroup(array $record, string $status_group): bool {
+    $status = (int)$record['http_status'];
+    return $status_group === 'all'
+      || ($status_group === '4xx' && $status >= 400 && $status < 500)
+      || ($status_group === '5xx' && $status >= 500 && $status < 600);
   }
 }
 

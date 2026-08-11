@@ -23,7 +23,7 @@ if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
 }
 
 // 公開画面へのPHPエラー詳細表示を止め、非公開ログへ記録する。
-if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260805) {
+if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260811) {
   die($en ? 'Please update the error handler.' : 'エラーハンドラーを最新版に更新してください。');
 }
 
@@ -385,6 +385,8 @@ switch ($mode) {
     return admin_manage();
   case 'admin_theme_settings':
     return admin_theme_settings();
+  case 'admin_errorlog':
+    return admin_errorlog();
   case 'admin_post':
     return admin_post();
   case 'admin_edit':
@@ -2092,6 +2094,44 @@ function require_admin_session(): void {
   admin_no_store();
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
+}
+
+// 管理者向けエラーログ閲覧
+function admin_errorlog(): void {
+  global $template_engine, $dat;
+  global $en;
+
+  require_admin_session();
+  $dates = ErrorLogReader::availableDates(__DIR__ . '/errorlog');
+  $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
+  if ($date_input !== '' && !in_array($date_input, $dates, true)) {
+    error($en ? 'The requested error log date does not exist.' : '指定されたエラーログの日付は存在しません。', 404);
+  }
+  $date = $date_input !== '' ? $date_input : ($dates[0] ?? '');
+  $type = (string)(filter_input_data('GET', 'log_type') ?? 'all');
+  $status_group = (string)(filter_input_data('GET', 'log_status') ?? 'all');
+  if (!in_array($status_group, ['all', '4xx', '5xx'], true)
+    || ($type !== 'all' && preg_match('/\A[a-z][a-z0-9-]{0,63}\z/D', $type) !== 1)) {
+    error($en ? 'Invalid error log filter.' : 'エラーログの絞り込み条件が不正です。', 400);
+  }
+
+  try {
+    $result = $date === ''
+      ? ['records' => [], 'total' => 0, 'types' => []]
+      : ErrorLogReader::read(__DIR__ . '/errorlog', $date, $type, $status_group);
+    $dat['admin_errorlog_dates'] = $dates;
+    $dat['admin_errorlog_date'] = $date;
+    $dat['admin_errorlog_type'] = $type;
+    $dat['admin_errorlog_status'] = $status_group;
+    $dat['admin_errorlog_types'] = $result['types'];
+    $dat['admin_errorlog_records'] = $result['records'];
+    $dat['admin_errorlog_total'] = $result['total'];
+    $dat['admin_errorlog_limit'] = 100;
+    $dat['token'] = RequestSecurity::csrfToken();
+    echo $template_engine->render(ADMINERRORLOGFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load the error log.' : 'エラーログの読み込みに失敗しました。', 500, $e);
   }
 }
 
