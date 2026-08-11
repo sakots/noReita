@@ -39,6 +39,7 @@
         <input class="button" type="submit" value="ログアウト">
       </form>
       <p><a href="{{$self}}?mode=admin_errorlog">[エラーログ]</a></p>
+      <p><a href="{{$self}}?mode=admin_temporary_images">[一時画像の管理]</a></p>
       </section>
       <hr>
     </div>

@@ -20,6 +20,7 @@ final class ThemeManifest {
     'admin' => 'ADMINFILE',
     'admin_post' => 'ADMINPOSTFILE',
     'admin_errorlog' => 'ADMINERRORLOGFILE',
+    'admin_temporary_images' => 'ADMINTEMPORARYFILE',
     'share_server' => 'SET_SHARE_SERVER',
     'misskey_note' => 'MISSKEYFILE',
     'other' => 'OTHERFILE',

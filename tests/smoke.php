@@ -130,7 +130,7 @@ smoke_test('theme manifests and diagnostics detect theme integrity problems', st
     'templates' => $manifest['templates'],
   ];
   $report = ThemeDiagnostics::inspect($eda, $manifest, $runtime);
-  if ($report['summary']['errors'] !== 0 || $report['summary']['templates_checked'] !== 14) return false;
+  if ($report['summary']['errors'] !== 0 || $report['summary']['templates_checked'] !== 15) return false;
   $invalid = $manifest;
   $invalid['assets']['css'][] = 'css/missing-theme-asset.css';
   $invalid_report = ThemeDiagnostics::inspect($eda, $invalid, $runtime);
@@ -1075,6 +1075,21 @@ smoke_test('temporary images are parsed, found, and cleaned up', static function
       || $images[0]['paint_seconds'] !== 60 || $images[0]['tool'] !== 'neo'
       || $found === null || $found['base_name'] !== '200'
       || ImageService::findTemporaryImageByReplacementCode($directory, 'missing') !== null) {
+      return false;
+    }
+
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '100.pch', 'animation');
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '100.psd', 'working data');
+    touch($directory . DIRECTORY_SEPARATOR . '100.png', $now - 86401);
+    $entries = ImageService::temporaryImageEntries($directory, 1, $now);
+    $entries_by_filename = [];
+    foreach ($entries as $entry) $entries_by_filename[$entry['filename']] = $entry;
+    $deleted = ImageService::deleteTemporaryImages($directory, ['100.png', '../invalid.png']);
+    if (count($entries) !== 2 || !isset($entries_by_filename['100.png']) || !$entries_by_filename['100.png']['expired']
+      || $entries_by_filename['100.png']['related_files'] !== 4 || $deleted['images'] !== 1 || $deleted['files'] !== 4
+      || $deleted['skipped'] !== 0 || is_file($directory . DIRECTORY_SEPARATOR . '100.png')
+      || is_file($directory . DIRECTORY_SEPARATOR . '100.dat') || is_file($directory . DIRECTORY_SEPARATOR . '100.pch')
+      || is_file($directory . DIRECTORY_SEPARATOR . '100.psd')) {
       return false;
     }
 

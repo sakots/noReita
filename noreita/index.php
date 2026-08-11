@@ -58,7 +58,7 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260726) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260806) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260811) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
@@ -387,6 +387,10 @@ switch ($mode) {
     return admin_theme_settings();
   case 'admin_errorlog':
     return admin_errorlog();
+  case 'admin_temporary_images':
+    return admin_temporary_images();
+  case 'admin_temporary_images_manage':
+    return admin_temporary_images_manage();
   case 'admin_post':
     return admin_post();
   case 'admin_edit':
@@ -2133,6 +2137,77 @@ function admin_errorlog(): void {
   } catch (Throwable $e) {
     error($en ? 'Failed to load the error log.' : 'エラーログの読み込みに失敗しました。', 500, $e);
   }
+}
+
+// 管理者向け一時画像管理
+function admin_temporary_images(): void {
+  global $template_engine, $dat;
+  global $en;
+
+  require_admin_session();
+  try {
+    $temporary_images = ImageService::temporaryImageEntries(
+      Config::string('paths.temporary'), Config::int('limits.temporary_days')
+    );
+    $total = count($temporary_images);
+    $temporary_images = array_slice($temporary_images, 0, 200);
+    foreach ($temporary_images as &$temporary_image) {
+      $temporary_image['url'] = Config::string('paths.temporary') . $temporary_image['filename'];
+      $temporary_image['modified'] = date(Config::string('board.date_format'), (int)$temporary_image['modified_at']);
+      $temporary_image['size'] = ImageService::formatBytes((int)$temporary_image['related_bytes']);
+    }
+    unset($temporary_image);
+    $dat['admin_temporary_images'] = $temporary_images;
+    $dat['admin_temporary_images_total'] = $total;
+    $dat['admin_temporary_images_limit'] = 200;
+    $dat['admin_temporary_images_message'] = isset($_SESSION['admin_temporary_images_message'])
+      ? (string)$_SESSION['admin_temporary_images_message'] : '';
+    unset($_SESSION['admin_temporary_images_message']);
+    $dat['temporary_days'] = Config::int('limits.temporary_days');
+    $dat['token'] = RequestSecurity::csrfToken();
+    echo $template_engine->render(ADMINTEMPORARYFILE, $dat);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to load temporary images.' : '一時画像の読み込みに失敗しました。', 500, $e);
+  }
+}
+
+function admin_temporary_images_manage(): void {
+  global $en;
+
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($en);
+  } catch (RequestSecurityException $e) {
+    error($e->getMessage(), $e->getCode() ?: 403);
+  }
+  require_admin_session();
+  $operation = (string)filter_input_data('POST', 'operation');
+  try {
+    if ($operation === 'delete_selected') {
+      $selected = filter_input_data('POST', 'temporary_image');
+      if (!is_array($selected) || $selected === []) {
+        throw new InvalidArgumentException('No temporary image was selected.');
+      }
+      $result = ImageService::deleteTemporaryImages(Config::string('paths.temporary'), $selected);
+      $_SESSION['admin_temporary_images_message'] = $en
+        ? "Deleted {$result['images']} pending image(s) and {$result['files']} file(s)."
+        : "一時画像{$result['images']}件と関連ファイル{$result['files']}件を削除しました。";
+    } elseif ($operation === 'cleanup_expired') {
+      $files = ImageService::cleanupTemporaryFiles(
+        Config::string('paths.temporary'), Config::int('limits.temporary_days')
+      );
+      $_SESSION['admin_temporary_images_message'] = $en
+        ? "Deleted {$files} expired temporary file(s)."
+        : "期限切れの一時ファイル{$files}件を削除しました。";
+    } else {
+      throw new InvalidArgumentException('Invalid temporary image operation.');
+    }
+  } catch (InvalidArgumentException $e) {
+    error($en ? 'Invalid temporary image operation.' : '一時画像の管理操作が不正です。', 400);
+  } catch (Throwable $e) {
+    error($en ? 'Failed to manage temporary images.' : '一時画像の管理に失敗しました。', 500, $e);
+  }
+  redirect(Config::string('site.script_name') . '?mode=admin_temporary_images');
 }
 
 function diary_post_allowed(bool $is_reply): bool {

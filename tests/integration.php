@@ -318,17 +318,19 @@ PHP;
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_errorlog_unauthorized_status] = http_request($base_url . '?mode=admin_errorlog', $cookie_jar);
+  [$admin_temporary_images_unauthorized_status] = http_request($base_url . '?mode=admin_temporary_images', $cookie_jar);
   [$admin_detail_unauthorized_status] = http_request($base_url . '?mode=admin_post&id=1', $cookie_jar);
   [$admin_edit_unauthorized_status] = http_request($base_url . '?mode=admin_edit&id=1', $cookie_jar);
   [$admin_manage_unauthorized_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'hide', 'delno' => ['1'], 'token' => $token,
   ]);
   integration_test('administration routes require a login session', static function () use (
-    $admin_unauthorized_status, $admin_errorlog_unauthorized_status, $admin_detail_unauthorized_status,
+    $admin_unauthorized_status, $admin_errorlog_unauthorized_status, $admin_temporary_images_unauthorized_status, $admin_detail_unauthorized_status,
     $admin_edit_unauthorized_status, $admin_manage_unauthorized_status
   ): bool {
     return $admin_unauthorized_status === 403
       && $admin_errorlog_unauthorized_status === 403
+      && $admin_temporary_images_unauthorized_status === 403
       && $admin_detail_unauthorized_status === 403
       && $admin_edit_unauthorized_status === 403
       && $admin_manage_unauthorized_status === 403;
@@ -376,6 +378,7 @@ PHP;
       && str_contains($admin_body, '画像ディレクトリ:')
       && str_contains($admin_body, 'mode=admin_logout')
       && str_contains($admin_body, 'mode=admin_errorlog')
+      && str_contains($admin_body, 'mode=admin_temporary_images')
       && str_contains($admin_body, 'mode=admin_manage')
       && str_contains($admin_body, 'value="hide"')
       && str_contains($admin_body, 'value="show"')
@@ -683,6 +686,31 @@ PHP;
       && is_file($webroot . '/img/' . $image_name)
       && is_file($webroot . '/img/' . $image_base . '.pch')
       && !is_file($webroot . '/tmp/' . $image_base . '.dat');
+  });
+
+  $admin_temporary_base = 'admin-temp-' . bin2hex(random_bytes(6));
+  $admin_temporary_name = $admin_temporary_base . '.png';
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_name, $png);
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
+  file_put_contents($webroot . '/tmp/' . $admin_temporary_base . '.pch', 'temporary animation');
+  [$admin_temporary_page_status, $admin_temporary_page_body] = http_request(
+    $base_url . '?mode=admin_temporary_images', $cookie_jar
+  );
+  [$admin_temporary_delete_status] = http_request($base_url . '?mode=admin_temporary_images_manage', $cookie_jar, [
+    'operation' => 'delete_selected', 'temporary_image' => [$admin_temporary_name], 'token' => $token,
+  ]);
+  integration_test('administrator manages pending images without accepting arbitrary files', static function () use (
+    $admin_temporary_page_status, $admin_temporary_page_body, $admin_temporary_delete_status,
+    $admin_temporary_name, $admin_temporary_base, $webroot
+  ): bool {
+    return $admin_temporary_page_status === 200
+      && str_contains($admin_temporary_page_body, '一時画像の管理')
+      && str_contains($admin_temporary_page_body, $admin_temporary_name)
+      && str_contains($admin_temporary_page_body, 'name="temporary_image[]"')
+      && $admin_temporary_delete_status === 302
+      && !is_file($webroot . '/tmp/' . $admin_temporary_name)
+      && !is_file($webroot . '/tmp/' . $admin_temporary_base . '.dat')
+      && !is_file($webroot . '/tmp/' . $admin_temporary_base . '.pch');
   });
 
   $image_post_id = (int)($image_row['tid'] ?? 0);

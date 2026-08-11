@@ -65,6 +65,9 @@ const ADMINPOSTFILE = "monoreita_admin_post";
 //管理モードのエラーログテンプレートファイル
 const ADMINERRORLOGFILE = "monoreita_admin_errorlog";
 
+//管理モードの一時画像管理テンプレートファイル
+const ADMINTEMPORARYFILE = "monoreita_admin_temporary_images";
+
 //SNSシェア選択のテンプレートファイル
 const SET_SHARE_SERVER = "monoreita_sns_share";
 
