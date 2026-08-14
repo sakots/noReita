@@ -46,7 +46,7 @@ if (!is_file(__DIR__ . '/' . $db_name . '.db')) {
     // LIMIT 1 で取り出す画像が1枚だけ決まる。
     // 紆余曲折を経てこの文に行き着いた →
     // https://www.it-swarm-ja.com/ja/sql/SQLiteでランダムな行を選択します/970867568/
-    $sql = "SELECT picfile FROM tlog WHERE thread = 1 LIMIT 1 OFFSET abs(random() % (SELECT SUM(thread) FROM tlog))";
+    $sql = "SELECT picfile FROM board_log WHERE thread = 1 LIMIT 1 OFFSET abs(random() % (SELECT SUM(thread) FROM board_log))";
     $msgs = $db->prepare($sql);
     $msgs->execute();
     $msg = $msgs->fetch(); // 取り出せた
@@ -57,39 +57,40 @@ if (!is_file(__DIR__ . '/' . $db_name . '.db')) {
       $filename = __DIR__ . '/' . $image_dir . $msg["picfile"];
     }
     $db = null; // db切断
+
+    // 画像を出力
+
+    $img_type = mime_content_type($filename);
+
+    switch ($img_type):
+      case 'image/png':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/png');
+      break;
+      case 'image/webp':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/webp');
+      break;
+      case 'image/avif':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/avif');
+      break;
+      case 'image/jpeg':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/jpeg');
+      break;
+      case 'image/gif':
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/gif');
+      break;
+      default :
+        header('Cache-Control: no-cache');
+        header('Content-Type: image/png');
+      endswitch;
+
+    readfile($filename);
+
   } catch (PDOException $e) {
     echo "DB接続エラー:" .$e->getMessage();
   }
 }
-
-// 画像を出力
-
-$img_type = mime_content_type($filename);
-
-switch ($img_type):
-  case 'image/png':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/png');
-  break;
-  case 'image/webp':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/webp');
-  break;
-  case 'image/avif':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/avif');
-  break;
-  case 'image/jpeg':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/jpeg');
-  break;
-  case 'image/gif':
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/gif');
-  break;
-  default :
-    header('Cache-Control: no-cache');
-    header('Content-Type: image/png');
-  endswitch;
-
-readfile($filename);
