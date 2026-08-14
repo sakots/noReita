@@ -4,7 +4,7 @@
 //  by sakots & OekakiBBS reDev.Team  https://oekakibbs.moe/
 //--------------------------------------------------
 
-//  noreita_newimg.php (c)sakots 2021 lot.211130.1
+//  noreita_newimg.php (c)sakots 2026 lot.260814.0
 //  The MIT License
 
 // 使い方
