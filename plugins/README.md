@@ -66,6 +66,10 @@ noReita3のindex.phpと同じディレクトリにアップロードして
 
 ## 更新履歴
 
+### [2026/08/14] noreita_newimg.php noreita_rndimg.php
+
+- v4対応
+
 ### [2026/07/22]
 
 - ディレクトリ名変更
