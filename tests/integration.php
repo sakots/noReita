@@ -545,11 +545,21 @@ PHP;
     $base_url . '?mode=search&target=all&match=partial&post_type=thread&image=any&nsfw=safe&sort=newest&search=' . rawurlencode($marker),
     $cookie_jar
   );
-  [$empty_public_search_status] = http_request($base_url . '?mode=search&target=all&search=', $cookie_jar);
-  integration_test('public search filters targets and rejects an empty query', static function () use (
-    $public_search_status, $public_search_body, $empty_public_search_status, $marker
+  [$empty_public_search_status, $empty_public_search_body] = http_request(
+    $base_url . '?mode=search&target=all&search=', $cookie_jar
+  );
+  [$long_public_search_status] = http_request(
+    $base_url . '?mode=search&target=all&search=' . str_repeat('a', 101), $cookie_jar
+  );
+  integration_test('public search filters targets and returns no rows for an empty query', static function () use (
+    $public_search_status, $public_search_body, $empty_public_search_status, $empty_public_search_body,
+    $long_public_search_status, $marker
   ): bool {
-    return $public_search_status === 200 && $empty_public_search_status === 400
+    return $public_search_status === 200
+      && $empty_public_search_status === 200
+      && str_contains($empty_public_search_body, '0件')
+      && !str_contains($empty_public_search_body, $marker)
+      && $long_public_search_status === 400
       && str_contains($public_search_body, '検索結果 - すべて')
       && str_contains($public_search_body, $marker)
       && str_contains($public_search_body, 'name="post_type"')

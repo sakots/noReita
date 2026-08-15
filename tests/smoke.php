@@ -225,6 +225,8 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'unknown' => true],
     ['admin' => ['password' => 'configured-admin', 'threads_per_page' => '50'], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin', 'threads_per_page' => 101], 'site' => ['base_url' => 'https://configured.example/']],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 0]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 201]],
     ['admin' => ['password' => 'admin_pass'], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://example.com/noreita/']],
   ];
@@ -236,7 +238,17 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
       if (str_contains($e->getMessage(), 'configured-admin')) return false;
     }
   }
-  return true;
+  $minimum = Config::resolve($defaults, [
+    'admin' => ['password' => 'configured-admin'],
+    'site' => ['base_url' => 'https://configured.example/'],
+    'board' => ['catalog_size' => 1],
+  ]);
+  $maximum = Config::resolve($defaults, [
+    'admin' => ['password' => 'configured-admin'],
+    'site' => ['base_url' => 'https://configured.example/'],
+    'board' => ['catalog_size' => 200],
+  ]);
+  return $minimum['board']['catalog_size'] === 1 && $maximum['board']['catalog_size'] === 200;
 });
 
 smoke_test('v3 configuration is converted to a validated local override', static function (): bool {

@@ -15,6 +15,6 @@
   <label>NSFW <select name="nsfw"><option value="any"{% if search_criteria['nsfw'] == 'any' %} selected{% endif %}>指定なし</option><option value="safe"{% if search_criteria['nsfw'] == 'safe' %} selected{% endif %}>なし</option><option value="nsfw"{% if search_criteria['nsfw'] == 'nsfw' %} selected{% endif %}>あり</option></select></label>
   <label>順序 <select name="sort"><option value="newest"{% if search_criteria['sort'] == 'newest' %} selected{% endif %}>新着順</option><option value="oldest"{% if search_criteria['sort'] == 'oldest' %} selected{% endif %}>古い順</option></select></label>
   <br>
-  <input type="search" name="search" placeholder="検索語（100文字まで）" size="20" maxlength="100" value="{{ search_criteria['query'] }}" required>
+  <input type="search" name="search" placeholder="検索語（100文字まで）" size="20" maxlength="100" value="{{ search_criteria['query'] }}">
   <input type="submit" value=" 検索 ">
 </form>
