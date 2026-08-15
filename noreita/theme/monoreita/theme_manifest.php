@@ -4,7 +4,7 @@ return [
   'format' => 1,
   'id' => 'monoreita',
   'name' => 'monoreita',
-  'version' => 'lot.260808.0',
+  'version' => 'lot.260815.0',
   'engine' => 'blade',
   'requires' => [
     'php' => '8.1.0',
