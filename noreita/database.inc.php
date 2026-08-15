@@ -180,8 +180,8 @@ final class PublicPostSearch {
   /** @return array<string,string> */
   public static function normalize(array $values): array {
     $query = trim((string)($values['query'] ?? ''));
-    if ($query === '' || mb_strlen($query, 'UTF-8') > 100) {
-      throw new InvalidArgumentException('Search query must be between 1 and 100 characters.');
+    if (mb_strlen($query, 'UTF-8') > 100) {
+      throw new InvalidArgumentException('Search query must not exceed 100 characters.');
     }
     return [
       'query' => $query,
@@ -434,6 +434,8 @@ final class BoardRepository {
    * @return array{sql:string,params:array<int,string>} */
   private function publicSearchCondition(array $criteria): array {
     $criteria = PublicPostSearch::normalize($criteria);
+    // 空検索を全件検索に変換しない。正常な0件検索として扱う。
+    if ($criteria['query'] === '') return ['sql' => '0 = 1', 'params' => []];
     $operator = $criteria['match'] === 'exact' ? '=' : 'LIKE';
     $value = $criteria['match'] === 'exact' ? $criteria['query'] : '%' . $criteria['query'] . '%';
     $sql = 'invz = 0';
