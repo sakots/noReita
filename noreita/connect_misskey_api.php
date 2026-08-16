@@ -9,6 +9,7 @@
 require_once __DIR__ . '/bootstrap.php';
 ApplicationBootstrap::boot(__DIR__);
 require_once(__DIR__.'/request_security.inc.php');
+require_once(__DIR__.'/misskey_security.inc.php');
 
 // index.phpを経由しないMisskeyコールバックの直接実行時だけDB接続を初期化する。
 // index.phpから読み込まれた場合は、すでに読み込み済みのDatabaseと後続のDB定数定義を使用する。
@@ -18,14 +19,44 @@ if (!class_exists('Database', false)) {
 	require_once(__DIR__.'/database.inc.php');
 }
 
-const CONNECT_MISSKEY_API_VER = 20260806;
+const CONNECT_MISSKEY_API_VER = 20260817;
 
 $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
 ? explode( ',', $http_langs )[0] : '';
 $en= (stripos($lang,'ja')!==0);
 
+function misskey_api_error(
+	string $public_message,
+	int $status,
+	string $diagnostic,
+	?Throwable $cause = null
+): void {
+	global $en;
+	ApplicationErrorHandler::respondPlainError(
+		$status,
+		$public_message,
+		(bool)$en,
+		'Error: ',
+		'Misskey API: ' . $diagnostic,
+		$cause
+	);
+}
+
 // 認証チェック
 class connect_misskey_api{
+	private static function applySecurity($curl, string $base_url, int $timeout = 15): bool {
+		if ($curl === false) return false;
+		$options = MisskeyServerSecurity::curlOptions($base_url, $timeout);
+		return is_array($options) && curl_setopt_array($curl, $options);
+	}
+
+	private static function responseErrorDetail(mixed $response): string {
+		if (!is_array($response)) return 'Unknown API error';
+		$message = $response['error']['message'] ?? null;
+		if (!is_scalar($message)) return 'Unknown API error';
+		$message = trim((string)$message);
+		return $message !== '' ? mb_substr($message, 0, 1000) : 'Unknown API error';
+	}
 
 	private static function get_thread_no(int $no): int {
 		try {
@@ -38,6 +69,7 @@ class connect_misskey_api{
 			}
 			return ((int)$post['thread'] === 1) ? (int)$post['tid'] : (int)$post['parent'];
 		} catch (PDOException $e) {
+			ApplicationErrorHandler::reportHttpError(500, 'Misskey API: thread lookup failed.', $e);
 			return $no;
 		}
 	}
@@ -48,6 +80,13 @@ class connect_misskey_api{
 		$checkUrl = $baseUrl . "/api/miauth/{$sns_api_session_id}/check";
 
 		$checkCurl = curl_init();
+		if (!self::applySecurity($checkCurl, $baseUrl)) {
+			misskey_api_error(
+				$en ? 'Invalid Misskey server.' : 'Misskeyサーバーが無効です。',
+				400,
+				'Miauth check rejected an invalid or unsafe server.'
+			);
+		}
 		curl_setopt($checkCurl, CURLOPT_URL, $checkUrl);
 		curl_setopt($checkCurl, CURLOPT_POST, true);
 		curl_setopt($checkCurl, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
@@ -55,32 +94,69 @@ class connect_misskey_api{
 		curl_setopt($checkCurl, CURLOPT_RETURNTRANSFER, true);
 
 		$checkResponse = curl_exec($checkCurl);
-		// curl_close($checkCurl);
+		$checkStatusCode = (int)curl_getinfo($checkCurl, CURLINFO_HTTP_CODE);
+		$checkCurlError = curl_error($checkCurl);
+		curl_close($checkCurl);
 
-		if (!$checkResponse) {
-			die("Error: " . ($en ? "Authentication failed." :"認証に失敗しました。") . " (Curl error)");
+		if ($checkResponse === false) {
+			misskey_api_error(
+				$en ? 'Authentication failed.' : '認証に失敗しました。',
+				502,
+				'Miauth check transport failed: ' . $checkCurlError
+			);
+		}
+		if (!in_array($checkStatusCode, [200, 204], true)) {
+			misskey_api_error(
+				$en ? 'Authentication failed.' : '認証に失敗しました。',
+				502,
+				'Miauth check returned HTTP ' . $checkStatusCode . '.'
+			);
 		}
 
 		$responseData = json_decode($checkResponse, true);
-		if(!isset($responseData['token'])){
-			die("Error: " . ($en ? "Authentication failed." :"認証に失敗しました。") . " (No token in response)");
+		if(!is_array($responseData) || !isset($responseData['token']) || !is_string($responseData['token'])){
+			misskey_api_error(
+				$en ? 'Authentication failed.' : '認証に失敗しました。',
+				502,
+				'Miauth response did not contain a valid token.'
+			);
 		}
 		$accessToken = $responseData['token'];
 		$_SESSION['accessToken'] = $accessToken;
-		$user = $responseData['user'];
 		self::create_misskey_note();
 	}
 
 	public static function create_misskey_note(): void {
 
-		global $en,$baseUrl,$root_url;
+		global $en,$baseUrl;
 
-		$accessToken = $_SESSION['accessToken'] ?? "";
-		if(!$accessToken){
-			die("Error: " . ($en ? "Authentication failed." :"認証に失敗しました。") . " (No access token)");
+		$accessToken = $_SESSION['accessToken'] ?? '';
+		if(!is_string($accessToken) || $accessToken === ''){
+			misskey_api_error(
+				$en ? 'Authentication failed.' : '認証に失敗しました。',
+				401,
+				'Misskey access token was missing from the session.'
+			);
 		}
 
-		list($com,$src_image,$tool,$painttime,$hide_thumbnail,$no,$article_url_link,$cw) = $_SESSION['sns_api_val'];
+		$sns_api_values = $_SESSION['sns_api_val'] ?? null;
+		if (!is_array($sns_api_values) || !array_is_list($sns_api_values) || count($sns_api_values) !== 8) {
+			misskey_api_error(
+				$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
+				400,
+				'Misskey posting session data had an invalid structure.'
+			);
+		}
+		list($com,$src_image,$tool,$painttime,$hide_thumbnail,$no,$article_url_link,$cw) = $sns_api_values;
+		foreach ([$com, $src_image, $tool, $painttime, $hide_thumbnail, $no, $article_url_link, $cw] as $value) {
+			if (!is_scalar($value) && $value !== null) {
+				misskey_api_error(
+					$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
+					400,
+					'Misskey posting session data contained a non-scalar value.'
+				);
+			}
+		}
 
 		$src_image=basename($src_image);
 
@@ -88,18 +164,26 @@ class connect_misskey_api{
 		$imagePath = __DIR__.'/'.Config::string('paths.images').$src_image;
 
 		if(!is_file($imagePath)){
-			die("Error: " . ($en ? "Image does not exist." : "画像がありません。") . ": " . $imagePath);
+			misskey_api_error(
+				$en ? 'Image does not exist.' : '画像がありません。',
+				404,
+				'Misskey upload source image was missing.'
+			);
 		};
 
 		$uploadUrl = $baseUrl . "/api/drive/files/create";
-		$uploadHeaders = array(
-			'Content-Type: multipart/form-data'
-		);
 		$uploadFields = array(
 			'i' => $accessToken,
 			'file' => new CURLFile($imagePath),
 		);
 		$uploadCurl = curl_init();
+		if (!self::applySecurity($uploadCurl, $baseUrl, 30)) {
+			misskey_api_error(
+				$en ? 'Invalid Misskey server.' : 'Misskeyサーバーが無効です。',
+				400,
+				'Misskey drive upload rejected an invalid or unsafe server.'
+			);
+		}
 		curl_setopt($uploadCurl, CURLOPT_URL, $uploadUrl);
 		curl_setopt($uploadCurl, CURLOPT_POST, true);
 		curl_setopt($uploadCurl, CURLOPT_POSTFIELDS, $uploadFields);
@@ -108,23 +192,35 @@ class connect_misskey_api{
 		$uploadResponse = curl_exec($uploadCurl);
 		$uploadStatusCode = curl_getinfo($uploadCurl, CURLINFO_HTTP_CODE);
 		$curlError = curl_error($uploadCurl);
-		// curl_close($uploadCurl);
+		curl_close($uploadCurl);
 
 		if ($uploadResponse === false) {
-			die("Error: 画像のアップロードに失敗しました (cURL Error: " . $curlError . ")");
+			misskey_api_error(
+				$en ? 'Failed to upload the image.' : '画像のアップロードに失敗しました。',
+				502,
+				'Misskey drive upload transport failed: ' . $curlError
+			);
 		}
 
 		$responseData = json_decode($uploadResponse, true);
 
 		if ($uploadStatusCode !== 200 && $uploadStatusCode !== 204) {
-			$errorDetails = isset($responseData['error']['message']) ? $responseData['error']['message'] : 'Unknown API Error';
-			die("Error: 画像のアップロードに失敗しました (API Status: " . $uploadStatusCode . ", Details: " . $errorDetails . ")");
+			misskey_api_error(
+				$en ? 'Failed to upload the image.' : '画像のアップロードに失敗しました。',
+				502,
+				'Misskey drive upload returned HTTP ' . $uploadStatusCode . ': ' . self::responseErrorDetail($responseData)
+			);
 		}
 
-		$fileId = $responseData['id'] ?? '';
+		$fileId = is_array($responseData) && is_string($responseData['id'] ?? null)
+			? $responseData['id'] : '';
 
 		if(!$fileId){
-			die("Error: " . ($en ? "Failed to upload the image." : "画像のアップロードに失敗しました。") . " (No file ID in response)");
+			misskey_api_error(
+				$en ? 'Failed to upload the image.' : '画像のアップロードに失敗しました。',
+				502,
+				'Misskey drive upload response did not contain a file ID.'
+			);
 		}
 
 		$updateUrl = $baseUrl . "/api/drive/files/update";
@@ -138,6 +234,13 @@ class connect_misskey_api{
 		);
 
 		$updateCurl = curl_init();
+		if (!self::applySecurity($updateCurl, $baseUrl)) {
+			misskey_api_error(
+				$en ? 'Invalid Misskey server.' : 'Misskeyサーバーが無効です。',
+				400,
+				'Misskey drive update rejected an invalid or unsafe server.'
+			);
+		}
 		curl_setopt($updateCurl, CURLOPT_URL, $updateUrl);
 		curl_setopt($updateCurl, CURLOPT_POST, true);
 		curl_setopt($updateCurl, CURLOPT_HTTPHEADER, $updateHeaders);
@@ -146,21 +249,22 @@ class connect_misskey_api{
 		$updateResponse = curl_exec($updateCurl);
 		$updateStatusCode = curl_getinfo($updateCurl, CURLINFO_HTTP_CODE);
 		$updateCurlError = curl_error($updateCurl);
-		// curl_close($updateCurl);
+		curl_close($updateCurl);
 
 		if ($updateResponse === false) {
-			die("Error: ファイルの更新に失敗しました (cURL Error: " . $updateCurlError . ")");
+			misskey_api_error(
+				$en ? 'Failed to update the uploaded image.' : 'ファイルの更新に失敗しました。',
+				502,
+				'Misskey drive update transport failed: ' . $updateCurlError
+			);
 		}
 		if ($updateStatusCode !== 200 && $updateStatusCode !== 204) {
 			$updateResponseData = json_decode($updateResponse, true);
-			$errorDetails = isset($updateResponseData['error']['message']) ? $updateResponseData['error']['message'] : 'Unknown API Error';
-			die("Error: ファイルの更新に失敗しました (API Status: " . $updateStatusCode . ", Details: " . $errorDetails . ")");
-		}
-
-		$uploadResult = json_decode($uploadResponse, true);
-
-		if (!$fileId) {
-			die("Error: " . ($en ? "Failed to post the content." : "投稿に失敗しました。") . " (No file ID in response)");
+			misskey_api_error(
+				$en ? 'Failed to update the uploaded image.' : 'ファイルの更新に失敗しました。',
+				502,
+				'Misskey drive update returned HTTP ' . $updateStatusCode . ': ' . self::responseErrorDetail($updateResponseData)
+			);
 		}
 
 		sleep(10);
@@ -192,6 +296,13 @@ class connect_misskey_api{
 		);
 
 		$postCurl = curl_init();
+		if (!self::applySecurity($postCurl, $baseUrl)) {
+			misskey_api_error(
+				$en ? 'Invalid Misskey server.' : 'Misskeyサーバーが無効です。',
+				400,
+				'Misskey note creation rejected an invalid or unsafe server.'
+			);
+		}
 		curl_setopt($postCurl, CURLOPT_URL, $postUrl);
 		curl_setopt($postCurl, CURLOPT_POST, true);
 		curl_setopt($postCurl, CURLOPT_HTTPHEADER, $postHeaders);
@@ -200,16 +311,23 @@ class connect_misskey_api{
 		$postResponse = curl_exec($postCurl);
 		$postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE);
 		$postCurlError = curl_error($postCurl);
-		// curl_close($postCurl);
+		curl_close($postCurl);
 
 		if ($postResponse === false) {
-			die("Error: Misskeyへの投稿に失敗しました (cURL Error: " . $postCurlError . ")");
+			misskey_api_error(
+				$en ? 'Failed to post the content.' : 'Misskeyへの投稿に失敗しました。',
+				502,
+				'Misskey note creation transport failed: ' . $postCurlError
+			);
 		}
 
 		if ($postStatusCode !== 200 && $postStatusCode !== 204) {
 			$postResponseData = json_decode($postResponse, true);
-			$errorDetails = isset($postResponseData['error']['message']) ? $postResponseData['error']['message'] : 'Unknown API Error';
-			die("Error: Misskeyへの投稿に失敗しました (API Status: " . $postStatusCode . ", Details: " . $errorDetails . ")");
+			misskey_api_error(
+				$en ? 'Failed to post the content.' : 'Misskeyへの投稿に失敗しました。',
+				502,
+				'Misskey note creation returned HTTP ' . $postStatusCode . ': ' . self::responseErrorDetail($postResponseData)
+			);
 		}
 
 		$postResult = json_decode($postResponse, true);
@@ -222,7 +340,11 @@ class connect_misskey_api{
 			redirect(Config::string('site.base_url').'?mode=misskey_success&no='.$thread_no);
 		}
 		else {
-			die("Error: " . ($en ? "Failed to post the content." : "投稿に失敗しました。") . " (API response missing createdNote)");
+			misskey_api_error(
+				$en ? 'Failed to post the content.' : '投稿に失敗しました。',
+				502,
+				'Misskey note creation response did not contain createdNote file IDs.'
+			);
 		}
 	}
 }
@@ -233,18 +355,33 @@ function connect_misskey_api_dispatch(): void {
 	RequestSecurity::startSession();
 
 	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
-		die("Error: セッションがありません。Misskey投稿フローが正しく動作していません。");
+		misskey_api_error(
+			$en ? 'The Misskey posting session is missing.' : 'セッションがありません。Misskey投稿フローが正しく動作していません。',
+			400,
+			'Misskey callback session was missing.'
+		);
 	};
 
-	$baseUrl = $_SESSION['misskey_server_radio'] ?? "";
-	if(!filter_var($baseUrl,FILTER_VALIDATE_URL)){
-		die("Error: サーバのURLが無効です。: " . $baseUrl);
+	$baseUrl = MisskeyServerSecurity::normalizeBaseUrl(
+		(string)($_SESSION['misskey_server_radio'] ?? '')
+	);
+	if($baseUrl === false){
+		misskey_api_error(
+			$en ? 'Invalid Misskey server URL.' : 'サーバのURLが無効です。',
+			400,
+			'Misskey callback session contained an invalid server URL.'
+		);
 	}
+	$_SESSION['misskey_server_radio'] = $baseUrl;
 
 	$skip_auth_check = (bool)filter_input_data('GET','skip_auth_check',FILTER_VALIDATE_BOOLEAN);
 	if($skip_auth_check){
 		if((string)filter_input_data('GET','s_id') !== $_SESSION['sns_api_session_id']){
-			die("Error: " . ($en ? "Operation failed." :"失敗しました。"));
+			misskey_api_error(
+				$en ? 'Operation failed.' : '失敗しました。',
+				403,
+				'Misskey callback state did not match the session.'
+			);
 		}
 		connect_misskey_api::create_misskey_note();
 		return;

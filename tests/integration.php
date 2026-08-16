@@ -86,7 +86,7 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
     CURLOPT_COOKIEFILE => $cookie_jar,
     CURLOPT_HTTPHEADER => [
       'Host: localhost', 'Origin: http://localhost',
-      'Client-IP: ' . $forwarded_for, 'X-Forwarded-For: ' . $forwarded_for,
+      'X-Forwarded-For: ' . $forwarded_for,
     ],
     CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$response_headers): int {
       $length = strlen($header);
@@ -167,6 +167,13 @@ return [
     'external_image_thumbnail' => false,
     'misskey_note' => false,
   ],
+  // The local HTTP server is the explicitly trusted reverse proxy for forwarded-IP tests.
+  'security' => ['trusted_proxies' => ['127.0.0.1']],
+  'limits' => [
+    'paint_image_kb' => 1,
+    'paint_work_kb' => 1,
+    'paint_request_kb' => 2,
+  ],
 ];
 PHP;
   if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
@@ -187,6 +194,34 @@ throw new RuntimeException('Failure token=error-probe-secret at ' . __FILE__);
 PHP;
   if (file_put_contents($webroot . '/error-probe.php', $error_probe) === false) {
     throw new RuntimeException('Could not create error handling probe.');
+  }
+  $plain_error_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
+ApplicationErrorHandler::respondPlainError(
+  502,
+  'public-detail-must-not-appear',
+  true,
+  'Error: ',
+  'Misskey API: upstream failed token=plain-api-secret'
+);
+PHP;
+  if (file_put_contents($webroot . '/plain-error-probe.php', $plain_error_probe) === false) {
+    throw new RuntimeException('Could not create plain error response probe.');
+  }
+  $misskey_missing_image_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/connect_misskey_api.php';
+RequestSecurity::startSession();
+$_SESSION['accessToken'] = 'misskey-probe-token';
+$_SESSION['sns_api_val'] = ['', 'missing-probe.png', '', 0, false, 1, false, ''];
+$en = true;
+$baseUrl = 'https://misskey.io';
+connect_misskey_api::create_misskey_note();
+PHP;
+  if (file_put_contents($webroot . '/misskey-missing-image-probe.php', $misskey_missing_image_probe) === false) {
+    throw new RuntimeException('Could not create Misskey missing-image probe.');
   }
 
   $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
@@ -229,8 +264,15 @@ PHP;
   $protected_probes = [
     'config.php' => 'admin_pass',
     'config.local.php' => 'integration-admin-pass',
+    'config.local.php.bak' => 'config-backup-secret',
+    'config.php.old' => 'old-config-secret',
+    'config.local.php~' => 'editor-config-backup-secret',
     'reita.db' => 'SQLite format',
+    'http-access-probe.db-wal' => 'sqlite-wal-secret',
+    'http-access-probe.db-shm' => 'sqlite-shm-secret',
+    'http-access-probe.db-journal' => 'sqlite-journal-secret',
     'theme/eda/theme_settings.db' => 'SQLite format',
+    'thumbnail/.external-image-failures/http-access-probe.failure.dat' => 'external-failure-secret',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
     'cache/http-access-probe.bladec' => 'blade-cache-secret',
@@ -239,6 +281,12 @@ PHP;
   ];
   foreach ($protected_probes as $relative_path => $secret) {
     $probe_path = $webroot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative_path);
+    $probe_directory = dirname($probe_path);
+    if (!is_dir($probe_directory)
+      && !mkdir($probe_directory, 0700, true)
+      && !is_dir($probe_directory)) {
+      throw new RuntimeException("Could not create protected HTTP probe directory: {$relative_path}");
+    }
     if (!is_file($probe_path) && file_put_contents($probe_path, $secret) === false) {
       throw new RuntimeException("Could not create protected HTTP probe: {$relative_path}");
     }
@@ -250,7 +298,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 9 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 16 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -289,14 +337,68 @@ PHP;
       && !str_contains($error_log_contents, 'error-probe-secret');
   });
 
+  [$plain_error_status, $plain_error_body] = http_request($origin_url . '/plain-error-probe.php', $cookie_jar);
+  preg_match('/\\b\\d{14}-[a-f0-9]{8}\\b/', $plain_error_body, $plain_error_id_match);
+  $plain_error_id = (string)($plain_error_id_match[0] ?? '');
+  $plain_error_log_contents = '';
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $plain_error_log_contents .= (string)file_get_contents($error_log_file);
+  }
+  integration_test('plain API 5xx responses hide details and log redacted diagnostics', static function () use (
+    $plain_error_status, $plain_error_body, $plain_error_id, $plain_error_log_contents
+  ): bool {
+    return $plain_error_status === 502
+      && $plain_error_id !== ''
+      && str_contains($plain_error_body, $plain_error_id)
+      && str_contains($plain_error_body, 'Date: ' . substr($plain_error_id, 0, 8))
+      && !str_contains($plain_error_body, 'public-detail-must-not-appear')
+      && !str_contains($plain_error_body, 'plain-api-secret')
+      && !str_contains($plain_error_body, 'Misskey API')
+      && str_contains($plain_error_log_contents, $plain_error_id)
+      && str_contains($plain_error_log_contents, 'Misskey API: upstream failed token=[REDACTED]')
+      && !str_contains($plain_error_log_contents, 'plain-api-secret');
+  });
+
+  $misskey_probe_cookie_jar = $root . DIRECTORY_SEPARATOR . 'misskey-probe-cookies.txt';
+  [$misskey_image_status, $misskey_image_body] = http_request(
+    $origin_url . '/misskey-missing-image-probe.php', $misskey_probe_cookie_jar
+  );
+  $misskey_image_log_safe = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    foreach (file($error_log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $log_line) {
+      if (!str_contains($log_line, 'Misskey upload source image was missing.')) continue;
+      $misskey_image_log_safe = !str_contains($log_line, $webroot)
+        && !str_contains($log_line, 'missing-probe.png');
+    }
+  }
+  integration_test('Misskey missing-image errors do not expose an absolute server path', static function () use (
+    $misskey_image_status, $misskey_image_body, $misskey_image_log_safe, $webroot
+  ): bool {
+    return $misskey_image_status === 404
+      && $misskey_image_body === 'Error: Image does not exist.'
+      && !str_contains($misskey_image_body, $webroot)
+      && !str_contains($misskey_image_body, 'missing-probe.png')
+      && $misskey_image_log_safe;
+  });
+
   [$misskey_callback_status, $misskey_callback_body] = http_request(
     $origin_url . '/connect_misskey_api.php', $cookie_jar
   );
-  integration_test('Misskey callback initializes standalone dependencies', static function () use (
-    $misskey_callback_status, $misskey_callback_body
+  $misskey_callback_logged = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $contents = (string)file_get_contents($error_log_file);
+    if (str_contains($contents, '"http_status":400')
+      && str_contains($contents, 'Misskey API: Misskey callback session was missing.')) {
+      $misskey_callback_logged = true;
+      break;
+    }
+  }
+  integration_test('Misskey callback records standalone failures without exposing internals', static function () use (
+    $misskey_callback_status, $misskey_callback_body, $misskey_callback_logged
   ): bool {
-    return $misskey_callback_status === 200
-      && str_contains($misskey_callback_body, 'セッションがありません')
+    return $misskey_callback_status === 400
+      && str_contains($misskey_callback_body, 'Misskey posting session is missing')
+      && $misskey_callback_logged
       && !str_contains($misskey_callback_body, 'Fatal error')
       && !str_contains($misskey_callback_body, 'Class &quot;Database&quot; not found')
       && !str_contains($misskey_callback_body, 'Class &quot;RequestSecurity&quot; not found');
@@ -316,6 +418,92 @@ PHP;
   $token = $session_id === null ? '' : hash('sha256', $session_id);
   integration_test('image upload form is available when enabled', static function () use ($status, $pictmp_body): bool {
     return $status === 200 && str_contains($pictmp_body, 'name="image_upload"');
+  });
+
+  $oversized_paint = $root . DIRECTORY_SEPARATOR . 'oversized-paint.png';
+  if (file_put_contents($oversized_paint, str_repeat('x', 1536)) !== 1536) {
+    throw new RuntimeException('Could not create oversized drawing upload probe.');
+  }
+  $temporary_before_capacity_test = glob($webroot . '/tmp/*') ?: [];
+  [$paint_capacity_status, $paint_capacity_body] = http_request(
+    $base_url . '?mode=saveimage&tool=neo',
+    $cookie_jar,
+    [
+      'header' => 'stime=1',
+      'picture' => new CURLFile($oversized_paint, 'image/png', 'oversized-paint.png'),
+    ]
+  );
+  $temporary_after_capacity_test = glob($webroot . '/tmp/*') ?: [];
+  $paint_capacity_logged = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $contents = (string)file_get_contents($error_log_file);
+    if (str_contains($contents, '"http_status":413')
+      && str_contains($contents, 'drawing upload is too large')) {
+      $paint_capacity_logged = true;
+      break;
+    }
+  }
+  integration_test('drawing save API rejects oversized uploads without creating temporary files', static function () use (
+    $paint_capacity_status, $paint_capacity_body, $temporary_before_capacity_test,
+    $temporary_after_capacity_test, $paint_capacity_logged
+  ): bool {
+    return $paint_capacity_status === 413
+      && str_contains($paint_capacity_body, 'drawing upload is too large')
+      && $temporary_after_capacity_test === $temporary_before_capacity_test
+      && $paint_capacity_logged;
+  });
+
+  $invalid_paint = $root . DIRECTORY_SEPARATOR . 'invalid-paint.png';
+  if (file_put_contents($invalid_paint, 'not-a-png') !== 9) {
+    throw new RuntimeException('Could not create invalid drawing upload probe.');
+  }
+  $temporary_before_invalid_paint = glob($webroot . '/tmp/*') ?: [];
+  [$invalid_paint_status, $invalid_paint_body] = http_request(
+    $base_url . '?mode=saveimage&tool=neo',
+    $cookie_jar,
+    [
+      'header' => 'stime=1',
+      'picture' => new CURLFile($invalid_paint, 'image/png', 'invalid-paint.png'),
+    ]
+  );
+  $temporary_after_invalid_paint = glob($webroot . '/tmp/*') ?: [];
+  $invalid_paint_logged = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $contents = (string)file_get_contents($error_log_file);
+    if (str_contains($contents, '"http_status":415')
+      && str_contains($contents, 'Drawing save API: Your picture upload failed!')) {
+      $invalid_paint_logged = true;
+      break;
+    }
+  }
+  integration_test('drawing save API records non-capacity errors and preserves its response protocol', static function () use (
+    $invalid_paint_status, $invalid_paint_body, $temporary_before_invalid_paint,
+    $temporary_after_invalid_paint, $invalid_paint_logged
+  ): bool {
+    return $invalid_paint_status === 415
+      && str_starts_with($invalid_paint_body, "error\nYour picture upload failed!")
+      && $temporary_after_invalid_paint === $temporary_before_invalid_paint
+      && $invalid_paint_logged;
+  });
+
+  [$misskey_loopback_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [
+    'mode' => 'create_misskey_authrequesturl', 'misskey_server_radio' => 'direct',
+    'misskey_server_direct_input' => 'https://127.0.0.1',
+  ]);
+  [$misskey_metadata_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [
+    'mode' => 'create_misskey_authrequesturl', 'misskey_server_radio' => 'direct',
+    'misskey_server_direct_input' => 'https://169.254.169.254',
+  ]);
+  [$misskey_port_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [
+    'mode' => 'create_misskey_authrequesturl', 'misskey_server_radio' => 'direct',
+    'misskey_server_direct_input' => 'https://misskey.io:8443',
+  ]);
+  integration_test('Misskey direct server input rejects SSRF destinations', static function () use (
+    $misskey_loopback_status, $misskey_metadata_status, $misskey_port_status
+  ): bool {
+    return $misskey_loopback_status === 400
+      && $misskey_metadata_status === 400
+      && $misskey_port_status === 400;
   });
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
@@ -535,6 +723,19 @@ PHP;
       && urldecode((string)cookie_value($cookie_jar, 'name_c')) === $raw_trip_name;
   });
 
+  $subject_escape_probe = '<b>XSS</b>';
+  $subject_escape_stmt = $db->prepare('UPDATE board_log SET sub = :sub WHERE tid = :tid');
+  $subject_escape_stmt->execute([':sub' => $subject_escape_probe, ':tid' => (int)($row['tid'] ?? 0)]);
+  [$subject_escape_status, $subject_escape_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  $subject_escape_stmt->execute([':sub' => "Integration's subject", ':tid' => (int)($row['tid'] ?? 0)]);
+  integration_test('administration list escapes truncated post subjects', static function () use (
+    $subject_escape_status, $subject_escape_body
+  ): bool {
+    return $subject_escape_status === 200
+      && str_contains($subject_escape_body, '&lt;b&gt;XSS')
+      && !str_contains($subject_escape_body, '<b>XSS');
+  });
+
   $search_term = "user's {$marker}";
   [$search_status, $search_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
   integration_test('search finds the posted comment', static function () use ($search_status, $search_body, $marker): bool {
@@ -567,6 +768,54 @@ PHP;
   });
 
   $post_id = (int)($row['tid'] ?? 0);
+  $admin_password_probe_cookie_jar = $root . '/admin-password-probe-cookies.txt';
+  http_request($base_url . '?mode=pictmp', $admin_password_probe_cookie_jar);
+  $admin_password_probe_session_id = cookie_value($admin_password_probe_cookie_jar, 'noreita_session');
+  $admin_password_probe_token = $admin_password_probe_session_id === null
+    ? '' : hash('sha256', $admin_password_probe_session_id);
+  [$admin_password_edit_status] = http_request($base_url . '?mode=editexec', $admin_password_probe_cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Password probe', 'mail' => '', 'url' => '',
+    'sub' => 'Admin password probe', 'com' => "管理パスワード試行 {$marker}", 'pwd' => 'integration-admin-pass',
+    'sodane' => '0', 'token' => $admin_password_probe_token,
+  ]);
+  [$forged_admin_edit_status] = http_request($base_url . '?mode=editexec', $admin_password_probe_cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Forged administrator', 'mail' => '', 'url' => '',
+    'sub' => 'Forged administrator edit', 'com' => "管理者編集フラグの偽装 {$marker}", 'pwd' => 'integration-admin-pass',
+    'sodane' => '0', 'admin_edit' => '1', 'token' => $admin_password_probe_token,
+  ]);
+  [$admin_password_delete_status] = http_request($base_url . '?mode=del', $admin_password_probe_cookie_jar, [
+    'mode' => 'del', 'delno' => (string)$post_id, 'pwd' => 'integration-admin-pass',
+  ]);
+  [$admin_password_post_status] = http_request($base_url . '?mode=regist', $admin_password_probe_cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => '管理人', 'mail' => '', 'url' => '',
+    'sub' => 'Admin password post probe', 'com' => '管理パスワードでも https://example.com は許可されません',
+    'pwd' => 'integration-admin-pass', 'invz' => '0', 'img_w' => '0', 'img_h' => '0',
+    'sodane' => '0', 'nsfw' => '0', 'token' => $admin_password_probe_token,
+  ]);
+  $admin_password_post = $db->query(
+    "SELECT tid, a_name, admins FROM board_log WHERE sub = 'Admin password post probe' ORDER BY tid DESC LIMIT 1"
+  )->fetch(PDO::FETCH_ASSOC);
+  if (is_array($admin_password_post)) {
+    $db->exec('DELETE FROM board_log WHERE tid = ' . (int)$admin_password_post['tid']);
+  }
+  $after_admin_password_probes = $db->query(
+    'SELECT sub, com FROM board_log WHERE tid = ' . $post_id
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('general posting, edit, and delete never accept the administrator password', static function () use (
+    $admin_password_edit_status, $forged_admin_edit_status, $admin_password_delete_status,
+    $admin_password_post_status, $admin_password_post, $after_admin_password_probes, $marker
+  ): bool {
+    return $admin_password_edit_status === 403
+      && $forged_admin_edit_status === 403
+      && $admin_password_delete_status === 403
+      && $admin_password_post_status === 200
+      && is_array($admin_password_post)
+      && $admin_password_post['a_name'] === '管理人(ではない)'
+      && (int)$admin_password_post['admins'] === 0
+      && is_array($after_admin_password_probes)
+      && $after_admin_password_probes['sub'] === "Integration's subject"
+      && $after_admin_password_probes['com'] === "結合テスト user's {$marker}";
+  });
   [$owner_edit_form_status, $owner_edit_form_body] = http_request($base_url . '?mode=edit', $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$post_id, 'pwd' => 'delete-pass',
   ]);
@@ -628,7 +877,9 @@ PHP;
   ): bool {
     return $admin_detail_edit_status === 200
       && str_contains($admin_detail_edit_body, 'mode=editexec')
-      && str_contains($admin_detail_edit_body, 'name="e_no"');
+      && str_contains($admin_detail_edit_body, 'name="e_no"')
+      && str_contains($admin_detail_edit_body, 'name="admin_edit" value="1"')
+      && str_contains($admin_detail_edit_body, '管理者セッションで認証済み');
   });
 
   $password_hash_before_edit = (string)$db->query('SELECT pwd FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
@@ -658,8 +909,8 @@ PHP;
 
   [$admin_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Administrator', 'mail' => '', 'url' => '',
-    'sub' => "Administrator's edit", 'com' => "管理者編集 user's {$marker}", 'pwd' => 'integration-admin-pass',
-    'sodane' => '0', 'token' => $token,
+    'sub' => "Administrator's edit", 'com' => "管理者編集 user's {$marker}", 'pwd' => 'wrong-and-ignored',
+    'sodane' => '0', 'admin_edit' => '1', 'token' => $token,
   ]);
   $admin_edited = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
   integration_test('administrator can edit without replacing the post password', static function () use ($admin_edit_status, $admin_edited, $marker, $password_hash_before_edit): bool {

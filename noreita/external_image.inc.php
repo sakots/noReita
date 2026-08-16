@@ -1,10 +1,13 @@
 <?php
 // external_image.inc.php for noReita (C) sakots 2026 MIT License
 
-const EXTERNAL_IMAGE_INC_VER = 20260725;
+const EXTERNAL_IMAGE_INC_VER = 20260816;
 
 final class ExternalImageService {
   public const MAX_BYTES = 1024 * 1024;
+  public const MAX_URLS_PER_POST = 2;
+  public const MAX_FETCHES_PER_REQUEST = 3;
+  public const FAILURE_CACHE_TTL = 300;
   private const MAX_REDIRECTS = 5;
   private const THUMBNAIL_EXTENSIONS = ['avif', 'webp', 'jpg', 'png', 'gif'];
   private string $thumbnail_dir;
@@ -12,31 +15,48 @@ final class ExternalImageService {
   private int $thumbnail_width;
   private int $file_permission;
   private int $directory_permission;
+  private int $private_file_permission;
+  private int $max_urls_per_post;
+  private int $max_fetches_per_request;
+  private int $failure_cache_ttl;
+  private int $fetch_count = 0;
+  private bool $failure_cache_cleaned = false;
 
   public function __construct(
     string $thumbnail_dir,
     string $thumbnail_url = 'thumbnail/',
     int $thumbnail_width = 200,
     int $file_permission = 0600,
-    int $directory_permission = 0700
+    int $directory_permission = 0700,
+    int $private_file_permission = 0600,
+    int $max_urls_per_post = self::MAX_URLS_PER_POST,
+    int $max_fetches_per_request = self::MAX_FETCHES_PER_REQUEST,
+    int $failure_cache_ttl = self::FAILURE_CACHE_TTL
   ) {
     $this->thumbnail_dir = $thumbnail_dir;
     $this->thumbnail_url = $thumbnail_url;
     $this->thumbnail_width = $thumbnail_width;
     $this->file_permission = $file_permission;
     $this->directory_permission = $directory_permission;
+    $this->private_file_permission = $private_file_permission;
+    $this->max_urls_per_post = max(0, min(10, $max_urls_per_post));
+    $this->max_fetches_per_request = max(0, min(20, $max_fetches_per_request));
+    $this->failure_cache_ttl = max(1, min(86400, $failure_cache_ttl));
   }
 
   // 本文中の外部画像URLへ、キャッシュしたサムネイルを追加する。
   public function addThumbnailLinks(string $comment): string {
     preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+/i', $comment, $matches);
-    foreach (array_unique($matches[0]) as $url) {
-      if (preg_match('/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i', $url) !== 1) continue;
+    $image_urls = array_values(array_filter(
+      array_unique($matches[0]),
+      static fn(string $url): bool => preg_match('/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i', $url) === 1
+    ));
+    foreach (array_slice($image_urls, 0, $this->max_urls_per_post) as $url) {
 
       $thumbnail_base = rtrim($this->thumbnail_dir, '/\\') . DIRECTORY_SEPARATOR . md5($url) . '_thumb';
       $thumbnail_path = $this->findThumbnail($thumbnail_base);
       if ($thumbnail_path === null) {
-        $thumbnail_path = $this->createThumbnail($url, $thumbnail_base);
+        $thumbnail_path = $this->createThumbnailWithinLimits($url, $thumbnail_base);
       }
       if ($thumbnail_path === null) continue;
 
@@ -50,6 +70,89 @@ final class ExternalImageService {
       $comment = str_replace($url, $replacement, $comment);
     }
     return $comment;
+  }
+
+  private function createThumbnailWithinLimits(string $url, string $thumbnail_base): ?string {
+    if ($this->fetch_count >= $this->max_fetches_per_request) return null;
+    if (!$this->prepareFailureCacheDirectory()) return null;
+    $this->cleanupExpiredFailureCache();
+
+    $failure_path = $this->failureCachePath($url);
+    if ($this->hasFreshFailure($failure_path)) return null;
+
+    // 複数のPHPリクエストが同時に外部取得しないようにし、ロック待ちはしない。
+    $lock_path = $this->failureCacheDirectory() . DIRECTORY_SEPARATOR . 'fetch.lock.dat';
+    $lock_handle = @fopen($lock_path, 'c+b');
+    if ($lock_handle === false) return null;
+    @chmod($lock_path, $this->private_file_permission);
+    if (!flock($lock_handle, LOCK_EX | LOCK_NB)) {
+      fclose($lock_handle);
+      return null;
+    }
+
+    try {
+      $existing = $this->findThumbnail($thumbnail_base);
+      if ($existing !== null) return $existing;
+      if ($this->hasFreshFailure($failure_path)
+        || $this->fetch_count >= $this->max_fetches_per_request) return null;
+
+      $this->fetch_count++;
+      $thumbnail_path = $this->createThumbnail($url, $thumbnail_base);
+      if ($thumbnail_path === null) {
+        if (@file_put_contents($failure_path, (string)time(), LOCK_EX) !== false) {
+          @chmod($failure_path, $this->private_file_permission);
+        }
+        return null;
+      }
+      @unlink($failure_path);
+      return $thumbnail_path;
+    } finally {
+      flock($lock_handle, LOCK_UN);
+      fclose($lock_handle);
+    }
+  }
+
+  private function failureCacheDirectory(): string {
+    return rtrim($this->thumbnail_dir, '/\\') . DIRECTORY_SEPARATOR . '.external-image-failures';
+  }
+
+  private function failureCachePath(string $url): string {
+    return $this->failureCacheDirectory() . DIRECTORY_SEPARATOR . hash('sha256', $url) . '.failure.dat';
+  }
+
+  private function prepareFailureCacheDirectory(): bool {
+    $directory = $this->failureCacheDirectory();
+    return is_dir($directory)
+      || @mkdir($directory, $this->directory_permission, true)
+      || is_dir($directory);
+  }
+
+  private function hasFreshFailure(string $path): bool {
+    if (!is_file($path)) return false;
+    $modified = @filemtime($path);
+    if (is_int($modified) && $modified >= time() - $this->failure_cache_ttl) return true;
+    @unlink($path);
+    return false;
+  }
+
+  // 専用ディレクトリだけを最大100件まで走査し、期限切れ失敗キャッシュを整理する。
+  private function cleanupExpiredFailureCache(): void {
+    if ($this->failure_cache_cleaned) return;
+    $this->failure_cache_cleaned = true;
+    try {
+      $checked = 0;
+      foreach (new DirectoryIterator($this->failureCacheDirectory()) as $file) {
+        if ($checked >= 100) break;
+        if ($file->isDot() || !$file->isFile()
+          || !str_ends_with($file->getFilename(), '.failure.dat')) continue;
+        $checked++;
+        if ($file->getMTime() < time() - $this->failure_cache_ttl) {
+          @unlink($file->getPathname());
+        }
+      }
+    } catch (Throwable $e) {
+      // キャッシュ整理の失敗で通常表示を停止しない。
+    }
   }
 
   private function findThumbnail(string $thumbnail_base): ?string {
@@ -160,7 +263,7 @@ final class ExternalImageService {
       $curl = curl_init();
       curl_setopt_array($curl, [
         CURLOPT_URL => $url, CURLOPT_RETURNTRANSFER => false, CURLOPT_FOLLOWLOCATION => false,
-        CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 10, CURLOPT_USERAGENT => 'noReita/1.0',
+        CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_TIMEOUT => 5, CURLOPT_USERAGENT => 'noReita/1.0',
         CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
         CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
         CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
@@ -211,6 +314,7 @@ function external_image_service(): ExternalImageService {
       200,
       Config::int('permissions.public_file'),
       Config::int('permissions.public_directory'),
+      Config::int('permissions.private_file'),
     );
   }
   return $service;

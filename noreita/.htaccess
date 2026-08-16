@@ -6,8 +6,15 @@
   </IfModule>
 </FilesMatch>
 
-# 設定、DB、ログ、メタデータをHTTPから保護する。
-<FilesMatch "(?i)(^config(?:\.[a-z0-9_-]+)*\.php$|\.(?:ini|log|dat|json|db)$)">
+# PHPがmultipart本文を一時ファイルへ展開する前に、リクエスト全体を32MiBで拒否する。
+<IfModule mod_core.c>
+  LimitRequestBody 33554432
+</IfModule>
+
+# 設定、そのバックアップ、DB、ログ、メタデータをHTTPから保護する。
+# SQLiteのWAL・共有メモリ・ロールバックジャーナルも対象に含める。
+# config.php.bak、config.local.php.old、config.local.php~なども拒否する。
+<FilesMatch "(?i)(^config(?:\..+)?$|\.(?:ini|log|dat|json|db(?:-(?:wal|shm|journal))?)$)">
   # Apache 2.4以降
   <IfModule mod_authz_core.c>
     Require all denied

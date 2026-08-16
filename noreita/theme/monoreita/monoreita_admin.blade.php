@@ -183,7 +183,7 @@
                 <td><a href="{{$self}}?mode=admin_post&amp;id={{$bbsline['tid']}}">{{$bbsline['tid']}}</a></td>
                 <td>{{$bbsline['a_name']}}</td>
                 <td>{{$bbsline['modified']}}</td>
-                <td>{!! mb_substr($bbsline['sub'], 0, 6) !!}</td>
+                <td>{{ mb_substr($bbsline['sub'], 0, 6) }}</td>
                 <td>
                   @if ($bbsline['picfile'] == true)
                     <a href="{{$path}}{{$bbsline['picfile']}}" target="_brank">{{$bbsline['picfile']}}</a>
@@ -206,7 +206,7 @@
                     <td>└<a href="{{$self}}?mode=admin_post&amp;id={{$res['tid']}}">{{$res['tid']}}</a></td>
                     <td>{{$res['a_name']}}</td>
                     <td>{{$res['modified']}}</td>
-                    <td>{!! mb_substr($res['sub'], 0, 6) !!}</td>
+                    <td>{{ mb_substr($res['sub'], 0, 6) }}</td>
                     <td>
                       @if ($res['picfile'] == true)
                         <a href="{{$path}}{{$res['picfile']}}" target="_brank">{{$res['picfile']}}</a>

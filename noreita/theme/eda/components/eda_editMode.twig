@@ -24,6 +24,9 @@
             <input type="hidden" name="sodane" value="0">
             <input type="hidden" name="nsfw" value="0">
             <input type="hidden" name="e_no" value="{{ bbsline['tid'] }}">
+            {% if bbsline['admin_edit'] ?? false %}
+            <input type="hidden" name="admin_edit" value="1">
+            {% endif %}
             {% if token != null %}
             <input type="hidden" name="token" value="{{ token }}">
             {% else %}
@@ -62,7 +65,13 @@
           {% endif %}
           <tr>
             <td>pass</td>
-            <td><input type="password" name="pwd" size="8" value="{{ bbsline['input_password'] ?? pwd_cookie }}" autocomplete="section-edit current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};"></td>
+            <td>
+              {% if bbsline['admin_edit'] ?? false %}
+              <input type="hidden" name="pwd" value="">管理者セッションで認証済み
+              {% else %}
+              <input type="password" name="pwd" size="8" value="{{ bbsline['input_password'] ?? pwd_cookie }}" autocomplete="section-edit current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};">
+              {% endif %}
+            </td>
           </tr>
           <tr>
             <td><input type="submit" name="send" id="send" value="書き込む"></td>

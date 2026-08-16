@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.1.1 lot.260815.0';
+const REITA_VER = 'v4.1.2 lot.260817.0';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -23,7 +23,7 @@ if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
 }
 
 // 公開画面へのPHPエラー詳細表示を止め、非公開ログへ記録する。
-if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260811) {
+if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260817) {
   die($en ? 'Please update the error handler.' : 'エラーハンドラーを最新版に更新してください。');
 }
 
@@ -37,7 +37,7 @@ if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260726) 
 // request_info.inc
 check_file(__DIR__.'/request_info.inc.php');
 require_once(__DIR__.'/request_info.inc.php');
-if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
+if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
   die($en ? 'Please update request_info.inc.php to the latest version.' : 'request_info.inc.phpを最新版に更新してください。');
 }
 
@@ -76,24 +76,31 @@ if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
   die($en ? 'Please update share.inc.php to the latest version.' : 'share.inc.phpを最新版に更新してください。');
 }
 
+// misskey_security.inc
+check_file(__DIR__.'/misskey_security.inc.php');
+require_once(__DIR__.'/misskey_security.inc.php');
+if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20260816) {
+  die($en ? 'Please update misskey_security.inc.php to the latest version.' : 'misskey_security.inc.phpを最新版に更新してください。');
+}
+
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260728) {
+if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260817) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
 check_file(__DIR__.'/connect_misskey_api.php');
 require_once(__DIR__.'/connect_misskey_api.php');
-if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260806) {
+if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260817) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
 // save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
-if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260809) {
+if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260817) {
   die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
@@ -107,7 +114,7 @@ if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260807) {
 // external_image.inc
 check_file(__DIR__.'/external_image.inc.php');
 require_once(__DIR__.'/external_image.inc.php');
-if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260725) {
+if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260816) {
   error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
 }
 
@@ -445,7 +452,7 @@ function init(): void {
     $initializer->migrateDatabase();
     $initializer->secureDatabaseFile();
     $recovery = (new PostService(
-      new BoardRepository(), '', __DIR__ . '/' . Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'),
+      new BoardRepository(), __DIR__ . '/' . Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'),
       __DIR__ . '/backup/delete-staging', __DIR__ . '/backup/delete-quarantine',
       Config::int('maintenance.delete_quarantine_days')
     ))->recoverInterruptedDeletions();
@@ -571,7 +578,13 @@ function regist(): void {
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
   try {
-    $rules = PostValidator::configuredRules($en, $req_method, $host, Config::array("spam.bad_hosts"), Config::string("admin.password"), (bool)Config::bool('features.require_comment'));
+    $is_administrator = AdminAuth::isAuthenticated(
+      Config::string('admin.password'), Config::int('admin.session_lifetime')
+    );
+    $rules = PostValidator::configuredRules(
+      $en, $req_method, $host, Config::array("spam.bad_hosts"), $is_administrator,
+      (bool)Config::bool('features.require_comment')
+    );
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
     error($e->getMessage(), $e->getCode() ?: 400);
@@ -591,7 +604,7 @@ function regist(): void {
   try {
     $repository = new BoardRepository();
     if (isset($_POST["send"])) {
-      $service = new PostService($repository, Config::string("admin.password"), Config::string('paths.images'));
+      $service = new PostService($repository, Config::string('paths.images'));
       if ($has_uploaded_file) {
         if (!is_array($uploaded_file)) {
           throw new ImageUploadException('Invalid uploaded file.', 400);
@@ -609,6 +622,7 @@ function regist(): void {
         $prepared_post = $service->prepareNewPost($input, $host, [
           'default_name' => Config::string('board.default_name'), 'default_comment' => Config::string('board.default_comment'), 'default_subject' => Config::string('board.default_subject'),
           'admin_name' => Config::string("admin.name"), 'admin_cap' => Config::string('admin.cap'),
+          'is_admin' => $is_administrator,
         ]);
       } catch (DuplicatePostException $e) {
         if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
@@ -1144,7 +1158,9 @@ function res(): void {
         $bbsline['com'] = auto_link($bbsline['com']);
       }
       //画像URLにサムネイルを追加
-      $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
+      if (Config::bool('features.external_image_thumbnail')) {
+        $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
+      }
       //ハッシュタグ
       if (Config::bool('features.hashtag')) {
         $bbsline['com'] = hashtag_link($bbsline['com']);
@@ -1676,15 +1692,13 @@ function delmode(): void {
     if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
       error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
     }
-    $p_pwd = Config::string("admin.password");
+    $p_pwd = '';
   }
 
   try {
-    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
-    $result = $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
-    $dat['message'] = $result === 'hidden'
-      ? ($en ? 'Post hidden.' : '非表示にしました。')
-      : ($en ? 'Successfully deleted.' : '削除しました。');
+    $service = new PostService(new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
+    $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
+    $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
   } catch (PostNotFoundException $e) {
     error($en ? 'That post does not exist.' : 'そんな記事ない気がします。', 404);
     return;
@@ -1804,7 +1818,7 @@ function picreplace(): void {
 }
 
 //編集モードくん入口
-function editform(?int $authorized_post_id = null, ?string $authorized_password = null): void {
+function editform(?int $authorized_post_id = null, ?string $authorized_password = null, bool $authorized_as_admin = false): void {
   global $template_engine, $dat;
   global $en;
 
@@ -1826,8 +1840,12 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
 
   //記事呼び出し
   try {
-    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'));
-    $authorization = $service->authorize((int)$edit_no, (string)$post_pwd);
+    if ($authorized_as_admin
+      && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
+      error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    }
+    $service = new PostService(new BoardRepository(), Config::string('paths.images'));
+    $authorization = $service->authorize((int)$edit_no, (string)$post_pwd, $authorized_as_admin);
     $msg = $authorization['post'];
     if ($authorization['role'] === 'owner') {
       $dat['message'] = $en ? 'Editing mode...' : '編集モード...';
@@ -1841,7 +1859,8 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     // 別投稿で保存されたCookieのパスワードでは、画像だけ更新され本文編集が失敗し得る。
     $msg['input_password'] = $authorization['role'] === 'owner'
       ? (string)$post_pwd
-      : (string)($dat['pwd_cookie'] ?? '');
+      : '';
+    $msg['admin_edit'] = $authorization['role'] === 'admin';
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
@@ -1882,11 +1901,18 @@ function editexec(): void {
   $pwd = $input['pwd'];
   $sodane = $input['sodane'];
   $edit_nsfw = Config::bool('features.nsfw') && $input['nsfw_flag'] === '1';
+  $edit_as_admin = filter_input_data('POST', 'admin_edit') === '1';
+  if ($edit_as_admin
+    && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
+    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
 
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
   try {
-    $rules = PostValidator::configuredRules($en, $req_method, $host, Config::array("spam.bad_hosts"), Config::string("admin.password"), true);
+    $rules = PostValidator::configuredRules(
+      $en, $req_method, $host, Config::array("spam.bad_hosts"), $edit_as_admin, true
+    );
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
     error($e->getMessage(), $e->getCode() ?: 400);
@@ -1895,11 +1921,11 @@ function editexec(): void {
   //↑セキュリティ関連ここまで
 
   try {
-    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
+    $service = new PostService(new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
     $edit_role = $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
-    ]);
+    ], $edit_as_admin);
     if ($edit_role === 'admin') {
       ApplicationErrorHandler::reportAdminAudit('post-edit', ['posts' => 1]);
     }
@@ -1947,8 +1973,8 @@ function admin_login(): void {
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
-  $client_ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP);
-  $client_ip = is_string($client_ip) ? $client_ip : 'unknown';
+  $client_ip = RequestInfo::clientIp();
+  $client_ip = $client_ip !== '' ? $client_ip : 'unknown';
   $limiter = new AdminLoginRateLimiter(
     __DIR__ . '/session',
     Config::string("admin.password"),
@@ -2032,7 +2058,7 @@ function admin_manage(?string $forced_operation = null): void {
   try {
     /** @var AdminPostManagementService $service */
     $service = new PostService(
-      new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file')
+      new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file')
     );
     if ($operation === 'delete') {
       $count = $service->deleteManyAsAdmin($selected);
@@ -2374,7 +2400,7 @@ function admin_post(): void {
 
 function admin_edit(): void {
   require_admin_session();
-  editform(admin_post_id(), Config::string("admin.password"));
+  editform(admin_post_id(), '', true);
 }
 
 //管理モード

@@ -25,15 +25,29 @@ composer install --working-dir=noreita --no-dev --prefer-dist
 
 `.htaccess`が有効なApacheまたはApache互換サーバーを想定しています。
 
-ルートの`.htaccess`は`config.php`、`config.local.php`、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
+ルートの`.htaccess`は`config.php`、`config.local.php`に加え、`config.local.php.bak`、`config.php.old`、`config.local.php~`など`config`から始まる設定バックアップ名、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
 
 FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後にルート、`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`の各`.htaccess`が存在することを確認してください。これらを削除したり、非公開ファイルだけを別の公開ディレクトリへ移動したりしないでください。
 
 `.htaccess`が禁止されているサーバーでは、サーバー管理画面またはApache本体の設定で設定ファイル、DB、`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`へのアクセスを拒否する必要があります。特に`tmp/`は一時画像を直接公開してはいけません。
 
+## リバースプロキシ経由の接続元IP
+
+既定では、接続元IPの判定にWebサーバーが設定した`REMOTE_ADDR`だけを使用し、利用者が送信できる`X-Forwarded-For`と`Client-IP`は信頼しません。通常のレンタルサーバーでは設定変更は不要です。
+
+CDNやリバースプロキシを自分で構成し、Webサーバーから見た`REMOTE_ADDR`が常にそのプロキシになる場合だけ、直近のプロキシIPまたはCIDRを`config.local.php`へ指定します。利用者側のIP範囲を指定してはいけません。
+
+```php
+'security' => [
+  'trusted_proxies' => ['192.0.2.10', '2001:db8:1234::/48'],
+],
+```
+
+信頼済みプロキシから接続された場合に限り`X-Forwarded-For`を右から検証し、信頼済みプロキシ群の手前にある最初のIPを接続元として扱います。不正な値が1つでも含まれる場合はヘッダー全体を無視します。非標準の`Client-IP`は設定の有無にかかわらず使用しません。
+
 ## nginxを使う場合のDB・設定ファイル保護
 
-nginxは`.htaccess`を使用しません。`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`、データベース、`config.php`、`config.local.php`へのアクセス拒否をnginx側で設定する必要があります。
+nginxは`.htaccess`を使用しません。`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`、データベース、`config.php`、`config.local.php`とそのバックアップ名へのアクセス拒否をnginx側で設定する必要があります。
 
 ## 必要な書き込み権限
 
@@ -52,3 +66,19 @@ v3.7.0以前の`config.php`にあった`0606`と`0707`は安全な初期値で�
 ## GDが対応する画像形式
 
 ## PHPのアップロード容量・メモリ上限の目安
+
+お絵描き保存APIは、PNG画像を既定10MiB、動画・PSDなどの作業データを既定20MiB、multipartリクエスト全体を32MiBまで受け付けます。上限は`config.local.php`の次の項目で、32MiB以下の範囲に調整できます。
+
+```php
+'limits' => [
+  'paint_image_kb' => 10240,
+  'paint_work_kb' => 20480,
+  'paint_request_kb' => 32768,
+],
+```
+
+アプリは`Content-Length`、PHPが解析した実ファイル容量、POSTデータとの合計、PNGの幅・高さを段階的に検証し、超過時はHTTP 413を返します。ルート`.htaccess`にも`LimitRequestBody 33554432`を設定し、ApacheではPHPがmultipartデータを一時ファイルへ展開する前に32MiBを超える要求を拒否します。
+
+PHP側は`upload_max_filesize = 20M`以上、`post_max_size = 32M`以上を目安にしてください。PHP側の値を小さくした場合は、その値が実際の上限になります。nginxでは`.htaccess`が効かないため、同等の上限として`client_max_body_size 32m;`を設定してください。
+
+サーバーのメモリ上限は、GDがPNGを展開する領域も考慮して設定してください。保存APIは設定されたキャンバス最大幅・高さに加えて、2,000万画素を超えるPNGを拒否します。

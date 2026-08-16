@@ -46,6 +46,11 @@ return [
   'limits' => [
     // 直接アップロードする画像の容量、幅、高さの上限です。
     'upload_kb' => 10000,
+    // お絵描き保存APIのPNG、作業データ、リクエスト全体の上限です（KB）。
+    // いずれもルート.htaccessの上限に合わせて32768以下にしてください。
+    'paint_image_kb' => 10240,
+    'paint_work_kb' => 20480,
+    'paint_request_kb' => 32768,
     'image_width' => 4000,
     'image_height' => 4000,
   ],
@@ -61,6 +66,10 @@ return [
 
     // 同一ドメインに複数のnoReitaを設置する場合は、設置ごとに異なる名前にします。
     'session_name' => 'noreita_session',
+
+    // リバースプロキシ配下の場合だけ、その直近のプロキシIPまたはCIDRを指定します。
+    // 未設定時はX-Forwarded-ForとClient-IPを信頼しません。
+    'trusted_proxies' => [],
   ],
 
 ];

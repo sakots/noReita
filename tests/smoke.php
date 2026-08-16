@@ -20,6 +20,7 @@ require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/error_handler.inc.php';
 require_once dirname(__DIR__) . '/noreita/request_security.inc.php';
 require_once dirname(__DIR__) . '/noreita/request_info.inc.php';
+require_once dirname(__DIR__) . '/noreita/save.inc.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/external_image.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
@@ -28,6 +29,7 @@ require_once dirname(__DIR__) . '/noreita/theme/eda/theme_settings.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 require_once dirname(__DIR__) . '/noreita/share.inc.php';
+require_once dirname(__DIR__) . '/noreita/misskey_security.inc.php';
 require_once dirname(__DIR__) . '/noreita/template_engine.inc.php';
 require_once dirname(__DIR__) . '/noreita/theme_manifest.inc.php';
 require_once dirname(__DIR__) . '/plugins/check-image-consistency.php';
@@ -122,6 +124,14 @@ smoke_test('eda Twig theme templates compile', static function (): bool {
   }
 });
 
+smoke_test('administration templates escape post subjects', static function (): bool {
+  $eda = file_get_contents(dirname(__DIR__) . '/noreita/theme/eda/eda_admin.twig');
+  $monoreita = file_get_contents(dirname(__DIR__) . '/noreita/theme/monoreita/monoreita_admin.blade.php');
+  if (!is_string($eda) || !is_string($monoreita)) return false;
+  return !preg_match('/mb_substr\\([^\\n]+\\[\'sub\'\\][^\\n]+\\)\\|raw/', $eda)
+    && !preg_match('/\\{!!\\s*mb_substr\\([^\\n]+\\[\'sub\'\\][^\\n]+\\)\\s*!!\\}/', $monoreita);
+});
+
 smoke_test('theme manifests and diagnostics detect theme integrity problems', static function (): bool {
   $eda = dirname(__DIR__) . '/noreita/theme/eda';
   $manifest = ThemeManifest::load($eda);
@@ -159,6 +169,7 @@ smoke_test('configuration overrides defaults and replaces list values', static f
       'diary_allow_public_replies' => false,
     ],
     'social' => ['servers' => [['Local', 'https://social.example']]],
+    'security' => ['trusted_proxies' => ['192.0.2.10', '2001:db8:1234::/48']],
   ]);
   return $resolved['admin']['name'] === '管理人'
     && $resolved['admin']['login']['max_failures'] === 9
@@ -166,6 +177,7 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['features']['image_upload'] === false
     && $resolved['features']['diary_mode'] === true
     && $resolved['features']['diary_allow_public_replies'] === false
+    && $resolved['security']['trusted_proxies'] === ['192.0.2.10', '2001:db8:1234::/48']
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
 });
 
@@ -227,6 +239,11 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin', 'threads_per_page' => 101], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 0]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 201]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_request_kb' => 32769]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_image_kb' => 2048, 'paint_work_kb' => 4096, 'paint_request_kb' => 1024]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['not-an-ip']]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['0.0.0.0/0']]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['2001:db8::/129']]],
     ['admin' => ['password' => 'admin_pass'], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://example.com/noreita/']],
   ];
@@ -439,8 +456,10 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'mod_authz_core.c')
     || !str_contains($root_rule, 'Require all denied')
     || !str_contains($root_rule, 'Deny from all')
-    || !str_contains($root_rule, '^config(?:\\.[a-z0-9_-]+)*\\.php$')
-    || !str_contains($root_rule, 'json|db')
+    || !str_contains($root_rule, '^config(?:\\..+)?$')
+    || !str_contains($root_rule, 'config.local.php~')
+    || !str_contains($root_rule, 'json|db(?:-(?:wal|shm|journal))?')
+    || !str_contains($root_rule, 'LimitRequestBody 33554432')
     || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
     || preg_match('/<\\/files>/i', $root_rule) === 1
     || preg_match('/<files\\s+~/i', $root_rule) === 1) {
@@ -460,13 +479,107 @@ smoke_test('private files and directories ship Apache access denial rules', stat
   return true;
 });
 
-smoke_test('request client IP is resolved from supported sources', static function (): bool {
+smoke_test('drawing save requests enforce file and aggregate capacity limits', static function (): bool {
+  PaintSaveRequestGuard::assertWithinLimits(
+    ['CONTENT_LENGTH' => '1800'],
+    ['tool' => 'neo', 'header' => 'stime=1'],
+    ['picture' => ['error' => UPLOAD_ERR_OK, 'size' => 900, 'tmp_name' => '']],
+    'neo',
+    1000,
+    2000,
+    3000
+  );
+
+  $rejected = static function (callable $request, int $expected_status): bool {
+    try {
+      $request();
+      return false;
+    } catch (PaintSaveCapacityException $e) {
+      return $e->getCode() === $expected_status;
+    }
+  };
+
+  return $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      ['CONTENT_LENGTH' => '3001'], [], [], 'neo', 1000, 2000, 3000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      [], [], ['picture' => ['error' => UPLOAD_ERR_OK, 'size' => 1001, 'tmp_name' => '']],
+      'neo', 1000, 2000, 3000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      [], [], [
+        'picture' => ['error' => UPLOAD_ERR_OK, 'size' => 900, 'tmp_name' => ''],
+        'pch' => ['error' => UPLOAD_ERR_OK, 'size' => 1500, 'tmp_name' => ''],
+      ], 'neo', 1000, 2000, 2000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      [], [], ['picture' => ['error' => UPLOAD_ERR_INI_SIZE, 'size' => 0, 'tmp_name' => '']],
+      'neo', 1000, 2000, 3000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      [], [], ['psd' => ['error' => UPLOAD_ERR_OK, 'size' => 1, 'tmp_name' => '']],
+      'neo', 1000, 2000, 3000
+    ), 400)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      ['CONTENT_LENGTH' => '100'], [], [], 'neo', 1000, 2000, 3000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertImageDimensions(
+      801, 600, 800, 800
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertImageDimensions(
+      5000, 5000, 10000, 10000
+    ), 413);
+});
+
+smoke_test('drawing and Misskey API errors use the centralized logging responder', static function (): bool {
+  $save = file_get_contents(dirname(__DIR__) . '/noreita/save.inc.php');
+  $misskey_note = file_get_contents(dirname(__DIR__) . '/noreita/misskey_note.inc.php');
+  $misskey_api = file_get_contents(dirname(__DIR__) . '/noreita/connect_misskey_api.php');
+  if (!is_string($save) || !is_string($misskey_note) || !is_string($misskey_api)) return false;
+  return str_contains($save, 'ApplicationErrorHandler::respondPlainError(')
+    && str_contains($misskey_api, 'ApplicationErrorHandler::respondPlainError(')
+    && !str_contains($misskey_api, "'Misskey upload source image was missing: ' . \$imagePath")
+    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $save)
+    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $misskey_note)
+    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $misskey_api);
+});
+
+smoke_test('request client IP only trusts forwarding headers from configured proxies', static function (): bool {
   return RequestInfo::clientIp(['REMOTE_ADDR' => '203.0.113.10']) === '203.0.113.10'
     && RequestInfo::clientIp([
-      'HTTP_X_FORWARDED_FOR' => 'invalid, 198.51.100.20, 203.0.113.20',
+      'HTTP_CLIENT_IP' => '198.51.100.10',
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.20',
       'REMOTE_ADDR' => '192.0.2.10',
-    ]) === '198.51.100.20'
-    && RequestInfo::clientIp(['HTTP_CLIENT_IP' => 'not-an-ip']) === '';
+    ]) === '192.0.2.10'
+    && RequestInfo::clientIp([
+      'HTTP_CLIENT_IP' => '198.51.100.10',
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.10']) === '198.51.100.20'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.20, 10.20.30.40, 192.0.2.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.0/24', '10.0.0.0/8']) === '198.51.100.20'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.99, 203.0.113.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.10']) === '203.0.113.20'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => 'invalid, 198.51.100.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.10']) === '192.0.2.10'
+    && RequestInfo::clientIp([
+      'HTTP_CLIENT_IP' => '198.51.100.10',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.10']) === '192.0.2.10'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => '2001:db8:ffff::20',
+      'REMOTE_ADDR' => '2001:db8:1234::10',
+    ], ['2001:db8:1234::/48']) === '2001:db8:ffff::20'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.20',
+      'REMOTE_ADDR' => 'invalid',
+    ], ['0.0.0.0/0']) === '';
 });
 
 smoke_test('administrator session validates password changes and idle timeout', static function (): bool {
@@ -930,7 +1043,7 @@ smoke_test('post validation is independent from HTTP rendering', static function
     'blocked_hosts' => [], 'require_name' => true, 'require_comment' => true,
     'require_subject' => true, 'max_comment' => 100, 'max_name' => 100,
     'max_email' => 100, 'max_subject' => 100, 'max_url' => 100,
-    'japanese_filter' => true, 'deny_comment_urls' => true, 'admin_pass' => 'admin',
+    'japanese_filter' => true, 'deny_comment_urls' => true, 'is_admin' => false,
     'bad_strings' => ['禁止語'], 'bad_names' => ['使用禁止名'],
     'bad_strings_a' => ['激安'], 'bad_strings_b' => ['ブランド'],
   ];
@@ -950,6 +1063,19 @@ smoke_test('post validation is independent from HTTP rendering', static function
       if ($e->getMessage() !== $expected) return false;
     }
   }
+  try {
+    PostValidator::validate(
+      array_merge($input, ['com' => 'https://example.com', 'pwd' => 'admin']),
+      array_merge($rules, ['japanese_filter' => false])
+    );
+    return false;
+  } catch (PostValidationException $e) {
+    if ($e->getMessage() !== 'コメントにはURLを含めることはできません。') return false;
+  }
+  PostValidator::validate(
+    array_merge($input, ['com' => 'https://example.com']),
+    array_merge($rules, ['japanese_filter' => false, 'is_admin' => true])
+  );
   return true;
 });
 
@@ -982,10 +1108,15 @@ smoke_test('post service centralizes edit and delete authorization', static func
     $hide_id = $insert('非表示対象', 'another-pass');
     $delete_id = $insert('削除対象', 'delete-pass', 'owner.png');
     file_put_contents($image_dir . DIRECTORY_SEPARATOR . 'owner.png', 'image');
-    $service = new PostService($repository, 'admin-pass', $image_dir);
+    $service = new PostService($repository, $image_dir);
 
     try {
       $service->edit($edit_id, 'wrong-pass', []);
+      return false;
+    } catch (PostAuthorizationException $e) {
+    }
+    try {
+      $service->edit($edit_id, 'admin-pass', []);
       return false;
     } catch (PostAuthorizationException $e) {
     }
@@ -995,8 +1126,11 @@ smoke_test('post service centralizes edit and delete authorization', static func
     ]);
     if (($repository->findPost($edit_id)['sub'] ?? '') !== '編集後') return false;
 
-    if ($service->delete($hide_id, 'admin-pass', false) !== 'hidden'
-      || (int)($repository->findPost($hide_id)['invz'] ?? 0) !== 1) return false;
+    try {
+      $service->delete($hide_id, 'admin-pass', false);
+      return false;
+    } catch (PostAuthorizationException $e) {
+    }
     if ($service->setVisibilityManyAsAdmin([$hide_id], false) !== 1
       || (int)($repository->findPost($hide_id)['invz'] ?? 1) !== 0
       || $service->setVisibilityManyAsAdmin([$hide_id, $hide_id], true) !== 1
@@ -1030,8 +1164,16 @@ smoke_test('post service centralizes edit and delete authorization', static func
     ];
     $settings = [
       'default_name' => '名無し', 'default_comment' => '本文なし', 'default_subject' => '無題',
-      'admin_name' => '管理者', 'admin_cap' => '(ではない)',
+      'admin_name' => '管理者', 'admin_cap' => '(ではない)', 'is_admin' => false,
     ];
+    $spoofed_admin = $service->prepareNewPost(array_merge($new_input, [
+      'name' => '管理者', 'com' => '管理者名の試行', 'pwd' => 'admin-pass',
+    ]), 'new.example.com', $settings);
+    if ($spoofed_admin['name'] !== '管理者(ではない)' || (int)$spoofed_admin['admins'] !== 0) return false;
+    $session_admin = $service->prepareNewPost(array_merge($new_input, [
+      'name' => '管理者', 'com' => '管理者セッションの投稿', 'pwd' => 'unrelated-post-pass',
+    ]), 'new.example.com', array_merge($settings, ['is_admin' => true]));
+    if ($session_admin['name'] !== '管理者' || (int)$session_admin['admins'] !== 1) return false;
     $prepared = $service->prepareNewPost($new_input, 'new.example.com', $settings);
     $new_id = $service->createPreparedPost($prepared, [
       'pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0, 'utime' => '',
@@ -1227,6 +1369,22 @@ smoke_test('external URL security boundaries', static function (): bool {
     && ExternalImageService::resolveRedirectUrl('https://example.com/a/b.png', "https://example.com/x\nInjected: yes") === false;
 });
 
+smoke_test('Misskey server URLs reject SSRF destinations', static function (): bool {
+  return MisskeyServerSecurity::resolvePublicIp('127.0.0.1') === false
+    && MisskeyServerSecurity::resolvePublicIp('169.254.169.254') === false
+    && MisskeyServerSecurity::resolvePublicIp('93.184.216.34') === '93.184.216.34'
+    && MisskeyServerSecurity::normalizeBaseUrl('https://127.0.0.1') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://169.254.169.254') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://localhost') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('http://misskey.io') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://user:pass@misskey.io') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://misskey.io:8443') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://misskey.io/api') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://misskey.io/?query=1') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://misskey.io/#fragment') === false
+    && MisskeyServerSecurity::curlOptions('https://127.0.0.1') === false;
+});
+
 smoke_test('cached external image thumbnail link', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
@@ -1240,6 +1398,52 @@ smoke_test('cached external image thumbnail link', static function (): bool {
       && str_contains($html, 'src="thumbnail/' . basename($thumbnail) . '"');
   } finally {
     if (is_file($thumbnail)) unlink($thumbnail);
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('external image thumbnails limit URLs and cache failures briefly', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_limits_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $cached_urls = [
+      'https://example.com/one.png',
+      'https://example.com/two.jpg',
+      'https://example.com/three.webp',
+    ];
+    foreach ($cached_urls as $url) {
+      file_put_contents($directory . DIRECTORY_SEPARATOR . md5($url) . '_thumb.jpg', 'cached');
+    }
+    $service = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 3, 300);
+    $html = $service->addThumbnailLinks(implode(' ', $cached_urls));
+    if (substr_count($html, 'src="thumbnail/') !== 2
+      || !str_contains($html, md5($cached_urls[0]) . '_thumb.jpg')
+      || !str_contains($html, md5($cached_urls[1]) . '_thumb.jpg')
+      || str_contains($html, md5($cached_urls[2]) . '_thumb.jpg')) return false;
+
+    $failed_urls = [
+      'http://127.0.0.1/blocked-one.png',
+      'http://127.0.0.1/blocked-two.png',
+      'http://127.0.0.1/blocked-three.png',
+    ];
+    $limited = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 1, 300);
+    $limited->addThumbnailLinks($failed_urls[0] . ' ' . $failed_urls[1]);
+    $failure_directory = $directory . DIRECTORY_SEPARATOR . '.external-image-failures';
+    if (count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) !== 1) return false;
+
+    // 既知の失敗は取得枠を消費せず、同一リクエスト内の次のURLを1件だけ試行できる。
+    $with_negative_cache = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 1, 300);
+    $with_negative_cache->addThumbnailLinks($failed_urls[0] . ' ' . $failed_urls[2]);
+    return count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) === 2;
+  } finally {
+    $failure_directory = $directory . DIRECTORY_SEPARATOR . '.external-image-failures';
+    foreach (glob($failure_directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($failure_directory)) rmdir($failure_directory);
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
     if (is_dir($directory)) rmdir($directory);
   }
 });
@@ -1314,7 +1518,7 @@ smoke_test('post deletion restores every related file when the database transact
       WHEN OLD.tid = 2 BEGIN SELECT RAISE(ABORT, 'forced deletion failure'); END");
 
     $service = new PostService(
-      new BoardRepository($db), 'admin-secret', $images, 100, 0600, $staging
+      new BoardRepository($db), $images, 100, 0600, $staging
     );
     $failed = false;
     try {
@@ -1363,7 +1567,7 @@ smoke_test('interrupted post deletions recover from manifests without touching a
     $db->exec('CREATE TABLE board_log (tid INTEGER PRIMARY KEY, picfile TEXT NOT NULL)');
     $insert = $db->prepare('INSERT INTO board_log VALUES (?, ?)');
     $service = new PostService(
-      new BoardRepository($db), 'admin-secret', $images, 100, 0600, $staging
+      new BoardRepository($db), $images, 100, 0600, $staging
     );
 
     foreach (['restore.png', 'restore.pch', 'restore_thumb_safe_test.webp'] as $file) {

@@ -19,14 +19,6 @@ function set_page_context_to_session(): void {
   $_SESSION['current_id'] = null;
 }
 
-//管理者パスワードを確認
-function is_admin_pass(string $pwd): bool {
-  global $second_pass;
-  $pwd=(string)$pwd;
-  $admin_pass = Config::string('admin.password');
-  return ($admin_pass && $pwd && $second_pass !== $admin_pass && $pwd === $admin_pass);
-}
-
 // 文字コード変換
 function charconvert(string $str): string {
   mb_language(Config::string('site.language'));
