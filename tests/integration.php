@@ -230,6 +230,9 @@ PHP;
     'config.php' => 'admin_pass',
     'config.local.php' => 'integration-admin-pass',
     'reita.db' => 'SQLite format',
+    'http-access-probe.db-wal' => 'sqlite-wal-secret',
+    'http-access-probe.db-shm' => 'sqlite-shm-secret',
+    'http-access-probe.db-journal' => 'sqlite-journal-secret',
     'theme/eda/theme_settings.db' => 'SQLite format',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
@@ -250,7 +253,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 9 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 12 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {

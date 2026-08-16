@@ -440,7 +440,7 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'Require all denied')
     || !str_contains($root_rule, 'Deny from all')
     || !str_contains($root_rule, '^config(?:\\.[a-z0-9_-]+)*\\.php$')
-    || !str_contains($root_rule, 'json|db')
+    || !str_contains($root_rule, 'json|db(?:-(?:wal|shm|journal))?')
     || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
     || preg_match('/<\\/files>/i', $root_rule) === 1
     || preg_match('/<files\\s+~/i', $root_rule) === 1) {
