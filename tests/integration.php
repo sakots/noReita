@@ -234,6 +234,7 @@ PHP;
     'http-access-probe.db-shm' => 'sqlite-shm-secret',
     'http-access-probe.db-journal' => 'sqlite-journal-secret',
     'theme/eda/theme_settings.db' => 'SQLite format',
+    'thumbnail/.external-image-failures/http-access-probe.failure.dat' => 'external-failure-secret',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
     'cache/http-access-probe.bladec' => 'blade-cache-secret',
@@ -242,6 +243,12 @@ PHP;
   ];
   foreach ($protected_probes as $relative_path => $secret) {
     $probe_path = $webroot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative_path);
+    $probe_directory = dirname($probe_path);
+    if (!is_dir($probe_directory)
+      && !mkdir($probe_directory, 0700, true)
+      && !is_dir($probe_directory)) {
+      throw new RuntimeException("Could not create protected HTTP probe directory: {$relative_path}");
+    }
     if (!is_file($probe_path) && file_put_contents($probe_path, $secret) === false) {
       throw new RuntimeException("Could not create protected HTTP probe: {$relative_path}");
     }
@@ -253,7 +260,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 12 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 13 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {

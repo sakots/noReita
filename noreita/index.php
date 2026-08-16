@@ -1151,7 +1151,9 @@ function res(): void {
         $bbsline['com'] = auto_link($bbsline['com']);
       }
       //画像URLにサムネイルを追加
-      $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
+      if (Config::bool('features.external_image_thumbnail')) {
+        $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
+      }
       //ハッシュタグ
       if (Config::bool('features.hashtag')) {
         $bbsline['com'] = hashtag_link($bbsline['com']);

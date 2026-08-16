@@ -1273,6 +1273,52 @@ smoke_test('cached external image thumbnail link', static function (): bool {
   }
 });
 
+smoke_test('external image thumbnails limit URLs and cache failures briefly', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_limits_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $cached_urls = [
+      'https://example.com/one.png',
+      'https://example.com/two.jpg',
+      'https://example.com/three.webp',
+    ];
+    foreach ($cached_urls as $url) {
+      file_put_contents($directory . DIRECTORY_SEPARATOR . md5($url) . '_thumb.jpg', 'cached');
+    }
+    $service = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 3, 300);
+    $html = $service->addThumbnailLinks(implode(' ', $cached_urls));
+    if (substr_count($html, 'src="thumbnail/') !== 2
+      || !str_contains($html, md5($cached_urls[0]) . '_thumb.jpg')
+      || !str_contains($html, md5($cached_urls[1]) . '_thumb.jpg')
+      || str_contains($html, md5($cached_urls[2]) . '_thumb.jpg')) return false;
+
+    $failed_urls = [
+      'http://127.0.0.1/blocked-one.png',
+      'http://127.0.0.1/blocked-two.png',
+      'http://127.0.0.1/blocked-three.png',
+    ];
+    $limited = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 1, 300);
+    $limited->addThumbnailLinks($failed_urls[0] . ' ' . $failed_urls[1]);
+    $failure_directory = $directory . DIRECTORY_SEPARATOR . '.external-image-failures';
+    if (count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) !== 1) return false;
+
+    // 既知の失敗は取得枠を消費せず、同一リクエスト内の次のURLを1件だけ試行できる。
+    $with_negative_cache = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 1, 300);
+    $with_negative_cache->addThumbnailLinks($failed_urls[0] . ' ' . $failed_urls[2]);
+    return count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) === 2;
+  } finally {
+    $failure_directory = $directory . DIRECTORY_SEPARATOR . '.external-image-failures';
+    foreach (glob($failure_directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($failure_directory)) rmdir($failure_directory);
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('GD thumbnail generation', static function (): bool {
   $input = tempnam(sys_get_temp_dir(), 'noreita_smoke_');
   if ($input === false) {
