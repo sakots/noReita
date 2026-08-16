@@ -264,6 +264,9 @@ PHP;
   $protected_probes = [
     'config.php' => 'admin_pass',
     'config.local.php' => 'integration-admin-pass',
+    'config.local.php.bak' => 'config-backup-secret',
+    'config.php.old' => 'old-config-secret',
+    'config.local.php~' => 'editor-config-backup-secret',
     'reita.db' => 'SQLite format',
     'http-access-probe.db-wal' => 'sqlite-wal-secret',
     'http-access-probe.db-shm' => 'sqlite-shm-secret',
@@ -295,7 +298,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 13 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 16 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
