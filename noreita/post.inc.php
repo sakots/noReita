@@ -21,7 +21,6 @@ interface AdminPostManagementService {
 
 final class PostService implements AdminPostManagementService {
   private BoardRepository $repository;
-  private string $admin_pass;
   private string $image_dir;
   private int $thumbnail_width;
   private int $file_permission;
@@ -31,7 +30,6 @@ final class PostService implements AdminPostManagementService {
 
   public function __construct(
     BoardRepository $repository,
-    string $admin_pass,
     string $image_dir,
     int $thumbnail_width = 0,
     int $file_permission = 0600,
@@ -40,7 +38,6 @@ final class PostService implements AdminPostManagementService {
     int $deletion_quarantine_retention_days = 30
   ) {
     $this->repository = $repository;
-    $this->admin_pass = $admin_pass;
     $this->image_dir = $image_dir;
     $this->thumbnail_width = $thumbnail_width;
     $this->file_permission = $file_permission;
@@ -53,20 +50,20 @@ final class PostService implements AdminPostManagementService {
     $this->deletion_quarantine_retention_days = max(1, min(3650, $deletion_quarantine_retention_days));
   }
 
-  public function authorize(int $post_id, string $password): array {
+  public function authorize(int $post_id, string $password, bool $authorize_as_admin = false): array {
     $post = $this->repository->findPost($post_id);
     if (empty($post)) throw new PostNotFoundException('Post was not found.');
+    if ($authorize_as_admin) {
+      return ['post' => $post, 'role' => 'admin'];
+    }
     if (password_verify($password, (string)$post['pwd'])) {
       return ['post' => $post, 'role' => 'owner'];
-    }
-    if ($this->admin_pass !== '' && hash_equals($this->admin_pass, $password)) {
-      return ['post' => $post, 'role' => 'admin'];
     }
     throw new PostAuthorizationException('Invalid password.');
   }
 
-  public function edit(int $post_id, string $password, array $values): string {
-    $authorization = $this->authorize($post_id, $password);
+  public function edit(int $post_id, string $password, array $values, bool $edit_as_admin = false): string {
+    $authorization = $this->authorize($post_id, $password, $edit_as_admin);
     $post = $authorization['post'];
     $submitted_name = (string)($values['name'] ?? '');
     $values['name'] = hash_equals((string)$post['a_name'], $submitted_name)
@@ -95,11 +92,7 @@ final class PostService implements AdminPostManagementService {
   }
 
   public function delete(int $post_id, string $password, bool $delete_as_admin): string {
-    $authorization = $this->authorize($post_id, $password);
-    if ($authorization['role'] === 'admin' && !$delete_as_admin) {
-      $this->repository->hidePost($post_id);
-      return 'hidden';
-    }
+    $authorization = $this->authorize($post_id, $password, $delete_as_admin);
     $with_replies = $authorization['role'] === 'admin';
     $posts = $this->repository->findPostsForDeletion($post_id, $with_replies);
     $this->deletePostsAtomically($posts, function () use ($post_id, $with_replies): void {
@@ -204,13 +197,14 @@ final class PostService implements AdminPostManagementService {
 
     $password = (string)($input['pwd'] ?? '');
     $admin_name = (string)$settings['admin_name'];
-    if ($name === $admin_name && $password !== $this->admin_pass) {
+    $is_admin = !empty($settings['is_admin']);
+    if ($name === $admin_name && !$is_admin) {
       $name .= (string)$settings['admin_cap'];
     }
     return array_merge($input, [
       'name' => $name, 'com' => $comment, 'sub' => $subject, 'host' => $host,
       'pwdh' => password_hash($password, PASSWORD_DEFAULT),
-      'admins' => ($password === $this->admin_pass && $name === $admin_name) ? 1 : 0,
+      'admins' => ($is_admin && $name === $admin_name) ? 1 : 0,
     ]);
   }
 
@@ -310,7 +304,7 @@ final class PostValidator {
     string $request_method,
     string $host,
     array $blocked_hosts,
-    string $admin_pass,
+    bool $is_admin,
     bool $require_comment
   ): array {
     return [
@@ -328,7 +322,7 @@ final class PostValidator {
       'max_url' => Config::int('limits.url_length'),
       'japanese_filter' => Config::bool('features.japanese_filter'),
       'deny_comment_urls' => Config::bool('features.deny_comment_urls'),
-      'admin_pass' => $admin_pass,
+      'is_admin' => $is_admin,
       'bad_strings' => Config::array('spam.bad_strings'),
       'bad_names' => Config::array('spam.bad_names'),
       'bad_strings_a' => Config::array('spam.bad_strings_a'),
@@ -375,7 +369,6 @@ final class PostValidator {
     $url = (string)($input['url'] ?? '');
     $sub = (string)($input['sub'] ?? '');
     $resto = (string)($input['resto'] ?? '');
-    $pwd = (string)($input['pwd'] ?? '');
     $values = [
       preg_replace('/\s/u', '', $com) ?? '', preg_replace('/\s/u', '', $sub) ?? '',
       preg_replace('/\s/u', '', $name) ?? '', preg_replace('/\s/u', '', $mail) ?? '',
@@ -384,7 +377,7 @@ final class PostValidator {
     if (!empty($rules['japanese_filter']) && $com !== '' && preg_match('/[ぁ-んァ-ヶー一-龠]+/u', $values[0]) !== 1) {
       throw new PostValidationException(self::message($en, 'Your comment must contain Japanese characters.', 'コメントには日本語を含めてください。'));
     }
-    if (!empty($rules['deny_comment_urls']) && $pwd !== (string)($rules['admin_pass'] ?? '')
+    if (!empty($rules['deny_comment_urls']) && empty($rules['is_admin'])
       && preg_match('/:\/\/|\.co|\.ly|\.gl|\.net|\.org|\.cc|\.ru|\.su|\.ua|\.gd/i', $com) === 1) {
       throw new PostValidationException(self::message($en, 'URLs are not allowed in comments.', 'コメントにはURLを含めることはできません。'));
     }

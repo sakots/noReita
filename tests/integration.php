@@ -570,6 +570,54 @@ PHP;
   });
 
   $post_id = (int)($row['tid'] ?? 0);
+  $admin_password_probe_cookie_jar = $root . '/admin-password-probe-cookies.txt';
+  http_request($base_url . '?mode=pictmp', $admin_password_probe_cookie_jar);
+  $admin_password_probe_session_id = cookie_value($admin_password_probe_cookie_jar, 'noreita_session');
+  $admin_password_probe_token = $admin_password_probe_session_id === null
+    ? '' : hash('sha256', $admin_password_probe_session_id);
+  [$admin_password_edit_status] = http_request($base_url . '?mode=editexec', $admin_password_probe_cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Password probe', 'mail' => '', 'url' => '',
+    'sub' => 'Admin password probe', 'com' => "管理パスワード試行 {$marker}", 'pwd' => 'integration-admin-pass',
+    'sodane' => '0', 'token' => $admin_password_probe_token,
+  ]);
+  [$forged_admin_edit_status] = http_request($base_url . '?mode=editexec', $admin_password_probe_cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Forged administrator', 'mail' => '', 'url' => '',
+    'sub' => 'Forged administrator edit', 'com' => "管理者編集フラグの偽装 {$marker}", 'pwd' => 'integration-admin-pass',
+    'sodane' => '0', 'admin_edit' => '1', 'token' => $admin_password_probe_token,
+  ]);
+  [$admin_password_delete_status] = http_request($base_url . '?mode=del', $admin_password_probe_cookie_jar, [
+    'mode' => 'del', 'delno' => (string)$post_id, 'pwd' => 'integration-admin-pass',
+  ]);
+  [$admin_password_post_status] = http_request($base_url . '?mode=regist', $admin_password_probe_cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => '管理人', 'mail' => '', 'url' => '',
+    'sub' => 'Admin password post probe', 'com' => '管理パスワードでも https://example.com は許可されません',
+    'pwd' => 'integration-admin-pass', 'invz' => '0', 'img_w' => '0', 'img_h' => '0',
+    'sodane' => '0', 'nsfw' => '0', 'token' => $admin_password_probe_token,
+  ]);
+  $admin_password_post = $db->query(
+    "SELECT tid, a_name, admins FROM board_log WHERE sub = 'Admin password post probe' ORDER BY tid DESC LIMIT 1"
+  )->fetch(PDO::FETCH_ASSOC);
+  if (is_array($admin_password_post)) {
+    $db->exec('DELETE FROM board_log WHERE tid = ' . (int)$admin_password_post['tid']);
+  }
+  $after_admin_password_probes = $db->query(
+    'SELECT sub, com FROM board_log WHERE tid = ' . $post_id
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('general posting, edit, and delete never accept the administrator password', static function () use (
+    $admin_password_edit_status, $forged_admin_edit_status, $admin_password_delete_status,
+    $admin_password_post_status, $admin_password_post, $after_admin_password_probes, $marker
+  ): bool {
+    return $admin_password_edit_status === 403
+      && $forged_admin_edit_status === 403
+      && $admin_password_delete_status === 403
+      && $admin_password_post_status === 200
+      && is_array($admin_password_post)
+      && $admin_password_post['a_name'] === '管理人(ではない)'
+      && (int)$admin_password_post['admins'] === 0
+      && is_array($after_admin_password_probes)
+      && $after_admin_password_probes['sub'] === "Integration's subject"
+      && $after_admin_password_probes['com'] === "結合テスト user's {$marker}";
+  });
   [$owner_edit_form_status, $owner_edit_form_body] = http_request($base_url . '?mode=edit', $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$post_id, 'pwd' => 'delete-pass',
   ]);
@@ -631,7 +679,9 @@ PHP;
   ): bool {
     return $admin_detail_edit_status === 200
       && str_contains($admin_detail_edit_body, 'mode=editexec')
-      && str_contains($admin_detail_edit_body, 'name="e_no"');
+      && str_contains($admin_detail_edit_body, 'name="e_no"')
+      && str_contains($admin_detail_edit_body, 'name="admin_edit" value="1"')
+      && str_contains($admin_detail_edit_body, '管理者セッションで認証済み');
   });
 
   $password_hash_before_edit = (string)$db->query('SELECT pwd FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
@@ -661,8 +711,8 @@ PHP;
 
   [$admin_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Administrator', 'mail' => '', 'url' => '',
-    'sub' => "Administrator's edit", 'com' => "管理者編集 user's {$marker}", 'pwd' => 'integration-admin-pass',
-    'sodane' => '0', 'token' => $token,
+    'sub' => "Administrator's edit", 'com' => "管理者編集 user's {$marker}", 'pwd' => 'wrong-and-ignored',
+    'sodane' => '0', 'admin_edit' => '1', 'token' => $token,
   ]);
   $admin_edited = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
   integration_test('administrator can edit without replacing the post password', static function () use ($admin_edit_status, $admin_edited, $marker, $password_hash_before_edit): bool {

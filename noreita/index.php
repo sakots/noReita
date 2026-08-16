@@ -445,7 +445,7 @@ function init(): void {
     $initializer->migrateDatabase();
     $initializer->secureDatabaseFile();
     $recovery = (new PostService(
-      new BoardRepository(), '', __DIR__ . '/' . Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'),
+      new BoardRepository(), __DIR__ . '/' . Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'),
       __DIR__ . '/backup/delete-staging', __DIR__ . '/backup/delete-quarantine',
       Config::int('maintenance.delete_quarantine_days')
     ))->recoverInterruptedDeletions();
@@ -571,7 +571,13 @@ function regist(): void {
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
   try {
-    $rules = PostValidator::configuredRules($en, $req_method, $host, Config::array("spam.bad_hosts"), Config::string("admin.password"), (bool)Config::bool('features.require_comment'));
+    $is_administrator = AdminAuth::isAuthenticated(
+      Config::string('admin.password'), Config::int('admin.session_lifetime')
+    );
+    $rules = PostValidator::configuredRules(
+      $en, $req_method, $host, Config::array("spam.bad_hosts"), $is_administrator,
+      (bool)Config::bool('features.require_comment')
+    );
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
     error($e->getMessage(), $e->getCode() ?: 400);
@@ -591,7 +597,7 @@ function regist(): void {
   try {
     $repository = new BoardRepository();
     if (isset($_POST["send"])) {
-      $service = new PostService($repository, Config::string("admin.password"), Config::string('paths.images'));
+      $service = new PostService($repository, Config::string('paths.images'));
       if ($has_uploaded_file) {
         if (!is_array($uploaded_file)) {
           throw new ImageUploadException('Invalid uploaded file.', 400);
@@ -609,6 +615,7 @@ function regist(): void {
         $prepared_post = $service->prepareNewPost($input, $host, [
           'default_name' => Config::string('board.default_name'), 'default_comment' => Config::string('board.default_comment'), 'default_subject' => Config::string('board.default_subject'),
           'admin_name' => Config::string("admin.name"), 'admin_cap' => Config::string('admin.cap'),
+          'is_admin' => $is_administrator,
         ]);
       } catch (DuplicatePostException $e) {
         if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
@@ -1676,15 +1683,13 @@ function delmode(): void {
     if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
       error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
     }
-    $p_pwd = Config::string("admin.password");
+    $p_pwd = '';
   }
 
   try {
-    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
-    $result = $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
-    $dat['message'] = $result === 'hidden'
-      ? ($en ? 'Post hidden.' : '非表示にしました。')
-      : ($en ? 'Successfully deleted.' : '削除しました。');
+    $service = new PostService(new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
+    $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
+    $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
   } catch (PostNotFoundException $e) {
     error($en ? 'That post does not exist.' : 'そんな記事ない気がします。', 404);
     return;
@@ -1804,7 +1809,7 @@ function picreplace(): void {
 }
 
 //編集モードくん入口
-function editform(?int $authorized_post_id = null, ?string $authorized_password = null): void {
+function editform(?int $authorized_post_id = null, ?string $authorized_password = null, bool $authorized_as_admin = false): void {
   global $template_engine, $dat;
   global $en;
 
@@ -1826,8 +1831,12 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
 
   //記事呼び出し
   try {
-    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'));
-    $authorization = $service->authorize((int)$edit_no, (string)$post_pwd);
+    if ($authorized_as_admin
+      && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
+      error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    }
+    $service = new PostService(new BoardRepository(), Config::string('paths.images'));
+    $authorization = $service->authorize((int)$edit_no, (string)$post_pwd, $authorized_as_admin);
     $msg = $authorization['post'];
     if ($authorization['role'] === 'owner') {
       $dat['message'] = $en ? 'Editing mode...' : '編集モード...';
@@ -1841,7 +1850,8 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     // 別投稿で保存されたCookieのパスワードでは、画像だけ更新され本文編集が失敗し得る。
     $msg['input_password'] = $authorization['role'] === 'owner'
       ? (string)$post_pwd
-      : (string)($dat['pwd_cookie'] ?? '');
+      : '';
+    $msg['admin_edit'] = $authorization['role'] === 'admin';
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
@@ -1882,11 +1892,18 @@ function editexec(): void {
   $pwd = $input['pwd'];
   $sodane = $input['sodane'];
   $edit_nsfw = Config::bool('features.nsfw') && $input['nsfw_flag'] === '1';
+  $edit_as_admin = filter_input_data('POST', 'admin_edit') === '1';
+  if ($edit_as_admin
+    && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
+    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+  }
 
   //ホスト取得
   $host = gethostbyaddr(RequestInfo::clientIp());
   try {
-    $rules = PostValidator::configuredRules($en, $req_method, $host, Config::array("spam.bad_hosts"), Config::string("admin.password"), true);
+    $rules = PostValidator::configuredRules(
+      $en, $req_method, $host, Config::array("spam.bad_hosts"), $edit_as_admin, true
+    );
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
     error($e->getMessage(), $e->getCode() ?: 400);
@@ -1895,11 +1912,11 @@ function editexec(): void {
   //↑セキュリティ関連ここまで
 
   try {
-    $service = new PostService(new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
+    $service = new PostService(new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
     $edit_role = $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
-    ]);
+    ], $edit_as_admin);
     if ($edit_role === 'admin') {
       ApplicationErrorHandler::reportAdminAudit('post-edit', ['posts' => 1]);
     }
@@ -2032,7 +2049,7 @@ function admin_manage(?string $forced_operation = null): void {
   try {
     /** @var AdminPostManagementService $service */
     $service = new PostService(
-      new BoardRepository(), Config::string("admin.password"), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file')
+      new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file')
     );
     if ($operation === 'delete') {
       $count = $service->deleteManyAsAdmin($selected);
@@ -2374,7 +2391,7 @@ function admin_post(): void {
 
 function admin_edit(): void {
   require_admin_session();
-  editform(admin_post_id(), Config::string("admin.password"));
+  editform(admin_post_id(), '', true);
 }
 
 //管理モード

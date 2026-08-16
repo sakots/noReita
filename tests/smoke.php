@@ -930,7 +930,7 @@ smoke_test('post validation is independent from HTTP rendering', static function
     'blocked_hosts' => [], 'require_name' => true, 'require_comment' => true,
     'require_subject' => true, 'max_comment' => 100, 'max_name' => 100,
     'max_email' => 100, 'max_subject' => 100, 'max_url' => 100,
-    'japanese_filter' => true, 'deny_comment_urls' => true, 'admin_pass' => 'admin',
+    'japanese_filter' => true, 'deny_comment_urls' => true, 'is_admin' => false,
     'bad_strings' => ['禁止語'], 'bad_names' => ['使用禁止名'],
     'bad_strings_a' => ['激安'], 'bad_strings_b' => ['ブランド'],
   ];
@@ -950,6 +950,19 @@ smoke_test('post validation is independent from HTTP rendering', static function
       if ($e->getMessage() !== $expected) return false;
     }
   }
+  try {
+    PostValidator::validate(
+      array_merge($input, ['com' => 'https://example.com', 'pwd' => 'admin']),
+      array_merge($rules, ['japanese_filter' => false])
+    );
+    return false;
+  } catch (PostValidationException $e) {
+    if ($e->getMessage() !== 'コメントにはURLを含めることはできません。') return false;
+  }
+  PostValidator::validate(
+    array_merge($input, ['com' => 'https://example.com']),
+    array_merge($rules, ['japanese_filter' => false, 'is_admin' => true])
+  );
   return true;
 });
 
@@ -982,10 +995,15 @@ smoke_test('post service centralizes edit and delete authorization', static func
     $hide_id = $insert('非表示対象', 'another-pass');
     $delete_id = $insert('削除対象', 'delete-pass', 'owner.png');
     file_put_contents($image_dir . DIRECTORY_SEPARATOR . 'owner.png', 'image');
-    $service = new PostService($repository, 'admin-pass', $image_dir);
+    $service = new PostService($repository, $image_dir);
 
     try {
       $service->edit($edit_id, 'wrong-pass', []);
+      return false;
+    } catch (PostAuthorizationException $e) {
+    }
+    try {
+      $service->edit($edit_id, 'admin-pass', []);
       return false;
     } catch (PostAuthorizationException $e) {
     }
@@ -995,8 +1013,11 @@ smoke_test('post service centralizes edit and delete authorization', static func
     ]);
     if (($repository->findPost($edit_id)['sub'] ?? '') !== '編集後') return false;
 
-    if ($service->delete($hide_id, 'admin-pass', false) !== 'hidden'
-      || (int)($repository->findPost($hide_id)['invz'] ?? 0) !== 1) return false;
+    try {
+      $service->delete($hide_id, 'admin-pass', false);
+      return false;
+    } catch (PostAuthorizationException $e) {
+    }
     if ($service->setVisibilityManyAsAdmin([$hide_id], false) !== 1
       || (int)($repository->findPost($hide_id)['invz'] ?? 1) !== 0
       || $service->setVisibilityManyAsAdmin([$hide_id, $hide_id], true) !== 1
@@ -1030,8 +1051,16 @@ smoke_test('post service centralizes edit and delete authorization', static func
     ];
     $settings = [
       'default_name' => '名無し', 'default_comment' => '本文なし', 'default_subject' => '無題',
-      'admin_name' => '管理者', 'admin_cap' => '(ではない)',
+      'admin_name' => '管理者', 'admin_cap' => '(ではない)', 'is_admin' => false,
     ];
+    $spoofed_admin = $service->prepareNewPost(array_merge($new_input, [
+      'name' => '管理者', 'com' => '管理者名の試行', 'pwd' => 'admin-pass',
+    ]), 'new.example.com', $settings);
+    if ($spoofed_admin['name'] !== '管理者(ではない)' || (int)$spoofed_admin['admins'] !== 0) return false;
+    $session_admin = $service->prepareNewPost(array_merge($new_input, [
+      'name' => '管理者', 'com' => '管理者セッションの投稿', 'pwd' => 'unrelated-post-pass',
+    ]), 'new.example.com', array_merge($settings, ['is_admin' => true]));
+    if ($session_admin['name'] !== '管理者' || (int)$session_admin['admins'] !== 1) return false;
     $prepared = $service->prepareNewPost($new_input, 'new.example.com', $settings);
     $new_id = $service->createPreparedPost($prepared, [
       'pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0, 'utime' => '',
@@ -1314,7 +1343,7 @@ smoke_test('post deletion restores every related file when the database transact
       WHEN OLD.tid = 2 BEGIN SELECT RAISE(ABORT, 'forced deletion failure'); END");
 
     $service = new PostService(
-      new BoardRepository($db), 'admin-secret', $images, 100, 0600, $staging
+      new BoardRepository($db), $images, 100, 0600, $staging
     );
     $failed = false;
     try {
@@ -1363,7 +1392,7 @@ smoke_test('interrupted post deletions recover from manifests without touching a
     $db->exec('CREATE TABLE board_log (tid INTEGER PRIMARY KEY, picfile TEXT NOT NULL)');
     $insert = $db->prepare('INSERT INTO board_log VALUES (?, ?)');
     $service = new PostService(
-      new BoardRepository($db), 'admin-secret', $images, 100, 0600, $staging
+      new BoardRepository($db), $images, 100, 0600, $staging
     );
 
     foreach (['restore.png', 'restore.pch', 'restore_thumb_safe_test.webp'] as $file) {
