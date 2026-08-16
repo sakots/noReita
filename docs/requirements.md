@@ -31,6 +31,20 @@ FTPソフトによっては、名前が`.`で始まるファイルを表示・�
 
 `.htaccess`が禁止されているサーバーでは、サーバー管理画面またはApache本体の設定で設定ファイル、DB、`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`へのアクセスを拒否する必要があります。特に`tmp/`は一時画像を直接公開してはいけません。
 
+## リバースプロキシ経由の接続元IP
+
+既定では、接続元IPの判定にWebサーバーが設定した`REMOTE_ADDR`だけを使用し、利用者が送信できる`X-Forwarded-For`と`Client-IP`は信頼しません。通常のレンタルサーバーでは設定変更は不要です。
+
+CDNやリバースプロキシを自分で構成し、Webサーバーから見た`REMOTE_ADDR`が常にそのプロキシになる場合だけ、直近のプロキシIPまたはCIDRを`config.local.php`へ指定します。利用者側のIP範囲を指定してはいけません。
+
+```php
+'security' => [
+  'trusted_proxies' => ['192.0.2.10', '2001:db8:1234::/48'],
+],
+```
+
+信頼済みプロキシから接続された場合に限り`X-Forwarded-For`を右から検証し、信頼済みプロキシ群の手前にある最初のIPを接続元として扱います。不正な値が1つでも含まれる場合はヘッダー全体を無視します。非標準の`Client-IP`は設定の有無にかかわらず使用しません。
+
 ## nginxを使う場合のDB・設定ファイル保護
 
 nginxは`.htaccess`を使用しません。`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`、データベース、`config.php`、`config.local.php`へのアクセス拒否をnginx側で設定する必要があります。

@@ -161,6 +161,7 @@ smoke_test('configuration overrides defaults and replaces list values', static f
       'diary_allow_public_replies' => false,
     ],
     'social' => ['servers' => [['Local', 'https://social.example']]],
+    'security' => ['trusted_proxies' => ['192.0.2.10', '2001:db8:1234::/48']],
   ]);
   return $resolved['admin']['name'] === '管理人'
     && $resolved['admin']['login']['max_failures'] === 9
@@ -168,6 +169,7 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['features']['image_upload'] === false
     && $resolved['features']['diary_mode'] === true
     && $resolved['features']['diary_allow_public_replies'] === false
+    && $resolved['security']['trusted_proxies'] === ['192.0.2.10', '2001:db8:1234::/48']
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
 });
 
@@ -231,6 +233,9 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 201]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_request_kb' => 32769]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_image_kb' => 2048, 'paint_work_kb' => 4096, 'paint_request_kb' => 1024]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['not-an-ip']]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['0.0.0.0/0']]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['2001:db8::/129']]],
     ['admin' => ['password' => 'admin_pass'], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://example.com/noreita/']],
   ];
@@ -517,13 +522,42 @@ smoke_test('drawing save requests enforce file and aggregate capacity limits', s
     ), 413);
 });
 
-smoke_test('request client IP is resolved from supported sources', static function (): bool {
+smoke_test('request client IP only trusts forwarding headers from configured proxies', static function (): bool {
   return RequestInfo::clientIp(['REMOTE_ADDR' => '203.0.113.10']) === '203.0.113.10'
     && RequestInfo::clientIp([
-      'HTTP_X_FORWARDED_FOR' => 'invalid, 198.51.100.20, 203.0.113.20',
+      'HTTP_CLIENT_IP' => '198.51.100.10',
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.20',
       'REMOTE_ADDR' => '192.0.2.10',
-    ]) === '198.51.100.20'
-    && RequestInfo::clientIp(['HTTP_CLIENT_IP' => 'not-an-ip']) === '';
+    ]) === '192.0.2.10'
+    && RequestInfo::clientIp([
+      'HTTP_CLIENT_IP' => '198.51.100.10',
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.10']) === '198.51.100.20'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.20, 10.20.30.40, 192.0.2.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.0/24', '10.0.0.0/8']) === '198.51.100.20'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.99, 203.0.113.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.10']) === '203.0.113.20'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => 'invalid, 198.51.100.20',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.10']) === '192.0.2.10'
+    && RequestInfo::clientIp([
+      'HTTP_CLIENT_IP' => '198.51.100.10',
+      'REMOTE_ADDR' => '192.0.2.10',
+    ], ['192.0.2.10']) === '192.0.2.10'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => '2001:db8:ffff::20',
+      'REMOTE_ADDR' => '2001:db8:1234::10',
+    ], ['2001:db8:1234::/48']) === '2001:db8:ffff::20'
+    && RequestInfo::clientIp([
+      'HTTP_X_FORWARDED_FOR' => '198.51.100.20',
+      'REMOTE_ADDR' => 'invalid',
+    ], ['0.0.0.0/0']) === '';
 });
 
 smoke_test('administrator session validates password changes and idle timeout', static function (): bool {

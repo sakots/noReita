@@ -86,7 +86,7 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
     CURLOPT_COOKIEFILE => $cookie_jar,
     CURLOPT_HTTPHEADER => [
       'Host: localhost', 'Origin: http://localhost',
-      'Client-IP: ' . $forwarded_for, 'X-Forwarded-For: ' . $forwarded_for,
+      'X-Forwarded-For: ' . $forwarded_for,
     ],
     CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$response_headers): int {
       $length = strlen($header);
@@ -167,6 +167,8 @@ return [
     'external_image_thumbnail' => false,
     'misskey_note' => false,
   ],
+  // The local HTTP server is the explicitly trusted reverse proxy for forwarded-IP tests.
+  'security' => ['trusted_proxies' => ['127.0.0.1']],
   'limits' => [
     'paint_image_kb' => 1,
     'paint_work_kb' => 1,

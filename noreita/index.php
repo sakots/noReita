@@ -37,7 +37,7 @@ if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260726) 
 // request_info.inc
 check_file(__DIR__.'/request_info.inc.php');
 require_once(__DIR__.'/request_info.inc.php');
-if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260718) {
+if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
   die($en ? 'Please update request_info.inc.php to the latest version.' : 'request_info.inc.phpを最新版に更新してください。');
 }
 
@@ -1973,8 +1973,8 @@ function admin_login(): void {
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
-  $client_ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP);
-  $client_ip = is_string($client_ip) ? $client_ip : 'unknown';
+  $client_ip = RequestInfo::clientIp();
+  $client_ip = $client_ip !== '' ? $client_ip : 'unknown';
   $limiter = new AdminLoginRateLimiter(
     __DIR__ . '/session',
     Config::string("admin.password"),

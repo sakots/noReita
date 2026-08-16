@@ -66,6 +66,10 @@ return [
 
     // 同一ドメインに複数のnoReitaを設置する場合は、設置ごとに異なる名前にします。
     'session_name' => 'noreita_session',
+
+    // リバースプロキシ配下の場合だけ、その直近のプロキシIPまたはCIDRを指定します。
+    // 未設定時はX-Forwarded-ForとClient-IPを信頼しません。
+    'trusted_proxies' => [],
   ],
 
 ];

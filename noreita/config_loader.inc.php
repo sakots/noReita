@@ -265,6 +265,7 @@ final class Config {
       self::validatePairs(self::valueAt($values, $key), $key, true);
     }
     self::validatePairs(self::valueAt($values, 'drawing.palettes'), 'drawing.palettes', false);
+    self::validateTrustedProxies(self::valueAt($values, 'security.trusted_proxies'));
     foreach (['spam.bad_strings', 'spam.bad_names', 'spam.bad_strings_a', 'spam.bad_strings_b',
       'spam.bad_files', 'spam.bad_hosts', 'board.additional_info'] as $key) {
       foreach (self::valueAt($values, $key) as $value) {
@@ -295,6 +296,35 @@ final class Config {
         }
       } else {
         self::validateRelativePath($pair[1], $key, false);
+      }
+    }
+  }
+
+  /** @param array<int,mixed> $proxies */
+  private static function validateTrustedProxies(array $proxies): void {
+    if (!self::isList($proxies)) {
+      throw new ConfigException('security.trusted_proxies must be a list.');
+    }
+    if (count($proxies) > 256) {
+      throw new ConfigException('security.trusted_proxies contains too many entries.');
+    }
+    foreach ($proxies as $proxy) {
+      if (!is_string($proxy) || $proxy === '' || trim($proxy) !== $proxy) {
+        throw new ConfigException('security.trusted_proxies must contain IP addresses or CIDR ranges.');
+      }
+      $parts = explode('/', $proxy, 2);
+      $packed = @inet_pton($parts[0]);
+      if ($packed === false) {
+        throw new ConfigException('security.trusted_proxies contains an invalid address.');
+      }
+      if (!isset($parts[1])) continue;
+      if (preg_match('/\A(?:0|[1-9][0-9]{0,2})\z/D', $parts[1]) !== 1) {
+        throw new ConfigException('security.trusted_proxies contains an invalid CIDR prefix.');
+      }
+      $prefix = (int)$parts[1];
+      $bits = strlen($packed) * 8;
+      if ($prefix < 1 || $prefix > $bits) {
+        throw new ConfigException('security.trusted_proxies contains an unsafe CIDR range.');
       }
     }
   }
