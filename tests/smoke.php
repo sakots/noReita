@@ -28,6 +28,7 @@ require_once dirname(__DIR__) . '/noreita/theme/eda/theme_settings.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
 require_once dirname(__DIR__) . '/noreita/post.inc.php';
 require_once dirname(__DIR__) . '/noreita/share.inc.php';
+require_once dirname(__DIR__) . '/noreita/misskey_security.inc.php';
 require_once dirname(__DIR__) . '/noreita/template_engine.inc.php';
 require_once dirname(__DIR__) . '/noreita/theme_manifest.inc.php';
 require_once dirname(__DIR__) . '/plugins/check-image-consistency.php';
@@ -1254,6 +1255,22 @@ smoke_test('external URL security boundaries', static function (): bool {
     && ExternalImageService::resolvePublicIp('::1') === false
     && ExternalImageService::resolveRedirectUrl('https://example.com/a/b.png', '../c.png') === 'https://example.com/c.png'
     && ExternalImageService::resolveRedirectUrl('https://example.com/a/b.png', "https://example.com/x\nInjected: yes") === false;
+});
+
+smoke_test('Misskey server URLs reject SSRF destinations', static function (): bool {
+  return MisskeyServerSecurity::resolvePublicIp('127.0.0.1') === false
+    && MisskeyServerSecurity::resolvePublicIp('169.254.169.254') === false
+    && MisskeyServerSecurity::resolvePublicIp('93.184.216.34') === '93.184.216.34'
+    && MisskeyServerSecurity::normalizeBaseUrl('https://127.0.0.1') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://169.254.169.254') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://localhost') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('http://misskey.io') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://user:pass@misskey.io') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://misskey.io:8443') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://misskey.io/api') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://misskey.io/?query=1') === false
+    && MisskeyServerSecurity::normalizeBaseUrl('https://misskey.io/#fragment') === false
+    && MisskeyServerSecurity::curlOptions('https://127.0.0.1') === false;
 });
 
 smoke_test('cached external image thumbnail link', static function (): bool {

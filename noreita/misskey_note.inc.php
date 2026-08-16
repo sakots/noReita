@@ -4,7 +4,7 @@
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
 
-const MISSKEY_NOTE_VER = 20260728; //misskey_note.inc.phpのバージョン
+const MISSKEY_NOTE_VER = 20260816; //misskey_note.inc.phpのバージョン
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -386,34 +386,35 @@ class misskey_note {
     // 直接入力欄の値
     $misskey_server_direct_input_value = filter_input_data('POST', "misskey_server_direct_input"); // フィルタリングしない生の値を取得
 
-    // セッションにセットする最終的なURLを決定
-    $baseUrl_to_set_in_session = null;
+    // セッションにセットする最終的なURLを決定する。
+    // 設定済み一覧も直接入力も、同じSSRF境界で検証する。
+    $baseUrl_to_set_in_session = false;
 
     if ($misskey_server_radio_value && $misskey_server_radio_value !== 'direct') {
-      // ラジオボタンが選択されており、かつ"direct"でない場合
-      // この値が有効なURLか検証して使用
-      $validated_url = filter_var($misskey_server_radio_value, FILTER_VALIDATE_URL);
-      if ($validated_url) {
-        $baseUrl_to_set_in_session = $validated_url;
-      }
+      $baseUrl_to_set_in_session = MisskeyServerSecurity::normalizeBaseUrl(
+        (string)$misskey_server_radio_value
+      );
     } elseif ($misskey_server_radio_value === 'direct' && $misskey_server_direct_input_value) {
-      // ラジオボタンが"direct"で、直接入力に値がある場合
-      // 直接入力の値を有効なURLか検証して使用
-      $validated_url = filter_var($misskey_server_direct_input_value, FILTER_VALIDATE_URL);
-      if ($validated_url) {
-        $baseUrl_to_set_in_session = $validated_url;
-      }
+      $baseUrl_to_set_in_session = MisskeyServerSecurity::normalizeBaseUrl(
+        (string)$misskey_server_direct_input_value
+      );
     }
 
     // どちらにも有効なURLがない場合エラー
     if (!$baseUrl_to_set_in_session) {
-      die("Error: " . ($en ? "Please select a valid Misskey server or enter a valid URL." : "有効なMisskeyサーバーを選択するか、有効なURLを直接入力してください。"));
+      error($en
+        ? 'Please select a public HTTPS Misskey server.'
+        : '公開HTTPSのMisskeyサーバーを指定してください。', 400);
     }
 
     // Cookie セット (misskey_server_radio_cookie は "direct" または URLを保存)
     $misskey_server_radio_for_cookie = ($misskey_server_radio_value === 'direct') ? 'direct' : $baseUrl_to_set_in_session;
     setcookie("misskey_server_radio_cookie", $misskey_server_radio_for_cookie, time() + (86400 * 30), "", "", false, true);
-    setcookie("misskey_server_direct_input_cookie", $misskey_server_direct_input_value, time() + (86400 * 30), "", "", false, true);
+    setcookie(
+      "misskey_server_direct_input_cookie",
+      $misskey_server_radio_value === 'direct' ? $baseUrl_to_set_in_session : '',
+      time() + (86400 * 30), "", "", false, true
+    );
 
     RequestSecurity::startSession();
     // セッションIDとユニークIDを結合
@@ -446,19 +447,26 @@ class misskey_note {
       );
 
       $postCurl = curl_init();
-      curl_setopt($postCurl, CURLOPT_URL, $postUrl);
-      curl_setopt($postCurl, CURLOPT_POST, true);
-      curl_setopt($postCurl, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-      curl_setopt($postCurl, CURLOPT_POSTFIELDS, json_encode($postData));
-      curl_setopt($postCurl, CURLOPT_RETURNTRANSFER, true);
-      $postResponse = curl_exec($postCurl);
-      $postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE);
-      // curl_close($postCurl);
+      $security_options = MisskeyServerSecurity::curlOptions($baseUrl_to_set_in_session);
+      $safe_curl = $postCurl !== false && is_array($security_options)
+        && curl_setopt_array($postCurl, $security_options);
+      if (!$safe_curl) {
+        unset($_SESSION['accessToken']);
+      } else {
+        curl_setopt($postCurl, CURLOPT_URL, $postUrl);
+        curl_setopt($postCurl, CURLOPT_POST, true);
+        curl_setopt($postCurl, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        curl_setopt($postCurl, CURLOPT_POSTFIELDS, json_encode($postData));
+        curl_setopt($postCurl, CURLOPT_RETURNTRANSFER, true);
+      }
+      $postResponse = $safe_curl ? curl_exec($postCurl) : false;
+      $postStatusCode = $safe_curl ? (int)curl_getinfo($postCurl, CURLINFO_HTTP_CODE) : 0;
+      if ($postCurl !== false) curl_close($postCurl);
 
       // HTTPステータスコードが403の時は、トークン不一致と判断しアプリを認証
-      if ($postStatusCode === 403) {
+      if ($postStatusCode === 403 || $postResponse === false) {
         unset($_SESSION['accessToken']); //トークンをクリア
-      } else {
+      } elseif (in_array($postStatusCode, [200, 204], true)) {
         //アプリの認証をスキップするURL
         $Location = Config::string('site.base_url') . "connect_misskey_api.php?skip_auth_check=on&s_id={$sns_api_session_id}";
       }

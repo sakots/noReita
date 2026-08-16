@@ -328,6 +328,26 @@ PHP;
     return $status === 200 && str_contains($pictmp_body, 'name="image_upload"');
   });
 
+  [$misskey_loopback_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [
+    'mode' => 'create_misskey_authrequesturl', 'misskey_server_radio' => 'direct',
+    'misskey_server_direct_input' => 'https://127.0.0.1',
+  ]);
+  [$misskey_metadata_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [
+    'mode' => 'create_misskey_authrequesturl', 'misskey_server_radio' => 'direct',
+    'misskey_server_direct_input' => 'https://169.254.169.254',
+  ]);
+  [$misskey_port_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [
+    'mode' => 'create_misskey_authrequesturl', 'misskey_server_radio' => 'direct',
+    'misskey_server_direct_input' => 'https://misskey.io:8443',
+  ]);
+  integration_test('Misskey direct server input rejects SSRF destinations', static function () use (
+    $misskey_loopback_status, $misskey_metadata_status, $misskey_port_status
+  ): bool {
+    return $misskey_loopback_status === 400
+      && $misskey_metadata_status === 400
+      && $misskey_port_status === 400;
+  });
+
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_errorlog_unauthorized_status] = http_request($base_url . '?mode=admin_errorlog', $cookie_jar);
   [$admin_auditlog_unauthorized_status] = http_request($base_url . '?mode=admin_auditlog', $cookie_jar);

@@ -76,17 +76,24 @@ if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
   die($en ? 'Please update share.inc.php to the latest version.' : 'share.inc.phpを最新版に更新してください。');
 }
 
+// misskey_security.inc
+check_file(__DIR__.'/misskey_security.inc.php');
+require_once(__DIR__.'/misskey_security.inc.php');
+if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20260816) {
+  die($en ? 'Please update misskey_security.inc.php to the latest version.' : 'misskey_security.inc.phpを最新版に更新してください。');
+}
+
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php');
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260728) {
+if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260816) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
 check_file(__DIR__.'/connect_misskey_api.php');
 require_once(__DIR__.'/connect_misskey_api.php');
-if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260806) {
+if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260816) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
@@ -107,7 +114,7 @@ if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260807) {
 // external_image.inc
 check_file(__DIR__.'/external_image.inc.php');
 require_once(__DIR__.'/external_image.inc.php');
-if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260725) {
+if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260816) {
   error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
 }
 
