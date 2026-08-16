@@ -6,6 +6,11 @@
   </IfModule>
 </FilesMatch>
 
+# PHPがmultipart本文を一時ファイルへ展開する前に、リクエスト全体を32MiBで拒否する。
+<IfModule mod_core.c>
+  LimitRequestBody 33554432
+</IfModule>
+
 # 設定、DB、ログ、メタデータをHTTPから保護する。
 # SQLiteのWAL・共有メモリ・ロールバックジャーナルも対象に含める。
 <FilesMatch "(?i)(^config(?:\.[a-z0-9_-]+)*\.php$|\.(?:ini|log|dat|json|db(?:-(?:wal|shm|journal))?)$)">

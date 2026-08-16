@@ -100,7 +100,7 @@ if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260816) {
 // save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
-if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260809) {
+if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260816) {
   die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 

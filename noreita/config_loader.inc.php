@@ -212,6 +212,10 @@ final class Config {
       'limits.paint_max_height' => [300, 10000],
       'limits.paint_default_width' => [1, 10000],
       'limits.paint_default_height' => [1, 10000],
+      // ルート.htaccessのLimitRequestBody（32MiB）を超える値は設定できない。
+      'limits.paint_image_kb' => [1, 32768],
+      'limits.paint_work_kb' => [1, 32768],
+      'limits.paint_request_kb' => [1, 32768],
       'error_log.max_bytes' => [1024, 1073741824],
       'error_log.max_files_per_day' => [1, 1000],
       'audit_log.max_bytes' => [1024, 1073741824],
@@ -238,6 +242,10 @@ final class Config {
     if (self::valueAt($values, 'limits.paint_default_width') > self::valueAt($values, 'limits.paint_max_width')
       || self::valueAt($values, 'limits.paint_default_height') > self::valueAt($values, 'limits.paint_max_height')) {
       throw new ConfigException('Default paint dimensions must not exceed maximum paint dimensions.');
+    }
+    if (self::valueAt($values, 'limits.paint_request_kb') < self::valueAt($values, 'limits.paint_image_kb')
+      || self::valueAt($values, 'limits.paint_request_kb') < self::valueAt($values, 'limits.paint_work_kb')) {
+      throw new ConfigException('Paint request limit must cover each paint upload file limit.');
     }
 
     foreach (['permissions.public_file', 'permissions.private_file'] as $key) {

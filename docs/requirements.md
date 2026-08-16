@@ -52,3 +52,19 @@ v3.7.0以前の`config.php`にあった`0606`と`0707`は安全な初期値で�
 ## GDが対応する画像形式
 
 ## PHPのアップロード容量・メモリ上限の目安
+
+お絵描き保存APIは、PNG画像を既定10MiB、動画・PSDなどの作業データを既定20MiB、multipartリクエスト全体を32MiBまで受け付けます。上限は`config.local.php`の次の項目で、32MiB以下の範囲に調整できます。
+
+```php
+'limits' => [
+  'paint_image_kb' => 10240,
+  'paint_work_kb' => 20480,
+  'paint_request_kb' => 32768,
+],
+```
+
+アプリは`Content-Length`、PHPが解析した実ファイル容量、POSTデータとの合計、PNGの幅・高さを段階的に検証し、超過時はHTTP 413を返します。ルート`.htaccess`にも`LimitRequestBody 33554432`を設定し、ApacheではPHPがmultipartデータを一時ファイルへ展開する前に32MiBを超える要求を拒否します。
+
+PHP側は`upload_max_filesize = 20M`以上、`post_max_size = 32M`以上を目安にしてください。PHP側の値を小さくした場合は、その値が実際の上限になります。nginxでは`.htaccess`が効かないため、同等の上限として`client_max_body_size 32m;`を設定してください。
+
+サーバーのメモリ上限は、GDがPNGを展開する領域も考慮して設定してください。保存APIは設定されたキャンバス最大幅・高さに加えて、2,000万画素を超えるPNGを拒否します。

@@ -263,6 +263,12 @@ return [
     'external_thumbnail_days' => 30,
     // 直接アップロードする画像の容量上限です（KB）。
     'upload_kb' => 10000,
+    // お絵描き保存APIが受け付けるPNG画像の容量上限です（KB）。
+    'paint_image_kb' => 10240,
+    // お絵描き保存APIが受け付ける動画・PSDなどの容量上限です（KB）。
+    'paint_work_kb' => 20480,
+    // お絵描き保存APIのリクエスト全体の容量上限です（KB、multipartの付加情報を含む）。
+    'paint_request_kb' => 32768,
     // 投稿画像として受け付ける最大幅です（ピクセル）。
     'image_width' => 4000,
     // 投稿画像として受け付ける最大高さです（ピクセル）。

@@ -167,6 +167,11 @@ return [
     'external_image_thumbnail' => false,
     'misskey_note' => false,
   ],
+  'limits' => [
+    'paint_image_kb' => 1,
+    'paint_work_kb' => 1,
+    'paint_request_kb' => 2,
+  ],
 ];
 PHP;
   if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
@@ -326,6 +331,39 @@ PHP;
   $token = $session_id === null ? '' : hash('sha256', $session_id);
   integration_test('image upload form is available when enabled', static function () use ($status, $pictmp_body): bool {
     return $status === 200 && str_contains($pictmp_body, 'name="image_upload"');
+  });
+
+  $oversized_paint = $root . DIRECTORY_SEPARATOR . 'oversized-paint.png';
+  if (file_put_contents($oversized_paint, str_repeat('x', 1536)) !== 1536) {
+    throw new RuntimeException('Could not create oversized drawing upload probe.');
+  }
+  $temporary_before_capacity_test = glob($webroot . '/tmp/*') ?: [];
+  [$paint_capacity_status, $paint_capacity_body] = http_request(
+    $base_url . '?mode=saveimage&tool=neo',
+    $cookie_jar,
+    [
+      'header' => 'stime=1',
+      'picture' => new CURLFile($oversized_paint, 'image/png', 'oversized-paint.png'),
+    ]
+  );
+  $temporary_after_capacity_test = glob($webroot . '/tmp/*') ?: [];
+  $paint_capacity_logged = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $contents = (string)file_get_contents($error_log_file);
+    if (str_contains($contents, '"http_status":413')
+      && str_contains($contents, 'drawing upload is too large')) {
+      $paint_capacity_logged = true;
+      break;
+    }
+  }
+  integration_test('drawing save API rejects oversized uploads without creating temporary files', static function () use (
+    $paint_capacity_status, $paint_capacity_body, $temporary_before_capacity_test,
+    $temporary_after_capacity_test, $paint_capacity_logged
+  ): bool {
+    return $paint_capacity_status === 413
+      && str_contains($paint_capacity_body, 'drawing upload is too large')
+      && $temporary_after_capacity_test === $temporary_before_capacity_test
+      && $paint_capacity_logged;
   });
 
   [$misskey_loopback_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [

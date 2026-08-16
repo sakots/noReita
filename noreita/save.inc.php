@@ -2,7 +2,117 @@
 //Petit Note (c)さとぴあ @satopian 2021-2025 MIT License
 //https://paintbbs.sakura.ne.jp/
 
-const SAVE_INC_VER = 20260809; //save.inc.phpのバージョン
+const SAVE_INC_VER = 20260816; //save.inc.phpのバージョン
+
+final class PaintSaveCapacityException extends RuntimeException {}
+
+final class PaintSaveRequestGuard {
+  private const FILE_FIELDS = [
+    'neo' => ['picture', 'pch'],
+    'chi' => ['picture', 'chibifile'],
+    'klecks' => ['picture', 'psd'],
+    'tegaki' => ['picture', 'tgkr'],
+    'axnos' => ['picture'],
+  ];
+
+  public static function assertWithinLimits(
+    array $server,
+    array $post,
+    array $files,
+    string $tool,
+    int $image_max_bytes,
+    int $work_max_bytes,
+    int $request_max_bytes
+  ): void {
+    if (!isset(self::FILE_FIELDS[$tool])) {
+      throw new PaintSaveCapacityException('Invalid drawing tool.', 400);
+    }
+    $content_length = $server['CONTENT_LENGTH'] ?? null;
+    if ($content_length !== null && $content_length !== '') {
+      if (!is_scalar($content_length) || preg_match('/\A[0-9]+\z/D', (string)$content_length) !== 1) {
+        throw new PaintSaveCapacityException('Invalid request size.', 400);
+      }
+      if ((int)$content_length > $request_max_bytes) {
+        throw new PaintSaveCapacityException('The drawing upload is too large.', 413);
+      }
+    }
+
+    $allowed = self::FILE_FIELDS[$tool];
+    $uploaded_bytes = 0;
+    $uploaded_files = 0;
+    foreach ($files as $field => $file) {
+      if (!is_string($field) || !in_array($field, $allowed, true) || !is_array($file)) {
+        throw new PaintSaveCapacityException('Invalid drawing upload fields.', 400);
+      }
+      foreach (['error', 'size', 'tmp_name'] as $key) {
+        if (!array_key_exists($key, $file) || is_array($file[$key])) {
+          throw new PaintSaveCapacityException('Invalid drawing upload fields.', 400);
+        }
+      }
+      $error = (int)$file['error'];
+      if (in_array($error, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+        throw new PaintSaveCapacityException('The drawing upload is too large.', 413);
+      }
+      if ($error !== UPLOAD_ERR_OK) continue;
+      $uploaded_files++;
+      if ($uploaded_files > 2) {
+        throw new PaintSaveCapacityException('Too many drawing upload files.', 400);
+      }
+      $declared_size = max(0, (int)$file['size']);
+      $actual_size = is_file((string)$file['tmp_name']) ? @filesize((string)$file['tmp_name']) : false;
+      $file_size = max($declared_size, $actual_size === false ? 0 : (int)$actual_size);
+      $file_limit = $field === 'picture' ? $image_max_bytes : $work_max_bytes;
+      if ($file_size > $file_limit) {
+        throw new PaintSaveCapacityException('The drawing upload is too large.', 413);
+      }
+      $uploaded_bytes += $file_size;
+      if ($uploaded_bytes > $request_max_bytes) {
+        throw new PaintSaveCapacityException('The drawing upload is too large.', 413);
+      }
+    }
+
+    $parsed_bytes = self::valueBytes($post, $request_max_bytes + 1);
+    if ($uploaded_bytes + $parsed_bytes > $request_max_bytes) {
+      throw new PaintSaveCapacityException('The drawing upload is too large.', 413);
+    }
+    if ((int)$content_length > 0 && $post === [] && $files === []) {
+      // post_max_size超過でPHPがPOSTデータを破棄した場合を容量超過として扱う。
+      throw new PaintSaveCapacityException('The drawing upload is too large.', 413);
+    }
+  }
+
+  public static function assertImageDimensions(
+    int $width,
+    int $height,
+    int $max_width,
+    int $max_height,
+    int $max_pixels = 20000000
+  ): void {
+    if ($width < 1 || $height < 1
+      || $width > $max_width || $height > $max_height
+      || $width * $height > $max_pixels) {
+      throw new PaintSaveCapacityException('The image dimensions are too large.', 413);
+    }
+  }
+
+  private static function valueBytes(array $values, int $stop_after): int {
+    $bytes = 0;
+    $pending = [$values];
+    $visited = 0;
+    while ($pending !== []) {
+      $value = array_pop($pending);
+      if (++$visited > 2000) return $stop_after;
+      foreach ($value as $key => $item) {
+        $bytes += strlen((string)$key);
+        if (is_array($item)) $pending[] = $item;
+        elseif (is_scalar($item) || $item === null) $bytes += strlen((string)$item);
+        else return $stop_after;
+        if ($bytes >= $stop_after) return $bytes;
+      }
+    }
+    return $bytes;
+  }
+}
 
 class image_save{
 
@@ -17,11 +127,6 @@ class image_save{
 
   // $security_timer=60;
   $this->security_timer = $security_timer ?? 0;
-  //容量違反チェックをする する:1 しない:0
-  defined('SIZE_CHECK') or define('SIZE_CHECK', '1');
-  //PNG画像データ投稿容量制限KB(chiは含まない)
-  defined('PICTURE_MAX_KB') or define('PICTURE_MAX_KB', '40960');//40MBまで
-  defined('PSD_MAX_KB') or define('PSD_MAX_KB', '40960');//40MBまで。ただしサーバのPHPの設定によって2MB以下に制限される可能性があります。
   if(($_SERVER["REQUEST_METHOD"]) !== "POST"){
     redirect("./");
   }
@@ -29,6 +134,25 @@ class image_save{
   $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
   ? explode( ',', $http_langs )[0] : '';
   $this->en= (stripos($lang,'ja')!==0);
+
+  $request_tool = (string)filter_input_data('GET', 'tool');
+  $this->error_type = $request_tool === 'neo' ? 'neo' : ($request_tool === 'chi' ? 'chi' : $request_tool);
+  try {
+    PaintSaveRequestGuard::assertWithinLimits(
+      $_SERVER,
+      $_POST,
+      $_FILES,
+      $request_tool,
+      Config::int('limits.paint_image_kb') * 1024,
+      Config::int('limits.paint_work_kb') * 1024,
+      Config::int('limits.paint_request_kb') * 1024
+    );
+  } catch (PaintSaveCapacityException $e) {
+    $this->error_msg(
+      $this->en ? $e->getMessage() : ($e->getCode() === 413 ? 'お絵描き保存データの容量が大きすぎます。' : 'お絵描き保存リクエストが不正です。'),
+      $e->getCode() ?: 400
+    );
+  }
 
   $this->imgfile = time().substr(microtime(),2,6);  //画像ファイル名
   $this->imgfile = is_file(Config::string('paths.temporary').$this->imgfile.'.png') ? ((time()+1).substr(microtime(),2,6)) : $this->imgfile;
@@ -191,12 +315,24 @@ class image_save{
       $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
     }
     
-    if(SIZE_CHECK && ($_FILES['picture']['size'] > (PICTURE_MAX_KB * 1024))){
-      $this->error_msg($this->en ? "The size of the picture is too big. " : "ファイルサイズが大きすぎます。");
+    if((int)$_FILES['picture']['size'] > (Config::int('limits.paint_image_kb') * 1024)){
+      $this->error_msg($this->en ? "The size of the picture is too big. " : "ファイルサイズが大きすぎます。", 413);
     }
 
-    if(mime_content_type($_FILES['picture']['tmp_name'])!=='image/png'){
+    $image_info = @getimagesize($_FILES['picture']['tmp_name']);
+    if(!is_array($image_info) || ($image_info['mime'] ?? '') !== 'image/png'){
       $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
+    }
+
+    try {
+      PaintSaveRequestGuard::assertImageDimensions(
+        (int)$image_info[0],
+        (int)$image_info[1],
+        Config::int('limits.paint_max_width'),
+        Config::int('limits.paint_max_height')
+      );
+    } catch (PaintSaveCapacityException $e) {
+      $this->error_msg($this->en ? $e->getMessage() : '画像のサイズが大きすぎます。', 413);
     }
 
     if(function_exists("ImageCreateFromPNG")){//PNG画像が壊れていたらエラー
@@ -204,6 +340,7 @@ class image_save{
       if(!$im_in){
         $this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。");
       }
+      imagedestroy($im_in);
     }
 
     // list($w,$h)=getimagesize($_FILES['picture']['tmp_name']);
@@ -224,7 +361,7 @@ class image_save{
   private function move_uploaded_chi(): void {
     if(isset($_FILES['chibifile']) && ($_FILES['chibifile']['error'] == UPLOAD_ERR_OK)){
       if(mime_content_type($_FILES['chibifile']['tmp_name'])==="application/octet-stream"){
-        if(!SIZE_CHECK || ($_FILES['chibifile']['size'] < (PSD_MAX_KB * 1024))){
+        if($_FILES['chibifile']['size'] <= (Config::int('limits.paint_work_kb') * 1024)){
           //chiファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
           move_uploaded_file($_FILES['chibifile']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.chi');
           if(is_file(Config::string('paths.temporary').$this->imgfile.'.chi')){
@@ -237,7 +374,7 @@ class image_save{
   private function move_uploaded_psd(): void {
     if(isset($_FILES['psd']) && ($_FILES['psd']['error'] == UPLOAD_ERR_OK)){
       if(mime_content_type($_FILES['psd']['tmp_name'])==="image/vnd.adobe.photoshop"){
-        if(!SIZE_CHECK || ($_FILES['psd']['size'] < (PSD_MAX_KB * 1024))){
+        if($_FILES['psd']['size'] <= (Config::int('limits.paint_work_kb') * 1024)){
           //PSDファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
           move_uploaded_file($_FILES['psd']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.psd');
           if(is_file(Config::string('paths.temporary').$this->imgfile.'.psd')){
@@ -248,7 +385,7 @@ class image_save{
     }
     if(isset($_FILES['tgkr']) && ($_FILES['tgkr']['error'] == UPLOAD_ERR_OK)){
       if(mime_content_type($_FILES['tgkr']['tmp_name'])==="application/octet-stream"){
-        if(!SIZE_CHECK || ($_FILES['tgkr']['size'] < (PSD_MAX_KB * 1024))){
+        if($_FILES['tgkr']['size'] <= (Config::int('limits.paint_work_kb') * 1024)){
           //PSDファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
           move_uploaded_file($_FILES['tgkr']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.tgkr');
           if(is_file(Config::string('paths.temporary').$this->imgfile.'.tgkr')){
@@ -261,7 +398,7 @@ class image_save{
   private function move_uploaded_pch(): void {
     if(isset($_FILES['pch']) && ($_FILES['pch']['error'] == UPLOAD_ERR_OK)){
       if(mime_content_type($_FILES['pch']['tmp_name'])==="application/octet-stream"){
-        if(!SIZE_CHECK || ($_FILES['pch']['size'] < (PSD_MAX_KB * 1024))){
+        if($_FILES['pch']['size'] <= (Config::int('limits.paint_work_kb') * 1024)){
           //PSDファイルのアップロードができなかった場合はエラーメッセージはださず、画像のみ投稿する。 
           move_uploaded_file($_FILES['pch']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.pch');
           if(is_file(Config::string('paths.temporary').$this->imgfile.'.pch')){
@@ -272,7 +409,7 @@ class image_save{
     }
   }
 
-  private function error_msg(string $message): void {
+  private function error_msg(string $message, ?int $http_status = null): void {
     switch ($this->error_type){
       case "neo":
         $errtext="error\n";
@@ -287,6 +424,12 @@ class image_save{
       $errtext="";
     }
 
+    if ($http_status !== null) {
+      http_response_code($http_status);
+      if (class_exists('ApplicationErrorHandler')) {
+        ApplicationErrorHandler::reportHttpError($http_status, $message);
+      }
+    }
     header('Content-type: text/plain');
     die(h($errtext.$message));
   }

@@ -20,6 +20,7 @@ require_once dirname(__DIR__) . '/noreita/functions.php';
 require_once dirname(__DIR__) . '/noreita/error_handler.inc.php';
 require_once dirname(__DIR__) . '/noreita/request_security.inc.php';
 require_once dirname(__DIR__) . '/noreita/request_info.inc.php';
+require_once dirname(__DIR__) . '/noreita/save.inc.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/external_image.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
@@ -228,6 +229,8 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin', 'threads_per_page' => 101], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 0]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 201]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_request_kb' => 32769]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_image_kb' => 2048, 'paint_work_kb' => 4096, 'paint_request_kb' => 1024]],
     ['admin' => ['password' => 'admin_pass'], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://example.com/noreita/']],
   ];
@@ -442,6 +445,7 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'Deny from all')
     || !str_contains($root_rule, '^config(?:\\.[a-z0-9_-]+)*\\.php$')
     || !str_contains($root_rule, 'json|db(?:-(?:wal|shm|journal))?')
+    || !str_contains($root_rule, 'LimitRequestBody 33554432')
     || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
     || preg_match('/<\\/files>/i', $root_rule) === 1
     || preg_match('/<files\\s+~/i', $root_rule) === 1) {
@@ -459,6 +463,58 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     }
   }
   return true;
+});
+
+smoke_test('drawing save requests enforce file and aggregate capacity limits', static function (): bool {
+  PaintSaveRequestGuard::assertWithinLimits(
+    ['CONTENT_LENGTH' => '1800'],
+    ['tool' => 'neo', 'header' => 'stime=1'],
+    ['picture' => ['error' => UPLOAD_ERR_OK, 'size' => 900, 'tmp_name' => '']],
+    'neo',
+    1000,
+    2000,
+    3000
+  );
+
+  $rejected = static function (callable $request, int $expected_status): bool {
+    try {
+      $request();
+      return false;
+    } catch (PaintSaveCapacityException $e) {
+      return $e->getCode() === $expected_status;
+    }
+  };
+
+  return $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      ['CONTENT_LENGTH' => '3001'], [], [], 'neo', 1000, 2000, 3000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      [], [], ['picture' => ['error' => UPLOAD_ERR_OK, 'size' => 1001, 'tmp_name' => '']],
+      'neo', 1000, 2000, 3000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      [], [], [
+        'picture' => ['error' => UPLOAD_ERR_OK, 'size' => 900, 'tmp_name' => ''],
+        'pch' => ['error' => UPLOAD_ERR_OK, 'size' => 1500, 'tmp_name' => ''],
+      ], 'neo', 1000, 2000, 2000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      [], [], ['picture' => ['error' => UPLOAD_ERR_INI_SIZE, 'size' => 0, 'tmp_name' => '']],
+      'neo', 1000, 2000, 3000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      [], [], ['psd' => ['error' => UPLOAD_ERR_OK, 'size' => 1, 'tmp_name' => '']],
+      'neo', 1000, 2000, 3000
+    ), 400)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
+      ['CONTENT_LENGTH' => '100'], [], [], 'neo', 1000, 2000, 3000
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertImageDimensions(
+      801, 600, 800, 800
+    ), 413)
+    && $rejected(static fn () => PaintSaveRequestGuard::assertImageDimensions(
+      5000, 5000, 10000, 10000
+    ), 413);
 });
 
 smoke_test('request client IP is resolved from supported sources', static function (): bool {

@@ -46,6 +46,11 @@ return [
   'limits' => [
     // 直接アップロードする画像の容量、幅、高さの上限です。
     'upload_kb' => 10000,
+    // お絵描き保存APIのPNG、作業データ、リクエスト全体の上限です（KB）。
+    // いずれもルート.htaccessの上限に合わせて32768以下にしてください。
+    'paint_image_kb' => 10240,
+    'paint_work_kb' => 20480,
+    'paint_request_kb' => 32768,
     'image_width' => 4000,
     'image_height' => 4000,
   ],
