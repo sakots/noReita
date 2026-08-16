@@ -195,6 +195,21 @@ PHP;
   if (file_put_contents($webroot . '/error-probe.php', $error_probe) === false) {
     throw new RuntimeException('Could not create error handling probe.');
   }
+  $plain_error_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
+ApplicationErrorHandler::respondPlainError(
+  502,
+  'public-detail-must-not-appear',
+  true,
+  'Error: ',
+  'Misskey API: upstream failed token=plain-api-secret'
+);
+PHP;
+  if (file_put_contents($webroot . '/plain-error-probe.php', $plain_error_probe) === false) {
+    throw new RuntimeException('Could not create plain error response probe.');
+  }
 
   $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
   if ($socket === false) throw new RuntimeException("Could not reserve port: {$error_message}");
@@ -306,14 +321,46 @@ PHP;
       && !str_contains($error_log_contents, 'error-probe-secret');
   });
 
+  [$plain_error_status, $plain_error_body] = http_request($origin_url . '/plain-error-probe.php', $cookie_jar);
+  preg_match('/\\b\\d{14}-[a-f0-9]{8}\\b/', $plain_error_body, $plain_error_id_match);
+  $plain_error_id = (string)($plain_error_id_match[0] ?? '');
+  $plain_error_log_contents = '';
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $plain_error_log_contents .= (string)file_get_contents($error_log_file);
+  }
+  integration_test('plain API 5xx responses hide details and log redacted diagnostics', static function () use (
+    $plain_error_status, $plain_error_body, $plain_error_id, $plain_error_log_contents
+  ): bool {
+    return $plain_error_status === 502
+      && $plain_error_id !== ''
+      && str_contains($plain_error_body, $plain_error_id)
+      && str_contains($plain_error_body, 'Date: ' . substr($plain_error_id, 0, 8))
+      && !str_contains($plain_error_body, 'public-detail-must-not-appear')
+      && !str_contains($plain_error_body, 'plain-api-secret')
+      && !str_contains($plain_error_body, 'Misskey API')
+      && str_contains($plain_error_log_contents, $plain_error_id)
+      && str_contains($plain_error_log_contents, 'Misskey API: upstream failed token=[REDACTED]')
+      && !str_contains($plain_error_log_contents, 'plain-api-secret');
+  });
+
   [$misskey_callback_status, $misskey_callback_body] = http_request(
     $origin_url . '/connect_misskey_api.php', $cookie_jar
   );
-  integration_test('Misskey callback initializes standalone dependencies', static function () use (
-    $misskey_callback_status, $misskey_callback_body
+  $misskey_callback_logged = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $contents = (string)file_get_contents($error_log_file);
+    if (str_contains($contents, '"http_status":400')
+      && str_contains($contents, 'Misskey API: Misskey callback session was missing.')) {
+      $misskey_callback_logged = true;
+      break;
+    }
+  }
+  integration_test('Misskey callback records standalone failures without exposing internals', static function () use (
+    $misskey_callback_status, $misskey_callback_body, $misskey_callback_logged
   ): bool {
-    return $misskey_callback_status === 200
-      && str_contains($misskey_callback_body, 'セッションがありません')
+    return $misskey_callback_status === 400
+      && str_contains($misskey_callback_body, 'Misskey posting session is missing')
+      && $misskey_callback_logged
       && !str_contains($misskey_callback_body, 'Fatal error')
       && !str_contains($misskey_callback_body, 'Class &quot;Database&quot; not found')
       && !str_contains($misskey_callback_body, 'Class &quot;RequestSecurity&quot; not found');
@@ -366,6 +413,39 @@ PHP;
       && str_contains($paint_capacity_body, 'drawing upload is too large')
       && $temporary_after_capacity_test === $temporary_before_capacity_test
       && $paint_capacity_logged;
+  });
+
+  $invalid_paint = $root . DIRECTORY_SEPARATOR . 'invalid-paint.png';
+  if (file_put_contents($invalid_paint, 'not-a-png') !== 9) {
+    throw new RuntimeException('Could not create invalid drawing upload probe.');
+  }
+  $temporary_before_invalid_paint = glob($webroot . '/tmp/*') ?: [];
+  [$invalid_paint_status, $invalid_paint_body] = http_request(
+    $base_url . '?mode=saveimage&tool=neo',
+    $cookie_jar,
+    [
+      'header' => 'stime=1',
+      'picture' => new CURLFile($invalid_paint, 'image/png', 'invalid-paint.png'),
+    ]
+  );
+  $temporary_after_invalid_paint = glob($webroot . '/tmp/*') ?: [];
+  $invalid_paint_logged = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $contents = (string)file_get_contents($error_log_file);
+    if (str_contains($contents, '"http_status":415')
+      && str_contains($contents, 'Drawing save API: Your picture upload failed!')) {
+      $invalid_paint_logged = true;
+      break;
+    }
+  }
+  integration_test('drawing save API records non-capacity errors and preserves its response protocol', static function () use (
+    $invalid_paint_status, $invalid_paint_body, $temporary_before_invalid_paint,
+    $temporary_after_invalid_paint, $invalid_paint_logged
+  ): bool {
+    return $invalid_paint_status === 415
+      && str_starts_with($invalid_paint_body, "error\nYour picture upload failed!")
+      && $temporary_after_invalid_paint === $temporary_before_invalid_paint
+      && $invalid_paint_logged;
   });
 
   [$misskey_loopback_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [

@@ -2,7 +2,7 @@
 //Petit Note (c)さとぴあ @satopian 2021-2025 MIT License
 //https://paintbbs.sakura.ne.jp/
 
-const SAVE_INC_VER = 20260816; //save.inc.phpのバージョン
+const SAVE_INC_VER = 20260817; //save.inc.phpのバージョン
 
 final class PaintSaveCapacityException extends RuntimeException {}
 
@@ -177,7 +177,8 @@ class image_save{
     $this->move_uploaded_psd();
     $this->put_user_dat();
 
-    die("ok");
+    echo "ok";
+    exit;
 
   }
   public function save_neo(): void {
@@ -204,7 +205,8 @@ class image_save{
     $this->move_uploaded_pch();
     $this->put_user_dat();
 
-    die("ok");
+    echo "ok";
+    exit;
   }
 
   public function save_chickenpaint(): void {
@@ -220,7 +222,8 @@ class image_save{
     $this->move_uploaded_chi();
     $this->put_user_dat();
 
-    die("CHIBIOK\n");
+    echo "CHIBIOK\n";
+    exit;
   }
 
   private function check_async_request(): void {
@@ -230,7 +233,7 @@ class image_save{
     if(isset($_SERVER['HTTP_ORIGIN']) || isset($_SERVER['HTTP_REFERER'])) {
       return;
     }
-    $this->error_msg($this->en ? "The post has been rejected." : "拒絶されました。");
+    $this->error_msg($this->en ? "The post has been rejected." : "拒絶されました。", 403);
   }
 
   private function check_security(): void {
@@ -242,24 +245,24 @@ class image_save{
     $cookie_usercode = t(filter_input_data('COOKIE', 'usercode'));
     if ($this->session_usercode && $cookie_usercode) {
       if ($this->session_usercode !== $cookie_usercode) {
-        $this->error_msg($this->en ? "User code has been reissued.\nPlease try again." : "ユーザーコードを再発行しました。\n再度投稿してみてください。");
+        $this->error_msg($this->en ? "User code has been reissued.\nPlease try again." : "ユーザーコードを再発行しました。\n再度投稿してみてください。", 403);
       }
     } elseif ($cookie_usercode) {
       $this->session_usercode = $cookie_usercode;
     } elseif (!empty($this->usercode_header)) {
       $this->session_usercode = $this->usercode_header;
     } else {
-      $this->error_msg($this->en ? "User code has been reissued.\nPlease try again." : "ユーザーコードを再発行しました。\n再度投稿してみてください。");
+      $this->error_msg($this->en ? "User code has been reissued.\nPlease try again." : "ユーザーコードを再発行しました。\n再度投稿してみてください。", 403);
     }
 
     $sec_fetch_site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
     $same_origin = ($sec_fetch_site === 'same-origin');
     
     if(!isset($_SERVER['HTTP_ORIGIN']) || !isset($_SERVER['HTTP_HOST'])){
-      $this->error_msg($this->en ? "Your browser is not supported." : "お使いのブラウザはサポートされていません。");
+      $this->error_msg($this->en ? "Your browser is not supported." : "お使いのブラウザはサポートされていません。", 400);
     }
     if(!$same_origin && (parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST) !== $_SERVER['HTTP_HOST'])){
-      $this->error_msg($this->en ? "The post has been rejected." : "拒絶されました。");
+      $this->error_msg($this->en ? "The post has been rejected." : "拒絶されました。", 403);
     }
 
     $this->timer=time()-(int)$this->stime;
@@ -269,9 +272,9 @@ class image_save{
       $psec=(int)$this->security_timer-(int)$this->timer;
       $waiting_time=calcPtime ($psec);
       if($this->en){
-        $this->error_msg("Please draw for another {$waiting_time}.");
+        $this->error_msg("Please draw for another {$waiting_time}.", 429);
       }else{
-        $this->error_msg("描画時間が短すぎます。あと{$waiting_time}。");
+        $this->error_msg("描画時間が短すぎます。あと{$waiting_time}。", 429);
       }
     }
   }
@@ -301,7 +304,7 @@ class image_save{
     file_put_contents(Config::string('paths.temporary').$this->imgfile.".dat",$userdata,LOCK_EX);
       
     if(!is_file(Config::string('paths.temporary').$this->imgfile.'.dat')){
-      $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
+      $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。", 500);
     }
     chmod(Config::string('paths.temporary').$this->imgfile.'.dat',Config::int('permissions.private_file'));
     // 描画直後のコメント入力では、この画像を投稿対象として固定する。
@@ -312,7 +315,7 @@ class image_save{
   private function move_uploaded_image(): void {
 
     if(!isset ($_FILES["picture"]) || $_FILES['picture']['error'] != UPLOAD_ERR_OK) {
-      $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
+      $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。", 400);
     }
     
     if((int)$_FILES['picture']['size'] > (Config::int('limits.paint_image_kb') * 1024)){
@@ -321,7 +324,7 @@ class image_save{
 
     $image_info = @getimagesize($_FILES['picture']['tmp_name']);
     if(!is_array($image_info) || ($image_info['mime'] ?? '') !== 'image/png'){
-      $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
+      $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。", 415);
     }
 
     try {
@@ -338,7 +341,7 @@ class image_save{
     if(function_exists("ImageCreateFromPNG")){//PNG画像が壊れていたらエラー
       $im_in = @ImageCreateFromPNG($_FILES['picture']['tmp_name']);
       if(!$im_in){
-        $this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。");
+        $this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。", 422);
       }
       imagedestroy($im_in);
     }
@@ -353,7 +356,7 @@ class image_save{
     $success = move_uploaded_file($_FILES['picture']['tmp_name'], Config::string('paths.temporary').$this->imgfile.'.png');
     
     if(!$success||!is_file(Config::string('paths.temporary').$this->imgfile.'.png')) {
-      $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。");
+      $this->error_msg($this->en ? "Your picture upload failed!\nPlease try again!" : "投稿に失敗。\n時間を置いて再度投稿してみてください。", 500);
     }
     chmod(Config::string('paths.temporary').$this->imgfile.'.png',Config::int('permissions.public_file'));
   }
@@ -409,7 +412,7 @@ class image_save{
     }
   }
 
-  private function error_msg(string $message, ?int $http_status = null): void {
+  private function error_msg(string $message, int $http_status = 400): void {
     switch ($this->error_type){
       case "neo":
         $errtext="error\n";
@@ -424,13 +427,12 @@ class image_save{
       $errtext="";
     }
 
-    if ($http_status !== null) {
-      http_response_code($http_status);
-      if (class_exists('ApplicationErrorHandler')) {
-        ApplicationErrorHandler::reportHttpError($http_status, $message);
-      }
-    }
-    header('Content-type: text/plain');
-    die(h($errtext.$message));
+    ApplicationErrorHandler::respondPlainError(
+      $http_status,
+      $message,
+      (bool)$this->en,
+      $errtext,
+      'Drawing save API: ' . str_replace(["\r", "\n"], ' ', $message)
+    );
   }
 }

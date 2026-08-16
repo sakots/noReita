@@ -522,6 +522,18 @@ smoke_test('drawing save requests enforce file and aggregate capacity limits', s
     ), 413);
 });
 
+smoke_test('drawing and Misskey API errors use the centralized logging responder', static function (): bool {
+  $save = file_get_contents(dirname(__DIR__) . '/noreita/save.inc.php');
+  $misskey_note = file_get_contents(dirname(__DIR__) . '/noreita/misskey_note.inc.php');
+  $misskey_api = file_get_contents(dirname(__DIR__) . '/noreita/connect_misskey_api.php');
+  if (!is_string($save) || !is_string($misskey_note) || !is_string($misskey_api)) return false;
+  return str_contains($save, 'ApplicationErrorHandler::respondPlainError(')
+    && str_contains($misskey_api, 'ApplicationErrorHandler::respondPlainError(')
+    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $save)
+    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $misskey_note)
+    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $misskey_api);
+});
+
 smoke_test('request client IP only trusts forwarding headers from configured proxies', static function (): bool {
   return RequestInfo::clientIp(['REMOTE_ADDR' => '203.0.113.10']) === '203.0.113.10'
     && RequestInfo::clientIp([

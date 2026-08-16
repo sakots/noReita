@@ -4,7 +4,7 @@
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
 
-const MISSKEY_NOTE_VER = 20260816; //misskey_note.inc.phpのバージョン
+const MISSKEY_NOTE_VER = 20260817; //misskey_note.inc.phpのバージョン
 
 //グローバル変数の宣言
 global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
@@ -323,7 +323,7 @@ class misskey_note {
     $cw = t(filter_input_data('POST', 'cw'));
 
     if ($hide_content && !$cw) {
-      die("Error: " . ($en ? "Content warning field is empty." : "注釈がありません。"));
+      error($en ? 'Content warning field is empty.' : '注釈がありません。', 400);
     }
 
     check_AsyncRequest();

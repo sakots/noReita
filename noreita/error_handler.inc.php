@@ -1,7 +1,7 @@
 <?php
 // error_handler.inc.php for noReita (C) sakots 2026 MIT License
 
-const ERROR_HANDLER_INC_VER = 20260811;
+const ERROR_HANDLER_INC_VER = 20260817;
 
 final class ErrorLogStorage {
   public static function append(
@@ -398,6 +398,29 @@ final class ApplicationErrorHandler {
       ];
     }
     return self::writeRecord($record);
+  }
+
+  /**
+   * HTMLテンプレートを使わないAPI向けに、記録と安全な本文生成を一括で行う。
+   * 5xxの詳細は公開せず、通常画面と同じ照合用エラーIDへ置き換える。
+   */
+  public static function respondPlainError(
+    int $status,
+    string $public_message,
+    bool $english = false,
+    string $prefix = '',
+    ?string $diagnostic = null,
+    ?Throwable $cause = null
+  ): void {
+    if ($status < 400 || $status > 599) $status = 500;
+    $log_message = trim(strip_tags($diagnostic ?? $public_message));
+    $log_message = mb_substr($log_message !== '' ? $log_message : 'API request failed.', 0, 4000);
+    $error_id = self::reportHttpError($status, $log_message, $cause);
+    $response_message = $status >= 500 ? self::publicMessage($error_id, $english) : $public_message;
+    http_response_code($status);
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo $prefix . $response_message;
+    exit;
   }
 
   public static function publicMessage(string $error_id, bool $english): string {
