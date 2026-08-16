@@ -529,6 +529,7 @@ smoke_test('drawing and Misskey API errors use the centralized logging responder
   if (!is_string($save) || !is_string($misskey_note) || !is_string($misskey_api)) return false;
   return str_contains($save, 'ApplicationErrorHandler::respondPlainError(')
     && str_contains($misskey_api, 'ApplicationErrorHandler::respondPlainError(')
+    && !str_contains($misskey_api, "'Misskey upload source image was missing: ' . \$imagePath")
     && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $save)
     && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $misskey_note)
     && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $misskey_api);

@@ -210,6 +210,19 @@ PHP;
   if (file_put_contents($webroot . '/plain-error-probe.php', $plain_error_probe) === false) {
     throw new RuntimeException('Could not create plain error response probe.');
   }
+  $misskey_missing_image_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/connect_misskey_api.php';
+RequestSecurity::startSession();
+$_SESSION['accessToken'] = 'misskey-probe-token';
+$_SESSION['sns_api_val'] = ['', 'missing-probe.png', '', 0, false, 1, false, ''];
+$en = true;
+$baseUrl = 'https://misskey.io';
+connect_misskey_api::create_misskey_note();
+PHP;
+  if (file_put_contents($webroot . '/misskey-missing-image-probe.php', $misskey_missing_image_probe) === false) {
+    throw new RuntimeException('Could not create Misskey missing-image probe.');
+  }
 
   $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error_message);
   if ($socket === false) throw new RuntimeException("Could not reserve port: {$error_message}");
@@ -341,6 +354,28 @@ PHP;
       && str_contains($plain_error_log_contents, $plain_error_id)
       && str_contains($plain_error_log_contents, 'Misskey API: upstream failed token=[REDACTED]')
       && !str_contains($plain_error_log_contents, 'plain-api-secret');
+  });
+
+  $misskey_probe_cookie_jar = $root . DIRECTORY_SEPARATOR . 'misskey-probe-cookies.txt';
+  [$misskey_image_status, $misskey_image_body] = http_request(
+    $origin_url . '/misskey-missing-image-probe.php', $misskey_probe_cookie_jar
+  );
+  $misskey_image_log_safe = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    foreach (file($error_log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $log_line) {
+      if (!str_contains($log_line, 'Misskey upload source image was missing.')) continue;
+      $misskey_image_log_safe = !str_contains($log_line, $webroot)
+        && !str_contains($log_line, 'missing-probe.png');
+    }
+  }
+  integration_test('Misskey missing-image errors do not expose an absolute server path', static function () use (
+    $misskey_image_status, $misskey_image_body, $misskey_image_log_safe, $webroot
+  ): bool {
+    return $misskey_image_status === 404
+      && $misskey_image_body === 'Error: Image does not exist.'
+      && !str_contains($misskey_image_body, $webroot)
+      && !str_contains($misskey_image_body, 'missing-probe.png')
+      && $misskey_image_log_safe;
   });
 
   [$misskey_callback_status, $misskey_callback_body] = http_request(

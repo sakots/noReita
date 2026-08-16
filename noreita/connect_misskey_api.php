@@ -167,7 +167,7 @@ class connect_misskey_api{
 			misskey_api_error(
 				$en ? 'Image does not exist.' : '画像がありません。',
 				404,
-				'Misskey upload source image was missing: ' . $imagePath
+				'Misskey upload source image was missing.'
 			);
 		};
 
