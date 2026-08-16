@@ -124,6 +124,14 @@ smoke_test('eda Twig theme templates compile', static function (): bool {
   }
 });
 
+smoke_test('administration templates escape post subjects', static function (): bool {
+  $eda = file_get_contents(dirname(__DIR__) . '/noreita/theme/eda/eda_admin.twig');
+  $monoreita = file_get_contents(dirname(__DIR__) . '/noreita/theme/monoreita/monoreita_admin.blade.php');
+  if (!is_string($eda) || !is_string($monoreita)) return false;
+  return !preg_match('/mb_substr\\([^\\n]+\\[\'sub\'\\][^\\n]+\\)\\|raw/', $eda)
+    && !preg_match('/\\{!!\\s*mb_substr\\([^\\n]+\\[\'sub\'\\][^\\n]+\\)\\s*!!\\}/', $monoreita);
+});
+
 smoke_test('theme manifests and diagnostics detect theme integrity problems', static function (): bool {
   $eda = dirname(__DIR__) . '/noreita/theme/eda';
   $manifest = ThemeManifest::load($eda);

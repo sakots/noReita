@@ -723,6 +723,19 @@ PHP;
       && urldecode((string)cookie_value($cookie_jar, 'name_c')) === $raw_trip_name;
   });
 
+  $subject_escape_probe = '<b>XSS</b>';
+  $subject_escape_stmt = $db->prepare('UPDATE board_log SET sub = :sub WHERE tid = :tid');
+  $subject_escape_stmt->execute([':sub' => $subject_escape_probe, ':tid' => (int)($row['tid'] ?? 0)]);
+  [$subject_escape_status, $subject_escape_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  $subject_escape_stmt->execute([':sub' => "Integration's subject", ':tid' => (int)($row['tid'] ?? 0)]);
+  integration_test('administration list escapes truncated post subjects', static function () use (
+    $subject_escape_status, $subject_escape_body
+  ): bool {
+    return $subject_escape_status === 200
+      && str_contains($subject_escape_body, '&lt;b&gt;XSS')
+      && !str_contains($subject_escape_body, '<b>XSS');
+  });
+
   $search_term = "user's {$marker}";
   [$search_status, $search_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
   integration_test('search finds the posted comment', static function () use ($search_status, $search_body, $marker): bool {
