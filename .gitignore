@@ -45,3 +45,6 @@ noreita/tmp/*
 
 # v4の既定値config.phpは配布対象。設置者固有設定だけを除外する。
 config.local.php
+
+# sassコンパイル用のnode_modulesは除外する。
+node_modules/
