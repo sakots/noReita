@@ -6,8 +6,10 @@ import {
   unlink,
 } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ROOT_DIR = process.cwd();
+const BUILD_ONCE = process.argv.includes("--once");
 
 const IGNORE_DIRS = new Set([
   "node_modules",
@@ -86,6 +88,14 @@ async function compileOne(input, style, suffix) {
 
   const sourceMap = {
     ...result.sourceMap,
+    // ローカルの絶対パスを配布物へ残さず、CIでも同じ内容を生成する。
+    sources: result.sourceMap.sources.map(source => {
+      try {
+        return path.relative(parsed.dir, fileURLToPath(source)).split(path.sep).join("/");
+      } catch {
+        return source;
+      }
+    }),
     file: path.basename(cssPath),
   };
 
@@ -121,6 +131,7 @@ async function compileFile(input) {
 
 async function compileAll() {
   const entries = await findScssFiles(ROOT_DIR);
+  let failures = 0;
 
   console.log(
     `\nSass: ${entries.length} entr${entries.length === 1 ? "y" : "ies"} found`
@@ -130,13 +141,16 @@ async function compileAll() {
     try {
       await compileFile(entry);
     } catch (error) {
+      failures++;
       console.error(
         `\n✗ ${path.relative(ROOT_DIR, entry)}`
       );
 
-      console.error(error.message);
+      console.error(error instanceof Error ? error.message : String(error));
     }
   }
+
+  return failures;
 }
 
 async function removeGenerated(input) {
@@ -178,50 +192,59 @@ async function removeGenerated(input) {
   }
 }
 
-console.log(`Watching project: ${ROOT_DIR}`);
+console.log(`${BUILD_ONCE ? "Building" : "Watching"} project: ${ROOT_DIR}`);
 console.log("Target: **/*.scss");
 
-await compileAll();
+const initialFailures = await compileAll();
 
-let timer;
+if (BUILD_ONCE) {
+  if (initialFailures > 0) {
+    console.error(`\nSass build failed: ${initialFailures} entry(s)`);
+    process.exitCode = 1;
+  } else {
+    console.log("\nSass build completed successfully");
+  }
+} else {
+  let timer;
 
-function scheduleCompile() {
-  clearTimeout(timer);
+  function scheduleCompile() {
+    clearTimeout(timer);
 
-  timer = setTimeout(() => {
-    compileAll();
-  }, 100);
+    timer = setTimeout(() => {
+      compileAll();
+    }, 100);
+  }
+
+  const watcher = chokidar.watch(ROOT_DIR, {
+    ignoreInitial: true,
+
+    ignored: filePath => {
+      return isIgnored(filePath);
+    },
+  });
+
+  watcher.on("add", file => {
+    if (!isScss(file)) {
+      return;
+    }
+
+    scheduleCompile();
+  });
+
+  watcher.on("change", file => {
+    if (!isScss(file)) {
+      return;
+    }
+
+    scheduleCompile();
+  });
+
+  watcher.on("unlink", async file => {
+    if (!isScss(file)) {
+      return;
+    }
+
+    await removeGenerated(file);
+    scheduleCompile();
+  });
 }
-
-const watcher = chokidar.watch(ROOT_DIR, {
-  ignoreInitial: true,
-
-  ignored: filePath => {
-    return isIgnored(filePath);
-  },
-});
-
-watcher.on("add", file => {
-  if (!isScss(file)) {
-    return;
-  }
-
-  scheduleCompile();
-});
-
-watcher.on("change", file => {
-  if (!isScss(file)) {
-    return;
-  }
-
-  scheduleCompile();
-});
-
-watcher.on("unlink", async file => {
-  if (!isScss(file)) {
-    return;
-  }
-
-  await removeGenerated(file);
-  scheduleCompile();
-});
