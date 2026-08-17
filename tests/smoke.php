@@ -59,6 +59,11 @@ smoke_test('minimum PHP version is 8.1', static function (): bool {
     && PHP_VERSION_ID >= NOREITA_MIN_PHP_VERSION_ID;
 });
 
+smoke_test('PHP 8.5 deprecated imagedestroy is not used', static function (): bool {
+  $save = file_get_contents(dirname(__DIR__) . '/noreita/save.inc.php');
+  return is_string($save) && !preg_match('/\bimagedestroy\s*\(/i', $save);
+});
+
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
   $views = $root . DIRECTORY_SEPARATOR . 'views';

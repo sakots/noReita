@@ -343,7 +343,8 @@ class image_save{
       if(!$im_in){
         $this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。", 422);
       }
-      imagedestroy($im_in);
+      // PHP 8以降のGD画像はオブジェクトなので、参照を外して自動解放に任せる。
+      unset($im_in);
     }
 
     // list($w,$h)=getimagesize($_FILES['picture']['tmp_name']);
