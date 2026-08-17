@@ -141,7 +141,8 @@ HTACCESS;
     if (is_link($rule_file)) {
       throw new RuntimeException('Temporary directory access rule must not be a symbolic link.');
     }
-    $expected = self::TEMPORARY_ACCESS_DENY_RULE . PHP_EOL;
+    // .htaccessはOSにかかわらずLFで生成し、既存ファイルはCRLF・CRもLFへそろえて比較する。
+    $expected = self::TEMPORARY_ACCESS_DENY_RULE . "\n";
     $current = is_file($rule_file) ? @file_get_contents($rule_file) : false;
     if ($current === false) {
       $temporary = @tempnam($real_directory, '.temporary-access-');
@@ -150,7 +151,7 @@ HTACCESS;
         if (is_string($temporary) && is_file($temporary)) @unlink($temporary);
         throw new RuntimeException('Failed to install temporary directory access rule.');
       }
-    } elseif (str_replace("\r\n", "\n", $current) !== $expected) {
+    } elseif (str_replace(["\r\n", "\r"], "\n", $current) !== $expected) {
       // 設置者の独自設定を上書きして公開状態に戻さない。安全な規則が必須であることを明示する。
       throw new RuntimeException('Temporary directory access rule is invalid.');
     }

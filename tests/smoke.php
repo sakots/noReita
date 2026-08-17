@@ -879,6 +879,14 @@ smoke_test('application initialization prepares runtime state', static function 
       'sqlite:' . $database_file, $database_file, $backup_dir, $root, $directories, 0600, $public_temp
     );
     $initializer->prepareDirectories();
+    $temporary_rule = $public_temp . DIRECTORY_SEPARATOR . '.htaccess';
+    $temporary_rule_contents = file_get_contents($temporary_rule);
+    if (!is_string($temporary_rule_contents)
+      || file_put_contents($temporary_rule, str_replace("\n", "\r\n", $temporary_rule_contents)) === false) {
+      return false;
+    }
+    // Windowsで転送・生成されたCRLFの規則も、同じ安全な内容として受け入れる。
+    $initializer->prepareDirectories();
     $initializer->migrateDatabase();
     $initializer->secureDatabaseFile();
     $database = new PDO('sqlite:' . $database_file);
@@ -906,7 +914,7 @@ smoke_test('application initialization prepares runtime state', static function 
       && !array_filter(array_keys($directories), static fn(string $directory): bool => !is_dir($directory))
       && (fileperms($public_image) & 0777) === 0755
       && (fileperms($public_temp) & 0777) === 0755
-      && str_contains((string)file_get_contents($public_temp . DIRECTORY_SEPARATOR . '.htaccess'), 'Require all denied')
+      && str_contains((string)file_get_contents($temporary_rule), 'Require all denied')
       && (fileperms($private_session) & 0777) === 0700
       && (fileperms($database_file) & 0777) === 0600;
   } finally {
