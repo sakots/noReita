@@ -1,6 +1,8 @@
 <?php
 // Theme-specific server-side settings for eda (C) sakots 2026 MIT License
 
+require_once dirname(__DIR__, 2) . '/filesystem_permissions.inc.php';
+
 final class EdaThemeSettings {
   private const SCHEMA_VERSION = 1;
   private const COLOR_SETTING_KEY = 'colors';
@@ -277,11 +279,13 @@ final class EdaThemeSettings {
     if ($permission < 0600 || $permission > 0640 || ($permission & 0007) !== 0) {
       throw new InvalidArgumentException('Invalid theme settings database permission.');
     }
+    if (!FilesystemPermissions::modeChecksAreReliable()) return;
+
     clearstatcache(true, $this->database_file);
     $current = fileperms($this->database_file);
     if ($current === false) throw new RuntimeException('Could not read theme settings database permissions.');
     if (($current & 0777) !== $permission) {
-      @chmod($this->database_file, $permission);
+      FilesystemPermissions::apply($this->database_file, $permission);
       clearstatcache(true, $this->database_file);
       $current = fileperms($this->database_file);
       if ($current === false || ($current & 0777) !== $permission) {

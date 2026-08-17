@@ -926,6 +926,13 @@ smoke_test('application initialization prepares runtime state', static function 
   }
 });
 
+smoke_test('Windows does not enforce unsupported POSIX permission modes', static function (): bool {
+  return !FilesystemPermissions::modeChecksAreReliable('Windows')
+    && !FilesystemPermissions::modeChecksAreReliable('WINDOWS')
+    && FilesystemPermissions::modeChecksAreReliable('Linux')
+    && FilesystemPermissions::modeChecksAreReliable('Darwin');
+});
+
 smoke_test('version 2 database is not modified automatically', static function (): bool {
   $database_file = tempnam(sys_get_temp_dir(), 'noreita_v2_');
   if ($database_file === false) {

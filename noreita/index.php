@@ -44,14 +44,14 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php');
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260728) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260817) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
 // initialization.inc
 check_file(__DIR__.'/initialization.inc.php');
 require_once(__DIR__.'/initialization.inc.php');
-if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260726) {
+if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260817) {
   die($en ? 'Please update initialization.inc.php to the latest version.' : 'initialization.inc.phpを最新版に更新してください。');
 }
 

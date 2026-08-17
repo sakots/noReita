@@ -1,7 +1,9 @@
 <?php
 // initialization.inc.php for noReita (C) sakots 2026 MIT License
 
-const INITIALIZATION_INC_VER = 20260726;
+require_once __DIR__ . '/filesystem_permissions.inc.php';
+
+const INITIALIZATION_INC_VER = 20260817;
 
 final class ApplicationInitializer {
   private string $database_dsn;
@@ -100,6 +102,9 @@ HTACCESS;
   }
 
   private function applyPermission(string $path, int $permission, bool $directory): void {
+    // Windowsでは数値モードをACLへ正確に対応付けられない。存在と読み書き可否は呼び出し側で検証する。
+    if (!FilesystemPermissions::modeChecksAreReliable()) return;
+
     clearstatcache(true, $path);
     $current = fileperms($path);
     if ($current === false) {
@@ -108,7 +113,7 @@ HTACCESS;
     $current &= 0777;
     if ($current === $permission) return;
 
-    if (@chmod($path, $permission)) {
+    if (FilesystemPermissions::apply($path, $permission)) {
       clearstatcache(true, $path);
       $updated = fileperms($path);
       if ($updated !== false && ($updated & 0777) === $permission) return;
@@ -141,7 +146,7 @@ HTACCESS;
     if ($current === false) {
       $temporary = @tempnam($real_directory, '.temporary-access-');
       if ($temporary === false || @file_put_contents($temporary, $expected, LOCK_EX) === false
-        || !@chmod($temporary, 0644) || !@rename($temporary, $rule_file)) {
+        || !FilesystemPermissions::apply($temporary, 0644) || !@rename($temporary, $rule_file)) {
         if (is_string($temporary) && is_file($temporary)) @unlink($temporary);
         throw new RuntimeException('Failed to install temporary directory access rule.');
       }

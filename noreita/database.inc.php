@@ -1,7 +1,9 @@
 <?php
 // database.inc.php for noReita (C) sakots 2026 MIT License
 
-const DATABASE_INC_VER = 20260728;
+require_once __DIR__ . '/filesystem_permissions.inc.php';
+
+const DATABASE_INC_VER = 20260817;
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -699,11 +701,13 @@ final class DatabaseMigrator {
     } finally {
       umask($previous_umask);
     }
+    if (!FilesystemPermissions::modeChecksAreReliable()) return $backup_path;
+
     clearstatcache(true, $backup_path);
     $permission = fileperms($backup_path);
     if ($permission === false) throw new RuntimeException('Could not read database backup permissions.');
     if (($permission & 0777) !== 0600) {
-      @chmod($backup_path, 0600);
+      FilesystemPermissions::apply($backup_path, 0600);
       clearstatcache(true, $backup_path);
       $permission = fileperms($backup_path);
       if ($permission === false || (($permission & 0777) & 0077) !== 0) {
