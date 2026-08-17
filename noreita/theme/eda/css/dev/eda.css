@@ -125,7 +125,7 @@ button {
 
 .oyat {
   border-color: #396;
-  background: linear-gradient(to right, #181111, #543b3b, #36262b) fixed;
+  background: linear-gradient(to right, #181111, rgb(32.8263988522%, 23.2520325203%, 23.2520325203%), rgb(21.1190817791%, 14.9593495935%, 17.0125936553%)) fixed;
   color: #CCE;
 }
 
