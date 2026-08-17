@@ -1,4 +1,4 @@
-name: PHP checks
+name: PHP and Sass checks
 
 on:
   push:
@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  sass:
+    name: Sass build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Compile Sass
+        run: npm run sass:build
+
+      - name: Check generated CSS is up to date
+        run: git diff --exit-code -- noreita/theme
+
   php-lint:
     name: PHP ${{ matrix.php-version }}
     runs-on: ubuntu-latest
