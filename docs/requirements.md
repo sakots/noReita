@@ -25,7 +25,7 @@ composer install --working-dir=noreita --no-dev --prefer-dist
 
 `.htaccess`が有効なApacheまたはApache互換サーバーを想定しています。
 
-ルートの`.htaccess`は`config.php`、`config.local.php`に加え、`config.local.php.bak`、`config.php.old`、`config.local.php~`など`config`から始まる設定バックアップ名、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
+ルートの`.htaccess`は`config.php`、`config.local.php`に加え、`config.local.php.bak`、`config.php.old`、`config.local.php~`など`config`から始まる設定バックアップ名、テーマ設定PHP、Twig・BladeOneテンプレート、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
 
 FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後にルート、`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`の各`.htaccess`が存在することを確認してください。これらを削除したり、非公開ファイルだけを別の公開ディレクトリへ移動したりしないでください。
 

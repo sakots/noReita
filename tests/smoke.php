@@ -67,14 +67,16 @@ smoke_test('PHP 8.5 deprecated imagedestroy is not used', static function (): bo
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
   $views = $root . DIRECTORY_SEPARATOR . 'views';
+  $overrides = $root . DIRECTORY_SEPARATOR . 'overrides';
   $cache = $root . DIRECTORY_SEPARATOR . 'cache';
-  if (!mkdir($views, 0700, true) || !mkdir($cache, 0700, true)) return false;
+  if (!mkdir($views, 0700, true) || !mkdir($overrides, 0700, true) || !mkdir($cache, 0700, true)) return false;
   try {
     if (file_put_contents($views . DIRECTORY_SEPARATOR . 'sample.blade.php', 'Hello {{ $name }}') === false
       || file_put_contents($views . DIRECTORY_SEPARATOR . 'sample.twig', 'Hello {{ name }}') === false
-      || file_put_contents($views . DIRECTORY_SEPARATOR . 'fallback.blade.php', 'Fallback {{ $name }}') === false) return false;
-    $blade = TemplateEngineFactory::create('blade', $views, $cache);
-    $twig = TemplateEngineFactory::create('twig', $views, $cache);
+      || file_put_contents($views . DIRECTORY_SEPARATOR . 'fallback.blade.php', 'Fallback {{ $name }}') === false
+      || file_put_contents($overrides . DIRECTORY_SEPARATOR . 'sample.twig', 'Override {{ name }}') === false) return false;
+    $blade = TemplateEngineFactory::create('blade', [$overrides, $views], $cache);
+    $twig = TemplateEngineFactory::create('twig', [$overrides, $views], $cache);
     try {
       TemplateEngineFactory::create('unknown', $views, $cache);
       return false;
@@ -82,7 +84,7 @@ smoke_test('BladeOne and Twig render through the template engine abstraction', s
       // Expected: only configured engines may be selected.
     }
     return $blade->render('sample', ['name' => 'BladeOne']) === 'Hello BladeOne'
-      && $twig->render('sample', ['name' => 'Twig']) === 'Hello Twig'
+      && $twig->render('sample', ['name' => 'Twig']) === 'Override Twig'
       && $twig->render('fallback', ['name' => 'BladeOne']) === 'Fallback BladeOne';
   } finally {
     if (is_dir($root)) {
@@ -151,6 +153,62 @@ smoke_test('theme manifests and diagnostics detect theme integrity problems', st
   $invalid_report = ThemeDiagnostics::inspect($eda, $invalid, $runtime);
   return $invalid_report['summary']['errors'] > 0
     && in_array('missing_asset', array_column($invalid_report['issues'], 'code'), true);
+});
+
+smoke_test('simple themes inherit templates, engine, assets, and diagnostics from a parent', static function (): bool {
+  $themes = dirname(__DIR__) . '/noreita/theme';
+  $runtime = ThemeRuntime::load($themes, 'starter');
+  $report = ThemeDiagnostics::inspectRuntime($runtime);
+  return $runtime['id'] === 'starter'
+    && $runtime['name'] === 'starter'
+    && $runtime['version'] === '1.0.0'
+    && $runtime['base_id'] === 'eda'
+    && $runtime['engine'] === 'twig'
+    && count($runtime['view_directories']) === 2
+    && $runtime['view_directories'][0] === $themes . '/starter'
+    && $runtime['view_directories'][1] === $themes . '/eda'
+    && count($runtime['stylesheet_themes']) === 1
+    && $runtime['stylesheet_themes'][0]['id'] === 'starter'
+    && str_starts_with($runtime['stylesheet_themes'][0]['version'], '1.0.0-')
+    && $report['summary']['errors'] === 0;
+});
+
+smoke_test('simple themes reject cycles, unsafe parents, and unknown settings', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_theme_inheritance_' . bin2hex(random_bytes(8));
+  $a = $root . DIRECTORY_SEPARATOR . 'a';
+  $b = $root . DIRECTORY_SEPARATOR . 'b';
+  if (!mkdir($a, 0700, true) || !mkdir($b, 0700, true)) return false;
+  try {
+    file_put_contents($a . DIRECTORY_SEPARATOR . 'theme.php', "<?php return ['extends' => 'b'];\n");
+    file_put_contents($b . DIRECTORY_SEPARATOR . 'theme.php', "<?php return ['extends' => 'a'];\n");
+    try {
+      ThemeRuntime::load($root, 'a');
+      return false;
+    } catch (ThemeManifestException $e) {
+      if (!str_contains($e->getMessage(), 'cycle')) return false;
+    }
+    file_put_contents($a . DIRECTORY_SEPARATOR . 'theme.php', "<?php return ['extends' => '../eda'];\n");
+    try {
+      ThemeRuntime::load($root, 'a');
+      return false;
+    } catch (ThemeManifestException $e) {
+      // Expected.
+    }
+    file_put_contents($a . DIRECTORY_SEPARATOR . 'theme.php', "<?php return ['extends' => 'b', 'engine' => 'twig'];\n");
+    try {
+      ThemeRuntime::load($root, 'a');
+      return false;
+    } catch (ThemeManifestException $e) {
+      return str_contains($e->getMessage(), 'unknown setting');
+    }
+  } finally {
+    foreach ([$a, $b] as $directory) {
+      $definition = $directory . DIRECTORY_SEPARATOR . 'theme.php';
+      if (is_file($definition)) unlink($definition);
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
 });
 
 smoke_test('required PHP extensions', static function (): bool {
@@ -463,7 +521,8 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'Deny from all')
     || !str_contains($root_rule, '^config(?:\\..+)?$')
     || !str_contains($root_rule, 'config.local.php~')
-    || !str_contains($root_rule, 'json|db(?:-(?:wal|shm|journal))?')
+    || !str_contains($root_rule, '^theme(?:_conf|_manifest)?\\.php$')
+    || !str_contains($root_rule, 'json|twig|blade\\.php|db(?:-(?:wal|shm|journal))?')
     || !str_contains($root_rule, 'LimitRequestBody 33554432')
     || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
     || preg_match('/<\\/files>/i', $root_rule) === 1

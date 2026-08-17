@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.1.3 lot.260817.1';
+const REITA_VER = 'v4.2.0 lot.260818.0';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -119,16 +119,15 @@ if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260816) {
 }
 
 // テーマ
-$theme_directory = __DIR__ . '/theme/' . Config::string('paths.theme');
-require($theme_directory . '/theme_conf.php');
 require_once __DIR__ . '/theme_manifest.inc.php';
+$theme_runtime = null;
 try {
-  $theme_manifest = ThemeManifest::load($theme_directory);
-  ThemeManifest::assertMatchesRuntime($theme_manifest, ThemeManifest::runtimeMetadata());
-} catch (ThemeManifestException $e) {
-  http_response_code(500);
-  die($en ? 'Theme configuration error: ' . h($e->getMessage()) : 'テーマ設定エラー: ' . h($e->getMessage()));
+  $theme_runtime = ThemeRuntime::load(__DIR__ . '/theme', Config::string('paths.theme'));
+} catch (Throwable $e) {
+  error($en ? 'Theme configuration failed.' : 'テーマ設定の読み込みに失敗しました。', 500, $e);
 }
+if (!is_array($theme_runtime)) exit;
+$theme_directory = $theme_runtime['active_directory'];
 
 // タイムゾーン設定
 date_default_timezone_set(Config::string('site.timezone'));
@@ -149,7 +148,7 @@ if (!is_file($autoload)) {
 require_once $autoload;
 require_once __DIR__ . '/template_engine.inc.php';
 
-$views = $theme_directory; // テンプレートフォルダ
+$views = $theme_runtime['view_directories']; // 子テーマから親テーマの順にテンプレートを探索
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
 // テンプレートキャッシュに必要な場所だけを書き込み可能にする。
@@ -161,7 +160,7 @@ if (!is_readable($cache) || !is_writable($cache)) {
     : 'テンプレートキャッシュディレクトリを読み書きできません。');
 }
 
-$theme_template_engine = defined('THEME_TEMPLATE_ENGINE') ? THEME_TEMPLATE_ENGINE : 'blade';
+$theme_template_engine = $theme_runtime['engine'];
 if (!is_string($theme_template_engine) || !in_array($theme_template_engine, ['blade', 'twig'], true)) {
   die($en ? 'The theme template engine must be blade or twig.' : 'テーマのテンプレートエンジンはbladeまたはtwigを指定してください。');
 }
@@ -203,9 +202,16 @@ $dat['max_sub'] = Config::int('limits.subject_length');
 $dat['max_url'] = Config::int('limits.url_length');
 $dat['max_com'] = Config::int('limits.comment_length');
 
-$dat['theme_dir'] = Config::string('paths.theme');
-$dat['theme_name'] = THEME_NAME;
-$dat['tver'] = THEME_VER;
+$dat['theme_dir'] = $theme_runtime['base_id'];
+$dat['theme_active_dir'] = $theme_runtime['id'];
+$dat['theme_name'] = $theme_runtime['name'];
+$dat['tver'] = $theme_runtime['simple']
+  ? (string)$theme_runtime['base_metadata']['version'] . '-' . $theme_runtime['version']
+  : $theme_runtime['version'];
+$dat['theme_custom_stylesheets'] = array_map(
+  static fn(array $theme): string => 'theme/' . rawurlencode($theme['id']) . '/theme.css?v=' . rawurlencode($theme['version']),
+  $theme_runtime['stylesheet_themes']
+);
 
 $dat['switch_sns'] = Config::bool('features.share_details');
 
@@ -253,7 +259,7 @@ $dat['upload_max_kb'] = Config::int('limits.upload_kb');
 $dat['upload_max_width'] = Config::int('limits.image_width');
 $dat['upload_max_height'] = Config::int('limits.image_height');
 
-$dat['theme_name'] = THEME_NAME;
+$dat['theme_name'] = $theme_runtime['name'];
 
 //ペイント画面の$pwdの暗号化
 const CRYPT_METHOD = 'aes-128-cbc';
@@ -1384,7 +1390,7 @@ function paint_form(string $rep, ?int $reply_to): void {
     $dat['pchfile'] = null;
   }
   $usercode .= '&tool=' . $tool . '&stime=' . time(); //拡張ヘッダにツールと描画開始時間をセット
-  
+
   // ctypeが設定されている場合はusercodeに含める
   if ($ctype !== null) {
     $usercode .= '&ctype=' . $ctype;
@@ -1624,10 +1630,10 @@ function in_continue(): void {
     $dat['oya'] = $continue_posts;
     $hist_ope = pathinfo($no, PATHINFO_FILENAME); //拡張子除去
     $hist_filename = Config::string('paths.images') . $hist_ope;
-    
+
     // データベースからctypeを取得
     $db_ctype = $continue_posts[0]['ctype'] ?? null;
-    
+
     if (is_file($hist_filename . '.pch')) {
       //$pchfile = Config::string('paths.images').$pch;
       $dat['tool'] = 'neo'; //拡張子がpchのときはNEO
@@ -1655,7 +1661,7 @@ function in_continue(): void {
       $dat['ctype_img'] = true;
     }
     // useshi, useneoは互換のためにいちおう残してある
-    
+
     // データベースのctypeを優先する
     if ($db_ctype === 'img') {
       $dat['ctype_img'] = true;

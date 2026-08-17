@@ -161,7 +161,7 @@ return [
     'login' => ['max_failures' => 3],
   ],
   'site' => ['base_url' => 'http://localhost/'],
-  'paths' => ['theme' => 'eda'],
+  'paths' => ['theme' => 'starter'],
   'features' => [
     'image_upload' => true,
     'external_image_thumbnail' => false,
@@ -271,7 +271,10 @@ PHP;
     'http-access-probe.db-wal' => 'sqlite-wal-secret',
     'http-access-probe.db-shm' => 'sqlite-shm-secret',
     'http-access-probe.db-journal' => 'sqlite-journal-secret',
-    'theme/eda/theme_settings.db' => 'SQLite format',
+    'theme/starter/theme_settings.db' => 'SQLite format',
+    'theme/starter/theme.php' => 'extends',
+    'theme/eda/eda_main.twig' => 'DOCTYPE',
+    'theme/monoreita/monoreita_main.blade.php' => 'DOCTYPE',
     'thumbnail/.external-image-failures/http-access-probe.failure.dat' => 'external-failure-secret',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
@@ -298,7 +301,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 16 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 19 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -563,6 +566,7 @@ PHP;
       && str_contains($admin_body, 'themeColorManager.js')
       && str_contains($admin_body, 'EDA_THEME_COLOR_PRESETS')
       && str_contains($admin_body, 'css/mono/eda.min.css')
+      && str_contains($admin_body, 'theme/starter/theme.css?v=1.0.0-')
       && !str_contains($admin_body, 'switchcss.js')
       && !str_contains($admin_body, 'css/reita/eda.min.css')
       && str_contains($admin_body, 'mode=admin_theme_settings')
@@ -627,7 +631,7 @@ PHP;
   [$theme_save_status] = http_request($base_url . '?mode=admin_theme_settings', $cookie_jar, [
     'operation' => 'save', 'theme_settings' => ['colors' => $theme_colors], 'token' => $token,
   ]);
-  $theme_database = new PDO('sqlite:' . $webroot . '/theme/eda/theme_settings.db');
+  $theme_database = new PDO('sqlite:' . $webroot . '/theme/starter/theme_settings.db');
   $stored_theme_colors = (string)$theme_database->query(
     "SELECT value FROM theme_settings WHERE setting_key = 'colors'"
   )->fetchColumn();
@@ -1347,7 +1351,7 @@ PHP;
   });
 
   $monoreita_config_local = str_replace(
-    "'paths' => ['theme' => 'eda'],",
+    "'paths' => ['theme' => 'starter'],",
     "'paths' => ['theme' => 'monoreita'],",
     $config_local
   );

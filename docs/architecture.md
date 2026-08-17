@@ -6,9 +6,9 @@
 
 外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定し、Twig 3も同梱します。
 
-`template_engine.inc.php`が画面描画の共通入口です。`TemplateEngine`を通して論理テンプレート名とデータ配列を渡し、テーマの`theme_conf.php`にある`THEME_TEMPLATE_ENGINE`定数で`blade`または`twig`を選択します。定数がない既存テーマは互換性のため`blade`として扱います。BladeOneは従来どおり`.blade.php`、Twigは同名の`.twig`をテーマディレクトリから読み込みます。Twig選択時に`.twig`がない画面は`.blade.php`へフォールバックするため、テーマを稼働させたまま1画面ずつ移行できます。Twigの自動エスケープを有効にしているため、HTMLを出力する値はTwigテンプレート側で必要な箇所だけ`|raw`を明示してください。
+`template_engine.inc.php`が画面描画の共通入口です。`TemplateEngine`を通して論理テンプレート名とデータ配列を渡します。v4.2簡易テーマでは子から親の順に複数のテンプレートディレクトリを探索し、未配置の画面とコンポーネントを親テーマへフォールバックします。BladeOneは`.blade.php`、Twigは同名の`.twig`を読み込みます。Twig選択時に`.twig`がない画面は`.blade.php`へフォールバックするため、テーマを稼働させたまま1画面ずつ移行できます。Twigの自動エスケープを有効にしているため、HTMLを出力する値はTwigテンプレート側で必要な箇所だけ`|raw`を明示してください。
 
-`theme_manifest.inc.php`はテーマのマニフェストを検証し、`ThemeDiagnostics`が必須テンプレート、コンポーネント参照、アセット、Twig構文を診断します。テーマ作成者は`theme_manifest.php`でテーマID、バージョン、使用エンジン、必要なPHP、テンプレート、アセットを宣言します。`plugins/check-theme.php`は読み取り専用のCLI自己診断です。
+`theme_manifest.inc.php`の`ThemeRuntime`は、`theme.php`だけを持つ簡易テーマの継承関係を検証し、親の`theme_conf.php`と`theme_manifest.php`からエンジン、論理テンプレート、標準アセットを解決します。簡易テーマの`theme.css`は親のCSSより後に読み込みます。従来の完全テーマは二つの設定ファイルをそのまま使用します。`ThemeDiagnostics`は親の必須テンプレートとアセットに加え、子の差分テンプレート、コンポーネント参照、Twig構文を診断します。`plugins/check-theme.php`は読み取り専用のCLI自己診断です。
 
 `PostValidator`は必須項目、文字数、NGワード、日本語フィルター、コメントURL、拒否ホストを画面描画から独立して検証します。
 
