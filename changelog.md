@@ -10,9 +10,11 @@
   - 簡易テーマの継承関係と差分ファイルをテーマ自己診断の対象に追加
   - コピーして使える`theme/starter/`を追加
 - eda・monoreitaのSCSSをSass 1.102以降のカラーAPIへ対応
-- Sassコンパイルと生成CSSの同期確認をGitHub Actionsへ追加
+- Sassコンパイルと追跡済み・未追跡の生成CSS同期確認をGitHub Actionsへ追加
 - 子テーマの`theme.css`をページ固有CSSより後に読み込むよう修正
 - eda・monoreita・starterのテーマ自己診断をGitHub Actionsへ追加
+- BladeOneテンプレートをコンパイルし、生成されたPHPの構文も自己診断
+- テーマPHP・Twig・BladeOneのバックアップ名もHTTPアクセス拒否
 
 ### [2026/08/17] v4.1.3
 
