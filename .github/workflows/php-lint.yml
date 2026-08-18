@@ -30,7 +30,14 @@ jobs:
         run: npm run sass:build
 
       - name: Check generated CSS is up to date
-        run: git diff --exit-code -- noreita/theme
+        shell: bash
+        run: |
+          changes="$(git status --porcelain --untracked-files=all -- noreita/theme)"
+          if [[ -n "$changes" ]]; then
+            echo "$changes"
+            echo "::error::Sass generated files are missing or out of date. Run npm run sass:build and commit the results."
+            exit 1
+          fi
 
   theme-diagnostics:
     name: Theme diagnostics
