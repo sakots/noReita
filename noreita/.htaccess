@@ -13,8 +13,8 @@
 
 # 設定、そのバックアップ、テーマソース、DB、ログ、メタデータをHTTPから保護する。
 # SQLiteのWAL・共有メモリ・ロールバックジャーナルも対象に含める。
-# config.php.bak、config.local.php.old、config.local.php~なども拒否する。
-<FilesMatch "(?i)(^config(?:\..+)?$|^theme(?:_conf|_manifest)?\.php$|\.(?:ini|log|dat|json|twig|blade\.php|db(?:-(?:wal|shm|journal))?)$)">
+# config.php.bak、theme.php.old、テンプレート.twig~などのバックアップ名も拒否する。
+<FilesMatch "(?i)(^config(?:\..+)?$|^theme(?:_conf|_manifest)?\.php(?:\..+|~)?$|\.(?:ini|log|dat|json|db(?:-(?:wal|shm|journal))?)$|\.(?:twig|blade\.php)(?:\..+|~)?$)">
   # Apache 2.4以降
   <IfModule mod_authz_core.c>
     Require all denied

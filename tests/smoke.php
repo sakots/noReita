@@ -619,15 +619,30 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'mod_authz_core.c')
     || !str_contains($root_rule, 'Require all denied')
     || !str_contains($root_rule, 'Deny from all')
-    || !str_contains($root_rule, '^config(?:\\..+)?$')
-    || !str_contains($root_rule, 'config.local.php~')
-    || !str_contains($root_rule, '^theme(?:_conf|_manifest)?\\.php$')
-    || !str_contains($root_rule, 'json|twig|blade\\.php|db(?:-(?:wal|shm|journal))?')
     || !str_contains($root_rule, 'LimitRequestBody 33554432')
     || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
     || preg_match('/<\\/files>/i', $root_rule) === 1
     || preg_match('/<files\\s+~/i', $root_rule) === 1) {
     return false;
+  }
+  if (preg_match_all('/<FilesMatch "([^"]+)">/i', $root_rule, $file_matches) < 1) return false;
+  $private_file_pattern = end($file_matches[1]);
+  if (!is_string($private_file_pattern)) return false;
+  $private_file_regex = '#' . str_replace('#', '\\#', $private_file_pattern) . '#';
+  foreach ([
+    'config.local.php~',
+    'theme.php.bak',
+    'theme_conf.php.old',
+    'theme_manifest.php~',
+    'main.twig.bak',
+    'main.twig~',
+    'main.blade.php.bak',
+    'database.db-wal',
+  ] as $private_file) {
+    if (preg_match($private_file_regex, $private_file) !== 1) return false;
+  }
+  foreach (['theme.css', 'thumbnail.png', 'readme.txt'] as $public_file) {
+    if (preg_match($private_file_regex, $public_file) === 1) return false;
   }
   $ignore = file_get_contents(dirname(__DIR__) . '/.gitignore');
   if (!is_string($ignore) || !str_contains($ignore, 'config.local.php')

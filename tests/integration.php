@@ -273,8 +273,14 @@ PHP;
     'http-access-probe.db-journal' => 'sqlite-journal-secret',
     'theme/starter/theme_settings.db' => 'SQLite format',
     'theme/starter/theme.php' => 'extends',
+    'theme/starter/theme.php.bak' => 'theme-backup-secret',
+    'theme/eda/theme_conf.php.old' => 'theme-config-backup-secret',
+    'theme/eda/theme_manifest.php~' => 'theme-manifest-backup-secret',
     'theme/eda/eda_main.twig' => 'DOCTYPE',
+    'theme/eda/eda_main.twig.bak' => 'twig-backup-secret',
+    'theme/eda/eda_main.twig~' => 'twig-editor-backup-secret',
     'theme/monoreita/monoreita_main.blade.php' => 'DOCTYPE',
+    'theme/monoreita/monoreita_main.blade.php.bak' => 'blade-backup-secret',
     'thumbnail/.external-image-failures/http-access-probe.failure.dat' => 'external-failure-secret',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
@@ -301,7 +307,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 19 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 25 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {

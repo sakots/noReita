@@ -25,7 +25,7 @@ composer install --working-dir=noreita --no-dev --prefer-dist
 
 `.htaccess`が有効なApacheまたはApache互換サーバーを想定しています。
 
-ルートの`.htaccess`は`config.php`、`config.local.php`に加え、`config.local.php.bak`、`config.php.old`、`config.local.php~`など`config`から始まる設定バックアップ名、テーマ設定PHP、Twig・BladeOneテンプレート、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
+ルートの`.htaccess`は`config.php`、`config.local.php`に加え、`config.local.php.bak`、`config.php.old`、`config.local.php~`など`config`から始まる設定バックアップ名、テーマ設定PHP、Twig・BladeOneテンプレート、DB、ログ、メタデータへのHTTPアクセスを拒否します。テーマソースも`.bak`、`.old`などのドット付き接尾辞と末尾`~`を含めて拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
 
 FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後にルート、`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`の各`.htaccess`が存在することを確認してください。これらを削除したり、非公開ファイルだけを別の公開ディレクトリへ移動したりしないでください。
 
@@ -50,11 +50,12 @@ CDNやリバースプロキシを自分で構成し、Webサーバーから見�
 nginxは`.htaccess`を使用しません。`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`、データベース、`config.php`、`config.local.php`とそのバックアップ名へのアクセス拒否をnginx側で設定する必要があります。
 
 テーマについても、`theme.php`、`theme_conf.php`、`theme_manifest.php`、`*.twig`、
-`*.blade.php`を直接取得できないようにしてください。例えば次の規則を、一般的なPHP実行用の
+`*.blade.php`と、それらの`.bak`、`.old`、末尾`~`などを直接取得できないようにしてください。
+例えば次の規則を、一般的なPHP実行用の
 `location`より前に配置します。設置先に合わせて対象パスを限定してください。
 
 ```nginx
-location ~* /(?:theme(?:_conf|_manifest)?\.php|[^/]+\.twig|[^/]+\.blade\.php)$ {
+location ~* /(?:theme(?:_conf|_manifest)?\.php|[^/]+\.(?:twig|blade\.php))(?:\.[^/]+|~)?$ {
     deny all;
 }
 ```
