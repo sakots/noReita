@@ -10,6 +10,7 @@ final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
   private const TEMPORARY_RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'psd', 'tgkr'];
   private const PLAYABLE_ANIMATION_EXTENSIONS = ['pch', 'spch', 'tgkr'];
+  private const UPLOADABLE_ANIMATION_EXTENSIONS = ['pch', 'tgkr'];
   /** @var array<string,array{extension:string,label:string,decoder:string}> */
   private const UPLOAD_IMAGE_TYPES = [
     'image/png' => ['extension' => 'png', 'label' => 'PNG', 'decoder' => 'imagecreatefrompng'],
@@ -276,7 +277,7 @@ final class ImageService {
       if ($modified === false) continue;
       $age = $now - $modified;
       $expired = $age > max(0, $limit_days) * 86400;
-      $expired_upload = preg_match('/\Apchup-.*-tmp\.s?pch\z/iD', $file) === 1 && $age > 300;
+      $expired_upload = preg_match('/\Apchup-.*-tmp\.(?:s?pch|tgkr)\z/iD', $file) === 1 && $age > 300;
       if (($expired || $expired_upload) && safe_unlink($path)) $deleted++;
     }
     return $deleted;
@@ -442,6 +443,171 @@ final class ImageService {
       self::deleteRelatedFiles($image_dir, $filename);
       throw $e;
     }
+  }
+
+  /**
+   * Identify a browser-uploaded NEO/Tegaki replay from both its extension and header.
+   * The returned NEO dimensions are used to ensure that the browser-generated PNG
+   * actually belongs to the uploaded replay.
+   *
+   * @return array{extension:string,tool:string,width:int,height:int}
+   */
+  public static function animationUploadInfo(string $file_path, string $client_name): array {
+    if (!is_file($file_path) || !is_readable($file_path)) {
+      throw new ImageUploadException('Invalid animation upload.', 400);
+    }
+    $extension = strtolower(pathinfo(basename($client_name), PATHINFO_EXTENSION));
+    if (!in_array($extension, self::UPLOADABLE_ANIMATION_EXTENSIONS, true)) {
+      throw new ImageUploadException('Unsupported animation format.', 415);
+    }
+    $header = @file_get_contents($file_path, false, null, 0, 12);
+    if (!is_string($header) || strlen($header) !== 12) {
+      throw new ImageUploadException('Invalid animation upload.', 422);
+    }
+
+    if ($extension === 'pch') {
+      if (substr($header, 0, 3) !== 'NEO') {
+        throw new ImageUploadException('Only PaintBBS NEO PCH files can be uploaded.', 422);
+      }
+      $width = ord($header[4]) + ord($header[5]) * 256;
+      $height = ord($header[6]) + ord($header[7]) * 256;
+      if ($width < 1 || $height < 1) {
+        throw new ImageUploadException('Invalid animation dimensions.', 422);
+      }
+      return ['extension' => 'pch', 'tool' => 'neo', 'width' => $width, 'height' => $height];
+    }
+
+    if (substr($header, 0, 3) !== 'TGK' || !in_array(ord($header[3]), [0, 1], true)) {
+      throw new ImageUploadException('Invalid Tegaki replay.', 422);
+    }
+    // TegakiBinWriter uses DataView's default big-endian byte order.
+    $unpacked_size = unpack('Nsize', substr($header, 4, 4));
+    $data_size = is_array($unpacked_size) ? (int)($unpacked_size['size'] ?? 0) : 0;
+    if ($data_size < 1 || $data_size > 134217728) {
+      throw new ImageUploadException('Invalid Tegaki replay size.', 422);
+    }
+    return ['extension' => 'tgkr', 'tool' => 'tegaki', 'width' => 0, 'height' => 0];
+  }
+
+  /**
+   * Store a replay and the final PNG rendered from it by the browser as one pending drawing.
+   * The .dat metadata is renamed last and therefore acts as the commit marker seen by readers.
+   *
+   * @return array{picfile:string,preview:string}
+   */
+  public static function storeUploadedAnimation(
+    array $picture_upload,
+    array $animation_upload,
+    string $temp_dir,
+    string $user_code,
+    int $resto,
+    int $image_max_bytes,
+    int $animation_max_bytes,
+    int $max_width,
+    int $max_height,
+    int $public_permission,
+    int $private_permission
+  ): array {
+    $picture = self::checkedUploadedFile($picture_upload, $image_max_bytes, 'image');
+    $animation = self::checkedUploadedFile($animation_upload, $animation_max_bytes, 'animation');
+    $animation_info = self::animationUploadInfo(
+      $animation['path'], (string)($animation_upload['name'] ?? '')
+    );
+
+    $image_info = @getimagesize($picture['path']);
+    if (!is_array($image_info) || ($image_info['mime'] ?? '') !== 'image/png'
+      || !self::isDecodableImage($picture['path'], 'image/png')) {
+      throw new ImageUploadException('The generated animation image is invalid.', 422);
+    }
+    $width = (int)$image_info[0];
+    $height = (int)$image_info[1];
+    if ($max_width < 1 || $max_height < 1 || $width < 1 || $height < 1
+      || $width > $max_width || $height > $max_height) {
+      throw new ImageUploadException('The generated animation image dimensions exceed the limit.', 413);
+    }
+    if ($animation_info['extension'] === 'pch'
+      && ($width !== $animation_info['width'] || $height !== $animation_info['height'])) {
+      throw new ImageUploadException('The generated image does not match the PCH file.', 422);
+    }
+
+    $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
+    if (!is_dir($temp_dir) || !is_writable($temp_dir)) {
+      throw new RuntimeException('Temporary image directory is not writable.');
+    }
+    $image_name = self::newOekakiImageFilename($temp_dir, 'png');
+    $base_name = pathinfo($image_name, PATHINFO_FILENAME);
+    $animation_name = $base_name . '.' . $animation_info['extension'];
+    $metadata_name = $base_name . '.dat';
+    $image_stage = tempnam($temp_dir, '.noreita_animation_image_');
+    $animation_stage = tempnam($temp_dir, '.noreita_animation_work_');
+    $metadata_stage = tempnam($temp_dir, '.noreita_animation_metadata_');
+    if ($image_stage === false || $animation_stage === false || $metadata_stage === false) {
+      foreach ([$image_stage, $animation_stage, $metadata_stage] as $stage) {
+        if (is_string($stage)) safe_unlink($stage);
+      }
+      throw new RuntimeException('Failed to prepare animation upload.');
+    }
+
+    $final_paths = [
+      $temp_dir . $image_name,
+      $temp_dir . $animation_name,
+      $temp_dir . $metadata_name,
+    ];
+    $now = time();
+    $ip = RequestInfo::clientIp();
+    $host = $ip !== '' ? gethostbyaddr($ip) : '';
+    $agent = t((string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+    $metadata = implode("\t", [
+      $ip, $host, $agent, '.png', trim($user_code), '', (string)$now, (string)$now,
+      $resto > 0 ? (string)$resto : '', $animation_info['tool'], '',
+    ]) . "\n";
+
+    try {
+      if (!move_uploaded_file($picture['path'], $image_stage)
+        || !move_uploaded_file($animation['path'], $animation_stage)
+        || file_put_contents($metadata_stage, $metadata, LOCK_EX) !== strlen($metadata)) {
+        throw new RuntimeException('Failed to stage animation upload.');
+      }
+      @chmod($image_stage, $public_permission);
+      @chmod($animation_stage, $private_permission);
+      @chmod($metadata_stage, $private_permission);
+      if (is_file($final_paths[0]) || !rename($image_stage, $final_paths[0])) {
+        throw new RuntimeException('Failed to save the generated animation image.');
+      }
+      if (is_file($final_paths[1]) || !rename($animation_stage, $final_paths[1])) {
+        throw new RuntimeException('Failed to save the animation file.');
+      }
+      // Publish metadata last so incomplete pairs never appear in the temporary image list.
+      if (is_file($final_paths[2]) || !rename($metadata_stage, $final_paths[2])) {
+        throw new RuntimeException('Failed to save animation metadata.');
+      }
+      @chmod($final_paths[0], $public_permission);
+      @chmod($final_paths[1], $private_permission);
+      @chmod($final_paths[2], $private_permission);
+      return ['picfile' => $image_name, 'preview' => $image_name];
+    } catch (Throwable $e) {
+      foreach ([$image_stage, $animation_stage, $metadata_stage] as $stage) safe_unlink($stage);
+      foreach ($final_paths as $path) safe_unlink($path);
+      throw $e;
+    }
+  }
+
+  /** @return array{path:string,size:int} */
+  private static function checkedUploadedFile(array $upload, int $max_bytes, string $label): array {
+    $error = $upload['error'] ?? UPLOAD_ERR_NO_FILE;
+    $path = $upload['tmp_name'] ?? null;
+    $declared_size = $upload['size'] ?? null;
+    if ((!is_int($error) && !ctype_digit((string)$error)) || (int)$error !== UPLOAD_ERR_OK
+      || !is_string($path) || !is_uploaded_file($path)
+      || (!is_int($declared_size) && !ctype_digit((string)$declared_size))) {
+      throw new ImageUploadException("Invalid {$label} upload.", 400);
+    }
+    $actual_size = @filesize($path);
+    $size = max((int)$declared_size, $actual_size === false ? 0 : (int)$actual_size);
+    if ($max_bytes < 1 || $size < 1 || $size > $max_bytes) {
+      throw new ImageUploadException("The {$label} upload exceeds the size limit.", 413);
+    }
+    return ['path' => $path, 'size' => $size];
   }
 
   private static function newOekakiImageFilename(string $image_dir, string $extension): string {

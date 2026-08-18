@@ -447,6 +447,18 @@ PHP;
       && str_contains($pictmp_body, implode(' / ', $upload_labels));
   });
 
+  integration_test('animation upload uses the normal post submit action', static function () use (
+    $status, $pictmp_body
+  ): bool {
+    return $status === 200
+      && str_contains($pictmp_body, 'data-animation-upload-file')
+      && str_contains($pictmp_body, 'name="animation_upload"')
+      && str_contains($pictmp_body, 'accept=".pch,.tgkr"')
+      && str_contains($pictmp_body, '「書き込む」で確認・投稿')
+      && !str_contains($pictmp_body, 'data-animation-upload-button')
+      && str_contains($pictmp_body, 'animation-upload.js?');
+  });
+
   $oversized_paint = $root . DIRECTORY_SEPARATOR . 'oversized-paint.png';
   if (file_put_contents($oversized_paint, str_repeat('x', 1536)) !== 1536) {
     throw new RuntimeException('Could not create oversized drawing upload probe.');
@@ -511,6 +523,123 @@ PHP;
       && str_starts_with($invalid_paint_body, "error\nYour picture upload failed!")
       && $temporary_after_invalid_paint === $temporary_before_invalid_paint
       && $invalid_paint_logged;
+  });
+
+  $animation_png = $root . DIRECTORY_SEPARATOR . 'animation-upload.png';
+  $animation_png_data = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+  if ($animation_png_data === false || file_put_contents($animation_png, $animation_png_data) === false) {
+    throw new RuntimeException('Could not create animation upload PNG.');
+  }
+  $mismatched_pch = $root . DIRECTORY_SEPARATOR . 'mismatched.pch';
+  $valid_pch = $root . DIRECTORY_SEPARATOR . 'valid.pch';
+  file_put_contents($mismatched_pch, "NEO\0" . pack('v', 2) . pack('v', 1) . "\0\0\0\0x");
+  file_put_contents($valid_pch, "NEO\0" . pack('v', 1) . pack('v', 1) . "\0\0\0\0x");
+  [$unconverted_animation_status, $unconverted_animation_body] = http_request(
+    $base_url . '?mode=regist',
+    $cookie_jar,
+    [
+      'mode' => 'regist', 'send' => '1', 'name' => 'Animation fallback', 'mail' => '', 'url' => '',
+      'sub' => 'Unconverted animation', 'com' => '未変換動画の結合テストです。', 'pwd' => 'animation-pass',
+      'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+      'animation_upload' => new CURLFile($valid_pch, 'application/octet-stream', 'valid.pch'),
+    ]
+  );
+  integration_test('normal posting rejects an animation when browser conversion did not run', static function () use (
+    $unconverted_animation_status, $unconverted_animation_body
+  ): bool {
+    return $unconverted_animation_status === 422
+      && str_contains($unconverted_animation_body, 'animation could not be checked');
+  });
+  $temporary_before_mismatch = glob($webroot . '/tmp/*') ?: [];
+  [$animation_mismatch_status] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
+    'token' => $token,
+    'picture' => new CURLFile($animation_png, 'image/png', 'animation.png'),
+    'animation' => new CURLFile($mismatched_pch, 'application/octet-stream', 'mismatched.pch'),
+  ]);
+  $temporary_after_mismatch = glob($webroot . '/tmp/*') ?: [];
+  integration_test('animation upload rejects a PNG whose dimensions do not match its PCH', static function () use (
+    $animation_mismatch_status, $temporary_before_mismatch, $temporary_after_mismatch
+  ): bool {
+    return $animation_mismatch_status === 422
+      && $temporary_after_mismatch === $temporary_before_mismatch;
+  });
+
+  [$animation_upload_status, $animation_upload_body] = http_request(
+    $base_url . '?mode=animation_upload',
+    $cookie_jar,
+    [
+      'token' => $token,
+      'picture' => new CURLFile($animation_png, 'image/png', 'animation.png'),
+      'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'valid.pch'),
+    ]
+  );
+  $animation_upload_lines = preg_split('/\r?\n/', trim($animation_upload_body)) ?: [];
+  $uploaded_animation_image = (string)($animation_upload_lines[1] ?? '');
+  $uploaded_animation_base = pathinfo($uploaded_animation_image, PATHINFO_FILENAME);
+  integration_test('animation upload stores a generated PNG and NEO replay as one pending image', static function () use (
+    $animation_upload_status, $animation_upload_lines, $uploaded_animation_image,
+    $uploaded_animation_base, $webroot
+  ): bool {
+    return $animation_upload_status === 200
+      && ($animation_upload_lines[0] ?? '') === 'ok'
+      && preg_match('/^\d{16}\.png$/D', $uploaded_animation_image) === 1
+      && is_file($webroot . '/tmp/' . $uploaded_animation_image)
+      && is_file($webroot . '/tmp/' . $uploaded_animation_base . '.pch')
+      && is_file($webroot . '/tmp/' . $uploaded_animation_base . '.dat');
+  });
+
+  [$animation_post_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'Animation upload', 'mail' => '', 'url' => '',
+    'sub' => 'Animation upload', 'com' => '動画アップロードの結合テストです。', 'pwd' => 'animation-pass',
+    'picfile' => $uploaded_animation_image, 'ctype' => 'new', 'invz' => '0', 'sodane' => '0',
+    'nsfw' => '0', 'token' => $token,
+  ]);
+  $animation_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $animation_row = $animation_db->query(
+    "SELECT picfile, pchfile, tool FROM board_log WHERE sub = 'Animation upload' ORDER BY tid DESC LIMIT 1"
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('uploaded animation remains playable after posting', static function () use (
+    $animation_post_status, $animation_row, $uploaded_animation_image, $uploaded_animation_base, $webroot
+  ): bool {
+    return $animation_post_status === 200 && is_array($animation_row)
+      && $animation_row['picfile'] === $uploaded_animation_image
+      && $animation_row['pchfile'] === $uploaded_animation_base . '.pch'
+      && $animation_row['tool'] === 'PaintBBS NEO'
+      && is_file($webroot . '/img/' . $uploaded_animation_image)
+      && is_file($webroot . '/img/' . $uploaded_animation_base . '.pch');
+  });
+
+  $valid_tgkr = $root . DIRECTORY_SEPARATOR . 'valid.tgkr';
+  file_put_contents($valid_tgkr, 'TGK' . chr(1) . pack('N', 1) . "\1\0\0\1x");
+  [$tgkr_upload_status, $tgkr_upload_body] = http_request(
+    $base_url . '?mode=animation_upload',
+    $cookie_jar,
+    [
+      'token' => $token,
+      'picture' => new CURLFile($animation_png, 'image/png', 'animation.png'),
+      'animation' => new CURLFile($valid_tgkr, 'application/octet-stream', 'valid.tgkr'),
+    ]
+  );
+  $tgkr_upload_lines = preg_split('/\r?\n/', trim($tgkr_upload_body)) ?: [];
+  $tgkr_image = (string)($tgkr_upload_lines[1] ?? '');
+  $tgkr_base = pathinfo($tgkr_image, PATHINFO_FILENAME);
+  [$tgkr_post_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'TGKR upload', 'mail' => '', 'url' => '',
+    'sub' => 'TGKR upload', 'com' => 'TGKRアップロードの結合テストです。', 'pwd' => 'tgkr-pass',
+    'picfile' => $tgkr_image, 'ctype' => 'new', 'invz' => '0', 'sodane' => '0',
+    'nsfw' => '0', 'token' => $token,
+  ]);
+  $tgkr_row = $animation_db->query(
+    "SELECT picfile, pchfile, tool FROM board_log WHERE sub = 'TGKR upload' ORDER BY tid DESC LIMIT 1"
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('Tegaki-enabled boards retain an uploaded TGKR after posting', static function () use (
+    $tgkr_upload_status, $tgkr_post_status, $tgkr_row, $tgkr_image, $tgkr_base, $webroot
+  ): bool {
+    return $tgkr_upload_status === 200 && $tgkr_post_status === 200 && is_array($tgkr_row)
+      && $tgkr_row['picfile'] === $tgkr_image && $tgkr_row['pchfile'] === $tgkr_base . '.tgkr'
+      && $tgkr_row['tool'] === 'Tegaki.js'
+      && is_file($webroot . '/img/' . $tgkr_image)
+      && is_file($webroot . '/img/' . $tgkr_base . '.tgkr');
   });
 
   [$misskey_loopback_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [

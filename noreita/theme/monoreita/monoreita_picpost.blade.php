@@ -91,8 +91,19 @@
             @endif
             @if ($use_image_upload && !isset($selected_picfile))
             <tr>
-              <td>upload</td>
+              <td>画像</td>
               <td><input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）</td>
+            </tr>
+            @endif
+            @if ($use_animation_upload && !isset($selected_picfile))
+            <tr>
+              <td>動画</td>
+              <td>
+                <input type="file" name="animation_upload" accept="{{$animation_upload_accept}}" data-animation-upload-file>
+                （{{$animation_upload_format_label}}、{{$animation_upload_max_kb}}KBまで。「書き込む」で確認・投稿）
+                <span data-animation-upload-status aria-live="polite"></span>
+                <div data-animation-upload-preview></div>
+              </td>
             </tr>
             @endif
             <tr>
@@ -143,6 +154,13 @@
   <footer id="footer">
     @include('components.monoreita_footerCopy')
   </footer>
+  @if ($use_animation_upload)
+  <script src="animation-upload.js?v={{$animation_upload_version}}" data-endpoint="{{$self}}?mode=animation_upload"
+    data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"
+    data-tegaki-enabled="{{$use_tegaki ? '1' : '0'}}"
+    data-max-work-bytes="{{$animation_upload_max_bytes}}"
+    data-max-width="{{$pmax_w}}" data-max-height="{{$pmax_h}}"></script>
+  @endif
 </body>
 
 </html>

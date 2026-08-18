@@ -1477,6 +1477,36 @@ smoke_test('animation filenames reject path traversal', static function (): bool
     && !ImageService::isSafeAnimationFilename('.pch');
 });
 
+smoke_test('uploaded animation headers distinguish NEO PCH and Tegaki TGKR', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_animation_header_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $pch = $directory . DIRECTORY_SEPARATOR . 'sample.pch';
+  $tgkr = $directory . DIRECTORY_SEPARATOR . 'sample.tgkr';
+  $invalid = $directory . DIRECTORY_SEPARATOR . 'invalid.pch';
+  try {
+    file_put_contents($pch, "NEO\0" . pack('v', 640) . pack('v', 480) . "\0\0\0\0");
+    file_put_contents($tgkr, 'TGK' . chr(1) . pack('N', 1024) . "\1\2\3\1");
+    file_put_contents($invalid, 'OLD' . str_repeat("\0", 9));
+    $neo = ImageService::animationUploadInfo($pch, 'client.PCH');
+    $tegaki = ImageService::animationUploadInfo($tgkr, 'client.tgkr');
+    if ($neo !== ['extension' => 'pch', 'tool' => 'neo', 'width' => 640, 'height' => 480]
+      || $tegaki !== ['extension' => 'tgkr', 'tool' => 'tegaki', 'width' => 0, 'height' => 0]) {
+      return false;
+    }
+    try {
+      ImageService::animationUploadInfo($invalid, 'invalid.pch');
+      return false;
+    } catch (ImageUploadException $e) {
+      return $e->getCode() === 422;
+    }
+  } finally {
+    safe_unlink($pch);
+    safe_unlink($tgkr);
+    safe_unlink($invalid);
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('posted image filenames reject invalid continuation targets', static function (): bool {
   return ImageService::isSafePostedImageFilename('1784.png')
     && ImageService::isSafePostedImageFilename('drawing-name.webp')

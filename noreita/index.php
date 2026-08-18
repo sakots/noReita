@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.2.0 lot.260818.0';
+const REITA_VER = 'v4.2.0 lot.260818.1';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -252,6 +252,15 @@ $dat['sodane'] = SODANE;
 
 $dat['use_oekaki_reply'] = Config::bool('features.oekaki_reply');
 $dat['use_image_upload'] = Config::bool('features.image_upload');
+$dat['use_animation_upload'] = Config::bool('features.image_upload') && Config::bool('features.animation');
+$dat['animation_upload_accept'] = Config::bool('features.tegaki') ? '.pch,.tgkr' : '.pch';
+$dat['animation_upload_format_label'] = Config::bool('features.tegaki') ? 'PCH / TGKR' : 'PCH';
+$dat['animation_upload_max_kb'] = Config::int('limits.paint_work_kb');
+$dat['animation_upload_max_bytes'] = Config::int('limits.paint_work_kb') * 1024;
+$animation_upload_modified = @filemtime(__DIR__ . '/animation-upload.js');
+$dat['animation_upload_version'] = $animation_upload_modified === false
+  ? REITA_VER
+  : (string)$animation_upload_modified;
 $dat['diary_mode'] = Config::bool('features.diary_mode');
 $dat['can_create_thread'] = diary_post_allowed(false);
 $dat['can_post_reply'] = diary_post_allowed(true);
@@ -391,6 +400,8 @@ switch ($mode) {
     return delmode();
   case 'saveimage': // 画像保存
     return save_image();
+  case 'animation_upload': // 動画ファイルをPNGと組にして一時保存
+    return animation_upload();
   case 'admin_in': // 管理モードin
     return admin_in();
   case 'admin_login':
@@ -560,6 +571,19 @@ function regist(): void {
   $uploaded_file = $_FILES['image_upload'] ?? null;
   $has_uploaded_file = $uploaded_file !== null
     && (!is_array($uploaded_file) || ($uploaded_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  $raw_animation_file = $_FILES['animation_upload'] ?? null;
+  $has_unconverted_animation = $raw_animation_file !== null
+    && (!is_array($raw_animation_file)
+      || ($raw_animation_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  if ($has_unconverted_animation) {
+    error(
+      $en
+        ? 'The animation could not be checked. Enable JavaScript, reload the page, and try again.'
+        : '動画を確認できませんでした。JavaScriptを有効にしてページを再読み込みし、もう一度お試しください。',
+      422
+    );
+    return;
+  }
   $pending_picfile = $_SESSION['pending_picfile'] ?? '';
   if (is_string($pending_picfile) && $pending_picfile !== '') {
     $pending_metadata = ImageService::parseTemporaryMetadata(
@@ -1562,6 +1586,79 @@ function paint_com(string $tmpmode): void {
 
 function temporary_image_url(string $filename): string {
   return Config::string('site.script_name') . '?mode=temporary_image&file=' . rawurlencode($filename);
+}
+
+/** Accept a browser-rendered PNG together with its original NEO/Tegaki replay. */
+function animation_upload(): void {
+  global $en, $usercode;
+
+  header('Content-Type: text/plain; charset=UTF-8');
+  if (!Config::bool('features.image_upload') || !Config::bool('features.animation')) {
+    error($en ? 'Animation uploads are disabled.' : '動画ファイルのアップロードは無効です。', 403);
+    return;
+  }
+  try {
+    if (Config::bool('features.csrf')) {
+      RequestSecurity::assertCurrentCsrfRequest($en);
+    } else {
+      RequestSecurity::assertCurrentSameOriginRequest($en);
+    }
+    PaintSaveRequestGuard::assertWithinLimits(
+      $_SERVER,
+      $_POST,
+      $_FILES,
+      'animation_upload',
+      Config::int('limits.paint_image_kb') * 1024,
+      Config::int('limits.paint_work_kb') * 1024,
+      Config::int('limits.paint_request_kb') * 1024
+    );
+    $resto_value = filter_input_data('POST', 'resto', FILTER_VALIDATE_INT);
+    $resto = is_int($resto_value) && $resto_value > 0 ? $resto_value : 0;
+    if (!diary_post_allowed($resto > 0)) {
+      throw new ImageUploadException(
+        $en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。',
+        403
+      );
+    }
+    $picture = $_FILES['picture'] ?? null;
+    $animation = $_FILES['animation'] ?? null;
+    if (!is_array($picture) || !is_array($animation)) {
+      throw new ImageUploadException('Invalid animation upload.', 400);
+    }
+    $extension = strtolower(pathinfo((string)($animation['name'] ?? ''), PATHINFO_EXTENSION));
+    if ($extension === 'tgkr' && !Config::bool('features.tegaki')) {
+      throw new ImageUploadException('Tegaki uploads are disabled.', 403);
+    }
+    $result = ImageService::storeUploadedAnimation(
+      $picture,
+      $animation,
+      Config::string('paths.temporary'),
+      (string)$usercode,
+      $resto,
+      Config::int('limits.paint_image_kb') * 1024,
+      Config::int('limits.paint_work_kb') * 1024,
+      Config::int('limits.paint_max_width'),
+      Config::int('limits.paint_max_height'),
+      Config::int('permissions.public_file'),
+      Config::int('permissions.private_file')
+    );
+    $_SESSION['pending_picfile'] = $result['picfile'];
+    echo "ok\n" . $result['picfile'] . "\n" . temporary_image_url($result['preview']);
+  } catch (RequestSecurityException|PaintSaveCapacityException|ImageUploadException $e) {
+    error($en ? $e->getMessage() : animation_upload_error_message($e), $e->getCode() ?: 400, $e);
+  } catch (Throwable $e) {
+    error($en ? 'Animation upload failed.' : '動画ファイルの保存に失敗しました。', 500, $e);
+  }
+}
+
+function animation_upload_error_message(Throwable $error): string {
+  return match ($error->getCode()) {
+    403 => '動画ファイルをアップロードできません。設定と投稿権限を確認してください。',
+    413 => '動画または生成画像の容量・寸法が上限を超えています。',
+    415 => '対応していない動画形式です。',
+    422 => '動画ファイルまたは生成画像が不正です。',
+    default => '動画ファイルを受け付けられませんでした。',
+  };
 }
 
 /** Serve the PNG/JPEG/GIF/WebP/AVIF preview of a pending drawing after authorization. */
