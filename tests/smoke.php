@@ -1432,6 +1432,19 @@ smoke_test('image MIME mapping', static function (): bool {
     && get_image_type('image/avif') === '.avif';
 });
 
+smoke_test('image upload formats follow available GD decoders', static function (): bool {
+  $without_avif = static fn(string $function): bool => $function !== 'imagecreatefromavif';
+  $with_everything = static fn(string $function): bool => true;
+  $limited = ImageService::supportedUploadFormats($without_avif);
+  $complete = ImageService::supportedUploadFormats($with_everything);
+  return !isset($limited['image/avif'])
+    && isset($limited['image/png'], $limited['image/jpeg'], $limited['image/gif'], $limited['image/webp'])
+    && isset($complete['image/avif'])
+    && ImageService::uploadAccept($without_avif) === 'image/png,image/jpeg,image/gif,image/webp'
+    && ImageService::uploadFormatLabel($without_avif) === 'PNG / JPEG / GIF / WebP'
+    && str_ends_with(ImageService::uploadFormatLabel($with_everything), ' / AVIF');
+});
+
 smoke_test('image directory usage is counted and formatted', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_usage_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;

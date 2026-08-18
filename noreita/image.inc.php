@@ -1,7 +1,7 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260811;
+const IMAGE_INC_VER = 20260818;
 
 final class ImageUploadException extends RuntimeException {
 }
@@ -10,6 +10,51 @@ final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
   private const TEMPORARY_RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'psd', 'tgkr'];
   private const PLAYABLE_ANIMATION_EXTENSIONS = ['pch', 'spch', 'tgkr'];
+  /** @var array<string,array{extension:string,label:string,decoder:string}> */
+  private const UPLOAD_IMAGE_TYPES = [
+    'image/png' => ['extension' => 'png', 'label' => 'PNG', 'decoder' => 'imagecreatefrompng'],
+    'image/jpeg' => ['extension' => 'jpg', 'label' => 'JPEG', 'decoder' => 'imagecreatefromjpeg'],
+    'image/gif' => ['extension' => 'gif', 'label' => 'GIF', 'decoder' => 'imagecreatefromgif'],
+    'image/webp' => ['extension' => 'webp', 'label' => 'WebP', 'decoder' => 'imagecreatefromwebp'],
+    'image/avif' => ['extension' => 'avif', 'label' => 'AVIF', 'decoder' => 'imagecreatefromavif'],
+  ];
+
+  /**
+   * @param callable(string):bool|null $function_exists
+   * @return array<string,array{extension:string,label:string}>
+   */
+  public static function supportedUploadFormats(?callable $function_exists = null): array {
+    $function_exists ??= static fn(string $function): bool => function_exists($function);
+    $supported = [];
+    foreach (self::UPLOAD_IMAGE_TYPES as $mime => $format) {
+      if (!$function_exists($format['decoder'])) continue;
+      $supported[$mime] = ['extension' => $format['extension'], 'label' => $format['label']];
+    }
+    return $supported;
+  }
+
+  /** @param callable(string):bool|null $function_exists */
+  public static function uploadAccept(?callable $function_exists = null): string {
+    return implode(',', array_keys(self::supportedUploadFormats($function_exists)));
+  }
+
+  /** @param callable(string):bool|null $function_exists */
+  public static function uploadFormatLabel(?callable $function_exists = null): string {
+    return implode(' / ', array_column(self::supportedUploadFormats($function_exists), 'label'));
+  }
+
+  private static function isDecodableImage(string $file_path, string $mime_type): bool {
+    $decoder = self::UPLOAD_IMAGE_TYPES[$mime_type]['decoder'] ?? null;
+    if (!is_string($decoder) || !function_exists($decoder)) return false;
+    try {
+      $image = @call_user_func($decoder, $file_path);
+      if ($image === false) return false;
+      unset($image);
+      return true;
+    } catch (Throwable) {
+      return false;
+    }
+  }
 
   public static function isSafePostedImageFilename(string $filename): bool {
     if ($filename === '' || strlen($filename) > 255 || basename($filename) !== $filename) {
@@ -301,7 +346,8 @@ final class ImageService {
     $image_info = @getimagesize($file_path);
     return $image_info !== false
       && $image_info[0] > 0 && $image_info[1] > 0
-      && $image_info[0] <= Config::int('limits.paint_max_width') && $image_info[1] <= Config::int('limits.paint_max_height');
+      && $image_info[0] <= Config::int('limits.paint_max_width') && $image_info[1] <= Config::int('limits.paint_max_height')
+      && self::isDecodableImage($file_path, $mime_type);
   }
 
   /**
@@ -347,14 +393,17 @@ final class ImageService {
       throw new ImageUploadException('The uploaded image exceeds the size limit.', 400);
     }
 
-    $types = [
-      'image/png' => 'png', 'image/jpeg' => 'jpg', 'image/gif' => 'gif',
-      'image/webp' => 'webp', 'image/avif' => 'avif',
-    ];
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($temporary_file);
+    $types = self::supportedUploadFormats();
+    if (!is_string($mime) || !isset(self::UPLOAD_IMAGE_TYPES[$mime])) {
+      throw new ImageUploadException('Unsupported image format.', 415);
+    }
+    if (!isset($types[$mime])) {
+      throw new ImageUploadException('The detected image format is not supported by this server.', 415);
+    }
     $image = @getimagesize($temporary_file);
-    if (!is_string($mime) || !isset($types[$mime]) || $image === false
-      || ($image['mime'] ?? null) !== $mime) {
+    if ($image === false || ($image['mime'] ?? null) !== $mime
+      || !self::isDecodableImage($temporary_file, $mime)) {
       throw new ImageUploadException('Unsupported image format.', 400);
     }
     $width = (int)$image[0];
@@ -368,7 +417,7 @@ final class ImageService {
     if (!is_dir($image_dir) || !is_writable($image_dir)) {
       throw new RuntimeException('Image directory is not writable.');
     }
-    $extension = $types[$mime];
+    $extension = $types[$mime]['extension'];
     $filename = self::newOekakiImageFilename($image_dir, $extension);
     $destination = $image_dir . $filename;
     $staged = tempnam($image_dir, '.noreita_upload_');

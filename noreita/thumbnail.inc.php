@@ -14,7 +14,7 @@
 // nsfwスイッチを1またはtrueにすると、サムネイル画像をぼかします。
 // 省略またはfalse、0ならぼかしません。
 
-const THUMBNAIL_VER = 20260807; //thumbnail.inc.phpのバージョン
+const THUMBNAIL_VER = 20260818; //thumbnail.inc.phpのバージョン
 
 class Thumbnail {
   private string $image_url; // 入力画像URL
@@ -68,18 +68,23 @@ class Thumbnail {
     // 入力画像を読み込む
     switch ($mime) {
       case 'image/jpeg':
+        if (!function_exists('imagecreatefromjpeg')) return false;
         $src_image = imagecreatefromjpeg($this->image_url);
         break;
       case 'image/png':
+        if (!function_exists('imagecreatefrompng')) return false;
         $src_image = imagecreatefrompng($this->image_url);
         break;
       case 'image/webp':
+        if (!function_exists('imagecreatefromwebp')) return false;
         $src_image = imagecreatefromwebp($this->image_url);
         break;
       case 'image/avif':
+        if (!function_exists('imagecreatefromavif')) return false;
         $src_image = imagecreatefromavif($this->image_url);
         break;
       case 'image/gif':
+        if (!function_exists('imagecreatefromgif')) return false;
         $src_image = imagecreatefromgif($this->image_url);
         break;
       default:

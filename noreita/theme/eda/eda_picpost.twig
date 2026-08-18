@@ -92,7 +92,7 @@
             {% if use_image_upload and selected_picfile is not defined %}
             <tr>
               <td>upload</td>
-              <td><input type="file" name="image_upload" accept="image/png,image/jpeg,image/gif,image/webp,image/avif">（PNG / JPEG / GIF / WebP / AVIF、{{ upload_max_kb }}KBまで）</td>
+              <td><input type="file" name="image_upload" accept="{{ upload_accept }}">（{{ upload_format_label }}、{{ upload_max_kb }}KBまで）</td>
             </tr>
             {% endif %}
             <tr>

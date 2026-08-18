@@ -58,7 +58,7 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260817) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260811) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260818) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
@@ -107,7 +107,7 @@ if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260817) {
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260807) {
+if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260818) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
@@ -258,6 +258,8 @@ $dat['can_post_reply'] = diary_post_allowed(true);
 $dat['upload_max_kb'] = Config::int('limits.upload_kb');
 $dat['upload_max_width'] = Config::int('limits.image_width');
 $dat['upload_max_height'] = Config::int('limits.image_height');
+$dat['upload_accept'] = ImageService::uploadAccept();
+$dat['upload_format_label'] = ImageService::uploadFormatLabel();
 
 $dat['theme_name'] = $theme_runtime['name'];
 
@@ -673,7 +675,12 @@ function regist(): void {
     }
   } catch (ImageUploadException $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
-    error($en ? $e->getMessage() : '画像ファイルを受け付けられませんでした。', $e->getCode() ?: 400, $e);
+    $upload_error = $en
+      ? $e->getMessage()
+      : ($e->getCode() === 415
+        ? 'このサーバーでは、この画像形式を処理できません。'
+        : '画像ファイルを受け付けられませんでした。');
+    error($upload_error, $e->getCode() ?: 400, $e);
   } catch (Throwable $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);

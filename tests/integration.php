@@ -425,8 +425,26 @@ PHP;
   [$status, $pictmp_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
-  integration_test('image upload form is available when enabled', static function () use ($status, $pictmp_body): bool {
-    return $status === 200 && str_contains($pictmp_body, 'name="image_upload"');
+  $upload_mimes = [];
+  $upload_labels = [];
+  foreach ([
+    'image/png' => ['PNG', 'imagecreatefrompng'],
+    'image/jpeg' => ['JPEG', 'imagecreatefromjpeg'],
+    'image/gif' => ['GIF', 'imagecreatefromgif'],
+    'image/webp' => ['WebP', 'imagecreatefromwebp'],
+    'image/avif' => ['AVIF', 'imagecreatefromavif'],
+  ] as $mime => [$label, $decoder]) {
+    if (!function_exists($decoder)) continue;
+    $upload_mimes[] = $mime;
+    $upload_labels[] = $label;
+  }
+  integration_test('image upload form lists only formats supported by GD', static function () use (
+    $status, $pictmp_body, $upload_mimes, $upload_labels
+  ): bool {
+    return $status === 200
+      && str_contains($pictmp_body, 'name="image_upload"')
+      && str_contains($pictmp_body, 'accept="' . implode(',', $upload_mimes) . '"')
+      && str_contains($pictmp_body, implode(' / ', $upload_labels));
   });
 
   $oversized_paint = $root . DIRECTORY_SEPARATOR . 'oversized-paint.png';
@@ -1347,7 +1365,7 @@ PHP;
   });
 
   $upload_source = $root . '/direct-upload.png';
-  $upload_png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL0XQAAAABJRU5ErkJggg==', true);
+  $upload_png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
   if ($upload_png === false || file_put_contents($upload_source, $upload_png) === false) {
     throw new RuntimeException('Could not create direct upload image.');
   }
@@ -1369,6 +1387,33 @@ PHP;
       && (int)$upload_row['img_w'] === 1 && (int)$upload_row['img_h'] === 1
       && $upload_row['tool'] === 'Upload' && $upload_row['thumbnail'] === ''
       && is_file($webroot . '/img/' . $upload_row['picfile']);
+  });
+
+  $unsupported_avif_rejected = true;
+  if (!function_exists('imagecreatefromavif')) {
+    $avif_source = $root . '/unsupported-upload.avif';
+    $avif_probe = pack('N', 24) . 'ftypavif' . pack('N', 0) . 'avifmif1';
+    if (file_put_contents($avif_source, $avif_probe) !== strlen($avif_probe)) {
+      throw new RuntimeException('Could not create unsupported AVIF upload probe.');
+    }
+    $avif_marker = 'unsupported-avif-' . bin2hex(random_bytes(6));
+    $avif_comment = '非対応AVIF ' . $avif_marker;
+    [$unsupported_avif_status, $unsupported_avif_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
+      'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
+      'sub' => 'Unsupported AVIF upload', 'com' => $avif_comment, 'pwd' => 'upload-delete-pass',
+      'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+      'image_upload' => new CURLFile($avif_source, 'image/avif', 'unsupported.avif'),
+    ]);
+    $avif_row_statement = $db->prepare('SELECT COUNT(*) FROM board_log WHERE com = :comment');
+    $avif_row_statement->execute([':comment' => $avif_comment]);
+    $unsupported_avif_rejected = $unsupported_avif_status === 415
+      && str_contains($unsupported_avif_body, 'not supported by this server')
+      && (int)$avif_row_statement->fetchColumn() === 0;
+  }
+  integration_test('unsupported AVIF uploads are rejected before database storage', static function () use (
+    $unsupported_avif_rejected
+  ): bool {
+    return $unsupported_avif_rejected;
   });
 
   $monoreita_config_local = str_replace(
