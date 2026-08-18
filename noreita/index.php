@@ -320,6 +320,9 @@ $https_only = (bool)($_SERVER['HTTPS'] ?? '');
 $usercode = t(filter_input_data('COOKIE', 'usercode')); //user-codeを取得
 
 RequestSecurity::startSession();
+$dat['admin_authenticated'] = AdminAuth::isAuthenticated(
+  Config::string('admin.password'), Config::int('admin.session_lifetime')
+);
 $session_usercode = $_SESSION['usercode'] ?? "";
 $session_usercode = t($session_usercode);
 

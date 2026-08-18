@@ -14,7 +14,7 @@
     <div>
       <section>
         <a href="{{$home}}" target="_top">[ホーム]</a>
-        <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+        @include('components.monoreita_adminSession')
       </section>
     </div>
     <hr>

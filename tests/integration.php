@@ -559,6 +559,17 @@ PHP;
   $token = $admin_session_id === null ? '' : hash('sha256', $admin_session_id);
   $login_attempt_records_after_success = glob($webroot . '/session/admin-login-*.json') ?: [];
   [$admin_status, $admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$admin_public_status, $admin_public_body] = http_request($base_url, $cookie_jar);
+  integration_test('public pages visibly indicate an active administrator session', static function () use (
+    $startup_body, $admin_public_status, $admin_public_body
+  ): bool {
+    return !str_contains($startup_body, '管理者ログイン中')
+      && str_contains($startup_body, 'mode=admin_in')
+      && $admin_public_status === 200
+      && str_contains($admin_public_body, 'class="admin-session-status"')
+      && str_contains($admin_public_body, '管理者ログイン中')
+      && str_contains($admin_public_body, 'mode=admin');
+  });
   integration_test('administrator login persists and clears prior failures', static function () use (
     $admin_login_status, $admin_status, $admin_body, $login_attempt_records_after_success
   ): bool {
@@ -1413,6 +1424,9 @@ PHP;
   [$monoreita_admin_status, $monoreita_admin_body] = http_request(
     $monoreita_base_url . '?mode=admin', $monoreita_cookie_jar
   );
+  [$monoreita_public_status, $monoreita_public_body] = http_request(
+    $monoreita_base_url, $monoreita_cookie_jar
+  );
   [$monoreita_errorlog_status, $monoreita_errorlog_body] = http_request(
     $monoreita_base_url . '?mode=admin_errorlog', $monoreita_cookie_jar
   );
@@ -1424,7 +1438,8 @@ PHP;
   );
   integration_test('monoreita renders administrator pages through BladeOne over HTTP', static function () use (
     $monoreita_login_form_status, $monoreita_login_form_body, $monoreita_login_status,
-    $monoreita_admin_status, $monoreita_admin_body, $monoreita_errorlog_status, $monoreita_errorlog_body,
+    $monoreita_admin_status, $monoreita_admin_body, $monoreita_public_status, $monoreita_public_body,
+    $monoreita_errorlog_status, $monoreita_errorlog_body,
     $monoreita_auditlog_status, $monoreita_auditlog_body,
     $monoreita_temporary_status, $monoreita_temporary_body
   ): bool {
@@ -1433,6 +1448,9 @@ PHP;
       && $monoreita_login_status === 302
       && $monoreita_admin_status === 200
       && str_contains($monoreita_admin_body, 'theme/monoreita/css/monoreita_index.min.css')
+      && $monoreita_public_status === 200
+      && str_contains($monoreita_public_body, 'class="admin-session-status"')
+      && str_contains($monoreita_public_body, '管理者ログイン中')
       && str_contains($monoreita_admin_body, 'mode=admin_errorlog')
       && str_contains($monoreita_admin_body, 'mode=admin_auditlog')
       && str_contains($monoreita_admin_body, 'mode=admin_temporary_images')
