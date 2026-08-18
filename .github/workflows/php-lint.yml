@@ -32,6 +32,34 @@ jobs:
       - name: Check generated CSS is up to date
         run: git diff --exit-code -- noreita/theme
 
+  theme-diagnostics:
+    name: Theme diagnostics
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --working-dir=noreita --no-interaction --no-progress --prefer-dist
+
+      - name: Check eda theme
+        run: php plugins/check-theme.php --root=noreita --theme=eda
+
+      - name: Check monoreita theme
+        run: php plugins/check-theme.php --root=noreita --theme=monoreita
+
+      - name: Check starter theme
+        run: php plugins/check-theme.php --root=noreita --theme=starter
+
   php-lint:
     name: PHP ${{ matrix.php-version }}
     runs-on: ubuntu-latest
