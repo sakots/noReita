@@ -301,7 +301,11 @@ final class ThemeDiagnostics {
         self::add($issues, 'error', 'missing_asset', "Required asset is missing or unreadable: {$asset}");
       }
     }
-    if ($engine === 'twig') self::compileTwigTemplates($theme_directory, $issues);
+    if ($engine === 'twig') {
+      self::compileTwigTemplates($theme_directory, $issues);
+    } else {
+      self::compileBladeTemplates([$theme_directory], [$theme_directory], $issues);
+    }
     return self::report($issues, $templates_checked, $components_checked, $assets_checked);
   }
 
@@ -335,7 +339,7 @@ final class ThemeDiagnostics {
         }
         $pattern = $engine === 'twig'
           ? "/\{%\\s*include\\s+['\"]([^'\"]+)['\"]/"
-          : "/@include\(\\s*'([^']+)'/";
+          : "/@include\\s*\(\\s*['\"]([^'\"]+)['\"]/";
         if (preg_match_all($pattern, $source, $matches) !== false) {
           foreach ($matches[1] ?? [] as $include) {
             if (!str_starts_with($include, 'components')) continue;
@@ -364,6 +368,8 @@ final class ThemeDiagnostics {
       } catch (Throwable $e) {
         self::add($issues, 'error', 'twig_syntax', $e->getMessage());
       }
+    } else {
+      self::compileBladeTemplates($directories, $override_directories, $issues);
     }
 
     $assets_checked = $base['summary']['assets_checked'];
@@ -382,7 +388,7 @@ final class ThemeDiagnostics {
     $suffix = $engine === 'twig' ? '.twig' : '.blade.php';
     $pattern = $engine === 'twig'
       ? "/\{%\\s*include\\s+['\"]([^'\"]+)['\"]/"
-      : "/@include\\(\\s*'([^']+)'/";
+      : "/@include\\s*\\(\\s*['\"]([^'\"]+)['\"]/";
     $checked = 0;
     foreach (self::templateFiles($directory, $suffix) as $file) {
       $source = file_get_contents($file);
@@ -421,6 +427,34 @@ final class ThemeDiagnostics {
       }
     } catch (Throwable $e) {
       self::add($issues, 'error', 'twig_syntax', $e->getMessage());
+    }
+  }
+
+  /** @param array<int,string> $view_directories @param array<int,string> $scan_directories
+   * @param array<int,array<string,string>> $issues */
+  private static function compileBladeTemplates(array $view_directories, array $scan_directories, array &$issues): void {
+    if (!class_exists(\eftec\bladeone\BladeOne::class)) {
+      self::add($issues, 'error', 'blade_unavailable', 'BladeOne template compiler is unavailable.');
+      return;
+    }
+    $blade = new \eftec\bladeone\BladeOne(
+      $view_directories,
+      sys_get_temp_dir(),
+      \eftec\bladeone\BladeOne::MODE_SLOW
+    );
+    foreach ($scan_directories as $directory) {
+      $prefix = strlen(rtrim($directory, '/\\')) + 1;
+      foreach (self::templateFiles($directory, '.blade.php') as $file) {
+        $source = @file_get_contents($file);
+        if (!is_string($source)) continue;
+        $relative = str_replace(DIRECTORY_SEPARATOR, '/', substr($file, $prefix));
+        try {
+          $compiled = $blade->compileString($source);
+          token_get_all($compiled, TOKEN_PARSE);
+        } catch (Throwable $e) {
+          self::add($issues, 'error', 'blade_syntax', "Blade syntax error in {$relative}: {$e->getMessage()}");
+        }
+      }
     }
   }
 

@@ -189,6 +189,72 @@ smoke_test('theme manifests and diagnostics detect theme integrity problems', st
     && in_array('missing_asset', array_column($invalid_report['issues'], 'code'), true);
 });
 
+smoke_test('Blade diagnostics reject syntax errors and double-quoted missing includes', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_blade_diagnostic_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700, true)) return false;
+  try {
+    $template = <<<'BLADE'
+@include("components.missing")
+@if (true)
+<p>missing endif</p>
+BLADE;
+    if (file_put_contents($directory . DIRECTORY_SEPARATOR . 'main.blade.php', $template) === false) return false;
+    $manifest = [
+      'format' => 1,
+      'id' => 'invalid-blade',
+      'name' => 'Invalid Blade',
+      'version' => '1.0.0',
+      'engine' => 'blade',
+      'requires' => ['php' => '8.1.0', 'noreita' => '4.2.0'],
+      'templates' => ['main' => 'main'],
+      'assets' => ['css' => [], 'javascript' => []],
+      'legacy' => false,
+    ];
+    $runtime = [
+      'id' => 'invalid-blade',
+      'version' => '1.0.0',
+      'engine' => 'blade',
+      'templates' => ['main' => 'main'],
+    ];
+    $report = ThemeDiagnostics::inspect($directory, $manifest, $runtime);
+    $codes = array_column($report['issues'], 'code');
+    $base_errors_detected = in_array('missing_component', $codes, true)
+      && in_array('blade_syntax', $codes, true);
+
+    $base_directory = $directory . DIRECTORY_SEPARATOR . 'base';
+    $override_directory = $directory . DIRECTORY_SEPARATOR . 'override';
+    if (!mkdir($base_directory, 0700) || !mkdir($override_directory, 0700)
+      || file_put_contents($base_directory . DIRECTORY_SEPARATOR . 'main.blade.php', '<p>valid</p>') === false
+      || file_put_contents($override_directory . DIRECTORY_SEPARATOR . 'main.blade.php', $template) === false) {
+      return false;
+    }
+    $override_report = ThemeDiagnostics::inspectRuntime([
+      'base_directory' => $base_directory,
+      'manifest' => $manifest,
+      'base_metadata' => $runtime,
+      'simple' => true,
+      'engine' => 'blade',
+      'view_directories' => [$override_directory, $base_directory],
+      'stylesheet_themes' => [],
+    ]);
+    $override_codes = array_column($override_report['issues'], 'code');
+    return $base_errors_detected
+      && in_array('missing_component', $override_codes, true)
+      && in_array('blade_syntax', $override_codes, true);
+  } finally {
+    if (is_dir($directory)) {
+      $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      );
+      foreach ($iterator as $item) {
+        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+      }
+      rmdir($directory);
+    }
+  }
+});
+
 smoke_test('simple themes inherit templates, engine, assets, and diagnostics from a parent', static function (): bool {
   $themes = dirname(__DIR__) . '/noreita/theme';
   $runtime = ThemeRuntime::load($themes, 'starter');

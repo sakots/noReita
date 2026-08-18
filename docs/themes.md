@@ -96,8 +96,9 @@ php plugins/check-theme.php --root=noreita --theme=mytheme
 php plugins/check-theme.php --root=noreita --theme=mytheme --json
 ```
 
-親テーマのマニフェスト、必須テンプレートとアセット、子テーマのTwig構文、
-コンポーネント参照、配置されている`theme.css`を検査します。エラーがある場合は終了コード1、
+親テーマのマニフェスト、必須テンプレートとアセット、子テーマのTwig／BladeOne構文、
+コンポーネント参照、配置されている`theme.css`を検査します。BladeOneはコンパイル後のPHPも
+構文解析します。エラーがある場合は終了コード1、
 診断自体に失敗した場合は終了コード2です。
 
 ## 従来形式との互換性
