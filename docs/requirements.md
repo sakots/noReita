@@ -45,9 +45,19 @@ CDNやリバースプロキシを自分で構成し、Webサーバーから見�
 
 信頼済みプロキシから接続された場合に限り`X-Forwarded-For`を右から検証し、信頼済みプロキシ群の手前にある最初のIPを接続元として扱います。不正な値が1つでも含まれる場合はヘッダー全体を無視します。非標準の`Client-IP`は設定の有無にかかわらず使用しません。
 
-## nginxを使う場合のDB・設定ファイル保護
+## nginxを使う場合のDB・設定・テーマソース保護
 
 nginxは`.htaccess`を使用しません。`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`、データベース、`config.php`、`config.local.php`とそのバックアップ名へのアクセス拒否をnginx側で設定する必要があります。
+
+テーマについても、`theme.php`、`theme_conf.php`、`theme_manifest.php`、`*.twig`、
+`*.blade.php`を直接取得できないようにしてください。例えば次の規則を、一般的なPHP実行用の
+`location`より前に配置します。設置先に合わせて対象パスを限定してください。
+
+```nginx
+location ~* /(?:theme(?:_conf|_manifest)?\.php|[^/]+\.twig|[^/]+\.blade\.php)$ {
+    deny all;
+}
+```
 
 ## 必要な書き込み権限
 

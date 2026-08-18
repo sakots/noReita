@@ -1,18 +1,18 @@
 # noReitaのテーマ作成
 
 noReita v4.2以降では、既存テーマを親に指定する簡易テーマを推奨します。
-PHPスクリプトの設置者が配色を変更するだけなら、必要なファイルは`theme.php`と
-`theme.css`の2つだけです。
+簡易テーマで必須のファイルは`theme.php`だけです。配色も変更する場合は、任意の
+`theme.css`を追加します。
 
 ## 最小テーマ
 
-`noreita/theme/starter/`を別名でコピーします。例えば`mytheme`を作る場合は、
-次の構成になります。
+例えば`mytheme`を最小構成で作る場合は、次のように`theme.php`だけを配置します。
+`noreita/theme/starter/`をコピーして始める場合、配色を変更しなければ同梱の
+`theme.css`は削除できます。
 
 ```text
 noreita/theme/mytheme/
-├── theme.php
-└── theme.css
+└── theme.php
 ```
 
 `theme.php`は親テーマだけ指定すれば動作します。`name`と`version`は省略でき、
@@ -45,9 +45,10 @@ return [
 ],
 ```
 
-## CSSだけ変更する
+## CSSも変更する
 
-`theme.css`は親テーマ、管理画面、描画アプリなどのページ固有CSSより後に自動で読み込まれます。
+テーマのディレクトリへ任意の`theme.css`を追加すると、親テーマ、管理画面、描画アプリなどの
+ページ固有CSSより後に自動で読み込まれます。
 変更したい規則だけを記述します。
 内容からキャッシュ用識別子を自動生成するため、CSSを編集するたびにバージョンを変更する必要はありません。
 
@@ -96,7 +97,7 @@ php plugins/check-theme.php --root=noreita --theme=mytheme --json
 ```
 
 親テーマのマニフェスト、必須テンプレートとアセット、子テーマのTwig構文、
-コンポーネント参照、`theme.css`を検査します。エラーがある場合は終了コード1、
+コンポーネント参照、配置されている`theme.css`を検査します。エラーがある場合は終了コード1、
 診断自体に失敗した場合は終了コード2です。
 
 ## 従来形式との互換性
@@ -110,3 +111,5 @@ edaとmonoreitaは、`theme_conf.php`と`theme_manifest.php`を持つ完全テ�
 
 ルートの`.htaccess`が`theme.php`、`theme_conf.php`、`theme_manifest.php`、Twig、BladeOneの
 テンプレートへの直接HTTPアクセスを拒否します。簡易テーマごとに`.htaccess`を作る必要はありません。
+nginxでは`.htaccess`が動作しないため、`docs/requirements.md`に従って同じ拒否規則を
+サーバー設定へ追加してください。
