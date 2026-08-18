@@ -73,9 +73,13 @@
     return { overlay, stage, message };
   }
 
-  function canvasBlob(canvas) {
+  function canvasBlob(canvas, timeoutMilliseconds = 30000) {
     return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        reject(new Error('最終画像の生成が時間内に完了しませんでした。'));
+      }, timeoutMilliseconds);
       canvas.toBlob((blob) => {
+        window.clearTimeout(timeout);
         if (blob && blob.type === 'image/png') resolve(blob);
         else reject(new Error('最終画像をPNGに変換できませんでした。'));
       }, 'image/png');
@@ -145,7 +149,7 @@
     throw new Error('PCHの変換が時間内に完了しませんでした。');
   }
 
-  async function convertTgkr(buffer) {
+  async function convertTgkr(buffer, updateStatus) {
     if (!settings.tegakiEnabled) throw new Error('Tegaki.jsは無効です。');
     const bytes = new Uint8Array(buffer);
     if (bytes.length < 13 || bytes[0] !== 0x54 || bytes[1] !== 0x47 || bytes[2] !== 0x4b) {
@@ -164,6 +168,9 @@
     const tegaki = window.Tegaki;
     tegaki.open({ replayMode: true });
     try {
+      // The viewer UI can look as though manual interaction is required. Conversion is automatic,
+      // so keep it mounted for canvas operations but report progress in the post form instead.
+      if (tegaki.bg) tegaki.bg.style.visibility = 'hidden';
       const replay = tegaki.replayViewer;
       replay.loadFromBuffer(buffer);
       if (!replay.loaded || replay.canvasWidth < 1 || replay.canvasHeight < 1
@@ -174,13 +181,24 @@
       tegaki.init();
       tegaki.setTool(tegaki.defaultTool);
       replay.currentPos = replay.duration;
+      replay.maxEventsPerFrame = 2000;
       const deadline = Date.now() + 120000;
-      let chunks = 0;
+      let lastPercentage = -1;
       while (replay.eventIndex < replay.events.length) {
+        const previousIndex = replay.eventIndex;
         replay.step(0);
-        if (++chunks % 20 === 0) await wait(0);
+        if (replay.eventIndex <= previousIndex) {
+          throw new Error('TGKRの再生処理を続行できませんでした。');
+        }
+        const percentage = Math.min(100, Math.floor(replay.eventIndex / replay.events.length * 100));
+        if (percentage !== lastPercentage) {
+          updateStatus(`TGKRを確認しています… ${percentage}%`);
+          lastPercentage = percentage;
+        }
         if (Date.now() >= deadline) throw new Error('TGKRの変換が時間内に完了しませんでした。');
+        await wait(0);
       }
+      updateStatus('TGKRの最終画像を生成しています…');
       const blob = await canvasBlob(tegaki.flatten());
       tegaki.destroy();
       return blob;
@@ -286,7 +304,7 @@
         const buffer = await file.arrayBuffer();
         const picture = extension === 'pch'
           ? await convertPch(buffer)
-          : await convertTgkr(buffer);
+          : await convertTgkr(buffer, (message) => { status.textContent = message; });
         status.textContent = '生成した画像と動画を保存しています…';
         const result = await uploadConverted(form, file, picture);
         setFormImage(form, result.filename, result.previewUrl);
