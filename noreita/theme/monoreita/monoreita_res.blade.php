@@ -20,6 +20,7 @@
     <meta property="og:description" content="{{$bbsline['com']}}">
     @endforeach
   @endif
+  @include('components.monoreita_customCss')
 </head>
 
 <body>

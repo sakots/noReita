@@ -18,6 +18,7 @@
 	</script>
   <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
   <script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
+  @include('components.monoreita_customCss')
 </head>
 
 <body id="paintmode">

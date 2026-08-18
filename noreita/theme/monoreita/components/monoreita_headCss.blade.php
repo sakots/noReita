@@ -9,6 +9,3 @@
 <link rel="stylesheet" href="theme/{{$theme_dir}}/css/sql/monoreita.min.css" id="css7" disabled>
 <link rel="stylesheet" href="theme/{{$theme_dir}}/css/pop/monoreita.min.css" id="css8" disabled>
 <script src="theme/{{$theme_dir}}/js/switchcss.js"></script>
-@foreach (($theme_custom_stylesheets ?? []) as $stylesheet)
-<link rel="stylesheet" href="{{$stylesheet}}">
-@endforeach

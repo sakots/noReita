@@ -10,6 +10,7 @@
   @if ($othermode == 'ok')
   <meta http-equiv="refresh" content="1; URL={{$self}}">
   @endif
+  @include('components.monoreita_customCss')
 </head>
 
 <body>

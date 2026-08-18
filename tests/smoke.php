@@ -131,6 +131,40 @@ smoke_test('eda Twig theme templates compile', static function (): bool {
   }
 });
 
+smoke_test('simple theme stylesheets load after page-specific styles', static function (): bool {
+  $themes = [
+    [
+      'directory' => dirname(__DIR__) . '/noreita/theme/eda',
+      'pattern' => '*.twig',
+      'head' => 'components/eda_headCss.twig',
+      'custom' => 'components/eda_customCss.twig',
+    ],
+    [
+      'directory' => dirname(__DIR__) . '/noreita/theme/monoreita',
+      'pattern' => '*.blade.php',
+      'head' => 'components.monoreita_headCss',
+      'custom' => 'components.monoreita_customCss',
+    ],
+  ];
+  $checked = 0;
+  foreach ($themes as $theme) {
+    foreach (glob($theme['directory'] . DIRECTORY_SEPARATOR . $theme['pattern']) ?: [] as $template) {
+      $source = file_get_contents($template);
+      if (!is_string($source) || !str_contains($source, $theme['head'])) continue;
+      $head_end = stripos($source, '</head>');
+      $custom_position = strpos($source, $theme['custom']);
+      if ($head_end === false || $custom_position === false || $custom_position >= $head_end) return false;
+      $head = substr($source, 0, $head_end);
+      $last_link = strripos($head, '<link rel="stylesheet"');
+      $last_style = strripos($head, '<style');
+      $last_page_style = max($last_link === false ? -1 : $last_link, $last_style === false ? -1 : $last_style);
+      if ($custom_position <= $last_page_style || $custom_position <= strpos($source, $theme['head'])) return false;
+      $checked++;
+    }
+  }
+  return $checked === 28;
+});
+
 smoke_test('administration templates escape post subjects', static function (): bool {
   $eda = file_get_contents(dirname(__DIR__) . '/noreita/theme/eda/eda_admin.twig');
   $monoreita = file_get_contents(dirname(__DIR__) . '/noreita/theme/monoreita/monoreita_admin.blade.php');

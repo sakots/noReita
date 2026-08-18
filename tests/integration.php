@@ -556,6 +556,8 @@ PHP;
   integration_test('administrator login persists and clears prior failures', static function () use (
     $admin_login_status, $admin_status, $admin_body, $login_attempt_records_after_success
   ): bool {
+    $admin_css_position = strpos($admin_body, 'css/eda_admin.css');
+    $custom_css_position = strpos($admin_body, 'theme/starter/theme.css?v=1.0.0-');
     return $admin_login_status === 302 && $admin_status === 200
       && $login_attempt_records_after_success === []
       && str_contains($admin_body, 'ADMIN MODE')
@@ -567,6 +569,8 @@ PHP;
       && str_contains($admin_body, 'EDA_THEME_COLOR_PRESETS')
       && str_contains($admin_body, 'css/mono/eda.min.css')
       && str_contains($admin_body, 'theme/starter/theme.css?v=1.0.0-')
+      && $admin_css_position !== false && $custom_css_position !== false
+      && $admin_css_position < $custom_css_position
       && !str_contains($admin_body, 'switchcss.js')
       && !str_contains($admin_body, 'css/reita/eda.min.css')
       && str_contains($admin_body, 'mode=admin_theme_settings')

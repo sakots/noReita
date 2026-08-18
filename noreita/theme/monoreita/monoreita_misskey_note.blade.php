@@ -35,6 +35,7 @@
       border-radius: 4px;
     }
   </style>
+  @include('components.monoreita_customCss')
 </head>
 <body>
   <header id="header">
