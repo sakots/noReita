@@ -63,15 +63,8 @@ function theme_checker_run(string $root, ?string $selected_theme): array {
   if ($selected_theme === null) Config::load($root);
   $theme = $selected_theme ?? Config::string('paths.theme');
   if (!ThemeManifest::safeName($theme)) throw new RuntimeException('Configured theme name is unsafe.');
-  $directory = $root . DIRECTORY_SEPARATOR . 'theme' . DIRECTORY_SEPARATOR . $theme;
-  if (!is_dir($directory)) throw new RuntimeException("Theme directory does not exist: {$theme}");
-  $configuration = $directory . DIRECTORY_SEPARATOR . 'theme_conf.php';
-  if (!is_file($configuration) || !is_readable($configuration)) {
-    throw new RuntimeException("theme_conf.php is missing or unreadable for theme: {$theme}");
-  }
-  require $configuration;
-  $manifest = ThemeManifest::load($directory);
-  return ThemeDiagnostics::inspect($directory, $manifest, ThemeManifest::runtimeMetadata());
+  $runtime = ThemeRuntime::load($root . DIRECTORY_SEPARATOR . 'theme', $theme);
+  return ThemeDiagnostics::inspectRuntime($runtime);
 }
 
 function theme_checker_main(array $arguments): int {

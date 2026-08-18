@@ -6,9 +6,9 @@
 
 外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定し、Twig 3も同梱します。
 
-`template_engine.inc.php`が画面描画の共通入口です。`TemplateEngine`を通して論理テンプレート名とデータ配列を渡し、テーマの`theme_conf.php`にある`THEME_TEMPLATE_ENGINE`定数で`blade`または`twig`を選択します。定数がない既存テーマは互換性のため`blade`として扱います。BladeOneは従来どおり`.blade.php`、Twigは同名の`.twig`をテーマディレクトリから読み込みます。Twig選択時に`.twig`がない画面は`.blade.php`へフォールバックするため、テーマを稼働させたまま1画面ずつ移行できます。Twigの自動エスケープを有効にしているため、HTMLを出力する値はTwigテンプレート側で必要な箇所だけ`|raw`を明示してください。
+`template_engine.inc.php`が画面描画の共通入口です。`TemplateEngine`を通して論理テンプレート名とデータ配列を渡します。v4.2簡易テーマでは子から親の順に複数のテンプレートディレクトリを探索し、未配置の画面とコンポーネントを親テーマへフォールバックします。BladeOneは`.blade.php`、Twigは同名の`.twig`を読み込みます。Twig選択時に`.twig`がない画面は`.blade.php`へフォールバックするため、テーマを稼働させたまま1画面ずつ移行できます。Twigの自動エスケープを有効にしているため、HTMLを出力する値はTwigテンプレート側で必要な箇所だけ`|raw`を明示してください。
 
-`theme_manifest.inc.php`はテーマのマニフェストを検証し、`ThemeDiagnostics`が必須テンプレート、コンポーネント参照、アセット、Twig構文を診断します。テーマ作成者は`theme_manifest.php`でテーマID、バージョン、使用エンジン、必要なPHP、テンプレート、アセットを宣言します。`plugins/check-theme.php`は読み取り専用のCLI自己診断です。
+`theme_manifest.inc.php`の`ThemeRuntime`は、`theme.php`だけを持つ簡易テーマの継承関係を検証し、親の`theme_conf.php`と`theme_manifest.php`からエンジン、論理テンプレート、標準アセットを解決します。簡易テーマの`theme.css`は親とページ固有のCSSより後に読み込みます。従来の完全テーマは二つの設定ファイルをそのまま使用します。`ThemeDiagnostics`は親の必須テンプレートとアセットに加え、子の差分テンプレート、コンポーネント参照、Twig構文、BladeOneコンパイル後のPHP構文を診断します。`plugins/check-theme.php`は読み取り専用のCLI自己診断です。
 
 `PostValidator`は必須項目、文字数、NGワード、日本語フィルター、コメントURL、拒否ホストを画面描画から独立して検証します。
 
@@ -79,6 +79,8 @@
 `thumbnail.inc.php`はGDを使った画像変換処理を担当し、`ImageService`と`ExternalImageService`から利用されます。
 
 管理者は`mode=admin_temporary_images`から、投稿前の一時画像を確認できます。保存日時の新しい順にページ分割し、1ページあたりの表示数は`admin.temporary_images_per_page`（既定50）で設定できます。選択削除は有効な`.dat`メタデータと一致する画像だけを対象にし、画像・動画・作業データを同じベース名でまとめて削除します。期限切れの一時ファイルは、設定された`limits.temporary_days`に従って一括整理できます。一時領域`tmp/`は`.htaccess`で直接取得を拒否し、プレビューは`mode=temporary_image`を経由します。この入口は同じ`usercode`の投稿者か管理者セッションにだけ画像を返し、動画・PSDなどの作業ファイルは返しません。
+
+PCH/TGKRアップロードは、サーバーに描画エンジンを持たせず、利用者のブラウザで動画の最終状態をPNGへ変換します。`mode=animation_upload`はCSRF・同一オリジン・投稿権限・容量・拡張子・ファイルヘッダー・生成PNGを再検証し、PNG・元動画・`.dat`を同じ自動生成名で`tmp/`へ保存します。`.dat`を最後にrenameすることで、不完全な組を一時画像一覧へ公開しません。PCHではヘッダーのキャンバス寸法と生成PNGの寸法一致も確認します。投稿確定後は通常のお絵描き画像と同じ`ImageService::finalizeNewPost()`を通り、画像と動画を`img/`へ移動します。
 
 `external_image.inc.php`の`ExternalImageService`は、本文中の外部画像URLの抽出、サムネイルキャッシュの生成と表示、安全な外部画像取得を担当します。外部取得ではTLS検証、公開IPだけへの接続、リダイレクト先の再検証、容量・画像形式・画像寸法の制限を行います。表示遅延と外部取得DoSを抑えるため、1投稿につき最大2URL、1回のPHPリクエストにつき最大3回の新規取得に制限します。取得タイムアウトは5秒で、失敗結果は5分間キャッシュします。複数リクエスト間の外部取得は非待機ロックで同時実行を避け、ロック中はサムネイルを省略します。
 

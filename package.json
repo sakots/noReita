@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "chokidar": "^5.0.0",
+    "sass": "^1.102.0"
+  },
+  "scripts": {
+    "sass": "node scripts/watch-sass.mjs",
+    "sass:build": "node scripts/watch-sass.mjs --once"
+  }
+}

@@ -55,6 +55,12 @@ FTPソフトをつかってサーバーにアップロードするだけです�
 保存名はお絵かき画像と同じ「時刻＋マイクロ秒」の自動生成名となり、元のファイル名は保存しません。
 無効化や上限の変更は`config.local.php`で行えます。
 
+同じ欄からPaintBBS NEOの`.pch`とTegaki.jsの`.tgkr`も選択できます。動画を選択して通常の
+「書き込む」を押すと、ブラウザ内で動画を最終状態まで再生してPNGを生成し、元動画と組にして投稿します。TGKRは
+`features.tegaki`が有効な場合だけ表示・受け付けます。PCHは現在のPaintBBS NEO形式だけが対象で、
+旧Java版PaintBBSのPCHには対応しません。動画アップロードも`features.image_upload`と
+`features.animation`の両方が有効な場合だけ利用できます。
+
 ```php
 <?php
 return [
@@ -62,6 +68,10 @@ return [
   'limits' => ['upload_kb' => 2000, 'image_width' => 800, 'image_height' => 800],
 ];
 ```
+
+動画ファイルには`limits.paint_work_kb`、生成PNGには`limits.paint_image_kb`、両方を含むHTTP
+リクエストには`limits.paint_request_kb`の上限が適用されます。確認・変換・掲示板への書き込みが終わるまで、
+ページを閉じずにお待ちください。
 
 ### 日記モード
 
@@ -146,6 +156,29 @@ return [
 ## 履歴
 
 [すべての履歴はこちら](changelog.md)
+
+### [2026/08/18] v4.2.0
+
+- `theme.php`だけで作れる簡易テーマに対応（`theme.css`は任意）
+  - eda・monoreitaなどの親テーマから設定、テンプレート、アセットを継承
+  - 変更したテンプレートとコンポーネントだけを子テーマへ配置可能
+  - 簡易テーマの継承関係と差分ファイルをテーマ自己診断の対象に追加
+  - コピーして使える`theme/starter/`を追加
+- eda・monoreitaのSCSSをSass 1.102以降のカラーAPIへ対応
+- Sassコンパイルと追跡済み・未追跡の生成CSS同期確認をGitHub Actionsへ追加
+- eda・monoreita・starterのテーマ自己診断をGitHub Actionsへ追加
+- BladeOneテンプレートをコンパイルし、生成されたPHPの構文も自己診断
+- テーマPHP・Twig・BladeOneのバックアップ名もHTTPアクセス拒否
+- 管理者セッション中は公開画面にも「管理者ログイン中」を常時表示
+- 画像アップロードの対応形式をGDのデコード能力に合わせ、AVIF非対応サーバーの場合は保存前に拒否
+- 画像アップロード欄からPaintBBS NEOのPCHとTegaki.jsのTGKRを投稿可能に
+  - ブラウザで動画の最終状態をPNGへ変換し、元動画と同じ自動生成名で保存
+  - 動画選択後は通常の「書き込む」1回で、動画確認・変換・掲示板投稿まで実行
+  - TGKR変換の進捗表示と停止検出、最終PNG生成のタイムアウトを追加
+  - TGKRはTegaki.js有効時だけ受け付け、PCHはNEO形式だけを許可
+  - CSRF、容量、ヘッダー、画像寸法、一時保存の不完全終了をサーバー側でも検査
+- Tegaki.jsのアイコンが読み込めない問題を修正
+  - アプリ側の問題ではなかったのですがここに書いておきます 
 
 ### [2026/08/17] v4.1.3
 

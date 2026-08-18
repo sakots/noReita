@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.1.3 lot.260817.1';
+const REITA_VER = 'v4.2.0 lot.260818.1';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -58,7 +58,7 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260817) {
 // image.inc
 check_file(__DIR__.'/image.inc.php');
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260811) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260818) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
@@ -107,7 +107,7 @@ if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260817) {
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260807) {
+if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260818) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
@@ -119,16 +119,15 @@ if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260816) {
 }
 
 // テーマ
-$theme_directory = __DIR__ . '/theme/' . Config::string('paths.theme');
-require($theme_directory . '/theme_conf.php');
 require_once __DIR__ . '/theme_manifest.inc.php';
+$theme_runtime = null;
 try {
-  $theme_manifest = ThemeManifest::load($theme_directory);
-  ThemeManifest::assertMatchesRuntime($theme_manifest, ThemeManifest::runtimeMetadata());
-} catch (ThemeManifestException $e) {
-  http_response_code(500);
-  die($en ? 'Theme configuration error: ' . h($e->getMessage()) : 'テーマ設定エラー: ' . h($e->getMessage()));
+  $theme_runtime = ThemeRuntime::load(__DIR__ . '/theme', Config::string('paths.theme'));
+} catch (Throwable $e) {
+  error($en ? 'Theme configuration failed.' : 'テーマ設定の読み込みに失敗しました。', 500, $e);
 }
+if (!is_array($theme_runtime)) exit;
+$theme_directory = $theme_runtime['active_directory'];
 
 // タイムゾーン設定
 date_default_timezone_set(Config::string('site.timezone'));
@@ -149,7 +148,7 @@ if (!is_file($autoload)) {
 require_once $autoload;
 require_once __DIR__ . '/template_engine.inc.php';
 
-$views = $theme_directory; // テンプレートフォルダ
+$views = $theme_runtime['view_directories']; // 子テーマから親テーマの順にテンプレートを探索
 $cache = __DIR__ . '/cache'; // キャッシュフォルダ
 
 // テンプレートキャッシュに必要な場所だけを書き込み可能にする。
@@ -161,7 +160,7 @@ if (!is_readable($cache) || !is_writable($cache)) {
     : 'テンプレートキャッシュディレクトリを読み書きできません。');
 }
 
-$theme_template_engine = defined('THEME_TEMPLATE_ENGINE') ? THEME_TEMPLATE_ENGINE : 'blade';
+$theme_template_engine = $theme_runtime['engine'];
 if (!is_string($theme_template_engine) || !in_array($theme_template_engine, ['blade', 'twig'], true)) {
   die($en ? 'The theme template engine must be blade or twig.' : 'テーマのテンプレートエンジンはbladeまたはtwigを指定してください。');
 }
@@ -203,9 +202,16 @@ $dat['max_sub'] = Config::int('limits.subject_length');
 $dat['max_url'] = Config::int('limits.url_length');
 $dat['max_com'] = Config::int('limits.comment_length');
 
-$dat['theme_dir'] = Config::string('paths.theme');
-$dat['theme_name'] = THEME_NAME;
-$dat['tver'] = THEME_VER;
+$dat['theme_dir'] = $theme_runtime['base_id'];
+$dat['theme_active_dir'] = $theme_runtime['id'];
+$dat['theme_name'] = $theme_runtime['name'];
+$dat['tver'] = $theme_runtime['simple']
+  ? (string)$theme_runtime['base_metadata']['version'] . '-' . $theme_runtime['version']
+  : $theme_runtime['version'];
+$dat['theme_custom_stylesheets'] = array_map(
+  static fn(array $theme): string => 'theme/' . rawurlencode($theme['id']) . '/theme.css?v=' . rawurlencode($theme['version']),
+  $theme_runtime['stylesheet_themes']
+);
 
 $dat['switch_sns'] = Config::bool('features.share_details');
 
@@ -246,14 +252,25 @@ $dat['sodane'] = SODANE;
 
 $dat['use_oekaki_reply'] = Config::bool('features.oekaki_reply');
 $dat['use_image_upload'] = Config::bool('features.image_upload');
+$dat['use_animation_upload'] = Config::bool('features.image_upload') && Config::bool('features.animation');
+$dat['animation_upload_accept'] = Config::bool('features.tegaki') ? '.pch,.tgkr' : '.pch';
+$dat['animation_upload_format_label'] = Config::bool('features.tegaki') ? 'PCH / TGKR' : 'PCH';
+$dat['animation_upload_max_kb'] = Config::int('limits.paint_work_kb');
+$dat['animation_upload_max_bytes'] = Config::int('limits.paint_work_kb') * 1024;
+$animation_upload_modified = @filemtime(__DIR__ . '/animation-upload.js');
+$dat['animation_upload_version'] = $animation_upload_modified === false
+  ? REITA_VER
+  : (string)$animation_upload_modified;
 $dat['diary_mode'] = Config::bool('features.diary_mode');
 $dat['can_create_thread'] = diary_post_allowed(false);
 $dat['can_post_reply'] = diary_post_allowed(true);
 $dat['upload_max_kb'] = Config::int('limits.upload_kb');
 $dat['upload_max_width'] = Config::int('limits.image_width');
 $dat['upload_max_height'] = Config::int('limits.image_height');
+$dat['upload_accept'] = ImageService::uploadAccept();
+$dat['upload_format_label'] = ImageService::uploadFormatLabel();
 
-$dat['theme_name'] = THEME_NAME;
+$dat['theme_name'] = $theme_runtime['name'];
 
 //ペイント画面の$pwdの暗号化
 const CRYPT_METHOD = 'aes-128-cbc';
@@ -314,6 +331,9 @@ $https_only = (bool)($_SERVER['HTTPS'] ?? '');
 $usercode = t(filter_input_data('COOKIE', 'usercode')); //user-codeを取得
 
 RequestSecurity::startSession();
+$dat['admin_authenticated'] = AdminAuth::isAuthenticated(
+  Config::string('admin.password'), Config::int('admin.session_lifetime')
+);
 $session_usercode = $_SESSION['usercode'] ?? "";
 $session_usercode = t($session_usercode);
 
@@ -380,6 +400,8 @@ switch ($mode) {
     return delmode();
   case 'saveimage': // 画像保存
     return save_image();
+  case 'animation_upload': // 動画ファイルをPNGと組にして一時保存
+    return animation_upload();
   case 'admin_in': // 管理モードin
     return admin_in();
   case 'admin_login':
@@ -549,6 +571,19 @@ function regist(): void {
   $uploaded_file = $_FILES['image_upload'] ?? null;
   $has_uploaded_file = $uploaded_file !== null
     && (!is_array($uploaded_file) || ($uploaded_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  $raw_animation_file = $_FILES['animation_upload'] ?? null;
+  $has_unconverted_animation = $raw_animation_file !== null
+    && (!is_array($raw_animation_file)
+      || ($raw_animation_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  if ($has_unconverted_animation) {
+    error(
+      $en
+        ? 'The animation could not be checked. Enable JavaScript, reload the page, and try again.'
+        : '動画を確認できませんでした。JavaScriptを有効にしてページを再読み込みし、もう一度お試しください。',
+      422
+    );
+    return;
+  }
   $pending_picfile = $_SESSION['pending_picfile'] ?? '';
   if (is_string($pending_picfile) && $pending_picfile !== '') {
     $pending_metadata = ImageService::parseTemporaryMetadata(
@@ -664,7 +699,12 @@ function regist(): void {
     }
   } catch (ImageUploadException $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
-    error($en ? $e->getMessage() : '画像ファイルを受け付けられませんでした。', $e->getCode() ?: 400, $e);
+    $upload_error = $en
+      ? $e->getMessage()
+      : ($e->getCode() === 415
+        ? 'このサーバーでは、この画像形式を処理できません。'
+        : '画像ファイルを受け付けられませんでした。');
+    error($upload_error, $e->getCode() ?: 400, $e);
   } catch (Throwable $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
@@ -1384,7 +1424,7 @@ function paint_form(string $rep, ?int $reply_to): void {
     $dat['pchfile'] = null;
   }
   $usercode .= '&tool=' . $tool . '&stime=' . time(); //拡張ヘッダにツールと描画開始時間をセット
-  
+
   // ctypeが設定されている場合はusercodeに含める
   if ($ctype !== null) {
     $usercode .= '&ctype=' . $ctype;
@@ -1548,6 +1588,79 @@ function temporary_image_url(string $filename): string {
   return Config::string('site.script_name') . '?mode=temporary_image&file=' . rawurlencode($filename);
 }
 
+/** Accept a browser-rendered PNG together with its original NEO/Tegaki replay. */
+function animation_upload(): void {
+  global $en, $usercode;
+
+  header('Content-Type: text/plain; charset=UTF-8');
+  if (!Config::bool('features.image_upload') || !Config::bool('features.animation')) {
+    error($en ? 'Animation uploads are disabled.' : '動画ファイルのアップロードは無効です。', 403);
+    return;
+  }
+  try {
+    if (Config::bool('features.csrf')) {
+      RequestSecurity::assertCurrentCsrfRequest($en);
+    } else {
+      RequestSecurity::assertCurrentSameOriginRequest($en);
+    }
+    PaintSaveRequestGuard::assertWithinLimits(
+      $_SERVER,
+      $_POST,
+      $_FILES,
+      'animation_upload',
+      Config::int('limits.paint_image_kb') * 1024,
+      Config::int('limits.paint_work_kb') * 1024,
+      Config::int('limits.paint_request_kb') * 1024
+    );
+    $resto_value = filter_input_data('POST', 'resto', FILTER_VALIDATE_INT);
+    $resto = is_int($resto_value) && $resto_value > 0 ? $resto_value : 0;
+    if (!diary_post_allowed($resto > 0)) {
+      throw new ImageUploadException(
+        $en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。',
+        403
+      );
+    }
+    $picture = $_FILES['picture'] ?? null;
+    $animation = $_FILES['animation'] ?? null;
+    if (!is_array($picture) || !is_array($animation)) {
+      throw new ImageUploadException('Invalid animation upload.', 400);
+    }
+    $extension = strtolower(pathinfo((string)($animation['name'] ?? ''), PATHINFO_EXTENSION));
+    if ($extension === 'tgkr' && !Config::bool('features.tegaki')) {
+      throw new ImageUploadException('Tegaki uploads are disabled.', 403);
+    }
+    $result = ImageService::storeUploadedAnimation(
+      $picture,
+      $animation,
+      Config::string('paths.temporary'),
+      (string)$usercode,
+      $resto,
+      Config::int('limits.paint_image_kb') * 1024,
+      Config::int('limits.paint_work_kb') * 1024,
+      Config::int('limits.paint_max_width'),
+      Config::int('limits.paint_max_height'),
+      Config::int('permissions.public_file'),
+      Config::int('permissions.private_file')
+    );
+    $_SESSION['pending_picfile'] = $result['picfile'];
+    echo "ok\n" . $result['picfile'] . "\n" . temporary_image_url($result['preview']);
+  } catch (RequestSecurityException|PaintSaveCapacityException|ImageUploadException $e) {
+    error($en ? $e->getMessage() : animation_upload_error_message($e), $e->getCode() ?: 400, $e);
+  } catch (Throwable $e) {
+    error($en ? 'Animation upload failed.' : '動画ファイルの保存に失敗しました。', 500, $e);
+  }
+}
+
+function animation_upload_error_message(Throwable $error): string {
+  return match ($error->getCode()) {
+    403 => '動画ファイルをアップロードできません。設定と投稿権限を確認してください。',
+    413 => '動画または生成画像の容量・寸法が上限を超えています。',
+    415 => '対応していない動画形式です。',
+    422 => '動画ファイルまたは生成画像が不正です。',
+    default => '動画ファイルを受け付けられませんでした。',
+  };
+}
+
 /** Serve the PNG/JPEG/GIF/WebP/AVIF preview of a pending drawing after authorization. */
 function temporary_image(): void {
   global $usercode;
@@ -1624,10 +1737,10 @@ function in_continue(): void {
     $dat['oya'] = $continue_posts;
     $hist_ope = pathinfo($no, PATHINFO_FILENAME); //拡張子除去
     $hist_filename = Config::string('paths.images') . $hist_ope;
-    
+
     // データベースからctypeを取得
     $db_ctype = $continue_posts[0]['ctype'] ?? null;
-    
+
     if (is_file($hist_filename . '.pch')) {
       //$pchfile = Config::string('paths.images').$pch;
       $dat['tool'] = 'neo'; //拡張子がpchのときはNEO
@@ -1655,7 +1768,7 @@ function in_continue(): void {
       $dat['ctype_img'] = true;
     }
     // useshi, useneoは互換のためにいちおう残してある
-    
+
     // データベースのctypeを優先する
     if ($db_ctype === 'img') {
       $dat['ctype_img'] = true;

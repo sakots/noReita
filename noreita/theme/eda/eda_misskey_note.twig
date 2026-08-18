@@ -35,13 +35,14 @@
       border-radius: 4px;
     }
   </style>
+  {% include 'components/eda_customCss.twig' %}
 </head>
 <body>
   <header id="header">
     <h1><a href="{{ self }}">{{ board_title }}</a></h1>
     <div>
       <a href="{{ home }}" target="_top">[ホーム]</a>
-      <a href="{{ self }}?mode=admin_in">[管理モード]</a>
+      {% include 'components/eda_adminSession.twig' %}
     </div>
     <hr>
     <div>

@@ -1,0 +1,5 @@
+@if ($admin_authenticated ?? false)
+<a class="admin-session-status" href="{{$self}}?mode=admin"><strong>[管理者ログイン中]</strong></a>
+@else
+<a href="{{$self}}?mode=admin_in">[管理モード]</a>
+@endif

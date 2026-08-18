@@ -32,6 +32,7 @@
     }
 	</style>
 	<title>Share</title>
+  @include('components.monoreita_customCss')
 </head>
 <body>
   <form action="{{$self}}" method="POST" class="form_radio_sns_server">

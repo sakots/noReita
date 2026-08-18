@@ -161,7 +161,7 @@ return [
     'login' => ['max_failures' => 3],
   ],
   'site' => ['base_url' => 'http://localhost/'],
-  'paths' => ['theme' => 'eda'],
+  'paths' => ['theme' => 'starter'],
   'features' => [
     'image_upload' => true,
     'external_image_thumbnail' => false,
@@ -271,7 +271,16 @@ PHP;
     'http-access-probe.db-wal' => 'sqlite-wal-secret',
     'http-access-probe.db-shm' => 'sqlite-shm-secret',
     'http-access-probe.db-journal' => 'sqlite-journal-secret',
-    'theme/eda/theme_settings.db' => 'SQLite format',
+    'theme/starter/theme_settings.db' => 'SQLite format',
+    'theme/starter/theme.php' => 'extends',
+    'theme/starter/theme.php.bak' => 'theme-backup-secret',
+    'theme/eda/theme_conf.php.old' => 'theme-config-backup-secret',
+    'theme/eda/theme_manifest.php~' => 'theme-manifest-backup-secret',
+    'theme/eda/eda_main.twig' => 'DOCTYPE',
+    'theme/eda/eda_main.twig.bak' => 'twig-backup-secret',
+    'theme/eda/eda_main.twig~' => 'twig-editor-backup-secret',
+    'theme/monoreita/monoreita_main.blade.php' => 'DOCTYPE',
+    'theme/monoreita/monoreita_main.blade.php.bak' => 'blade-backup-secret',
     'thumbnail/.external-image-failures/http-access-probe.failure.dat' => 'external-failure-secret',
     'session/http-access-probe' => 'session-secret',
     'backup/http-access-probe.db' => 'backup-secret',
@@ -298,7 +307,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 16 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 25 && !in_array(false, $protected_results, true);
   });
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
@@ -416,8 +425,38 @@ PHP;
   [$status, $pictmp_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
-  integration_test('image upload form is available when enabled', static function () use ($status, $pictmp_body): bool {
-    return $status === 200 && str_contains($pictmp_body, 'name="image_upload"');
+  $upload_mimes = [];
+  $upload_labels = [];
+  foreach ([
+    'image/png' => ['PNG', 'imagecreatefrompng'],
+    'image/jpeg' => ['JPEG', 'imagecreatefromjpeg'],
+    'image/gif' => ['GIF', 'imagecreatefromgif'],
+    'image/webp' => ['WebP', 'imagecreatefromwebp'],
+    'image/avif' => ['AVIF', 'imagecreatefromavif'],
+  ] as $mime => [$label, $decoder]) {
+    if (!function_exists($decoder)) continue;
+    $upload_mimes[] = $mime;
+    $upload_labels[] = $label;
+  }
+  integration_test('image upload form lists only formats supported by GD', static function () use (
+    $status, $pictmp_body, $upload_mimes, $upload_labels
+  ): bool {
+    return $status === 200
+      && str_contains($pictmp_body, 'name="image_upload"')
+      && str_contains($pictmp_body, 'accept="' . implode(',', $upload_mimes) . '"')
+      && str_contains($pictmp_body, implode(' / ', $upload_labels));
+  });
+
+  integration_test('animation upload uses the normal post submit action', static function () use (
+    $status, $pictmp_body
+  ): bool {
+    return $status === 200
+      && str_contains($pictmp_body, 'data-animation-upload-file')
+      && str_contains($pictmp_body, 'name="animation_upload"')
+      && str_contains($pictmp_body, 'accept=".pch,.tgkr"')
+      && str_contains($pictmp_body, '「書き込む」で確認・投稿')
+      && !str_contains($pictmp_body, 'data-animation-upload-button')
+      && str_contains($pictmp_body, 'animation-upload.js?');
   });
 
   $oversized_paint = $root . DIRECTORY_SEPARATOR . 'oversized-paint.png';
@@ -486,6 +525,123 @@ PHP;
       && $invalid_paint_logged;
   });
 
+  $animation_png = $root . DIRECTORY_SEPARATOR . 'animation-upload.png';
+  $animation_png_data = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+  if ($animation_png_data === false || file_put_contents($animation_png, $animation_png_data) === false) {
+    throw new RuntimeException('Could not create animation upload PNG.');
+  }
+  $mismatched_pch = $root . DIRECTORY_SEPARATOR . 'mismatched.pch';
+  $valid_pch = $root . DIRECTORY_SEPARATOR . 'valid.pch';
+  file_put_contents($mismatched_pch, "NEO\0" . pack('v', 2) . pack('v', 1) . "\0\0\0\0x");
+  file_put_contents($valid_pch, "NEO\0" . pack('v', 1) . pack('v', 1) . "\0\0\0\0x");
+  [$unconverted_animation_status, $unconverted_animation_body] = http_request(
+    $base_url . '?mode=regist',
+    $cookie_jar,
+    [
+      'mode' => 'regist', 'send' => '1', 'name' => 'Animation fallback', 'mail' => '', 'url' => '',
+      'sub' => 'Unconverted animation', 'com' => '未変換動画の結合テストです。', 'pwd' => 'animation-pass',
+      'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+      'animation_upload' => new CURLFile($valid_pch, 'application/octet-stream', 'valid.pch'),
+    ]
+  );
+  integration_test('normal posting rejects an animation when browser conversion did not run', static function () use (
+    $unconverted_animation_status, $unconverted_animation_body
+  ): bool {
+    return $unconverted_animation_status === 422
+      && str_contains($unconverted_animation_body, 'animation could not be checked');
+  });
+  $temporary_before_mismatch = glob($webroot . '/tmp/*') ?: [];
+  [$animation_mismatch_status] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
+    'token' => $token,
+    'picture' => new CURLFile($animation_png, 'image/png', 'animation.png'),
+    'animation' => new CURLFile($mismatched_pch, 'application/octet-stream', 'mismatched.pch'),
+  ]);
+  $temporary_after_mismatch = glob($webroot . '/tmp/*') ?: [];
+  integration_test('animation upload rejects a PNG whose dimensions do not match its PCH', static function () use (
+    $animation_mismatch_status, $temporary_before_mismatch, $temporary_after_mismatch
+  ): bool {
+    return $animation_mismatch_status === 422
+      && $temporary_after_mismatch === $temporary_before_mismatch;
+  });
+
+  [$animation_upload_status, $animation_upload_body] = http_request(
+    $base_url . '?mode=animation_upload',
+    $cookie_jar,
+    [
+      'token' => $token,
+      'picture' => new CURLFile($animation_png, 'image/png', 'animation.png'),
+      'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'valid.pch'),
+    ]
+  );
+  $animation_upload_lines = preg_split('/\r?\n/', trim($animation_upload_body)) ?: [];
+  $uploaded_animation_image = (string)($animation_upload_lines[1] ?? '');
+  $uploaded_animation_base = pathinfo($uploaded_animation_image, PATHINFO_FILENAME);
+  integration_test('animation upload stores a generated PNG and NEO replay as one pending image', static function () use (
+    $animation_upload_status, $animation_upload_lines, $uploaded_animation_image,
+    $uploaded_animation_base, $webroot
+  ): bool {
+    return $animation_upload_status === 200
+      && ($animation_upload_lines[0] ?? '') === 'ok'
+      && preg_match('/^\d{16}\.png$/D', $uploaded_animation_image) === 1
+      && is_file($webroot . '/tmp/' . $uploaded_animation_image)
+      && is_file($webroot . '/tmp/' . $uploaded_animation_base . '.pch')
+      && is_file($webroot . '/tmp/' . $uploaded_animation_base . '.dat');
+  });
+
+  [$animation_post_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'Animation upload', 'mail' => '', 'url' => '',
+    'sub' => 'Animation upload', 'com' => '動画アップロードの結合テストです。', 'pwd' => 'animation-pass',
+    'picfile' => $uploaded_animation_image, 'ctype' => 'new', 'invz' => '0', 'sodane' => '0',
+    'nsfw' => '0', 'token' => $token,
+  ]);
+  $animation_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $animation_row = $animation_db->query(
+    "SELECT picfile, pchfile, tool FROM board_log WHERE sub = 'Animation upload' ORDER BY tid DESC LIMIT 1"
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('uploaded animation remains playable after posting', static function () use (
+    $animation_post_status, $animation_row, $uploaded_animation_image, $uploaded_animation_base, $webroot
+  ): bool {
+    return $animation_post_status === 200 && is_array($animation_row)
+      && $animation_row['picfile'] === $uploaded_animation_image
+      && $animation_row['pchfile'] === $uploaded_animation_base . '.pch'
+      && $animation_row['tool'] === 'PaintBBS NEO'
+      && is_file($webroot . '/img/' . $uploaded_animation_image)
+      && is_file($webroot . '/img/' . $uploaded_animation_base . '.pch');
+  });
+
+  $valid_tgkr = $root . DIRECTORY_SEPARATOR . 'valid.tgkr';
+  file_put_contents($valid_tgkr, 'TGK' . chr(1) . pack('N', 1) . "\1\0\0\1x");
+  [$tgkr_upload_status, $tgkr_upload_body] = http_request(
+    $base_url . '?mode=animation_upload',
+    $cookie_jar,
+    [
+      'token' => $token,
+      'picture' => new CURLFile($animation_png, 'image/png', 'animation.png'),
+      'animation' => new CURLFile($valid_tgkr, 'application/octet-stream', 'valid.tgkr'),
+    ]
+  );
+  $tgkr_upload_lines = preg_split('/\r?\n/', trim($tgkr_upload_body)) ?: [];
+  $tgkr_image = (string)($tgkr_upload_lines[1] ?? '');
+  $tgkr_base = pathinfo($tgkr_image, PATHINFO_FILENAME);
+  [$tgkr_post_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'TGKR upload', 'mail' => '', 'url' => '',
+    'sub' => 'TGKR upload', 'com' => 'TGKRアップロードの結合テストです。', 'pwd' => 'tgkr-pass',
+    'picfile' => $tgkr_image, 'ctype' => 'new', 'invz' => '0', 'sodane' => '0',
+    'nsfw' => '0', 'token' => $token,
+  ]);
+  $tgkr_row = $animation_db->query(
+    "SELECT picfile, pchfile, tool FROM board_log WHERE sub = 'TGKR upload' ORDER BY tid DESC LIMIT 1"
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('Tegaki-enabled boards retain an uploaded TGKR after posting', static function () use (
+    $tgkr_upload_status, $tgkr_post_status, $tgkr_row, $tgkr_image, $tgkr_base, $webroot
+  ): bool {
+    return $tgkr_upload_status === 200 && $tgkr_post_status === 200 && is_array($tgkr_row)
+      && $tgkr_row['picfile'] === $tgkr_image && $tgkr_row['pchfile'] === $tgkr_base . '.tgkr'
+      && $tgkr_row['tool'] === 'Tegaki.js'
+      && is_file($webroot . '/img/' . $tgkr_image)
+      && is_file($webroot . '/img/' . $tgkr_base . '.tgkr');
+  });
+
   [$misskey_loopback_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [
     'mode' => 'create_misskey_authrequesturl', 'misskey_server_radio' => 'direct',
     'misskey_server_direct_input' => 'https://127.0.0.1',
@@ -550,9 +706,22 @@ PHP;
   $token = $admin_session_id === null ? '' : hash('sha256', $admin_session_id);
   $login_attempt_records_after_success = glob($webroot . '/session/admin-login-*.json') ?: [];
   [$admin_status, $admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+  [$admin_public_status, $admin_public_body] = http_request($base_url, $cookie_jar);
+  integration_test('public pages visibly indicate an active administrator session', static function () use (
+    $startup_body, $admin_public_status, $admin_public_body
+  ): bool {
+    return !str_contains($startup_body, '管理者ログイン中')
+      && str_contains($startup_body, 'mode=admin_in')
+      && $admin_public_status === 200
+      && str_contains($admin_public_body, 'class="admin-session-status"')
+      && str_contains($admin_public_body, '管理者ログイン中')
+      && str_contains($admin_public_body, 'mode=admin');
+  });
   integration_test('administrator login persists and clears prior failures', static function () use (
     $admin_login_status, $admin_status, $admin_body, $login_attempt_records_after_success
   ): bool {
+    $admin_css_position = strpos($admin_body, 'css/eda_admin.css');
+    $custom_css_position = strpos($admin_body, 'theme/starter/theme.css?v=1.0.0-');
     return $admin_login_status === 302 && $admin_status === 200
       && $login_attempt_records_after_success === []
       && str_contains($admin_body, 'ADMIN MODE')
@@ -563,6 +732,9 @@ PHP;
       && str_contains($admin_body, 'themeColorManager.js')
       && str_contains($admin_body, 'EDA_THEME_COLOR_PRESETS')
       && str_contains($admin_body, 'css/mono/eda.min.css')
+      && str_contains($admin_body, 'theme/starter/theme.css?v=1.0.0-')
+      && $admin_css_position !== false && $custom_css_position !== false
+      && $admin_css_position < $custom_css_position
       && !str_contains($admin_body, 'switchcss.js')
       && !str_contains($admin_body, 'css/reita/eda.min.css')
       && str_contains($admin_body, 'mode=admin_theme_settings')
@@ -627,7 +799,7 @@ PHP;
   [$theme_save_status] = http_request($base_url . '?mode=admin_theme_settings', $cookie_jar, [
     'operation' => 'save', 'theme_settings' => ['colors' => $theme_colors], 'token' => $token,
   ]);
-  $theme_database = new PDO('sqlite:' . $webroot . '/theme/eda/theme_settings.db');
+  $theme_database = new PDO('sqlite:' . $webroot . '/theme/starter/theme_settings.db');
   $stored_theme_colors = (string)$theme_database->query(
     "SELECT value FROM theme_settings WHERE setting_key = 'colors'"
   )->fetchColumn();
@@ -1322,7 +1494,7 @@ PHP;
   });
 
   $upload_source = $root . '/direct-upload.png';
-  $upload_png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL0XQAAAABJRU5ErkJggg==', true);
+  $upload_png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
   if ($upload_png === false || file_put_contents($upload_source, $upload_png) === false) {
     throw new RuntimeException('Could not create direct upload image.');
   }
@@ -1346,8 +1518,35 @@ PHP;
       && is_file($webroot . '/img/' . $upload_row['picfile']);
   });
 
+  $unsupported_avif_rejected = true;
+  if (!function_exists('imagecreatefromavif')) {
+    $avif_source = $root . '/unsupported-upload.avif';
+    $avif_probe = pack('N', 24) . 'ftypavif' . pack('N', 0) . 'avifmif1';
+    if (file_put_contents($avif_source, $avif_probe) !== strlen($avif_probe)) {
+      throw new RuntimeException('Could not create unsupported AVIF upload probe.');
+    }
+    $avif_marker = 'unsupported-avif-' . bin2hex(random_bytes(6));
+    $avif_comment = '非対応AVIF ' . $avif_marker;
+    [$unsupported_avif_status, $unsupported_avif_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
+      'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
+      'sub' => 'Unsupported AVIF upload', 'com' => $avif_comment, 'pwd' => 'upload-delete-pass',
+      'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+      'image_upload' => new CURLFile($avif_source, 'image/avif', 'unsupported.avif'),
+    ]);
+    $avif_row_statement = $db->prepare('SELECT COUNT(*) FROM board_log WHERE com = :comment');
+    $avif_row_statement->execute([':comment' => $avif_comment]);
+    $unsupported_avif_rejected = $unsupported_avif_status === 415
+      && str_contains($unsupported_avif_body, 'not supported by this server')
+      && (int)$avif_row_statement->fetchColumn() === 0;
+  }
+  integration_test('unsupported AVIF uploads are rejected before database storage', static function () use (
+    $unsupported_avif_rejected
+  ): bool {
+    return $unsupported_avif_rejected;
+  });
+
   $monoreita_config_local = str_replace(
-    "'paths' => ['theme' => 'eda'],",
+    "'paths' => ['theme' => 'starter'],",
     "'paths' => ['theme' => 'monoreita'],",
     $config_local
   );
@@ -1399,6 +1598,9 @@ PHP;
   [$monoreita_admin_status, $monoreita_admin_body] = http_request(
     $monoreita_base_url . '?mode=admin', $monoreita_cookie_jar
   );
+  [$monoreita_public_status, $monoreita_public_body] = http_request(
+    $monoreita_base_url, $monoreita_cookie_jar
+  );
   [$monoreita_errorlog_status, $monoreita_errorlog_body] = http_request(
     $monoreita_base_url . '?mode=admin_errorlog', $monoreita_cookie_jar
   );
@@ -1410,7 +1612,8 @@ PHP;
   );
   integration_test('monoreita renders administrator pages through BladeOne over HTTP', static function () use (
     $monoreita_login_form_status, $monoreita_login_form_body, $monoreita_login_status,
-    $monoreita_admin_status, $monoreita_admin_body, $monoreita_errorlog_status, $monoreita_errorlog_body,
+    $monoreita_admin_status, $monoreita_admin_body, $monoreita_public_status, $monoreita_public_body,
+    $monoreita_errorlog_status, $monoreita_errorlog_body,
     $monoreita_auditlog_status, $monoreita_auditlog_body,
     $monoreita_temporary_status, $monoreita_temporary_body
   ): bool {
@@ -1419,6 +1622,9 @@ PHP;
       && $monoreita_login_status === 302
       && $monoreita_admin_status === 200
       && str_contains($monoreita_admin_body, 'theme/monoreita/css/monoreita_index.min.css')
+      && $monoreita_public_status === 200
+      && str_contains($monoreita_public_body, 'class="admin-session-status"')
+      && str_contains($monoreita_public_body, '管理者ログイン中')
       && str_contains($monoreita_admin_body, 'mode=admin_errorlog')
       && str_contains($monoreita_admin_body, 'mode=admin_auditlog')
       && str_contains($monoreita_admin_body, 'mode=admin_temporary_images')

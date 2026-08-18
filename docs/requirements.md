@@ -11,6 +11,10 @@ noReitaが動作するサーバー条件
 - curl、gd、mbstring、pdo_sqlite
 - （おそらく多くのレンタルサーバーには入っています）
 
+画像アップロードで表示される対応形式は、GDが実際に読み込める形式に限られます。
+AVIFを受け付けるにはGDのAVIF入力対応（`imagecreatefromavif()`）が必要です。
+AVIF非対応のサーバーではフォームの候補から除外され、送信されても保存前に拒否されます。
+
 ## Composer依存ライブラリ
 
 BladeOne v4.19.1をComposerで管理しています。ソースコードから設置・開発する場合は、事前に次を実行してください。
@@ -25,7 +29,7 @@ composer install --working-dir=noreita --no-dev --prefer-dist
 
 `.htaccess`が有効なApacheまたはApache互換サーバーを想定しています。
 
-ルートの`.htaccess`は`config.php`、`config.local.php`に加え、`config.local.php.bak`、`config.php.old`、`config.local.php~`など`config`から始まる設定バックアップ名、DB、ログ、メタデータへのHTTPアクセスを拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
+ルートの`.htaccess`は`config.php`、`config.local.php`に加え、`config.local.php.bak`、`config.php.old`、`config.local.php~`など`config`から始まる設定バックアップ名、テーマ設定PHP、Twig・BladeOneテンプレート、DB、ログ、メタデータへのHTTPアクセスを拒否します。テーマソースも`.bak`、`.old`などのドット付き接尾辞と末尾`~`を含めて拒否します。`noreita/session/.htaccess`、`noreita/cache/.htaccess`、`noreita/backup/.htaccess`、`noreita/errorlog/.htaccess`、`noreita/auditlog/.htaccess`、`noreita/tmp/.htaccess`は各ディレクトリ全体を拒否します。`tmp/`の投稿前画像は、認可を確認する`index.php?mode=temporary_image`経由でだけ表示されます。いずれもApache 2.4以降の`Require all denied`と、Apache 2.2互換の`Deny from all`の両方を収録しています。
 
 FTPソフトによっては、名前が`.`で始まるファイルを表示・転送しないことがあります。アップロード後にルート、`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`の各`.htaccess`が存在することを確認してください。これらを削除したり、非公開ファイルだけを別の公開ディレクトリへ移動したりしないでください。
 
@@ -45,9 +49,20 @@ CDNやリバースプロキシを自分で構成し、Webサーバーから見�
 
 信頼済みプロキシから接続された場合に限り`X-Forwarded-For`を右から検証し、信頼済みプロキシ群の手前にある最初のIPを接続元として扱います。不正な値が1つでも含まれる場合はヘッダー全体を無視します。非標準の`Client-IP`は設定の有無にかかわらず使用しません。
 
-## nginxを使う場合のDB・設定ファイル保護
+## nginxを使う場合のDB・設定・テーマソース保護
 
 nginxは`.htaccess`を使用しません。`session/`、`cache/`、`backup/`、`errorlog/`、`auditlog/`、`tmp/`、データベース、`config.php`、`config.local.php`とそのバックアップ名へのアクセス拒否をnginx側で設定する必要があります。
+
+テーマについても、`theme.php`、`theme_conf.php`、`theme_manifest.php`、`*.twig`、
+`*.blade.php`と、それらの`.bak`、`.old`、末尾`~`などを直接取得できないようにしてください。
+例えば次の規則を、一般的なPHP実行用の
+`location`より前に配置します。設置先に合わせて対象パスを限定してください。
+
+```nginx
+location ~* /(?:theme(?:_conf|_manifest)?\.php|[^/]+\.(?:twig|blade\.php))(?:\.[^/]+|~)?$ {
+    deny all;
+}
+```
 
 ## 必要な書き込み権限
 

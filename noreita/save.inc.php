@@ -13,6 +13,7 @@ final class PaintSaveRequestGuard {
     'klecks' => ['picture', 'psd'],
     'tegaki' => ['picture', 'tgkr'],
     'axnos' => ['picture'],
+    'animation_upload' => ['picture', 'animation'],
   ];
 
   public static function assertWithinLimits(

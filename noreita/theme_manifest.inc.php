@@ -4,6 +4,135 @@
 final class ThemeManifestException extends RuntimeException {
 }
 
+/**
+ * v4.2の簡易テーマと従来テーマを、同じ実行情報へ解決する。
+ * 簡易テーマはtheme.phpで親を1つ指定し、設定・未配置テンプレート・アセットを継承する。
+ */
+final class ThemeRuntime {
+  private const MAX_INHERITANCE_DEPTH = 8;
+
+  /**
+   * @return array{
+   *   id:string,name:string,version:string,engine:string,templates:array<string,string>,
+   *   active_directory:string,base_id:string,base_directory:string,
+   *   view_directories:array<int,string>,stylesheet_themes:array<int,array{id:string,version:string}>,
+   *   manifest:array<string,mixed>,base_metadata:array<string,mixed>,simple:bool
+   * }
+   */
+  public static function load(string $themes_root, string $theme_id): array {
+    $root = realpath($themes_root);
+    if ($root === false || !is_dir($root)) {
+      throw new ThemeManifestException('Theme root directory does not exist.');
+    }
+    if (!ThemeManifest::safeName($theme_id)) {
+      throw new ThemeManifestException('Configured theme name is unsafe.');
+    }
+
+    $active_id = $theme_id;
+    $simple_themes = [];
+    $seen = [];
+    for ($depth = 0; $depth < self::MAX_INHERITANCE_DEPTH; $depth++) {
+      if (isset($seen[$theme_id])) {
+        throw new ThemeManifestException('Theme inheritance contains a cycle.');
+      }
+      $seen[$theme_id] = true;
+      $directory = $root . DIRECTORY_SEPARATOR . $theme_id;
+      if (!is_dir($directory) || !is_readable($directory)) {
+        throw new ThemeManifestException("Theme directory is missing or unreadable: {$theme_id}");
+      }
+
+      $simple_file = $directory . DIRECTORY_SEPARATOR . 'theme.php';
+      if (!is_file($simple_file)) {
+        $configuration = $directory . DIRECTORY_SEPARATOR . 'theme_conf.php';
+        if (!is_file($configuration) || !is_readable($configuration)) {
+          throw new ThemeManifestException("Theme must contain theme.php or theme_conf.php: {$theme_id}");
+        }
+        $base_id = $theme_id;
+        $base_directory = $directory;
+        break;
+      }
+
+      $definition = require $simple_file;
+      if (!is_array($definition)) {
+        throw new ThemeManifestException("theme.php must return an array: {$theme_id}");
+      }
+      $definition = self::validateSimpleDefinition($definition, $theme_id);
+      $simple_themes[] = [
+        'id' => $theme_id,
+        'directory' => $directory,
+        'name' => $definition['name'],
+        'version' => $definition['version'],
+      ];
+      $theme_id = $definition['extends'];
+    }
+    if (!isset($base_id, $base_directory)) {
+      throw new ThemeManifestException('Theme inheritance is too deep.');
+    }
+
+    require_once $base_directory . DIRECTORY_SEPARATOR . 'theme_conf.php';
+    $manifest = ThemeManifest::load($base_directory);
+    $base_metadata = ThemeManifest::runtimeMetadata();
+    ThemeManifest::assertMatchesRuntime($manifest, $base_metadata);
+
+    $active = $simple_themes[0] ?? [
+      'id' => $base_id,
+      'directory' => $base_directory,
+      'name' => (string)$base_metadata['id'],
+      'version' => (string)$base_metadata['version'],
+    ];
+    $view_directories = array_column($simple_themes, 'directory');
+    $view_directories[] = $base_directory;
+    $view_directories = array_values(array_unique($view_directories));
+
+    $stylesheet_themes = [];
+    foreach (array_reverse($simple_themes) as $theme) {
+      $stylesheet = $theme['directory'] . DIRECTORY_SEPARATOR . 'theme.css';
+      if (is_file($stylesheet)) {
+        $digest = @hash_file('sha256', $stylesheet);
+        $cache_version = $theme['version'] . (is_string($digest) ? '-' . substr($digest, 0, 12) : '');
+        $stylesheet_themes[] = ['id' => $theme['id'], 'version' => $cache_version];
+      }
+    }
+
+    return [
+      'id' => $active_id,
+      'name' => $active['name'],
+      'version' => $active['version'],
+      'engine' => (string)$base_metadata['engine'],
+      'templates' => $base_metadata['templates'],
+      'active_directory' => $active['directory'],
+      'base_id' => $base_id,
+      'base_directory' => $base_directory,
+      'view_directories' => $view_directories,
+      'stylesheet_themes' => $stylesheet_themes,
+      'manifest' => $manifest,
+      'base_metadata' => $base_metadata,
+      'simple' => $simple_themes !== [],
+    ];
+  }
+
+  /** @param array<string,mixed> $definition @return array{name:string,version:string,extends:string} */
+  private static function validateSimpleDefinition(array $definition, string $theme_id): array {
+    $unknown = array_diff(array_keys($definition), ['name', 'version', 'extends']);
+    if ($unknown !== []) {
+      throw new ThemeManifestException('theme.php contains an unknown setting: ' . (string)reset($unknown));
+    }
+    $parent = $definition['extends'] ?? null;
+    if (!is_string($parent) || !ThemeManifest::safeName($parent) || $parent === $theme_id) {
+      throw new ThemeManifestException('theme.php extends must be a different safe theme name.');
+    }
+    $name = $definition['name'] ?? $theme_id;
+    if (!is_string($name) || trim($name) === '' || mb_strlen($name) > 100) {
+      throw new ThemeManifestException('theme.php name must be a non-empty string up to 100 characters.');
+    }
+    $version = $definition['version'] ?? '1.0.0';
+    if (!is_string($version) || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z/D', $version) !== 1) {
+      throw new ThemeManifestException('theme.php version must contain only letters, numbers, dot, underscore, and hyphen.');
+    }
+    return ['name' => trim($name), 'version' => $version, 'extends' => $parent];
+  }
+}
+
 final class ThemeManifest {
   public const FORMAT_VERSION = 1;
 
@@ -172,7 +301,85 @@ final class ThemeDiagnostics {
         self::add($issues, 'error', 'missing_asset', "Required asset is missing or unreadable: {$asset}");
       }
     }
-    if ($engine === 'twig') self::compileTwigTemplates($theme_directory, $issues);
+    if ($engine === 'twig') {
+      self::compileTwigTemplates($theme_directory, $issues);
+    } else {
+      self::compileBladeTemplates([$theme_directory], [$theme_directory], $issues);
+    }
+    return self::report($issues, $templates_checked, $components_checked, $assets_checked);
+  }
+
+  /**
+   * 親テーマの完全性に加えて、簡易テーマの差分テンプレートと固定CSSを検査する。
+   * @param array<string,mixed> $runtime
+   * @return array{summary:array<string,int>,issues:array<int,array<string,string>>}
+   */
+  public static function inspectRuntime(array $runtime): array {
+    $base = self::inspect(
+      (string)$runtime['base_directory'],
+      $runtime['manifest'],
+      $runtime['base_metadata']
+    );
+    if (($runtime['simple'] ?? false) !== true) return $base;
+
+    $issues = $base['issues'];
+    $engine = (string)$runtime['engine'];
+    $suffix = $engine === 'twig' ? '.twig' : '.blade.php';
+    $directories = $runtime['view_directories'];
+    $override_directories = array_slice($directories, 0, -1);
+    $templates_checked = $base['summary']['templates_checked'];
+    $components_checked = $base['summary']['components_checked'];
+    foreach ($override_directories as $directory) {
+      foreach (self::templateFiles($directory, $suffix) as $file) {
+        $templates_checked++;
+        $source = @file_get_contents($file);
+        if (!is_string($source)) {
+          self::add($issues, 'error', 'unreadable_template', 'Override template is unreadable: ' . basename($file));
+          continue;
+        }
+        $pattern = $engine === 'twig'
+          ? "/\{%\\s*include\\s+['\"]([^'\"]+)['\"]/"
+          : "/@include\\s*\(\\s*['\"]([^'\"]+)['\"]/";
+        if (preg_match_all($pattern, $source, $matches) !== false) {
+          foreach ($matches[1] ?? [] as $include) {
+            if (!str_starts_with($include, 'components')) continue;
+            $relative = $engine === 'twig'
+              ? $include
+              : str_replace('.', '/', $include) . '.blade.php';
+            $components_checked++;
+            if (!self::existsInDirectories($directories, $relative)) {
+              self::add($issues, 'error', 'missing_component', 'Override references a missing component: ' . $relative);
+            }
+          }
+        }
+      }
+    }
+
+    if ($engine === 'twig') {
+      try {
+        $twig = TwigTemplateEngine::createEnvironment($directories, false);
+        foreach ($override_directories as $directory) {
+          $prefix = strlen(rtrim($directory, '/\\')) + 1;
+          foreach (self::templateFiles($directory, '.twig') as $file) {
+            $relative = str_replace(DIRECTORY_SEPARATOR, '/', substr($file, $prefix));
+            $twig->load($relative);
+          }
+        }
+      } catch (Throwable $e) {
+        self::add($issues, 'error', 'twig_syntax', $e->getMessage());
+      }
+    } else {
+      self::compileBladeTemplates($directories, $override_directories, $issues);
+    }
+
+    $assets_checked = $base['summary']['assets_checked'];
+    foreach ($runtime['stylesheet_themes'] as $stylesheet_theme) {
+      $assets_checked++;
+      $directory = dirname((string)$runtime['base_directory']) . DIRECTORY_SEPARATOR . $stylesheet_theme['id'];
+      if (!is_readable($directory . DIRECTORY_SEPARATOR . 'theme.css')) {
+        self::add($issues, 'error', 'missing_asset', 'Simple theme stylesheet is unreadable.');
+      }
+    }
     return self::report($issues, $templates_checked, $components_checked, $assets_checked);
   }
 
@@ -181,7 +388,7 @@ final class ThemeDiagnostics {
     $suffix = $engine === 'twig' ? '.twig' : '.blade.php';
     $pattern = $engine === 'twig'
       ? "/\{%\\s*include\\s+['\"]([^'\"]+)['\"]/"
-      : "/@include\\(\\s*'([^']+)'/";
+      : "/@include\\s*\\(\\s*['\"]([^'\"]+)['\"]/";
     $checked = 0;
     foreach (self::templateFiles($directory, $suffix) as $file) {
       $source = file_get_contents($file);
@@ -223,6 +430,34 @@ final class ThemeDiagnostics {
     }
   }
 
+  /** @param array<int,string> $view_directories @param array<int,string> $scan_directories
+   * @param array<int,array<string,string>> $issues */
+  private static function compileBladeTemplates(array $view_directories, array $scan_directories, array &$issues): void {
+    if (!class_exists(\eftec\bladeone\BladeOne::class)) {
+      self::add($issues, 'error', 'blade_unavailable', 'BladeOne template compiler is unavailable.');
+      return;
+    }
+    $blade = new \eftec\bladeone\BladeOne(
+      $view_directories,
+      sys_get_temp_dir(),
+      \eftec\bladeone\BladeOne::MODE_SLOW
+    );
+    foreach ($scan_directories as $directory) {
+      $prefix = strlen(rtrim($directory, '/\\')) + 1;
+      foreach (self::templateFiles($directory, '.blade.php') as $file) {
+        $source = @file_get_contents($file);
+        if (!is_string($source)) continue;
+        $relative = str_replace(DIRECTORY_SEPARATOR, '/', substr($file, $prefix));
+        try {
+          $compiled = $blade->compileString($source);
+          token_get_all($compiled, TOKEN_PARSE);
+        } catch (Throwable $e) {
+          self::add($issues, 'error', 'blade_syntax', "Blade syntax error in {$relative}: {$e->getMessage()}");
+        }
+      }
+    }
+  }
+
   /** @return array<int,string> */
   private static function templateFiles(string $directory, string $suffix): array {
     $files = [];
@@ -233,6 +468,15 @@ final class ThemeDiagnostics {
     }
     sort($files, SORT_STRING);
     return $files;
+  }
+
+  /** @param array<int,string> $directories */
+  private static function existsInDirectories(array $directories, string $relative): bool {
+    $relative = str_replace('/', DIRECTORY_SEPARATOR, $relative);
+    foreach ($directories as $directory) {
+      if (is_file($directory . DIRECTORY_SEPARATOR . $relative)) return true;
+    }
+    return false;
   }
 
   /** @param array<int,array<string,string>> $issues */

@@ -1,0 +1,14 @@
+@use "sass:color";
+@use "sass:math";
+
+// 旧 lighten()/darken() と同じく、明度を 0%～100% の範囲に収める。
+@function adjust-lightness($value, $amount) {
+	$lightness: color.channel($value, "lightness", $space: hsl);
+	$adjusted: math.clamp(0%, $lightness + $amount, 100%);
+
+	@return color.change($value, $lightness: $adjusted, $space: hsl);
+}
+
+@function adjust-hue($value, $amount) {
+	@return color.adjust($value, $hue: $amount, $space: hsl);
+}

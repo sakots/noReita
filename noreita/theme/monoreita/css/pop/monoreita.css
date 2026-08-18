@@ -2,7 +2,7 @@
 /*! =====このcssファイルはsassから生成されています。===== */
 body {
   background-attachment: fixed;
-  background: linear-gradient(#263, #3cb359) fixed;
+  background: linear-gradient(#263, rgb(23.3333333333%, 70%, 35%)) fixed;
   color: #000;
 }
 body svg {
@@ -125,7 +125,7 @@ button {
 
 .oyat {
   border-color: #C11;
-  background: linear-gradient(to right, #66C, #3939ac, #6a40bf) fixed;
+  background: linear-gradient(to right, #66C, rgb(22.5%, 22.5%, 67.5%), rgb(41.6666666667%, 25%, 75%)) fixed;
   color: #FCA;
 }
 

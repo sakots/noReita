@@ -8,7 +8,7 @@
 const THEME_NAME = "eda";
 
 //テーマのバージョン
-const THEME_VER = "lot.260817.0";
+const THEME_VER = "lot.260818.0";
 
 // テンプレートエンジン。Twigテーマでは'twig'に変更します。
 const THEME_TEMPLATE_ENGINE = 'twig';
@@ -84,10 +84,10 @@ const OTHERFILE = "eda_other";
 //描画時間の書式
 //※日本語だと、"1日1時間1分1秒"
 //※英語だと、"1day 1hr 1min 1sec"
-const PTIME_D = '日';
-const PTIME_H = '時間';
-const PTIME_M = '分';
-const PTIME_S = '秒';
+defined('PTIME_D') or define('PTIME_D', '日');
+defined('PTIME_H') or define('PTIME_H', '時間');
+defined('PTIME_M') or define('PTIME_M', '分');
+defined('PTIME_S') or define('PTIME_S', '秒');
 
 //＞が付いた時の書式
 //※RE_STARTとRE_ENDで囲むのでそれを考慮して

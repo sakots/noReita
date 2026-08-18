@@ -14,13 +14,14 @@
     </script>
     <script src="theme/{{$theme_dir}}/js/appFit.js?{{$stime}}" charset="utf-8"></script>
     <!-- アプレットフィットここまで -->
+    @include('components.monoreita_customCss')
   </head>
   <body id="paintmode">
     <header>
       <h1><a href="{{$self}}">{{$board_title}}</a></h1>
       <div>
         <a href="{{$home}}" target="_top">[ホーム]</a>
-        <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+        @include('components.monoreita_adminSession')
       </div>
       <hr>
       <section>

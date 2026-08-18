@@ -1,0 +1,3 @@
+{% for stylesheet in theme_custom_stylesheets ?? [] %}
+<link rel="stylesheet" href="{{ stylesheet }}">
+{% endfor %}

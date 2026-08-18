@@ -18,6 +18,7 @@
 	</script>
   <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
   <script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
+  @include('components.monoreita_customCss')
 </head>
 
 <body id="paintmode">
@@ -25,7 +26,7 @@
     <h1><a href="{{$self}}">{{$board_title}}</a></h1>
     <div>
       <a href="{{$home}}" target="_top">[ホーム]</a>
-      <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+      @include('components.monoreita_adminSession')
     </div>
     <hr>
     <section>

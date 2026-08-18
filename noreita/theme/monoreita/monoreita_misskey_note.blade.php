@@ -35,13 +35,14 @@
       border-radius: 4px;
     }
   </style>
+  @include('components.monoreita_customCss')
 </head>
 <body>
   <header id="header">
     <h1><a href="{{$self}}">{{$board_title}}</a></h1>
     <div>
       <a href="{{$home}}" target="_top">[ホーム]</a>
-      <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+      @include('components.monoreita_adminSession')
     </div>
     <hr>
     <div>

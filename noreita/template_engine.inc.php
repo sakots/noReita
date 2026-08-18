@@ -9,7 +9,8 @@ interface TemplateEngine {
 final class BladeTemplateEngine implements TemplateEngine {
   private \eftec\bladeone\BladeOne $blade;
 
-  public function __construct(string $views, string $cache) {
+  /** @param string|array<int,string> $views */
+  public function __construct(string|array $views, string $cache) {
     $this->blade = new \eftec\bladeone\BladeOne($views, $cache, \eftec\bladeone\BladeOne::MODE_AUTO);
     $this->blade->pipeEnable = true;
   }
@@ -24,13 +25,14 @@ final class TwigTemplateEngine implements TemplateEngine {
   private \Twig\Environment $twig;
   private BladeTemplateEngine $blade_fallback;
 
-  public function __construct(string $views, string $cache) {
+  /** @param string|array<int,string> $views */
+  public function __construct(string|array $views, string $cache) {
     $this->twig = self::createEnvironment($views, $cache . DIRECTORY_SEPARATOR . 'twig');
     $this->blade_fallback = new BladeTemplateEngine($views, $cache);
   }
 
-  /** @param string|false $cache */
-  public static function createEnvironment(string $views, $cache): \Twig\Environment {
+  /** @param string|array<int,string> $views @param string|false $cache */
+  public static function createEnvironment(string|array $views, $cache): \Twig\Environment {
     $twig = new \Twig\Environment(new \Twig\Loader\FilesystemLoader($views), [
       'cache' => $cache,
       'auto_reload' => true,
@@ -67,17 +69,24 @@ final class TwigTemplateEngine implements TemplateEngine {
 }
 
 final class TemplateEngineFactory {
-  public static function create(string $engine, string $views, string $cache): TemplateEngine {
-    if (!is_dir($views)) {
-      throw new RuntimeException('Template directory is missing: ' . $views);
+  /** @param string|array<int,string> $views */
+  public static function create(string $engine, string|array $views, string $cache): TemplateEngine {
+    $view_directories = is_array($views) ? array_values($views) : [$views];
+    if ($view_directories === []) {
+      throw new RuntimeException('At least one template directory is required.');
+    }
+    foreach ($view_directories as $view_directory) {
+      if (!is_string($view_directory) || !is_dir($view_directory) || !is_readable($view_directory)) {
+        throw new RuntimeException('Template directory is missing or unreadable.');
+      }
     }
     if (!is_dir($cache) || !is_writable($cache)) {
       throw new RuntimeException('Template cache directory is not writable: ' . $cache);
     }
 
     return match ($engine) {
-      'blade' => new BladeTemplateEngine($views, $cache),
-      'twig' => new TwigTemplateEngine($views, $cache),
+      'blade' => new BladeTemplateEngine($view_directories, $cache),
+      'twig' => new TwigTemplateEngine($view_directories, $cache),
       default => throw new InvalidArgumentException('Unsupported template engine: ' . $engine),
     };
   }

@@ -1,4 +1,4 @@
-name: PHP checks
+name: PHP and Sass checks
 
 on:
   push:
@@ -9,6 +9,64 @@ permissions:
   contents: read
 
 jobs:
+  sass:
+    name: Sass build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Compile Sass
+        run: npm run sass:build
+
+      - name: Check generated CSS is up to date
+        shell: bash
+        run: |
+          changes="$(git status --porcelain --untracked-files=all -- noreita/theme)"
+          if [[ -n "$changes" ]]; then
+            echo "$changes"
+            echo "::error::Sass generated files are missing or out of date. Run npm run sass:build and commit the results."
+            exit 1
+          fi
+
+  theme-diagnostics:
+    name: Theme diagnostics
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --working-dir=noreita --no-interaction --no-progress --prefer-dist
+
+      - name: Check eda theme
+        run: php plugins/check-theme.php --root=noreita --theme=eda
+
+      - name: Check monoreita theme
+        run: php plugins/check-theme.php --root=noreita --theme=monoreita
+
+      - name: Check starter theme
+        run: php plugins/check-theme.php --root=noreita --theme=starter
+
   php-lint:
     name: PHP ${{ matrix.php-version }}
     runs-on: ubuntu-latest

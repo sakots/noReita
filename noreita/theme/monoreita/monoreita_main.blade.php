@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/luminous-basic.min.css">
   @include('components.monoreita_headCss')
+  @include('components.monoreita_customCss')
 </head>
 <body>
   <header id="header">
@@ -13,7 +14,7 @@
     <div>
       <section>
         <a href="{{$home}}" target="_top">[ホーム]</a>
-        <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+        @include('components.monoreita_adminSession')
       </section>
     </div>
     <hr>

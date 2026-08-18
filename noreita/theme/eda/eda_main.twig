@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="theme/{{ theme_dir }}/luminous/luminous-basic.min.css">
   {% include 'components/eda_headCss.twig' %}
+  {% include 'components/eda_customCss.twig' %}
 </head>
 <body>
   <header id="header">
@@ -13,7 +14,7 @@
     <div>
       <section>
         <a href="{{ home }}" target="_top">[ホーム]</a>
-        <a href="{{ self }}?mode=admin_in">[管理モード]</a>
+        {% include 'components/eda_adminSession.twig' %}
       </section>
     </div>
     <hr>

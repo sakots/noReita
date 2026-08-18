@@ -34,6 +34,7 @@ header, .thread, footer {
   padding: 8px;
   margin-left: auto;
   margin-right: auto;
+  border-radius: 8px;
   width: 70%;
 }
 
@@ -140,9 +141,7 @@ textarea[name=com] {
 }
 
 input[type=number] {
-  -webkit-appearance: textfield;
-     -moz-appearance: textfield;
-          appearance: textfield;
+  appearance: textfield;
 }
 input[type=number]::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -341,8 +340,7 @@ button {
 #catalog img {
   width: 150px;
   height: 150px;
-  -o-object-fit: cover;
-     object-fit: cover;
+  object-fit: cover;
 }
 
 .delfo {

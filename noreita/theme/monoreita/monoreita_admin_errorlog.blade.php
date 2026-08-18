@@ -6,6 +6,7 @@
   <title>@if ($admin_log_is_audit ?? false)監査ログ@else エラーログ @endif - {{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   @include('components.monoreita_headCss')
+  @include('components.monoreita_customCss')
 </head>
 
 <body>

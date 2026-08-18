@@ -1,4 +1,6 @@
 @charset "UTF-8";
+
+@use "../color" as theme-color;
 /*! =====このcssファイルはsassから生成されています。===== */
 
 @use "monoreita_conf" as *;
@@ -24,10 +26,10 @@
 body {
 	@if $dev == 1 {
 		background-attachment: fixed;
-		background: linear-gradient($bg, darken($bg,20%)) fixed;
+		background: linear-gradient($bg, theme-color.adjust-lightness($bg, -20%)) fixed;
 	} @else if $dev == -1 {
 		background-attachment: fixed;
-		background: linear-gradient($bg, lighten($bg,20%)) fixed;
+		background: linear-gradient($bg, theme-color.adjust-lightness($bg, 20%)) fixed;
 	} @else {
 		background-attachment: unset;
 		background: $bg;
@@ -139,9 +141,9 @@ button {
 .oyat {
 	border-color: $border;
 	@if $dev == 1 {
-		background: linear-gradient(to right, $th_bg, lighten($th_bg,20%), adjust-hue(lighten($th_bg, 10%),-20deg)) fixed;
+		background: linear-gradient(to right, $th_bg, theme-color.adjust-lightness($th_bg, 20%), theme-color.adjust-hue(theme-color.adjust-lightness($th_bg, 10%), -20deg)) fixed;
 	} @else if $dev == -1 {
-		background: linear-gradient(to right, $th_bg, darken($th_bg,15%), adjust-hue(darken($th_bg, 10%),20deg)) fixed;
+		background: linear-gradient(to right, $th_bg, theme-color.adjust-lightness($th_bg, -15%), theme-color.adjust-hue(theme-color.adjust-lightness($th_bg, -10%), 20deg)) fixed;
 	} @else {
 		background: $th_bg;
 	}

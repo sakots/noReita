@@ -10,6 +10,7 @@
   @if ($othermode == 'ok')
   <meta http-equiv="refresh" content="1; URL={{$self}}">
   @endif
+  @include('components.monoreita_customCss')
 </head>
 
 <body>
@@ -17,7 +18,7 @@
     <h1><a href="{{$self}}">{{$board_title}}</a></h1>
     <div>
       <a href="{{$home}}" target="_top">[ホーム]</a>
-      <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+      @include('components.monoreita_adminSession')
     </div>
     <hr>
     <section>

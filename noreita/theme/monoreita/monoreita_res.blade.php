@@ -20,6 +20,7 @@
     <meta property="og:description" content="{{$bbsline['com']}}">
     @endforeach
   @endif
+  @include('components.monoreita_customCss')
 </head>
 
 <body>
@@ -27,7 +28,7 @@
     <h1><a href="{{$self}}">{{$board_title}}</a></h1>
     <div>
       <a href="{{$home}}" target="_top">[ホーム]</a>
-      <a href="{{$self}}?mode=admin_in">[管理モード]</a>
+      @include('components.monoreita_adminSession')
     </div>
     <hr>
     <div>
@@ -135,6 +136,13 @@
     </footer>
     <!-- scripts -->
     <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
+    @if ($use_animation_upload)
+    <script src="animation-upload.js?v={{$animation_upload_version}}" data-endpoint="{{$self}}?mode=animation_upload"
+      data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"
+      data-tegaki-enabled="{{$use_tegaki ? '1' : '0'}}"
+      data-max-work-bytes="{{$animation_upload_max_bytes}}"
+      data-max-width="{{$pmax_w}}" data-max-height="{{$pmax_h}}"></script>
+    @endif
     @include('components.monoreita_togglePaletteVisibility')
     @include('components.monoreita_luminous')
     @include('components.monoreita_snsShare')

@@ -21,6 +21,7 @@
       touch-action: auto;
     }
 </style>
+  @include('components.monoreita_customCss')
 </head>
 
 <body>

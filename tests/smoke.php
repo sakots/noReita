@@ -67,14 +67,16 @@ smoke_test('PHP 8.5 deprecated imagedestroy is not used', static function (): bo
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
   $views = $root . DIRECTORY_SEPARATOR . 'views';
+  $overrides = $root . DIRECTORY_SEPARATOR . 'overrides';
   $cache = $root . DIRECTORY_SEPARATOR . 'cache';
-  if (!mkdir($views, 0700, true) || !mkdir($cache, 0700, true)) return false;
+  if (!mkdir($views, 0700, true) || !mkdir($overrides, 0700, true) || !mkdir($cache, 0700, true)) return false;
   try {
     if (file_put_contents($views . DIRECTORY_SEPARATOR . 'sample.blade.php', 'Hello {{ $name }}') === false
       || file_put_contents($views . DIRECTORY_SEPARATOR . 'sample.twig', 'Hello {{ name }}') === false
-      || file_put_contents($views . DIRECTORY_SEPARATOR . 'fallback.blade.php', 'Fallback {{ $name }}') === false) return false;
-    $blade = TemplateEngineFactory::create('blade', $views, $cache);
-    $twig = TemplateEngineFactory::create('twig', $views, $cache);
+      || file_put_contents($views . DIRECTORY_SEPARATOR . 'fallback.blade.php', 'Fallback {{ $name }}') === false
+      || file_put_contents($overrides . DIRECTORY_SEPARATOR . 'sample.twig', 'Override {{ name }}') === false) return false;
+    $blade = TemplateEngineFactory::create('blade', [$overrides, $views], $cache);
+    $twig = TemplateEngineFactory::create('twig', [$overrides, $views], $cache);
     try {
       TemplateEngineFactory::create('unknown', $views, $cache);
       return false;
@@ -82,7 +84,7 @@ smoke_test('BladeOne and Twig render through the template engine abstraction', s
       // Expected: only configured engines may be selected.
     }
     return $blade->render('sample', ['name' => 'BladeOne']) === 'Hello BladeOne'
-      && $twig->render('sample', ['name' => 'Twig']) === 'Hello Twig'
+      && $twig->render('sample', ['name' => 'Twig']) === 'Override Twig'
       && $twig->render('fallback', ['name' => 'BladeOne']) === 'Fallback BladeOne';
   } finally {
     if (is_dir($root)) {
@@ -129,6 +131,40 @@ smoke_test('eda Twig theme templates compile', static function (): bool {
   }
 });
 
+smoke_test('simple theme stylesheets load after page-specific styles', static function (): bool {
+  $themes = [
+    [
+      'directory' => dirname(__DIR__) . '/noreita/theme/eda',
+      'pattern' => '*.twig',
+      'head' => 'components/eda_headCss.twig',
+      'custom' => 'components/eda_customCss.twig',
+    ],
+    [
+      'directory' => dirname(__DIR__) . '/noreita/theme/monoreita',
+      'pattern' => '*.blade.php',
+      'head' => 'components.monoreita_headCss',
+      'custom' => 'components.monoreita_customCss',
+    ],
+  ];
+  $checked = 0;
+  foreach ($themes as $theme) {
+    foreach (glob($theme['directory'] . DIRECTORY_SEPARATOR . $theme['pattern']) ?: [] as $template) {
+      $source = file_get_contents($template);
+      if (!is_string($source) || !str_contains($source, $theme['head'])) continue;
+      $head_end = stripos($source, '</head>');
+      $custom_position = strpos($source, $theme['custom']);
+      if ($head_end === false || $custom_position === false || $custom_position >= $head_end) return false;
+      $head = substr($source, 0, $head_end);
+      $last_link = strripos($head, '<link rel="stylesheet"');
+      $last_style = strripos($head, '<style');
+      $last_page_style = max($last_link === false ? -1 : $last_link, $last_style === false ? -1 : $last_style);
+      if ($custom_position <= $last_page_style || $custom_position <= strpos($source, $theme['head'])) return false;
+      $checked++;
+    }
+  }
+  return $checked === 28;
+});
+
 smoke_test('administration templates escape post subjects', static function (): bool {
   $eda = file_get_contents(dirname(__DIR__) . '/noreita/theme/eda/eda_admin.twig');
   $monoreita = file_get_contents(dirname(__DIR__) . '/noreita/theme/monoreita/monoreita_admin.blade.php');
@@ -151,6 +187,128 @@ smoke_test('theme manifests and diagnostics detect theme integrity problems', st
   $invalid_report = ThemeDiagnostics::inspect($eda, $invalid, $runtime);
   return $invalid_report['summary']['errors'] > 0
     && in_array('missing_asset', array_column($invalid_report['issues'], 'code'), true);
+});
+
+smoke_test('Blade diagnostics reject syntax errors and double-quoted missing includes', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_blade_diagnostic_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700, true)) return false;
+  try {
+    $template = <<<'BLADE'
+@include("components.missing")
+@if (true)
+<p>missing endif</p>
+BLADE;
+    if (file_put_contents($directory . DIRECTORY_SEPARATOR . 'main.blade.php', $template) === false) return false;
+    $manifest = [
+      'format' => 1,
+      'id' => 'invalid-blade',
+      'name' => 'Invalid Blade',
+      'version' => '1.0.0',
+      'engine' => 'blade',
+      'requires' => ['php' => '8.1.0', 'noreita' => '4.2.0'],
+      'templates' => ['main' => 'main'],
+      'assets' => ['css' => [], 'javascript' => []],
+      'legacy' => false,
+    ];
+    $runtime = [
+      'id' => 'invalid-blade',
+      'version' => '1.0.0',
+      'engine' => 'blade',
+      'templates' => ['main' => 'main'],
+    ];
+    $report = ThemeDiagnostics::inspect($directory, $manifest, $runtime);
+    $codes = array_column($report['issues'], 'code');
+    $base_errors_detected = in_array('missing_component', $codes, true)
+      && in_array('blade_syntax', $codes, true);
+
+    $base_directory = $directory . DIRECTORY_SEPARATOR . 'base';
+    $override_directory = $directory . DIRECTORY_SEPARATOR . 'override';
+    if (!mkdir($base_directory, 0700) || !mkdir($override_directory, 0700)
+      || file_put_contents($base_directory . DIRECTORY_SEPARATOR . 'main.blade.php', '<p>valid</p>') === false
+      || file_put_contents($override_directory . DIRECTORY_SEPARATOR . 'main.blade.php', $template) === false) {
+      return false;
+    }
+    $override_report = ThemeDiagnostics::inspectRuntime([
+      'base_directory' => $base_directory,
+      'manifest' => $manifest,
+      'base_metadata' => $runtime,
+      'simple' => true,
+      'engine' => 'blade',
+      'view_directories' => [$override_directory, $base_directory],
+      'stylesheet_themes' => [],
+    ]);
+    $override_codes = array_column($override_report['issues'], 'code');
+    return $base_errors_detected
+      && in_array('missing_component', $override_codes, true)
+      && in_array('blade_syntax', $override_codes, true);
+  } finally {
+    if (is_dir($directory)) {
+      $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+      );
+      foreach ($iterator as $item) {
+        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+      }
+      rmdir($directory);
+    }
+  }
+});
+
+smoke_test('simple themes inherit templates, engine, assets, and diagnostics from a parent', static function (): bool {
+  $themes = dirname(__DIR__) . '/noreita/theme';
+  $runtime = ThemeRuntime::load($themes, 'starter');
+  $report = ThemeDiagnostics::inspectRuntime($runtime);
+  return $runtime['id'] === 'starter'
+    && $runtime['name'] === 'starter'
+    && $runtime['version'] === '1.0.0'
+    && $runtime['base_id'] === 'eda'
+    && $runtime['engine'] === 'twig'
+    && count($runtime['view_directories']) === 2
+    && $runtime['view_directories'][0] === $themes . '/starter'
+    && $runtime['view_directories'][1] === $themes . '/eda'
+    && count($runtime['stylesheet_themes']) === 1
+    && $runtime['stylesheet_themes'][0]['id'] === 'starter'
+    && str_starts_with($runtime['stylesheet_themes'][0]['version'], '1.0.0-')
+    && $report['summary']['errors'] === 0;
+});
+
+smoke_test('simple themes reject cycles, unsafe parents, and unknown settings', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_theme_inheritance_' . bin2hex(random_bytes(8));
+  $a = $root . DIRECTORY_SEPARATOR . 'a';
+  $b = $root . DIRECTORY_SEPARATOR . 'b';
+  if (!mkdir($a, 0700, true) || !mkdir($b, 0700, true)) return false;
+  try {
+    file_put_contents($a . DIRECTORY_SEPARATOR . 'theme.php', "<?php return ['extends' => 'b'];\n");
+    file_put_contents($b . DIRECTORY_SEPARATOR . 'theme.php', "<?php return ['extends' => 'a'];\n");
+    try {
+      ThemeRuntime::load($root, 'a');
+      return false;
+    } catch (ThemeManifestException $e) {
+      if (!str_contains($e->getMessage(), 'cycle')) return false;
+    }
+    file_put_contents($a . DIRECTORY_SEPARATOR . 'theme.php', "<?php return ['extends' => '../eda'];\n");
+    try {
+      ThemeRuntime::load($root, 'a');
+      return false;
+    } catch (ThemeManifestException $e) {
+      // Expected.
+    }
+    file_put_contents($a . DIRECTORY_SEPARATOR . 'theme.php', "<?php return ['extends' => 'b', 'engine' => 'twig'];\n");
+    try {
+      ThemeRuntime::load($root, 'a');
+      return false;
+    } catch (ThemeManifestException $e) {
+      return str_contains($e->getMessage(), 'unknown setting');
+    }
+  } finally {
+    foreach ([$a, $b] as $directory) {
+      $definition = $directory . DIRECTORY_SEPARATOR . 'theme.php';
+      if (is_file($definition)) unlink($definition);
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
 });
 
 smoke_test('required PHP extensions', static function (): bool {
@@ -461,14 +619,30 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     || !str_contains($root_rule, 'mod_authz_core.c')
     || !str_contains($root_rule, 'Require all denied')
     || !str_contains($root_rule, 'Deny from all')
-    || !str_contains($root_rule, '^config(?:\\..+)?$')
-    || !str_contains($root_rule, 'config.local.php~')
-    || !str_contains($root_rule, 'json|db(?:-(?:wal|shm|journal))?')
     || !str_contains($root_rule, 'LimitRequestBody 33554432')
     || substr_count(strtolower($root_rule), '<filesmatch') !== substr_count(strtolower($root_rule), '</filesmatch>')
     || preg_match('/<\\/files>/i', $root_rule) === 1
     || preg_match('/<files\\s+~/i', $root_rule) === 1) {
     return false;
+  }
+  if (preg_match_all('/<FilesMatch "([^"]+)">/i', $root_rule, $file_matches) < 1) return false;
+  $private_file_pattern = end($file_matches[1]);
+  if (!is_string($private_file_pattern)) return false;
+  $private_file_regex = '#' . str_replace('#', '\\#', $private_file_pattern) . '#';
+  foreach ([
+    'config.local.php~',
+    'theme.php.bak',
+    'theme_conf.php.old',
+    'theme_manifest.php~',
+    'main.twig.bak',
+    'main.twig~',
+    'main.blade.php.bak',
+    'database.db-wal',
+  ] as $private_file) {
+    if (preg_match($private_file_regex, $private_file) !== 1) return false;
+  }
+  foreach (['theme.css', 'thumbnail.png', 'readme.txt'] as $public_file) {
+    if (preg_match($private_file_regex, $public_file) === 1) return false;
   }
   $ignore = file_get_contents(dirname(__DIR__) . '/.gitignore');
   if (!is_string($ignore) || !str_contains($ignore, 'config.local.php')
@@ -1258,6 +1432,19 @@ smoke_test('image MIME mapping', static function (): bool {
     && get_image_type('image/avif') === '.avif';
 });
 
+smoke_test('image upload formats follow available GD decoders', static function (): bool {
+  $without_avif = static fn(string $function): bool => $function !== 'imagecreatefromavif';
+  $with_everything = static fn(string $function): bool => true;
+  $limited = ImageService::supportedUploadFormats($without_avif);
+  $complete = ImageService::supportedUploadFormats($with_everything);
+  return !isset($limited['image/avif'])
+    && isset($limited['image/png'], $limited['image/jpeg'], $limited['image/gif'], $limited['image/webp'])
+    && isset($complete['image/avif'])
+    && ImageService::uploadAccept($without_avif) === 'image/png,image/jpeg,image/gif,image/webp'
+    && ImageService::uploadFormatLabel($without_avif) === 'PNG / JPEG / GIF / WebP'
+    && str_ends_with(ImageService::uploadFormatLabel($with_everything), ' / AVIF');
+});
+
 smoke_test('image directory usage is counted and formatted', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_usage_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
@@ -1288,6 +1475,36 @@ smoke_test('animation filenames reject path traversal', static function (): bool
     && !ImageService::isSafeAnimationFilename('drawing.php')
     && !ImageService::isSafeAnimationFilename('drawing.chi')
     && !ImageService::isSafeAnimationFilename('.pch');
+});
+
+smoke_test('uploaded animation headers distinguish NEO PCH and Tegaki TGKR', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_animation_header_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $pch = $directory . DIRECTORY_SEPARATOR . 'sample.pch';
+  $tgkr = $directory . DIRECTORY_SEPARATOR . 'sample.tgkr';
+  $invalid = $directory . DIRECTORY_SEPARATOR . 'invalid.pch';
+  try {
+    file_put_contents($pch, "NEO\0" . pack('v', 640) . pack('v', 480) . "\0\0\0\0");
+    file_put_contents($tgkr, 'TGK' . chr(1) . pack('N', 1024) . "\1\2\3\1");
+    file_put_contents($invalid, 'OLD' . str_repeat("\0", 9));
+    $neo = ImageService::animationUploadInfo($pch, 'client.PCH');
+    $tegaki = ImageService::animationUploadInfo($tgkr, 'client.tgkr');
+    if ($neo !== ['extension' => 'pch', 'tool' => 'neo', 'width' => 640, 'height' => 480]
+      || $tegaki !== ['extension' => 'tgkr', 'tool' => 'tegaki', 'width' => 0, 'height' => 0]) {
+      return false;
+    }
+    try {
+      ImageService::animationUploadInfo($invalid, 'invalid.pch');
+      return false;
+    } catch (ImageUploadException $e) {
+      return $e->getCode() === 422;
+    }
+  } finally {
+    safe_unlink($pch);
+    safe_unlink($tgkr);
+    safe_unlink($invalid);
+    if (is_dir($directory)) rmdir($directory);
+  }
 });
 
 smoke_test('posted image filenames reject invalid continuation targets', static function (): bool {
