@@ -363,8 +363,8 @@ class image_save{
       $this->error_msg($this->en ? $e->getMessage() : '画像のサイズが大きすぎます。', 413);
     }
 
-    if(function_exists("ImageCreateFromPNG")){//PNG画像が壊れていたらエラー
-      $im_in = @ImageCreateFromPNG($_FILES['picture']['tmp_name']);
+    if(function_exists('imagecreatefrompng')){//PNG画像が壊れていたらエラー
+      $im_in = @imagecreatefrompng($_FILES['picture']['tmp_name']);
       if(!$im_in){
         $this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。", 422);
       }
