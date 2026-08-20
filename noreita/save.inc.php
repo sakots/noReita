@@ -16,6 +16,16 @@ final class PaintSaveRequestGuard {
     'animation_upload' => ['picture', 'animation'],
   ];
 
+  /**
+   * @param array<string,mixed> $server リクエストサーバー情報
+   * @param array<string,mixed> $post POST値
+   * @param array<string,mixed> $files アップロードファイル情報
+   * @param string $tool 描画ツール識別子
+   * @param int $image_max_bytes 画像ファイルの上限バイト数
+   * @param int $work_max_bytes 動画・作業ファイルの上限バイト数
+   * @param int $request_max_bytes リクエスト全体の上限バイト数
+   * @throws PaintSaveCapacityException
+   */
   public static function assertWithinLimits(
     array $server,
     array $post,
@@ -82,6 +92,14 @@ final class PaintSaveRequestGuard {
     }
   }
 
+  /**
+   * @param int $width 画像幅
+   * @param int $height 画像高
+   * @param int $max_width 最大画像幅
+   * @param int $max_height 最大画像高
+   * @param int $max_pixels 最大ピクセル数
+   * @throws PaintSaveCapacityException
+   */
   public static function assertImageDimensions(
     int $width,
     int $height,
@@ -96,6 +114,10 @@ final class PaintSaveRequestGuard {
     }
   }
 
+  /**
+   * @param array<string,mixed> $values
+   * @param int $stop_after この値以上は打ち切るバイト数
+   */
   private static function valueBytes(array $values, int $stop_after): int {
     $bytes = 0;
     $pending = [$values];
