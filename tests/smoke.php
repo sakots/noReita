@@ -131,6 +131,27 @@ smoke_test('eda Twig theme templates compile', static function (): bool {
   }
 });
 
+smoke_test('asynchronous paint replacements display the returned edit form', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $templates = [
+    'eda/components/eda_paintKlecks.twig',
+    'eda/components/eda_paintTegaki.twig',
+    'eda/components/eda_paintAxnos.twig',
+    'monoreita/components/monoreita_paintKlecks.blade.php',
+    'monoreita/components/monoreita_paintTegaki.blade.php',
+    'monoreita/components/monoreita_paintAxnos.blade.php',
+  ];
+  foreach ($templates as $template) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
+    if (!is_string($source)
+      || !str_contains($source, 'formData.append("mode", "picrep")')
+      || !str_contains($source, 'document.write(text)')) {
+      return false;
+    }
+  }
+  return true;
+});
+
 smoke_test('simple theme stylesheets load after page-specific styles', static function (): bool {
   $themes = [
     [

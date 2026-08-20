@@ -178,6 +178,10 @@
               console.log(text);
               return window.location.href = "{{$self}}?mode={!!$mode!!}" + (resto ? "&resto=" + resto : "");
             }
+            // picrepは編集フォームのHTMLを返すため、非同期保存後にその画面へ切り替える。
+            document.open();
+            document.write(text);
+            document.close();
           })
         }
       })
