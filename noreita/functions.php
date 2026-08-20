@@ -325,15 +325,23 @@ function switch_tool(string $tool): string {
 }
 
 //sessionの確認
+function admin_secondary_pass_matches(mixed $stored_password, mixed $configured_password): bool {
+  return is_string($configured_password) && $configured_password !== ''
+    && is_string($stored_password)
+    && hash_equals($configured_password, $stored_password);
+}
+
 function admin_post_valid(): bool {
   global $second_pass;
   RequestSecurity::startSession();
-  return isset($_SESSION['admin_post']) && ($second_pass && $_SESSION['admin_post'] === $second_pass);
+  return isset($_SESSION['admin_post'])
+    && admin_secondary_pass_matches($_SESSION['admin_post'], $second_pass ?? null);
 }
 function admin_del_valid(): bool {
   global $second_pass;
   RequestSecurity::startSession();
-  return isset($_SESSION['admin_del']) && ($second_pass && $_SESSION['admin_del'] === $second_pass);
+  return isset($_SESSION['admin_del'])
+    && admin_secondary_pass_matches($_SESSION['admin_del'], $second_pass ?? null);
 }
 function user_del_valid(): bool {
   RequestSecurity::startSession();

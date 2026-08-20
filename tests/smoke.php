@@ -773,6 +773,13 @@ smoke_test('administrator session validates password changes and idle timeout', 
     && !AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now - 120);
 });
 
+smoke_test('legacy administrator session secrets use constant-time comparison', static function (): bool {
+  return admin_secondary_pass_matches('smoke-secondary-admin-secret', 'smoke-secondary-admin-secret')
+    && !admin_secondary_pass_matches('not-the-secondary-admin-secret', 'smoke-secondary-admin-secret')
+    && !admin_secondary_pass_matches('', 'smoke-secondary-admin-secret')
+    && !admin_secondary_pass_matches('smoke-secondary-admin-secret', '');
+});
+
 smoke_test('administrator login rate limit locks by IP, clears after success, and removes expired records', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_admin_limit_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
