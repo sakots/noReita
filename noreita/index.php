@@ -379,7 +379,7 @@ switch ($mode) {
     }
     return paint_com("tmp");
   case 'anime':
-    return open_pch($sp ?? "");
+    return open_pch();
   case 'continue':
     return in_continue();
   case 'contpaint':
