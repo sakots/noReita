@@ -2,20 +2,31 @@
 //Petit Note (c)さとぴあ @satopian 2021-2025 MIT License
 //https://paintbbs.sakura.ne.jp/
 
-const SAVE_INC_VER = 20260817; //save.inc.phpのバージョン
+const SAVE_INC_VER = 20260820; //save.inc.phpのバージョン
 
 final class PaintSaveCapacityException extends RuntimeException {}
 
 final class PaintSaveRequestGuard {
   private const FILE_FIELDS = [
     'neo' => ['picture', 'pch'],
-    'chi' => ['picture', 'chibifile'],
+    // LitaChix/ChickenPaintはPNG・.chiに加えて、編集済みパレットをswatchesとして送信する。
+    'chi' => ['picture', 'chibifile', 'swatches'],
     'klecks' => ['picture', 'psd'],
     'tegaki' => ['picture', 'tgkr'],
     'axnos' => ['picture'],
     'animation_upload' => ['picture', 'animation'],
   ];
 
+  /**
+   * @param array<string,mixed> $server リクエストサーバー情報
+   * @param array<string,mixed> $post POST値
+   * @param array<string,mixed> $files アップロードファイル情報
+   * @param string $tool 描画ツール識別子
+   * @param int $image_max_bytes 画像ファイルの上限バイト数
+   * @param int $work_max_bytes 動画・作業ファイルの上限バイト数
+   * @param int $request_max_bytes リクエスト全体の上限バイト数
+   * @throws PaintSaveCapacityException
+   */
   public static function assertWithinLimits(
     array $server,
     array $post,
@@ -56,7 +67,7 @@ final class PaintSaveRequestGuard {
       }
       if ($error !== UPLOAD_ERR_OK) continue;
       $uploaded_files++;
-      if ($uploaded_files > 2) {
+      if ($uploaded_files > count($allowed)) {
         throw new PaintSaveCapacityException('Too many drawing upload files.', 400);
       }
       $declared_size = max(0, (int)$file['size']);
@@ -82,6 +93,14 @@ final class PaintSaveRequestGuard {
     }
   }
 
+  /**
+   * @param int $width 画像幅
+   * @param int $height 画像高
+   * @param int $max_width 最大画像幅
+   * @param int $max_height 最大画像高
+   * @param int $max_pixels 最大ピクセル数
+   * @throws PaintSaveCapacityException
+   */
   public static function assertImageDimensions(
     int $width,
     int $height,
@@ -96,6 +115,10 @@ final class PaintSaveRequestGuard {
     }
   }
 
+  /**
+   * @param array<string,mixed> $values
+   * @param int $stop_after この値以上は打ち切るバイト数
+   */
   private static function valueBytes(array $values, int $stop_after): int {
     $bytes = 0;
     $pending = [$values];
@@ -192,6 +215,8 @@ class image_save{
     $this->tool = 'neo';
     
     //拡張ヘッダから情報を取得    
+    /** @var array<string,string> $u */
+    $u = [];
     parse_str($sendheader, $u);
     $this->repcode = isset($u['repcode']) ? t($u['repcode']) : '';
     $this->resto = isset($u['resto']) ? t($u['resto']) : '';
@@ -339,8 +364,8 @@ class image_save{
       $this->error_msg($this->en ? $e->getMessage() : '画像のサイズが大きすぎます。', 413);
     }
 
-    if(function_exists("ImageCreateFromPNG")){//PNG画像が壊れていたらエラー
-      $im_in = @ImageCreateFromPNG($_FILES['picture']['tmp_name']);
+    if(function_exists('imagecreatefrompng')){//PNG画像が壊れていたらエラー
+      $im_in = @imagecreatefrompng($_FILES['picture']['tmp_name']);
       if(!$im_in){
         $this->error_msg($this->en ? "The image appears to be corrupted.\nPlease consider saving a screenshot to preserve your work." : "破損した画像が検出されました。\nスクリーンショットを撮り作品を保存する事を強くおすすめします。", 422);
       }
@@ -429,12 +454,18 @@ class image_save{
       $errtext="";
     }
 
+    // LitaChixは非2xx応答の本文を読まず、HTTPステータスだけを一般的なエラー文に置き換える。
+    // CHIBIERROR本文を表示させるため、実際の失敗コードはヘッダーとログに残しつつ200で返す。
+    $is_litachix = $this->error_type === 'chi';
     ApplicationErrorHandler::respondPlainError(
       $http_status,
       $message,
       (bool)$this->en,
       $errtext,
-      'Drawing save API: ' . str_replace(["\r", "\n"], ' ', $message)
+      'Drawing save API: ' . str_replace(["\r", "\n"], ' ', $message),
+      null,
+      $is_litachix,
+      $is_litachix ? 200 : null
     );
   }
 }

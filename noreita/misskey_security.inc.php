@@ -4,8 +4,7 @@
 const MISSKEY_SECURITY_VER = 20260816;
 
 final class MisskeyServerSecurity {
-  /** @return string|false */
-  public static function normalizeBaseUrl(string $url) {
+  public static function normalizeBaseUrl(string $url): string|false {
     $url = trim($url);
     if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false) return false;
     $parts = parse_url($url);
@@ -25,8 +24,7 @@ final class MisskeyServerSecurity {
     return 'https://' . $host;
   }
 
-  /** @return string|false */
-  public static function resolvePublicIp(string $host) {
+  public static function resolvePublicIp(string $host): string|false {
     if (filter_var($host, FILTER_VALIDATE_IP)) {
       $addresses = [$host];
     } else {
@@ -51,7 +49,7 @@ final class MisskeyServerSecurity {
   }
 
   /** @return array<int, mixed>|false */
-  public static function curlOptions(string $base_url, int $timeout = 15) {
+  public static function curlOptions(string $base_url, int $timeout = 15): array|false {
     $normalized = self::normalizeBaseUrl($base_url);
     if ($normalized === false) return false;
     $host = (string)parse_url($normalized, PHP_URL_HOST);

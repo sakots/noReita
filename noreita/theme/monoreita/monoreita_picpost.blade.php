@@ -51,7 +51,7 @@
         </div>
         @if (isset($temp) || $use_image_upload)
         <form class="ppost postform" action="{{$self}}?mode=regist" method="post" enctype="multipart/form-data">
-          @if (isset($selected_picfile))<input type="hidden" name="picfile" value="{{$selected_picfile}}">@endif
+          @if (isset($selected_picfile) && (!isset($temp) || count($temp) <= 1))<input type="hidden" name="picfile" value="{{$selected_picfile}}">@endif
           <table>
             <tr>
               <td>name @if ($use_name) * @endif</td>
@@ -75,14 +75,16 @@
               <td>comment @if ($use_com) * @endif </td>
               <td><textarea name="com" cols="48" rows="5" wrap="soft" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};" @if ($use_com) required @endif maxlength="{{$max_com}}"></textarea></td>
             </tr>
-            @if (!isset($selected_picfile) && isset($temp))
+            @if (isset($temp) && (!isset($selected_picfile) || count($temp) > 1))
             <tr>
               <td>imgs</td>
               <td>
                 <select name="picfile">
+                  @if (!isset($selected_picfile))
                   <option value="">（お絵かき画像を選ばない）</option>
+                  @endif
                   @foreach ($temp as $tmp)
-                  @if (isset($tmp['src_name'])) <option value="{{$tmp['src_name']}}">{{$tmp['src_name']}}</option>
+                  @if (isset($tmp['src_name'])) <option value="{{$tmp['src_name']}}" @if (isset($selected_picfile) && $tmp['src_name'] === $selected_picfile) selected @endif>{{$tmp['src_name']}}</option>
                   @endif
                   @endforeach
                 </select>
@@ -92,7 +94,9 @@
             @if ($use_image_upload && !isset($selected_picfile))
             <tr>
               <td>画像</td>
-              <td><input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）</td>
+              <td>
+                <input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
+              </td>
             </tr>
             @endif
             @if ($use_animation_upload && !isset($selected_picfile))
@@ -154,7 +158,7 @@
   <footer id="footer">
     @include('components.monoreita_footerCopy')
   </footer>
-  @if ($use_animation_upload)
+  @if ($use_image_upload)
   <script src="animation-upload.js?v={{$animation_upload_version}}" data-endpoint="{{$self}}?mode=animation_upload"
     data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"
     data-tegaki-enabled="{{$use_tegaki ? '1' : '0'}}"

@@ -161,6 +161,12 @@ final class AdminAuth {
   private const SESSION_FINGERPRINT = 'admin_auth_fingerprint';
   private const SESSION_LAST_ACTIVITY = 'admin_auth_last_activity';
 
+  public static function secondaryPasswordMatches(mixed $stored_password, mixed $configured_password): bool {
+    return is_string($configured_password) && $configured_password !== ''
+      && is_string($stored_password)
+      && hash_equals($configured_password, $stored_password);
+  }
+
   public static function login(string $provided_password, string $admin_password): bool {
     RequestSecurity::startSession();
     if ($provided_password === '' || !hash_equals($admin_password, $provided_password)) {

@@ -525,11 +525,62 @@ PHP;
       && $invalid_paint_logged;
   });
 
+  [$litachix_error_status, $litachix_error_body, , $litachix_error_headers] = http_request(
+    $base_url . '?mode=saveimage&tool=chi&stime=1', $cookie_jar, ['header' => 'stime=1']
+  );
+  preg_match('/\b\d{14}-[a-f0-9]{8}\b/', $litachix_error_body, $litachix_error_id_match);
+  $litachix_error_id = (string)($litachix_error_id_match[0] ?? '');
+  $litachix_error_logged = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $contents = (string)file_get_contents($error_log_file);
+    if (str_contains($contents, $litachix_error_id) && str_contains($contents, '"http_status":400')) {
+      $litachix_error_logged = true;
+      break;
+    }
+  }
+  integration_test('LitaChix displays a logged drawing error reference despite its non-2xx response limitation', static function () use (
+    $litachix_error_status, $litachix_error_body, $litachix_error_headers,
+    $litachix_error_id, $litachix_error_logged
+  ): bool {
+    return $litachix_error_status === 200
+      && ($litachix_error_headers['x-noreita-error-status'] ?? '') === '400'
+      && str_starts_with($litachix_error_body, 'CHIBIERROR ')
+      && $litachix_error_id !== ''
+      && str_contains($litachix_error_body, $litachix_error_id)
+      && $litachix_error_logged;
+  });
+
   $animation_png = $root . DIRECTORY_SEPARATOR . 'animation-upload.png';
   $animation_png_data = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
   if ($animation_png_data === false || file_put_contents($animation_png, $animation_png_data) === false) {
     throw new RuntimeException('Could not create animation upload PNG.');
   }
+  $litachix_chi = $root . DIRECTORY_SEPARATOR . 'litachix-work.chi';
+  $litachix_swatches = $root . DIRECTORY_SEPARATOR . 'litachix-swatches.aco';
+  if (file_put_contents($litachix_chi, "CHIBI\0") === false
+    || file_put_contents($litachix_swatches, "ACO\0") === false) {
+    throw new RuntimeException('Could not create LitaChix upload probes.');
+  }
+  $litachix_temporary_before = glob($webroot . '/tmp/*') ?: [];
+  [$litachix_three_file_status, $litachix_three_file_body] = http_request(
+    $base_url . '?mode=saveimage&tool=chi&stime=1',
+    $cookie_jar,
+    [
+      'picture' => new CURLFile($animation_png, 'image/png', 'drawing.png'),
+      'chibifile' => new CURLFile($litachix_chi, 'application/octet-stream', 'drawing.chi'),
+      'swatches' => new CURLFile($litachix_swatches, 'application/octet-stream', 'palette.aco'),
+    ]
+  );
+  $litachix_temporary_after = glob($webroot . '/tmp/*') ?: [];
+  $litachix_created_files = array_values(array_diff($litachix_temporary_after, $litachix_temporary_before));
+  foreach ($litachix_created_files as $created_file) @unlink($created_file);
+  integration_test('LitaChix accepts its PNG, CHI, and swatches upload fields', static function () use (
+    $litachix_three_file_status, $litachix_three_file_body, $litachix_created_files
+  ): bool {
+    return $litachix_three_file_status === 200
+      && $litachix_three_file_body === "CHIBIOK\n"
+      && count($litachix_created_files) >= 2;
+  });
   $mismatched_pch = $root . DIRECTORY_SEPARATOR . 'mismatched.pch';
   $valid_pch = $root . DIRECTORY_SEPARATOR . 'valid.pch';
   file_put_contents($mismatched_pch, "NEO\0" . pack('v', 2) . pack('v', 1) . "\0\0\0\0x");
@@ -549,6 +600,23 @@ PHP;
   ): bool {
     return $unconverted_animation_status === 422
       && str_contains($unconverted_animation_body, 'animation could not be checked');
+  });
+  [$mixed_upload_status, $mixed_upload_body] = http_request(
+    $base_url . '?mode=regist',
+    $cookie_jar,
+    [
+      'mode' => 'regist', 'send' => '1', 'name' => 'Mixed upload', 'mail' => '', 'url' => '',
+      'sub' => 'Mixed upload', 'com' => '画像と動画を同時に選んだ結合テストです。', 'pwd' => 'mixed-upload-pass',
+      'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+      'image_upload' => new CURLFile($animation_png, 'image/png', 'image.png'),
+      'animation_upload' => new CURLFile($valid_pch, 'application/octet-stream', 'animation.pch'),
+    ]
+  );
+  integration_test('normal posting explains that image and animation uploads are exclusive', static function () use (
+    $mixed_upload_status, $mixed_upload_body
+  ): bool {
+    return $mixed_upload_status === 400
+      && str_contains($mixed_upload_body, 'Choose either an image or an animation file.');
   });
   $temporary_before_mismatch = glob($webroot . '/tmp/*') ?: [];
   [$animation_mismatch_status] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
@@ -1325,16 +1393,17 @@ PHP;
     "127.0.0.1\tlocalhost\tagent\t.png\tcode\t{$replacement_code}\t200\t260\t0\tneo"
   );
   file_put_contents($webroot . '/tmp/' . $replacement_base . '.pch', 'replacement animation');
-  $encrypted_password = openssl_encrypt(
-    'image-pass', 'aes-128-cbc', '0qYzf1x6nyN4gS1', OPENSSL_RAW_DATA, 'T3pkYxNyjN7Wz3pu'
-  );
-  if ($encrypted_password === false) throw new RuntimeException('Could not encrypt replacement password');
+  [$replacement_authorization_status, $replacement_authorization_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
+    'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
+    'tools' => 'neo', 'anime' => 'true',
+  ]);
   if (!replace_cookie_value($cookie_jar, 'pwd_cookie', 'another-post-pass')) {
     throw new RuntimeException('Could not prepare a mismatched saved password');
   }
   [$replacement_status, $replacement_body] = http_request(
     $base_url . '?mode=picrep&no=' . $image_post_id . '&repcode=' . rawurlencode($replacement_code)
-      . '&pwd=' . bin2hex($encrypted_password) . '&stime=300',
+      . '&stime=300',
     $cookie_jar,
     ['nsfw' => '0']
   );
@@ -1342,10 +1411,14 @@ PHP;
   $replacement_thumbnail = (string)($replaced_image_row['thumbnail'] ?? '');
   clearstatcache(true, $webroot . '/img/' . $continued_from_thumbnail);
   integration_test('continued NSFW drawing can become safe with a fresh thumbnail', static function () use (
-    $replacement_status, $replacement_body, $replaced_image_row, $replacement_base,
+    $replacement_authorization_status, $replacement_authorization_body, $replacement_status,
+    $replacement_body, $replaced_image_row, $replacement_base,
     $replacement_thumbnail, $continued_from_thumbnail, $webroot
   ): bool {
-    return $replacement_status === 200 && is_array($replaced_image_row)
+    return $replacement_authorization_status === 200
+      && !str_contains($replacement_authorization_body, '&amp;pwd=')
+      && !str_contains($replacement_authorization_body, 'enc_pwd')
+      && $replacement_status === 200 && is_array($replaced_image_row)
       && $replaced_image_row['picfile'] === $replacement_base . '.png'
       && $replaced_image_row['pchfile'] === $replacement_base . '.pch'
       && (int)$replaced_image_row['nsfw'] === 0
@@ -1383,6 +1456,52 @@ PHP;
       && $continued_content['a_url'] === 'https://example.com/continued'
       && $continued_content['sub'] === $continued_subject
       && $continued_content['com'] === $continued_comment;
+  });
+
+  // Tegakiは画像からの続き描きではリプレイを生成しない。そのためPNGだけを
+  // saveimageへ送信してから、POSTのpicrepで差し替える実際の経路を確認する。
+  [$tegaki_continue_form_status, $tegaki_continue_form_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
+    'picw' => '300', 'pich' => '300', 'img' => (string)($replaced_image_row['picfile'] ?? ''),
+    'ctype' => 'img', 'tools' => 'tegaki', 'anime' => 'true',
+  ]);
+  preg_match('/formData\\.append\\("repcode",\\s*"([a-f0-9]{32})"\\)/', $tegaki_continue_form_body, $tegaki_repcode_match);
+  preg_match('/formData\\.append\\("no",\\s*"([0-9]+)"\\)/', $tegaki_continue_form_body, $tegaki_post_id_match);
+  $tegaki_replacement_code = (string)($tegaki_repcode_match[1] ?? '');
+  $tegaki_replacement_post_id = (string)($tegaki_post_id_match[1] ?? '');
+  [$tegaki_save_status, $tegaki_save_body] = http_request(
+    $base_url . '?mode=saveimage&tool=tegaki',
+    $cookie_jar,
+    [
+      'picture' => new CURLFile($animation_png, 'image/png', 'continued-drawing.png'),
+      'tool' => 'tegaki', 'repcode' => $tegaki_replacement_code,
+      'stime' => (string)time(), 'resto' => '0',
+    ]
+  );
+  [$tegaki_replace_status, $tegaki_replace_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'picrep', 'no' => $tegaki_replacement_post_id, 'repcode' => $tegaki_replacement_code,
+    'nsfw' => '0', 'paint_picrep' => 'true',
+  ]);
+  $tegaki_replaced_row = $db->query(
+    'SELECT picfile, pchfile FROM board_log WHERE tid = ' . $image_post_id
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('Tegaki continuation saves its PNG and opens the replacement edit form', static function () use (
+    $tegaki_continue_form_status, $tegaki_continue_form_body, $tegaki_replacement_code, $tegaki_replacement_post_id,
+    $tegaki_save_status, $tegaki_save_body, $tegaki_replace_status, $tegaki_replace_body,
+    $tegaki_replaced_row, $webroot, $image_post_id
+  ): bool {
+    $tegaki_base = pathinfo((string)($tegaki_replaced_row['picfile'] ?? ''), PATHINFO_FILENAME);
+    return $tegaki_continue_form_status === 200
+      && str_contains($tegaki_continue_form_body, 'saveReplay:  false')
+      && $tegaki_replacement_code !== ''
+      && $tegaki_replacement_post_id === (string)$image_post_id
+      && $tegaki_save_status === 200 && $tegaki_save_body === 'ok'
+      && $tegaki_replace_status === 200 && is_array($tegaki_replaced_row)
+      && preg_match('/^\\d{16}\\.png$/D', (string)$tegaki_replaced_row['picfile']) === 1
+      && $tegaki_replaced_row['pchfile'] === ''
+      && is_file($webroot . '/img/' . $tegaki_replaced_row['picfile'])
+      && str_contains($tegaki_replace_body, 'action="index.php?mode=editexec"')
+      && $tegaki_base !== '';
   });
 
   [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);
@@ -1516,6 +1635,97 @@ PHP;
       && (int)$upload_row['img_w'] === 1 && (int)$upload_row['img_h'] === 1
       && $upload_row['tool'] === 'Upload' && $upload_row['thumbnail'] === ''
       && is_file($webroot . '/img/' . $upload_row['picfile']);
+  });
+
+  [$pending_drawing_status, $pending_drawing_body] = http_request(
+    $base_url . '?mode=animation_upload',
+    $cookie_jar,
+    [
+      'token' => $token,
+      'picture' => new CURLFile($animation_png, 'image/png', 'pending-drawing.png'),
+      'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'pending-drawing.pch'),
+    ]
+  );
+  $pending_drawing_lines = preg_split('/\r?\n/', trim($pending_drawing_body)) ?: [];
+  $pending_drawing_image = (string)($pending_drawing_lines[1] ?? '');
+  $pending_drawing_base = pathinfo($pending_drawing_image, PATHINFO_FILENAME);
+  [$pending_form_status, $pending_form_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
+  integration_test('a pending drawing hides the unrelated image upload field', static function () use (
+    $pending_drawing_status, $pending_drawing_image, $pending_form_status, $pending_form_body
+  ): bool {
+    return $pending_drawing_status === 200
+      && preg_match('/^\d{16}\.png$/D', $pending_drawing_image) === 1
+      && $pending_form_status === 200
+      && !str_contains($pending_form_body, 'name="image_upload"')
+      && !str_contains($pending_form_body, 'name="replace_pending_image"');
+  });
+
+  $pending_replacement_marker = 'pending-replacement-' . bin2hex(random_bytes(6));
+  [$pending_replacement_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'pending-replacement', 'mail' => '', 'url' => '',
+    'sub' => 'Replace pending drawing', 'com' => "お絵かき差し替え {$pending_replacement_marker}", 'pwd' => 'replacement-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+    'replace_pending_image' => '1',
+    'image_upload' => new CURLFile($upload_source, 'image/png', 'replacement.png'),
+  ]);
+  $pending_replacement_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $pending_replacement_statement = $pending_replacement_db->prepare(
+    'SELECT picfile, tool FROM board_log WHERE com = :comment LIMIT 1'
+  );
+  $pending_replacement_statement->execute([':comment' => "お絵かき差し替え {$pending_replacement_marker}"]);
+  $pending_replacement_row = $pending_replacement_statement->fetch(PDO::FETCH_ASSOC);
+  integration_test('an uploaded image can replace a pending drawing and cleans its temporary files', static function () use (
+    $pending_replacement_status, $pending_replacement_row, $pending_drawing_image,
+    $pending_drawing_base, $webroot
+  ): bool {
+    return $pending_replacement_status === 200 && is_array($pending_replacement_row)
+      && $pending_replacement_row['picfile'] !== $pending_drawing_image
+      && $pending_replacement_row['tool'] === 'Upload'
+      && !is_file($webroot . '/tmp/' . $pending_drawing_image)
+      && !is_file($webroot . '/tmp/' . $pending_drawing_base . '.pch')
+      && !is_file($webroot . '/tmp/' . $pending_drawing_base . '.dat');
+  });
+
+  // piccomは直前の絵を既定にするが、投稿途中画像が複数あれば選び直せる。
+  [, $multiple_pending_first_body] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
+    'token' => $token,
+    'picture' => new CURLFile($animation_png, 'image/png', 'multiple-first.png'),
+    'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'multiple-first.pch'),
+  ]);
+  [, $multiple_pending_second_body] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
+    'token' => $token,
+    'picture' => new CURLFile($animation_png, 'image/png', 'multiple-second.png'),
+    'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'multiple-second.pch'),
+  ]);
+  $multiple_pending_first = (string)((preg_split('/\r?\n/', trim($multiple_pending_first_body)) ?: [])[1] ?? '');
+  $multiple_pending_second = (string)((preg_split('/\r?\n/', trim($multiple_pending_second_body)) ?: [])[1] ?? '');
+  [$multiple_piccom_status, $multiple_piccom_body] = http_request($base_url . '?mode=piccom', $cookie_jar);
+  $multiple_marker = 'multiple-pending-' . bin2hex(random_bytes(6));
+  [$multiple_selection_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'multiple-pending', 'mail' => '', 'url' => '',
+    'sub' => 'Multiple pending images', 'com' => "複数画像 {$multiple_marker}", 'pwd' => 'multiple-pending-pass',
+    'picfile' => $multiple_pending_first, 'invz' => '0', 'img_w' => '0', 'img_h' => '0',
+    'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  // Earlier test queries can keep an SQLite read snapshot open; use a fresh connection
+  // so this assertion observes the post just made through HTTP.
+  $multiple_pending_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $multiple_pending_statement = $multiple_pending_db->prepare(
+    'SELECT picfile FROM board_log WHERE com = :comment LIMIT 1'
+  );
+  $multiple_pending_statement->execute([':comment' => "複数画像 {$multiple_marker}"]);
+  $multiple_pending_row = $multiple_pending_statement->fetch(PDO::FETCH_ASSOC);
+  integration_test('piccom allows selecting another owned image when multiple pending drawings exist', static function () use (
+    $multiple_piccom_status, $multiple_pending_first, $multiple_pending_second,
+    $multiple_piccom_body, $multiple_selection_status, $multiple_pending_row
+  ): bool {
+    return $multiple_piccom_status === 200
+      && $multiple_pending_first !== '' && $multiple_pending_second !== ''
+      && str_contains($multiple_piccom_body, 'name="picfile"')
+      && str_contains($multiple_piccom_body, $multiple_pending_first)
+      && str_contains($multiple_piccom_body, $multiple_pending_second)
+      && $multiple_selection_status === 200 && is_array($multiple_pending_row)
+      && $multiple_pending_row['picfile'] === $multiple_pending_first;
   });
 
   $unsupported_avif_rejected = true;

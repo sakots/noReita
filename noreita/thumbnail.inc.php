@@ -14,20 +14,28 @@
 // nsfwスイッチを1またはtrueにすると、サムネイル画像をぼかします。
 // 省略またはfalse、0ならぼかしません。
 
-const THUMBNAIL_VER = 20260818; //thumbnail.inc.phpのバージョン
+const THUMBNAIL_VER = 20260820; //thumbnail.inc.phpのバージョン
 
 class Thumbnail {
   private string $image_url; // 入力画像URL
   private string $thumb_dir; // 出力ディレクトリ
   private int $thumb_width; // サムネイルの幅（高さは幅で決まります）
   private bool $nsfw; // nsfwスイッチ
+  private ?string $output_basename;
   private ?string $last_output_path = null;
 
-  public function __construct(string $image_url, string $thumb_dir, int $thumb_width, bool $nsfw = false) {
+  public function __construct(
+    string $image_url,
+    string $thumb_dir,
+    int $thumb_width,
+    bool $nsfw = false,
+    ?string $output_basename = null
+  ) {
     $this->image_url = $image_url;
     $this->thumb_dir = rtrim($thumb_dir, DIRECTORY_SEPARATOR);
     $this->thumb_width = $thumb_width;
     $this->nsfw = $nsfw;
+    $this->output_basename = $output_basename;
   }
 
   public function getOutputPath(): ?string {
@@ -55,7 +63,7 @@ class Thumbnail {
 
     // 出力ファイルのベースネーム
     $path_info = pathinfo($this->image_url);
-    $base_filename = $path_info['filename'];
+    $base_filename = $this->output_basename ?? $path_info['filename'];
     $output_base = $this->thumb_dir . DIRECTORY_SEPARATOR . $base_filename;
 
     if (!is_dir($this->thumb_dir) && !mkdir($this->thumb_dir, 0755, true)) {

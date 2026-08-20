@@ -349,7 +349,6 @@ final class PostValidator {
       'repcode' => (string)filter_input(INPUT_POST, 'repcode'),
       'id' => (string)filter_input(INPUT_POST, 'id'),
       'no' => (string)filter_input(INPUT_POST, 'no'),
-      'enc_pwd' => (string)filter_input(INPUT_POST, 'enc_pwd'),
       'modid' => (string)filter_input(INPUT_POST, 'modid'),
       'resto' => (string)filter_input(INPUT_POST, 'resto'),
       'resedit' => trim((string)filter_input(INPUT_POST, 'resedit')),

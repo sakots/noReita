@@ -64,6 +64,16 @@ smoke_test('PHP 8.5 deprecated imagedestroy is not used', static function (): bo
   return is_string($save) && !preg_match('/\bimagedestroy\s*\(/i', $save);
 });
 
+smoke_test('post image candidates replace each other in the post form', static function (): bool {
+  $script = file_get_contents(dirname(__DIR__) . '/noreita/animation-upload.js');
+  return is_string($script)
+    && str_contains($script, "select[name=\"picfile\"]")
+    && str_contains($script, 'clearTemporaryImage')
+    && str_contains($script, "directUpload.addEventListener('change'")
+    && str_contains($script, "input.value = '';")
+    && str_contains($script, "directUpload.value = '';");
+});
+
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
   $views = $root . DIRECTORY_SEPARATOR . 'views';
@@ -129,6 +139,27 @@ smoke_test('eda Twig theme templates compile', static function (): bool {
       rmdir($root);
     }
   }
+});
+
+smoke_test('asynchronous paint replacements display the returned edit form', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $templates = [
+    'eda/components/eda_paintKlecks.twig',
+    'eda/components/eda_paintTegaki.twig',
+    'eda/components/eda_paintAxnos.twig',
+    'monoreita/components/monoreita_paintKlecks.blade.php',
+    'monoreita/components/monoreita_paintTegaki.blade.php',
+    'monoreita/components/monoreita_paintAxnos.blade.php',
+  ];
+  foreach ($templates as $template) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
+    if (!is_string($source)
+      || !str_contains($source, 'formData.append("mode", "picrep")')
+      || !str_contains($source, 'document.write(text)')) {
+      return false;
+    }
+  }
+  return true;
 });
 
 smoke_test('simple theme stylesheets load after page-specific styles', static function (): bool {
@@ -699,6 +730,16 @@ smoke_test('drawing save requests enforce file and aggregate capacity limits', s
       [], [], ['psd' => ['error' => UPLOAD_ERR_OK, 'size' => 1, 'tmp_name' => '']],
       'neo', 1000, 2000, 3000
     ), 400)
+    && (static function (): bool {
+      PaintSaveRequestGuard::assertWithinLimits(
+        [], [], [
+          'picture' => ['error' => UPLOAD_ERR_OK, 'size' => 900, 'tmp_name' => ''],
+          'chibifile' => ['error' => UPLOAD_ERR_OK, 'size' => 1500, 'tmp_name' => ''],
+          'swatches' => ['error' => UPLOAD_ERR_OK, 'size' => 100, 'tmp_name' => ''],
+        ], 'chi', 1000, 2000, 3000
+      );
+      return true;
+    })()
     && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
       ['CONTENT_LENGTH' => '100'], [], [], 'neo', 1000, 2000, 3000
     ), 413)
@@ -771,6 +812,13 @@ smoke_test('administrator session validates password changes and idle timeout', 
     && !AdminAuth::hasValidSession($session, 'changed-secret', 1800, $now)
     && !AdminAuth::hasValidSession($session, 'admin-secret', 30, $now)
     && !AdminAuth::hasValidSession($session, 'admin-secret', 1800, $now - 120);
+});
+
+smoke_test('legacy administrator session secrets use constant-time comparison', static function (): bool {
+  return AdminAuth::secondaryPasswordMatches('smoke-secondary-admin-secret', 'smoke-secondary-admin-secret')
+    && !AdminAuth::secondaryPasswordMatches('not-the-secondary-admin-secret', 'smoke-secondary-admin-secret')
+    && !AdminAuth::secondaryPasswordMatches('', 'smoke-secondary-admin-secret')
+    && !AdminAuth::secondaryPasswordMatches('smoke-secondary-admin-secret', '');
 });
 
 smoke_test('administrator login rate limit locks by IP, clears after success, and removes expired records', static function (): bool {
@@ -1086,7 +1134,10 @@ smoke_test('application initialization prepares runtime state', static function 
       $initializer->prepareDirectories();
       chmod($root, 0700);
     }
-    return count(ApplicationInitializer::securityHeaders()) === 5
+    $security_headers = ApplicationInitializer::securityHeaders();
+    return !in_array('X-XSS-Protection: 1; mode=block', $security_headers, true)
+      && in_array('X-Content-Type-Options: nosniff', $security_headers, true)
+      && in_array('X-Frame-Options: DENY', $security_headers, true)
       && $schema_version === DatabaseMigrator::SCHEMA_VERSION
       && $unsafe_permission_rejected
       && $read_only_root_supported
@@ -1635,6 +1686,31 @@ smoke_test('cached external image thumbnail link', static function (): bool {
       && str_contains($html, 'src="thumbnail/' . basename($thumbnail) . '"');
   } finally {
     if (is_file($thumbnail)) unlink($thumbnail);
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('external image thumbnails use a stable cache filename and remove legacy files', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_cache_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $input = $directory . DIRECTORY_SEPARATOR . 'source.png';
+  $output = null;
+  $legacy = $directory . DIRECTORY_SEPARATOR . 'noreita_thumb_legacy.avif';
+  try {
+    $image = imagecreatetruecolor(4, 4);
+    if ($image === false || !imagepng($image, $input)) return false;
+    $thumbnail = new Thumbnail($input, $directory, 20, false, 'cached_thumb');
+    if (!$thumbnail->createThumbnail()) return false;
+    $output = $thumbnail->getOutputPath();
+    $cached = $directory . DIRECTORY_SEPARATOR . 'cached_thumb.' . pathinfo((string)$output, PATHINFO_EXTENSION);
+    if ($output !== $cached || !is_file($cached)) return false;
+    if (file_put_contents($legacy, 'legacy') === false) return false;
+    ExternalImageService::cleanupLegacyThumbnails($directory);
+    return !is_file($legacy) && is_file($cached);
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
     if (is_dir($directory)) rmdir($directory);
   }
 });

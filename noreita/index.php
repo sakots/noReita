@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.2.0 lot.260818.1';
+const REITA_VER = 'v4.2.1 lot.260820.0';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -23,7 +23,7 @@ if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
 }
 
 // 公開画面へのPHPエラー詳細表示を止め、非公開ログへ記録する。
-if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260817) {
+if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260820) {
   die($en ? 'Please update the error handler.' : 'エラーハンドラーを最新版に更新してください。');
 }
 
@@ -100,21 +100,21 @@ if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260817) {
 // save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
-if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260817) {
+if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260820) {
   die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260818) {
+if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260820) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
 // external_image.inc
 check_file(__DIR__.'/external_image.inc.php');
 require_once(__DIR__.'/external_image.inc.php');
-if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260816) {
+if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260820) {
   error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
 }
 
@@ -379,7 +379,7 @@ switch ($mode) {
     }
     return paint_com("tmp");
   case 'anime':
-    return open_pch($sp ?? "");
+    return open_pch();
   case 'continue':
     return in_continue();
   case 'contpaint':
@@ -539,7 +539,7 @@ function submit_share_server(): void {
 // 投稿があればデータベースへ保存する
 /* 記事書き込み スレ立てとリプライ */
 function regist(): void {
-  global $en;
+  global $en, $usercode;
   global $req_method;
   global $dat;
 
@@ -571,10 +571,22 @@ function regist(): void {
   $uploaded_file = $_FILES['image_upload'] ?? null;
   $has_uploaded_file = $uploaded_file !== null
     && (!is_array($uploaded_file) || ($uploaded_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  // 続きから描いた画像を残したまま、意図して通常アップロードへ切り替える場合だけ受け付ける。
+  $replace_pending_image = (string)filter_input_data('POST', 'replace_pending_image') === '1';
+  $replaced_pending_picfile = '';
   $raw_animation_file = $_FILES['animation_upload'] ?? null;
   $has_unconverted_animation = $raw_animation_file !== null
     && (!is_array($raw_animation_file)
       || ($raw_animation_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  if ($has_uploaded_file && $has_unconverted_animation) {
+    error(
+      $en
+        ? 'Choose either an image or an animation file.'
+        : '画像と動画は同時に投稿できません。どちらか一方だけを選択してください。',
+      400
+    );
+    return;
+  }
   if ($has_unconverted_animation) {
     error(
       $en
@@ -597,13 +609,48 @@ function regist(): void {
     if (!$pending_image_exists) {
       unset($_SESSION['pending_picfile']);
       ApplicationErrorHandler::reportMessage('Discarded an unavailable pending drawing image.', 'pending-image-reset');
+    } elseif ($has_uploaded_file && $replace_pending_image) {
+      // アップロードの検証・投稿が完了するまでは一時画像とセッションを維持する。
+      // 失敗時にも、描いた画像から投稿をやり直せるようにするため。
+      $replaced_pending_picfile = $pending_picfile;
+      $input['picfile'] = '';
+      $picfile = '';
     } else {
-      if (!hash_equals($pending_picfile, (string)$picfile)) {
-        ApplicationErrorHandler::reportMessage('Normalized a pending drawing image selection.', 'pending-image-selection');
+      if ($has_uploaded_file) {
+        error(
+          $en
+            ? 'Check the option to replace the drawing image with the uploaded image.'
+            : 'お絵かき画像をアップロード画像に差し替えるには、差し替えのチェックを入れてください。',
+          400
+        );
+        return;
       }
-      // 画面の古いキャッシュやPOST値の改変に影響されず、直前に描いた画像を投稿する。
-      $input['picfile'] = $pending_picfile;
-      $picfile = $pending_picfile;
+      $requested_picfile = (string)$picfile;
+      if (!hash_equals($pending_picfile, $requested_picfile)) {
+        // 直前の絵を既定にしつつ、同じ利用者の投稿途中画像が複数ある時だけ
+        // 選択欄から別の画像を選べるようにする。任意のファイル名は受け付けない。
+        $selected_temporary_image = null;
+        foreach (ImageService::listTemporaryImages(Config::string('paths.temporary')) as $temporary_image) {
+          if (hash_equals((string)$temporary_image['user_code'], (string)$usercode)
+            && hash_equals((string)$temporary_image['filename'], $requested_picfile)) {
+            $selected_temporary_image = $temporary_image;
+            break;
+          }
+        }
+        if (is_array($selected_temporary_image)) {
+          $input['picfile'] = $requested_picfile;
+          $picfile = $requested_picfile;
+          ApplicationErrorHandler::reportMessage('Selected a different pending drawing image.', 'pending-image-selection');
+        } else {
+          ApplicationErrorHandler::reportMessage('Normalized a pending drawing image selection.', 'pending-image-selection');
+          $input['picfile'] = $pending_picfile;
+          $picfile = $pending_picfile;
+        }
+      } else {
+        // 画面の古いキャッシュやPOST値の改変に影響されず、直前に描いた画像を投稿する。
+        $input['picfile'] = $pending_picfile;
+        $picfile = $pending_picfile;
+      }
     }
   }
 
@@ -681,6 +728,9 @@ function regist(): void {
       }
       $service->createPreparedPost($prepared_post, $image_result);
       unset($_SESSION['pending_picfile']);
+      if ($replaced_pending_picfile !== '') {
+        ImageService::deleteTemporaryImages(Config::string('paths.temporary'), [$replaced_pending_picfile]);
+      }
 
       $c_pass = $pwd;
       //-- クッキー保存 --
@@ -709,7 +759,7 @@ function regist(): void {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
   }
-  unset($name, $mail, $sub, $com, $url, $pwd, $pictmp, $picfile, $mode);
+  unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
   //ログ行数オーバー処理
   //スレ数カウント
@@ -1248,9 +1298,8 @@ function res(): void {
 function paint_form(string $rep, ?int $reply_to): void {
   global $message, $usercode, $quality, $qualitys, $no;
   global $mode, $ctype, $pch, $type;
-  global $template_engine, $dat;
+  global $template_engine, $dat, $en;
 
-  $pwd = (string)filter_input(INPUT_POST, 'pwd');
   $imgfile = filter_input(INPUT_POST, 'img');
 
   //ツール
@@ -1303,13 +1352,10 @@ function paint_form(string $rep, ?int $reply_to): void {
 
   $dat['stime'] = time();
 
-  $userip = RequestInfo::clientIp();
-
   //続きから
   if ($rep !== "") {
     $ctype = filter_input(INPUT_POST, 'ctype');
     $type = $rep;
-    $pwd_f = filter_input(INPUT_POST, 'pwd');
 
     // 動画ファイルの存在をチェックしてctypeを自動設定
     if ($ctype === null || $ctype === '') {
@@ -1331,8 +1377,6 @@ function paint_form(string $rep, ?int $reply_to): void {
     // 続きから描く場合は一時画像を除外するフラグを設定
     $dat['exclude_temp_images'] = true;
 
-    $dat['no'] = $no;
-    $dat['pwd'] = $pwd_f;
     $dat['ctype'] = $ctype;
     if (is_file(Config::string('paths.images') . $pch . '.pch')) {
       $dat['useneo'] = true;
@@ -1399,9 +1443,6 @@ function paint_form(string $rep, ?int $reply_to): void {
 
   $dat['palsize'] = $count_dyn_p;
 
-  //パスワード暗号化
-  $pwd_f = openssl_encrypt($pwd, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV); //暗号化
-  $pwd_f = bin2hex($pwd_f); //16進数に
   $arr_dyn_p=[];
   foreach ($DynP as $p) {
     $arr_dyn_p[] = '<option>' . $p . '</option>';
@@ -1433,19 +1474,21 @@ function paint_form(string $rep, ?int $reply_to): void {
   //差し換え時の認識コード追加
   if ($type === 'rep') {
     $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
-    $userip = RequestInfo::clientIp();
-
     RequestSecurity::startSession();
-    $time = time();
-    $repcode = substr(crypt(md5($no . $userip . $pwd_f . date("Ymd", $time)), $time), -8);
-    //念の為にエスケープ文字があればアルファベットに変換
-    $repcode = strtr($repcode, "!\"#$%&'()+,/:;<=>?@[\\]^`/{|}~", "ABCDEFGHIJKLMNOabcdefghijklmn");
-    $datmode = 'picrep&no=' . $no . '&pwd=' . $pwd_f . '&repcode=' . $repcode;
+    // 認証済みの投稿番号はセッションに保持する。パスワードをURLやクライアントへ渡さない。
+    $authorization = $_SESSION['image_replacement_authorization'] ?? null;
+    if (!is_array($authorization) || (int)($authorization['post_id'] ?? 0) !== (int)$no) {
+      error($en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
+      return;
+    }
+    $repcode = bin2hex(random_bytes(16));
+    $datmode = 'picrep&no=' . $no . '&repcode=' . $repcode;
+    // 非同期ツールがpicrepへPOSTする投稿番号。GET由来の未初期化値ではなく、
+    // 続き描きフォームで検証済みのPOST値をテンプレートへ渡す。
+    $dat['no'] = $no;
     $usercode .= '&repcode=' . $repcode;
     $dat['rep'] = true;
     $dat['repcode'] = $repcode;
-    $dat['enc_pwd'] = $pwd_f;
-    $dat['pwd'] = $pwd_f;
   }
   $dat['usercode'] = $usercode; //usercodeにいろいろくっついたものをまとめて出力
 
@@ -1823,7 +1866,7 @@ function delmode(): void {
     return;
   }
   //変数クリア
-  unset($delno, $delt);
+  unset($delno);
   //header('Location:'.Config::string('site.script_name'));
   ok($en ? 'Successfully deleted. Switching screen.' : '削除しました。画面を切り替えます。');
 }
@@ -1840,15 +1883,24 @@ function picreplace(): void {
   $no = $no ?: filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
   $repcode = filter_input(INPUT_GET, 'repcode');
   $repcode = $repcode ?: filter_input(INPUT_POST, 'repcode');
-  $pwd = filter_input(INPUT_GET, 'pwd');
-  $pwd = $pwd ?: filter_input(INPUT_POST, 'enc_pwd');
-  if (!$no || !$repcode || !$pwd || !ctype_xdigit($pwd) || strlen($pwd) % 2 !== 0) {
+  if (!$no || !$repcode) {
     error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
   }
-  $pwd_bin = hex2bin($pwd); //バイナリに
-  $pwd_f = $pwd_bin === false ? false : openssl_decrypt($pwd_bin, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV); //復号化
+  RequestSecurity::startSession();
+  $authorization = $_SESSION['image_replacement_authorization'] ?? null;
+  $authorized_post_id = is_array($authorization) ? (int)($authorization['post_id'] ?? 0) : 0;
+  $encrypted_password = is_array($authorization) ? (string)($authorization['password'] ?? '') : '';
+  $expires_at = is_array($authorization) ? (int)($authorization['expires_at'] ?? 0) : 0;
+  if ($authorized_post_id !== (int)$no || $encrypted_password === '' || $expires_at < time()) {
+    unset($_SESSION['image_replacement_authorization']);
+    error($en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
+    return;
+  }
+  $pwd_f = openssl_decrypt($encrypted_password, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV);
   if ($pwd_f === false) {
+    unset($_SESSION['image_replacement_authorization']);
     error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
+    return;
   }
   $nsfw_flag = filter_input(INPUT_POST, 'nsfw');
 
@@ -1920,6 +1972,7 @@ function picreplace(): void {
         'expected_picfile' => (string)$msg_d['picfile'],
       ]);
       ImageService::completePostedReplacement($replacement);
+      unset($_SESSION['image_replacement_authorization']);
     } else {
       error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     }
@@ -2060,7 +2113,7 @@ function editexec(): void {
     error($en ? 'Editing failed.' : '編集に失敗しました。', 500, $e);
     return;
   }
-  unset($name, $mail, $sub, $com, $url, $pwd, $resto, $pictmp, $picfile, $mode);
+  unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
   ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }
@@ -2629,6 +2682,21 @@ function usrchk(): void {
     $msg = (new BoardRepository())->findPost((int)$no);
     if (password_verify($pwd_f, $msg['pwd'])) {
       $flag = true;
+      if (filter_input_data('POST', 'type') === 'rep') {
+        RequestSecurity::startSession();
+        $encrypted_password = openssl_encrypt(
+          (string)$pwd_f, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV
+        );
+        if ($encrypted_password === false) {
+          error($en ? 'Could not prepare image replacement authorization.' : '画像差し替えの認証を準備できませんでした。', 500);
+          return;
+        }
+        $_SESSION['image_replacement_authorization'] = [
+          'post_id' => (int)$no,
+          'password' => $encrypted_password,
+          'expires_at' => time() + Config::int('security.session_file_lifetime'),
+        ];
+      }
     } else {
       $flag = false;
     }
@@ -2671,10 +2739,11 @@ function del_temp(): void {
 
 //古い外部画像サムネイルの削除
 function clean_old_thumbnails(): void {
+  $thumbnail_dir = __DIR__ . '/thumbnail/';
+  ExternalImageService::cleanupLegacyThumbnails($thumbnail_dir);
   if (Config::int('limits.external_thumbnail_days') <= 0) {
     return;
   }
-  $thumbnail_dir = __DIR__ . '/thumbnail/';
   if (!is_dir($thumbnail_dir)) {
     return;
   }
