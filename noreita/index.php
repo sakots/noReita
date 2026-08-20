@@ -571,6 +571,9 @@ function regist(): void {
   $uploaded_file = $_FILES['image_upload'] ?? null;
   $has_uploaded_file = $uploaded_file !== null
     && (!is_array($uploaded_file) || ($uploaded_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  // 続きから描いた画像を残したまま、意図して通常アップロードへ切り替える場合だけ受け付ける。
+  $replace_pending_image = (string)filter_input_data('POST', 'replace_pending_image') === '1';
+  $replaced_pending_picfile = '';
   $raw_animation_file = $_FILES['animation_upload'] ?? null;
   $has_unconverted_animation = $raw_animation_file !== null
     && (!is_array($raw_animation_file)
@@ -597,7 +600,22 @@ function regist(): void {
     if (!$pending_image_exists) {
       unset($_SESSION['pending_picfile']);
       ApplicationErrorHandler::reportMessage('Discarded an unavailable pending drawing image.', 'pending-image-reset');
+    } elseif ($has_uploaded_file && $replace_pending_image) {
+      // アップロードの検証・投稿が完了するまでは一時画像とセッションを維持する。
+      // 失敗時にも、描いた画像から投稿をやり直せるようにするため。
+      $replaced_pending_picfile = $pending_picfile;
+      $input['picfile'] = '';
+      $picfile = '';
     } else {
+      if ($has_uploaded_file) {
+        error(
+          $en
+            ? 'Check the option to replace the drawing image with the uploaded image.'
+            : 'お絵かき画像をアップロード画像に差し替えるには、差し替えのチェックを入れてください。',
+          400
+        );
+        return;
+      }
       if (!hash_equals($pending_picfile, (string)$picfile)) {
         ApplicationErrorHandler::reportMessage('Normalized a pending drawing image selection.', 'pending-image-selection');
       }
@@ -681,6 +699,9 @@ function regist(): void {
       }
       $service->createPreparedPost($prepared_post, $image_result);
       unset($_SESSION['pending_picfile']);
+      if ($replaced_pending_picfile !== '') {
+        ImageService::deleteTemporaryImages(Config::string('paths.temporary'), [$replaced_pending_picfile]);
+      }
 
       $c_pass = $pwd;
       //-- クッキー保存 --

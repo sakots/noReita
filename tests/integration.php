@@ -1543,6 +1543,55 @@ PHP;
       && is_file($webroot . '/img/' . $upload_row['picfile']);
   });
 
+  [$pending_drawing_status, $pending_drawing_body] = http_request(
+    $base_url . '?mode=animation_upload',
+    $cookie_jar,
+    [
+      'token' => $token,
+      'picture' => new CURLFile($animation_png, 'image/png', 'pending-drawing.png'),
+      'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'pending-drawing.pch'),
+    ]
+  );
+  $pending_drawing_lines = preg_split('/\r?\n/', trim($pending_drawing_body)) ?: [];
+  $pending_drawing_image = (string)($pending_drawing_lines[1] ?? '');
+  $pending_drawing_base = pathinfo($pending_drawing_image, PATHINFO_FILENAME);
+  [$pending_form_status, $pending_form_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
+  integration_test('a pending drawing keeps the image upload field available for an intentional replacement', static function () use (
+    $pending_drawing_status, $pending_drawing_image, $pending_form_status, $pending_form_body
+  ): bool {
+    return $pending_drawing_status === 200
+      && preg_match('/^\d{16}\.png$/D', $pending_drawing_image) === 1
+      && $pending_form_status === 200
+      && str_contains($pending_form_body, 'name="image_upload"')
+      && str_contains($pending_form_body, 'name="replace_pending_image"');
+  });
+
+  $pending_replacement_marker = 'pending-replacement-' . bin2hex(random_bytes(6));
+  [$pending_replacement_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'pending-replacement', 'mail' => '', 'url' => '',
+    'sub' => 'Replace pending drawing', 'com' => "お絵かき差し替え {$pending_replacement_marker}", 'pwd' => 'replacement-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+    'replace_pending_image' => '1',
+    'image_upload' => new CURLFile($upload_source, 'image/png', 'replacement.png'),
+  ]);
+  $pending_replacement_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $pending_replacement_statement = $pending_replacement_db->prepare(
+    'SELECT picfile, tool FROM board_log WHERE com = :comment LIMIT 1'
+  );
+  $pending_replacement_statement->execute([':comment' => "お絵かき差し替え {$pending_replacement_marker}"]);
+  $pending_replacement_row = $pending_replacement_statement->fetch(PDO::FETCH_ASSOC);
+  integration_test('an uploaded image can replace a pending drawing and cleans its temporary files', static function () use (
+    $pending_replacement_status, $pending_replacement_row, $pending_drawing_image,
+    $pending_drawing_base, $webroot
+  ): bool {
+    return $pending_replacement_status === 200 && is_array($pending_replacement_row)
+      && $pending_replacement_row['picfile'] !== $pending_drawing_image
+      && $pending_replacement_row['tool'] === 'Upload'
+      && !is_file($webroot . '/tmp/' . $pending_drawing_image)
+      && !is_file($webroot . '/tmp/' . $pending_drawing_base . '.pch')
+      && !is_file($webroot . '/tmp/' . $pending_drawing_base . '.dat');
+  });
+
   $unsupported_avif_rejected = true;
   if (!function_exists('imagecreatefromavif')) {
     $avif_source = $root . '/unsupported-upload.avif';

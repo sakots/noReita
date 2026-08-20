@@ -89,10 +89,15 @@
               </td>
             </tr>
             @endif
-            @if ($use_image_upload && !isset($selected_picfile))
+            @if ($use_image_upload)
             <tr>
               <td>画像</td>
-              <td><input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）</td>
+              <td>
+                <input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
+                @if (isset($selected_picfile))
+                <label><input type="checkbox" name="replace_pending_image" value="1"> お絵かき画像の代わりに、この画像を投稿する</label>
+                @endif
+              </td>
             </tr>
             @endif
             @if ($use_animation_upload && !isset($selected_picfile))
