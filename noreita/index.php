@@ -1823,7 +1823,7 @@ function delmode(): void {
     return;
   }
   //変数クリア
-  unset($delno, $delt);
+  unset($delno);
   //header('Location:'.Config::string('site.script_name'));
   ok($en ? 'Successfully deleted. Switching screen.' : '削除しました。画面を切り替えます。');
 }
