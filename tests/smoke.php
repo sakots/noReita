@@ -774,10 +774,10 @@ smoke_test('administrator session validates password changes and idle timeout', 
 });
 
 smoke_test('legacy administrator session secrets use constant-time comparison', static function (): bool {
-  return admin_secondary_pass_matches('smoke-secondary-admin-secret', 'smoke-secondary-admin-secret')
-    && !admin_secondary_pass_matches('not-the-secondary-admin-secret', 'smoke-secondary-admin-secret')
-    && !admin_secondary_pass_matches('', 'smoke-secondary-admin-secret')
-    && !admin_secondary_pass_matches('smoke-secondary-admin-secret', '');
+  return AdminAuth::secondaryPasswordMatches('smoke-secondary-admin-secret', 'smoke-secondary-admin-secret')
+    && !AdminAuth::secondaryPasswordMatches('not-the-secondary-admin-secret', 'smoke-secondary-admin-secret')
+    && !AdminAuth::secondaryPasswordMatches('', 'smoke-secondary-admin-secret')
+    && !AdminAuth::secondaryPasswordMatches('smoke-secondary-admin-secret', '');
 });
 
 smoke_test('administrator login rate limit locks by IP, clears after success, and removes expired records', static function (): bool {
