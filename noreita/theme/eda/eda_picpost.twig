@@ -51,7 +51,7 @@
         </div>
         {% if temp is defined or use_image_upload %}
         <form class="ppost postform" action="{{ self }}?mode=regist" method="post" enctype="multipart/form-data">
-          {% if selected_picfile is defined %}<input type="hidden" name="picfile" value="{{ selected_picfile }}">{% endif %}
+          {% if selected_picfile is defined and (temp is not defined or temp|length <= 1) %}<input type="hidden" name="picfile" value="{{ selected_picfile }}">{% endif %}
           <table>
             <tr>
               <td>name {% if use_name %} * {% endif %}</td>
@@ -75,14 +75,16 @@
               <td>comment {% if use_com %} * {% endif %} </td>
               <td><textarea name="com" cols="48" rows="5" wrap="soft" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};" {% if use_com %} required {% endif %} maxlength="{{ max_com }}"></textarea></td>
             </tr>
-            {% if selected_picfile is not defined and temp is defined %}
+            {% if temp is defined and (selected_picfile is not defined or temp|length > 1) %}
             <tr>
               <td>imgs</td>
               <td>
                 <select name="picfile">
+                  {% if selected_picfile is not defined %}
                   <option value="">（お絵かき画像を選ばない）</option>
+                  {% endif %}
                   {% for tmp in temp %}
-                  {% if tmp['src_name'] is defined %} <option value="{{ tmp['src_name'] }}">{{ tmp['src_name'] }}</option>
+                  {% if tmp['src_name'] is defined %} <option value="{{ tmp['src_name'] }}"{% if selected_picfile is defined and tmp['src_name'] == selected_picfile %} selected{% endif %}>{{ tmp['src_name'] }}</option>
                   {% endif %}
                   {% endfor %}
                 </select>

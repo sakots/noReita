@@ -1669,6 +1669,48 @@ PHP;
       && !is_file($webroot . '/tmp/' . $pending_drawing_base . '.dat');
   });
 
+  // piccomは直前の絵を既定にするが、投稿途中画像が複数あれば選び直せる。
+  [, $multiple_pending_first_body] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
+    'token' => $token,
+    'picture' => new CURLFile($animation_png, 'image/png', 'multiple-first.png'),
+    'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'multiple-first.pch'),
+  ]);
+  [, $multiple_pending_second_body] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
+    'token' => $token,
+    'picture' => new CURLFile($animation_png, 'image/png', 'multiple-second.png'),
+    'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'multiple-second.pch'),
+  ]);
+  $multiple_pending_first = (string)((preg_split('/\r?\n/', trim($multiple_pending_first_body)) ?: [])[1] ?? '');
+  $multiple_pending_second = (string)((preg_split('/\r?\n/', trim($multiple_pending_second_body)) ?: [])[1] ?? '');
+  [$multiple_piccom_status, $multiple_piccom_body] = http_request($base_url . '?mode=piccom', $cookie_jar);
+  $multiple_marker = 'multiple-pending-' . bin2hex(random_bytes(6));
+  [$multiple_selection_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'multiple-pending', 'mail' => '', 'url' => '',
+    'sub' => 'Multiple pending images', 'com' => "複数画像 {$multiple_marker}", 'pwd' => 'multiple-pending-pass',
+    'picfile' => $multiple_pending_first, 'invz' => '0', 'img_w' => '0', 'img_h' => '0',
+    'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  // Earlier test queries can keep an SQLite read snapshot open; use a fresh connection
+  // so this assertion observes the post just made through HTTP.
+  $multiple_pending_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $multiple_pending_statement = $multiple_pending_db->prepare(
+    'SELECT picfile FROM board_log WHERE com = :comment LIMIT 1'
+  );
+  $multiple_pending_statement->execute([':comment' => "複数画像 {$multiple_marker}"]);
+  $multiple_pending_row = $multiple_pending_statement->fetch(PDO::FETCH_ASSOC);
+  integration_test('piccom allows selecting another owned image when multiple pending drawings exist', static function () use (
+    $multiple_piccom_status, $multiple_pending_first, $multiple_pending_second,
+    $multiple_piccom_body, $multiple_selection_status, $multiple_pending_row
+  ): bool {
+    return $multiple_piccom_status === 200
+      && $multiple_pending_first !== '' && $multiple_pending_second !== ''
+      && str_contains($multiple_piccom_body, 'name="picfile"')
+      && str_contains($multiple_piccom_body, $multiple_pending_first)
+      && str_contains($multiple_piccom_body, $multiple_pending_second)
+      && $multiple_selection_status === 200 && is_array($multiple_pending_row)
+      && $multiple_pending_row['picfile'] === $multiple_pending_first;
+  });
+
   $unsupported_avif_rejected = true;
   if (!function_exists('imagecreatefromavif')) {
     $avif_source = $root . '/unsupported-upload.avif';

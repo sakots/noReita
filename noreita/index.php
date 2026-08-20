@@ -539,7 +539,7 @@ function submit_share_server(): void {
 // 投稿があればデータベースへ保存する
 /* 記事書き込み スレ立てとリプライ */
 function regist(): void {
-  global $en;
+  global $en, $usercode;
   global $req_method;
   global $dat;
 
@@ -616,12 +616,32 @@ function regist(): void {
         );
         return;
       }
-      if (!hash_equals($pending_picfile, (string)$picfile)) {
-        ApplicationErrorHandler::reportMessage('Normalized a pending drawing image selection.', 'pending-image-selection');
+      $requested_picfile = (string)$picfile;
+      if (!hash_equals($pending_picfile, $requested_picfile)) {
+        // 直前の絵を既定にしつつ、同じ利用者の投稿途中画像が複数ある時だけ
+        // 選択欄から別の画像を選べるようにする。任意のファイル名は受け付けない。
+        $selected_temporary_image = null;
+        foreach (ImageService::listTemporaryImages(Config::string('paths.temporary')) as $temporary_image) {
+          if (hash_equals((string)$temporary_image['user_code'], (string)$usercode)
+            && hash_equals((string)$temporary_image['filename'], $requested_picfile)) {
+            $selected_temporary_image = $temporary_image;
+            break;
+          }
+        }
+        if (is_array($selected_temporary_image)) {
+          $input['picfile'] = $requested_picfile;
+          $picfile = $requested_picfile;
+          ApplicationErrorHandler::reportMessage('Selected a different pending drawing image.', 'pending-image-selection');
+        } else {
+          ApplicationErrorHandler::reportMessage('Normalized a pending drawing image selection.', 'pending-image-selection');
+          $input['picfile'] = $pending_picfile;
+          $picfile = $pending_picfile;
+        }
+      } else {
+        // 画面の古いキャッシュやPOST値の改変に影響されず、直前に描いた画像を投稿する。
+        $input['picfile'] = $pending_picfile;
+        $picfile = $pending_picfile;
       }
-      // 画面の古いキャッシュやPOST値の改変に影響されず、直前に描いた画像を投稿する。
-      $input['picfile'] = $pending_picfile;
-      $picfile = $pending_picfile;
     }
   }
 
