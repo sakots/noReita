@@ -214,6 +214,8 @@ class image_save{
     $this->tool = 'neo';
     
     //拡張ヘッダから情報を取得    
+    /** @var array<string,string> $u */
+    $u = [];
     parse_str($sendheader, $u);
     $this->repcode = isset($u['repcode']) ? t($u['repcode']) : '';
     $this->resto = isset($u['resto']) ? t($u['resto']) : '';
