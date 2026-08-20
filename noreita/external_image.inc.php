@@ -1,7 +1,7 @@
 <?php
 // external_image.inc.php for noReita (C) sakots 2026 MIT License
 
-const EXTERNAL_IMAGE_INC_VER = 20260816;
+const EXTERNAL_IMAGE_INC_VER = 20260820;
 
 final class ExternalImageService {
   public const MAX_BYTES = 1024 * 1024;
@@ -177,7 +177,14 @@ final class ExternalImageService {
 
     try {
       if (file_put_contents($temporary_file, $image_data, LOCK_EX) === false) return null;
-      $thumbnail = new Thumbnail($temporary_file, $this->thumbnail_dir, $this->thumbnail_width);
+      // 一時ファイル名ではなくURLから決まる名前で保存し、次回以降の表示でキャッシュを再利用する。
+      $thumbnail = new Thumbnail(
+        $temporary_file,
+        $this->thumbnail_dir,
+        $this->thumbnail_width,
+        false,
+        basename($thumbnail_base)
+      );
       if (!$thumbnail->createThumbnail()) return null;
       $output_path = $thumbnail->getOutputPath();
       if (!$output_path || !is_file($output_path)) return null;
@@ -185,6 +192,24 @@ final class ExternalImageService {
       return $output_path;
     } finally {
       @unlink($temporary_file);
+    }
+  }
+
+  // 旧実装が一時ファイル名で残した外部画像サムネイルを削除する。
+  public static function cleanupLegacyThumbnails(string $thumbnail_dir): void {
+    if (!is_dir($thumbnail_dir)) return;
+    try {
+      $checked = 0;
+      foreach (new DirectoryIterator($thumbnail_dir) as $file) {
+        if ($checked >= 1000) break;
+        if ($file->isDot() || !$file->isFile()) continue;
+        $checked++;
+        if (preg_match('/\Anoreita_thumb_[A-Za-z0-9_-]+\.(?:jpg|png|gif|webp|avif)\z/iD', $file->getFilename()) === 1) {
+          @unlink($file->getPathname());
+        }
+      }
+    } catch (Throwable $e) {
+      // キャッシュ整理の失敗で通常表示を停止しない。
     }
   }
 

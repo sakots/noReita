@@ -107,14 +107,14 @@ if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260817) {
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php');
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260818) {
+if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260820) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
 // external_image.inc
 check_file(__DIR__.'/external_image.inc.php');
 require_once(__DIR__.'/external_image.inc.php');
-if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260816) {
+if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260820) {
   error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
 }
 
@@ -2671,10 +2671,11 @@ function del_temp(): void {
 
 //古い外部画像サムネイルの削除
 function clean_old_thumbnails(): void {
+  $thumbnail_dir = __DIR__ . '/thumbnail/';
+  ExternalImageService::cleanupLegacyThumbnails($thumbnail_dir);
   if (Config::int('limits.external_thumbnail_days') <= 0) {
     return;
   }
-  $thumbnail_dir = __DIR__ . '/thumbnail/';
   if (!is_dir($thumbnail_dir)) {
     return;
   }

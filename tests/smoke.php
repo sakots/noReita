@@ -1642,6 +1642,31 @@ smoke_test('cached external image thumbnail link', static function (): bool {
   }
 });
 
+smoke_test('external image thumbnails use a stable cache filename and remove legacy files', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_cache_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $input = $directory . DIRECTORY_SEPARATOR . 'source.png';
+  $output = null;
+  $legacy = $directory . DIRECTORY_SEPARATOR . 'noreita_thumb_legacy.avif';
+  try {
+    $image = imagecreatetruecolor(4, 4);
+    if ($image === false || !imagepng($image, $input)) return false;
+    $thumbnail = new Thumbnail($input, $directory, 20, false, 'cached_thumb');
+    if (!$thumbnail->createThumbnail()) return false;
+    $output = $thumbnail->getOutputPath();
+    $cached = $directory . DIRECTORY_SEPARATOR . 'cached_thumb.' . pathinfo((string)$output, PATHINFO_EXTENSION);
+    if ($output !== $cached || !is_file($cached)) return false;
+    if (file_put_contents($legacy, 'legacy') === false) return false;
+    ExternalImageService::cleanupLegacyThumbnails($directory);
+    return !is_file($legacy) && is_file($cached);
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('external image thumbnails limit URLs and cache failures briefly', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_limits_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
