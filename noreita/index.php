@@ -1348,7 +1348,6 @@ function paint_form(string $rep, ?int $reply_to): void {
     // 続きから描く場合は一時画像を除外するフラグを設定
     $dat['exclude_temp_images'] = true;
 
-    $dat['no'] = $no;
     $dat['ctype'] = $ctype;
     if (is_file(Config::string('paths.images') . $pch . '.pch')) {
       $dat['useneo'] = true;
@@ -1455,6 +1454,9 @@ function paint_form(string $rep, ?int $reply_to): void {
     }
     $repcode = bin2hex(random_bytes(16));
     $datmode = 'picrep&no=' . $no . '&repcode=' . $repcode;
+    // 非同期ツールがpicrepへPOSTする投稿番号。GET由来の未初期化値ではなく、
+    // 続き描きフォームで検証済みのPOST値をテンプレートへ渡す。
+    $dat['no'] = $no;
     $usercode .= '&repcode=' . $repcode;
     $dat['rep'] = true;
     $dat['repcode'] = $repcode;

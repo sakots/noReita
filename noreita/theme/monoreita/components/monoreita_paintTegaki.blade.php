@@ -47,21 +47,11 @@
           },
           body: data,
         })
-        .then((response) => {
-          if (response.ok) {
-            response.text().then((text) => {
-              console.log(text)
-              if (text === 'ok') {
-                @if (isset($rep))
-                  return repData();
-                @endif
-                Tegaki.hide(); //｢このサイトを離れますか?｣を解除
-                return window.location.href = "{{$self}}?mode={!!$mode!!}" + (resto ? "&resto=" + resto : "");
-              }
-              return showAlert(text);
-            })
-          } else {
+        .then(async (response) => {
+          const text = await response.text();
+          if (!response.ok) {
             const HttpStatusMessage = getHttpStatusMessage(response.status);
+            console.error('Tegaki drawing save failed:', response.status, text);
 
             return showAlert(
               @if (isset($en))
@@ -71,6 +61,15 @@
               @endif
             );
           }
+          console.log(text);
+          if (text.trim() === 'ok') {
+            @if (isset($rep))
+              return repData();
+            @endif
+            Tegaki.hide(); //｢このサイトを離れますか?｣を解除
+            return window.location.href = "{{$self}}?mode={!!$mode!!}" + (resto ? "&resto=" + resto : "");
+          }
+          return showAlert(text || '投稿に失敗しました。');
         })
         .catch((error) => {
           return showAlert(
@@ -94,7 +93,7 @@
           formData.append("paint_picrep", true);
 
           // 画像差し換え
-          fetch("./", {
+          return fetch("./", {
             method: 'POST',
             mode: 'same-origin',
             headers: {
@@ -102,25 +101,21 @@
             },
             body: formData
           })
-          .then(response => {
-            if (response.ok) {
-              if (response.redirected) {
-                Tegaki.hide(); //｢このサイトを離れますか?｣を解除
-                return window.location.href = response.url;
-              }
-              response.text().then((text) => {
-                if (text.startsWith("error\n")) {
-                  console.log(text);
-                  Tegaki.hide(); //｢このサイトを離れますか?｣を解除
-                  return window.location.href = "{{$self}}?mode={!!$mode!!}";
-                }
-                Tegaki.hide(); //｢このサイトを離れますか?｣を解除
-                // picrepは編集フォームのHTMLを返すため、非同期保存後にその画面へ切り替える。
-                document.open();
-                document.write(text);
-                document.close();
-              })
+          .then(async response => {
+            if (response.redirected) {
+              Tegaki.hide(); //｢このサイトを離れますか?｣を解除
+              return window.location.href = response.url;
             }
+            const text = await response.text();
+            if (!response.ok || text.startsWith("error\n")) {
+              console.error('Tegaki image replacement failed:', response.status, text);
+              return showAlert(text || '画像の差し替えに失敗しました。');
+            }
+            Tegaki.hide(); //｢このサイトを離れますか?｣を解除
+            // picrepは編集フォームのHTMLを返すため、非同期保存後にその画面へ切り替える。
+            document.open();
+            document.write(text);
+            document.close();
           })
           .catch(error => {
             console.error('There was a problem with the fetch operation:', error);
@@ -132,8 +127,13 @@
 
       Tegaki.flatten().toBlob(
         function(blob) {
-          // console.log(blob);
-          const tgkr = Tegaki.replayRecorder ? Tegaki.replayRecorder.toBlob() : null;
+          if (!(blob instanceof Blob) || blob.size < 1) {
+            return showAlert('画像を作成できませんでした。ページを再読み込みして、もう一度お試しください。');
+          }
+          // 続き描きではsaveReplayがfalseであり、リプレイ記録器は生成されない。
+          const tgkr = Tegaki.saveReplay && Tegaki.replayRecorder
+            && typeof Tegaki.replayRecorder.toBlob === 'function'
+            ? Tegaki.replayRecorder.toBlob() : null;
           const formData = new FormData();
           let DataSize = 1000;
           let max_pch = 2000;

@@ -1441,6 +1441,52 @@ PHP;
       && $continued_content['com'] === $continued_comment;
   });
 
+  // Tegakiは画像からの続き描きではリプレイを生成しない。そのためPNGだけを
+  // saveimageへ送信してから、POSTのpicrepで差し替える実際の経路を確認する。
+  [$tegaki_continue_form_status, $tegaki_continue_form_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
+    'picw' => '300', 'pich' => '300', 'img' => (string)($replaced_image_row['picfile'] ?? ''),
+    'ctype' => 'img', 'tools' => 'tegaki', 'anime' => 'true',
+  ]);
+  preg_match('/formData\\.append\\("repcode",\\s*"([a-f0-9]{32})"\\)/', $tegaki_continue_form_body, $tegaki_repcode_match);
+  preg_match('/formData\\.append\\("no",\\s*"([0-9]+)"\\)/', $tegaki_continue_form_body, $tegaki_post_id_match);
+  $tegaki_replacement_code = (string)($tegaki_repcode_match[1] ?? '');
+  $tegaki_replacement_post_id = (string)($tegaki_post_id_match[1] ?? '');
+  [$tegaki_save_status, $tegaki_save_body] = http_request(
+    $base_url . '?mode=saveimage&tool=tegaki',
+    $cookie_jar,
+    [
+      'picture' => new CURLFile($animation_png, 'image/png', 'continued-drawing.png'),
+      'tool' => 'tegaki', 'repcode' => $tegaki_replacement_code,
+      'stime' => (string)time(), 'resto' => '0',
+    ]
+  );
+  [$tegaki_replace_status, $tegaki_replace_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'picrep', 'no' => $tegaki_replacement_post_id, 'repcode' => $tegaki_replacement_code,
+    'nsfw' => '0', 'paint_picrep' => 'true',
+  ]);
+  $tegaki_replaced_row = $db->query(
+    'SELECT picfile, pchfile FROM board_log WHERE tid = ' . $image_post_id
+  )->fetch(PDO::FETCH_ASSOC);
+  integration_test('Tegaki continuation saves its PNG and opens the replacement edit form', static function () use (
+    $tegaki_continue_form_status, $tegaki_continue_form_body, $tegaki_replacement_code, $tegaki_replacement_post_id,
+    $tegaki_save_status, $tegaki_save_body, $tegaki_replace_status, $tegaki_replace_body,
+    $tegaki_replaced_row, $webroot, $image_post_id
+  ): bool {
+    $tegaki_base = pathinfo((string)($tegaki_replaced_row['picfile'] ?? ''), PATHINFO_FILENAME);
+    return $tegaki_continue_form_status === 200
+      && str_contains($tegaki_continue_form_body, 'saveReplay:  false')
+      && $tegaki_replacement_code !== ''
+      && $tegaki_replacement_post_id === (string)$image_post_id
+      && $tegaki_save_status === 200 && $tegaki_save_body === 'ok'
+      && $tegaki_replace_status === 200 && is_array($tegaki_replaced_row)
+      && preg_match('/^\\d{16}\\.png$/D', (string)$tegaki_replaced_row['picfile']) === 1
+      && $tegaki_replaced_row['pchfile'] === ''
+      && is_file($webroot . '/img/' . $tegaki_replaced_row['picfile'])
+      && str_contains($tegaki_replace_body, 'action="index.php?mode=editexec"')
+      && $tegaki_base !== '';
+  });
+
   [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);
   [$admin_page_two_status, $admin_page_two_body] = http_request($base_url . '?mode=admin&page=2', $cookie_jar);
   [$admin_filtered_status, $admin_filtered_body] = http_request($base_url . '?mode=admin&isAdministrator=no&page=1', $cookie_jar);
