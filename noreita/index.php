@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.2.0 lot.260818.1';
+const REITA_VER = 'v4.2.1 lot.260820.0';
 
 // 全エントリーポイント共通の設定・エラー処理を初期化する。
 require_once __DIR__ . '/bootstrap.php';
@@ -1269,9 +1269,8 @@ function res(): void {
 function paint_form(string $rep, ?int $reply_to): void {
   global $message, $usercode, $quality, $qualitys, $no;
   global $mode, $ctype, $pch, $type;
-  global $template_engine, $dat;
+  global $template_engine, $dat, $en;
 
-  $pwd = (string)filter_input(INPUT_POST, 'pwd');
   $imgfile = filter_input(INPUT_POST, 'img');
 
   //ツール
@@ -1324,13 +1323,10 @@ function paint_form(string $rep, ?int $reply_to): void {
 
   $dat['stime'] = time();
 
-  $userip = RequestInfo::clientIp();
-
   //続きから
   if ($rep !== "") {
     $ctype = filter_input(INPUT_POST, 'ctype');
     $type = $rep;
-    $pwd_f = filter_input(INPUT_POST, 'pwd');
 
     // 動画ファイルの存在をチェックしてctypeを自動設定
     if ($ctype === null || $ctype === '') {
@@ -1353,7 +1349,6 @@ function paint_form(string $rep, ?int $reply_to): void {
     $dat['exclude_temp_images'] = true;
 
     $dat['no'] = $no;
-    $dat['pwd'] = $pwd_f;
     $dat['ctype'] = $ctype;
     if (is_file(Config::string('paths.images') . $pch . '.pch')) {
       $dat['useneo'] = true;
@@ -1420,9 +1415,6 @@ function paint_form(string $rep, ?int $reply_to): void {
 
   $dat['palsize'] = $count_dyn_p;
 
-  //パスワード暗号化
-  $pwd_f = openssl_encrypt($pwd, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV); //暗号化
-  $pwd_f = bin2hex($pwd_f); //16進数に
   $arr_dyn_p=[];
   foreach ($DynP as $p) {
     $arr_dyn_p[] = '<option>' . $p . '</option>';
@@ -1454,19 +1446,18 @@ function paint_form(string $rep, ?int $reply_to): void {
   //差し換え時の認識コード追加
   if ($type === 'rep') {
     $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
-    $userip = RequestInfo::clientIp();
-
     RequestSecurity::startSession();
-    $time = time();
-    $repcode = substr(crypt(md5($no . $userip . $pwd_f . date("Ymd", $time)), $time), -8);
-    //念の為にエスケープ文字があればアルファベットに変換
-    $repcode = strtr($repcode, "!\"#$%&'()+,/:;<=>?@[\\]^`/{|}~", "ABCDEFGHIJKLMNOabcdefghijklmn");
-    $datmode = 'picrep&no=' . $no . '&pwd=' . $pwd_f . '&repcode=' . $repcode;
+    // 認証済みの投稿番号はセッションに保持する。パスワードをURLやクライアントへ渡さない。
+    $authorization = $_SESSION['image_replacement_authorization'] ?? null;
+    if (!is_array($authorization) || (int)($authorization['post_id'] ?? 0) !== (int)$no) {
+      error($en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
+      return;
+    }
+    $repcode = bin2hex(random_bytes(16));
+    $datmode = 'picrep&no=' . $no . '&repcode=' . $repcode;
     $usercode .= '&repcode=' . $repcode;
     $dat['rep'] = true;
     $dat['repcode'] = $repcode;
-    $dat['enc_pwd'] = $pwd_f;
-    $dat['pwd'] = $pwd_f;
   }
   $dat['usercode'] = $usercode; //usercodeにいろいろくっついたものをまとめて出力
 
@@ -1861,15 +1852,24 @@ function picreplace(): void {
   $no = $no ?: filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
   $repcode = filter_input(INPUT_GET, 'repcode');
   $repcode = $repcode ?: filter_input(INPUT_POST, 'repcode');
-  $pwd = filter_input(INPUT_GET, 'pwd');
-  $pwd = $pwd ?: filter_input(INPUT_POST, 'enc_pwd');
-  if (!$no || !$repcode || !$pwd || !ctype_xdigit($pwd) || strlen($pwd) % 2 !== 0) {
+  if (!$no || !$repcode) {
     error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
   }
-  $pwd_bin = hex2bin($pwd); //バイナリに
-  $pwd_f = $pwd_bin === false ? false : openssl_decrypt($pwd_bin, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV); //復号化
+  RequestSecurity::startSession();
+  $authorization = $_SESSION['image_replacement_authorization'] ?? null;
+  $authorized_post_id = is_array($authorization) ? (int)($authorization['post_id'] ?? 0) : 0;
+  $encrypted_password = is_array($authorization) ? (string)($authorization['password'] ?? '') : '';
+  $expires_at = is_array($authorization) ? (int)($authorization['expires_at'] ?? 0) : 0;
+  if ($authorized_post_id !== (int)$no || $encrypted_password === '' || $expires_at < time()) {
+    unset($_SESSION['image_replacement_authorization']);
+    error($en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
+    return;
+  }
+  $pwd_f = openssl_decrypt($encrypted_password, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV);
   if ($pwd_f === false) {
+    unset($_SESSION['image_replacement_authorization']);
     error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
+    return;
   }
   $nsfw_flag = filter_input(INPUT_POST, 'nsfw');
 
@@ -1941,6 +1941,7 @@ function picreplace(): void {
         'expected_picfile' => (string)$msg_d['picfile'],
       ]);
       ImageService::completePostedReplacement($replacement);
+      unset($_SESSION['image_replacement_authorization']);
     } else {
       error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     }
@@ -2650,6 +2651,21 @@ function usrchk(): void {
     $msg = (new BoardRepository())->findPost((int)$no);
     if (password_verify($pwd_f, $msg['pwd'])) {
       $flag = true;
+      if (filter_input_data('POST', 'type') === 'rep') {
+        RequestSecurity::startSession();
+        $encrypted_password = openssl_encrypt(
+          (string)$pwd_f, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV
+        );
+        if ($encrypted_password === false) {
+          error($en ? 'Could not prepare image replacement authorization.' : '画像差し替えの認証を準備できませんでした。', 500);
+          return;
+        }
+        $_SESSION['image_replacement_authorization'] = [
+          'post_id' => (int)$no,
+          'password' => $encrypted_password,
+          'expires_at' => time() + Config::int('security.session_file_lifetime'),
+        ];
+      }
     } else {
       $flag = false;
     }

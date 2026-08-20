@@ -156,7 +156,6 @@
       const formData = new FormData();
       formData.append("mode", "picrep");
       formData.append("no", "{{$no}}");
-      formData.append("enc_pwd", "{{$enc_pwd}}");
       formData.append("repcode", "{{$repcode}}");
       formData.append("paint_picrep", true);
 
