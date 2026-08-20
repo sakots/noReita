@@ -1086,7 +1086,10 @@ smoke_test('application initialization prepares runtime state', static function 
       $initializer->prepareDirectories();
       chmod($root, 0700);
     }
-    return count(ApplicationInitializer::securityHeaders()) === 5
+    $security_headers = ApplicationInitializer::securityHeaders();
+    return !in_array('X-XSS-Protection: 1; mode=block', $security_headers, true)
+      && in_array('X-Content-Type-Options: nosniff', $security_headers, true)
+      && in_array('X-Frame-Options: DENY', $security_headers, true)
       && $schema_version === DatabaseMigrator::SCHEMA_VERSION
       && $unsafe_permission_rejected
       && $read_only_root_supported
