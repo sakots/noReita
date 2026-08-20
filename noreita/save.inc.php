@@ -9,7 +9,8 @@ final class PaintSaveCapacityException extends RuntimeException {}
 final class PaintSaveRequestGuard {
   private const FILE_FIELDS = [
     'neo' => ['picture', 'pch'],
-    'chi' => ['picture', 'chibifile'],
+    // LitaChix/ChickenPaintはPNG・.chiに加えて、編集済みパレットをswatchesとして送信する。
+    'chi' => ['picture', 'chibifile', 'swatches'],
     'klecks' => ['picture', 'psd'],
     'tegaki' => ['picture', 'tgkr'],
     'axnos' => ['picture'],
@@ -66,7 +67,7 @@ final class PaintSaveRequestGuard {
       }
       if ($error !== UPLOAD_ERR_OK) continue;
       $uploaded_files++;
-      if ($uploaded_files > 2) {
+      if ($uploaded_files > count($allowed)) {
         throw new PaintSaveCapacityException('Too many drawing upload files.', 400);
       }
       $declared_size = max(0, (int)$file['size']);

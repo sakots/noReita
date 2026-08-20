@@ -699,6 +699,16 @@ smoke_test('drawing save requests enforce file and aggregate capacity limits', s
       [], [], ['psd' => ['error' => UPLOAD_ERR_OK, 'size' => 1, 'tmp_name' => '']],
       'neo', 1000, 2000, 3000
     ), 400)
+    && (static function (): bool {
+      PaintSaveRequestGuard::assertWithinLimits(
+        [], [], [
+          'picture' => ['error' => UPLOAD_ERR_OK, 'size' => 900, 'tmp_name' => ''],
+          'chibifile' => ['error' => UPLOAD_ERR_OK, 'size' => 1500, 'tmp_name' => ''],
+          'swatches' => ['error' => UPLOAD_ERR_OK, 'size' => 100, 'tmp_name' => ''],
+        ], 'chi', 1000, 2000, 3000
+      );
+      return true;
+    })()
     && $rejected(static fn () => PaintSaveRequestGuard::assertWithinLimits(
       ['CONTENT_LENGTH' => '100'], [], [], 'neo', 1000, 2000, 3000
     ), 413)

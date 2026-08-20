@@ -555,6 +555,32 @@ PHP;
   if ($animation_png_data === false || file_put_contents($animation_png, $animation_png_data) === false) {
     throw new RuntimeException('Could not create animation upload PNG.');
   }
+  $litachix_chi = $root . DIRECTORY_SEPARATOR . 'litachix-work.chi';
+  $litachix_swatches = $root . DIRECTORY_SEPARATOR . 'litachix-swatches.aco';
+  if (file_put_contents($litachix_chi, "CHIBI\0") === false
+    || file_put_contents($litachix_swatches, "ACO\0") === false) {
+    throw new RuntimeException('Could not create LitaChix upload probes.');
+  }
+  $litachix_temporary_before = glob($webroot . '/tmp/*') ?: [];
+  [$litachix_three_file_status, $litachix_three_file_body] = http_request(
+    $base_url . '?mode=saveimage&tool=chi&stime=1',
+    $cookie_jar,
+    [
+      'picture' => new CURLFile($animation_png, 'image/png', 'drawing.png'),
+      'chibifile' => new CURLFile($litachix_chi, 'application/octet-stream', 'drawing.chi'),
+      'swatches' => new CURLFile($litachix_swatches, 'application/octet-stream', 'palette.aco'),
+    ]
+  );
+  $litachix_temporary_after = glob($webroot . '/tmp/*') ?: [];
+  $litachix_created_files = array_values(array_diff($litachix_temporary_after, $litachix_temporary_before));
+  foreach ($litachix_created_files as $created_file) @unlink($created_file);
+  integration_test('LitaChix accepts its PNG, CHI, and swatches upload fields', static function () use (
+    $litachix_three_file_status, $litachix_three_file_body, $litachix_created_files
+  ): bool {
+    return $litachix_three_file_status === 200
+      && $litachix_three_file_body === "CHIBIOK\n"
+      && count($litachix_created_files) >= 2;
+  });
   $mismatched_pch = $root . DIRECTORY_SEPARATOR . 'mismatched.pch';
   $valid_pch = $root . DIRECTORY_SEPARATOR . 'valid.pch';
   file_put_contents($mismatched_pch, "NEO\0" . pack('v', 2) . pack('v', 1) . "\0\0\0\0x");
