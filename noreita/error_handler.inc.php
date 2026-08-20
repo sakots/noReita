@@ -447,6 +447,9 @@ final class ApplicationErrorHandler {
         . ' / 設置者へ次のエラーIDをお知らせください: ' . $error_id;
   }
 
+  /**
+   * @param array<string,mixed> $details 追加するエラーログの項目
+   */
   private static function writeRecord(array $details): string {
     $error_id = self::newErrorId();
     $record = [
