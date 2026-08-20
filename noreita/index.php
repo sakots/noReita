@@ -709,7 +709,7 @@ function regist(): void {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
   }
-  unset($name, $mail, $sub, $com, $url, $pwd, $pictmp, $picfile, $mode);
+  unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
   //ログ行数オーバー処理
   //スレ数カウント
@@ -2060,7 +2060,7 @@ function editexec(): void {
     error($en ? 'Editing failed.' : '編集に失敗しました。', 500, $e);
     return;
   }
-  unset($name, $mail, $sub, $com, $url, $pwd, $resto, $pictmp, $picfile, $mode);
+  unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
   ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }
