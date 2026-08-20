@@ -64,6 +64,14 @@ smoke_test('PHP 8.5 deprecated imagedestroy is not used', static function (): bo
   return is_string($save) && !preg_match('/\bimagedestroy\s*\(/i', $save);
 });
 
+smoke_test('image and animation file selections replace each other in the post form', static function (): bool {
+  $script = file_get_contents(dirname(__DIR__) . '/noreita/animation-upload.js');
+  return is_string($script)
+    && str_contains($script, "directUpload.addEventListener('change'")
+    && str_contains($script, "input.value = '';")
+    && str_contains($script, "directUpload.value = '';");
+});
+
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
   $views = $root . DIRECTORY_SEPARATOR . 'views';

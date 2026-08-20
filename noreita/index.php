@@ -578,6 +578,15 @@ function regist(): void {
   $has_unconverted_animation = $raw_animation_file !== null
     && (!is_array($raw_animation_file)
       || ($raw_animation_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+  if ($has_uploaded_file && $has_unconverted_animation) {
+    error(
+      $en
+        ? 'Choose either an image or an animation file.'
+        : '画像と動画は同時に投稿できません。どちらか一方だけを選択してください。',
+      400
+    );
+    return;
+  }
   if ($has_unconverted_animation) {
     error(
       $en

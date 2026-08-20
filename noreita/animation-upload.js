@@ -260,12 +260,30 @@
     const form = input.closest('form');
     const status = form && form.querySelector('[data-animation-upload-status]');
     if (!form || !status) return;
+    const directUpload = form.querySelector('[name="image_upload"]');
     let processing = false;
 
+    if (directUpload) {
+      directUpload.addEventListener('change', () => {
+        if (!directUpload.files || !directUpload.files[0]) return;
+        if (input.files && input.files[0]) {
+          input.value = '';
+          status.textContent = '画像を選択したため、動画の選択を解除しました。';
+        }
+      });
+    }
+
     input.addEventListener('change', () => {
-      status.textContent = input.files && input.files[0]
-        ? '「書き込む」を押すと、動画を確認して投稿します。'
-        : '';
+      if (!input.files || !input.files[0]) {
+        status.textContent = '';
+        return;
+      }
+      if (directUpload && directUpload.files && directUpload.files[0]) {
+        directUpload.value = '';
+        status.textContent = '動画を選択したため、画像の選択を解除しました。';
+        return;
+      }
+      status.textContent = '「書き込む」を押すと、動画を確認して投稿します。';
     });
 
     form.addEventListener('submit', async (event) => {
@@ -274,9 +292,8 @@
       event.preventDefault();
       if (processing) return;
 
-      const directUpload = form.querySelector('[name="image_upload"]');
       if (directUpload && directUpload.files && directUpload.files[0]) {
-        status.textContent = '画像と動画は同時に選択できません。どちらか一方を選択してください。';
+        status.textContent = '画像と動画は同時に投稿できません。片方を選び直してください。';
         return;
       }
       const extension = file.name.toLowerCase().split('.').pop();

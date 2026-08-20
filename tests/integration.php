@@ -601,6 +601,23 @@ PHP;
     return $unconverted_animation_status === 422
       && str_contains($unconverted_animation_body, 'animation could not be checked');
   });
+  [$mixed_upload_status, $mixed_upload_body] = http_request(
+    $base_url . '?mode=regist',
+    $cookie_jar,
+    [
+      'mode' => 'regist', 'send' => '1', 'name' => 'Mixed upload', 'mail' => '', 'url' => '',
+      'sub' => 'Mixed upload', 'com' => '画像と動画を同時に選んだ結合テストです。', 'pwd' => 'mixed-upload-pass',
+      'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+      'image_upload' => new CURLFile($animation_png, 'image/png', 'image.png'),
+      'animation_upload' => new CURLFile($valid_pch, 'application/octet-stream', 'animation.pch'),
+    ]
+  );
+  integration_test('normal posting explains that image and animation uploads are exclusive', static function () use (
+    $mixed_upload_status, $mixed_upload_body
+  ): bool {
+    return $mixed_upload_status === 400
+      && str_contains($mixed_upload_body, 'Choose either an image or an animation file.');
+  });
   $temporary_before_mismatch = glob($webroot . '/tmp/*') ?: [];
   [$animation_mismatch_status] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
     'token' => $token,
