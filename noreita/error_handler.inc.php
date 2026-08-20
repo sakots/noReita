@@ -480,6 +480,9 @@ final class ApplicationErrorHandler {
     return $error_id;
   }
 
+  /**
+   * @param array<string,mixed> $details 追加する監査ログの項目
+   */
   private static function writeAuditRecord(array $details): string {
     $audit_id = self::newErrorId();
     $record = [
@@ -548,6 +551,10 @@ final class ApplicationErrorHandler {
     }
   }
 
+  /**
+   * @param array<string,mixed> $record
+   * @return array<string,mixed>
+   */
   private static function redactRecord(array $record): array {
     foreach ($record as $key => $value) {
       if (is_string($value)) $record[$key] = self::redact($value);
