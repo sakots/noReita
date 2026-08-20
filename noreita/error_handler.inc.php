@@ -1,7 +1,7 @@
 <?php
 // error_handler.inc.php for noReita (C) sakots 2026 MIT License
 
-const ERROR_HANDLER_INC_VER = 20260817;
+const ERROR_HANDLER_INC_VER = 20260820;
 
 final class ErrorLogStorage {
   public static function append(
@@ -403,6 +403,7 @@ final class ApplicationErrorHandler {
   /**
    * HTMLテンプレートを使わないAPI向けに、記録と安全な本文生成を一括で行う。
    * 5xxの詳細は公開せず、通常画面と同じ照合用エラーIDへ置き換える。
+   * HTTPエラー本文を読まない旧クライアント向けには、4xxでもIDを付けて成功ステータスで返せる。
    */
   public static function respondPlainError(
     int $status,
@@ -410,25 +411,39 @@ final class ApplicationErrorHandler {
     bool $english = false,
     string $prefix = '',
     ?string $diagnostic = null,
-    ?Throwable $cause = null
+    ?Throwable $cause = null,
+    bool $include_error_id_for_client_error = false,
+    ?int $response_status = null
   ): void {
     if ($status < 400 || $status > 599) $status = 500;
     $log_message = trim(strip_tags($diagnostic ?? $public_message));
     $log_message = mb_substr($log_message !== '' ? $log_message : 'API request failed.', 0, 4000);
     $error_id = self::reportHttpError($status, $log_message, $cause);
     $response_message = $status >= 500 ? self::publicMessage($error_id, $english) : $public_message;
-    http_response_code($status);
+    if ($status < 500 && $include_error_id_for_client_error) {
+      $response_message .= "\n" . self::publicErrorReference($error_id, $english);
+    }
+    $wire_status = $response_status ?? $status;
+    if ($wire_status < 100 || $wire_status > 599) $wire_status = $status;
+    if ($wire_status !== $status) header('X-noReita-Error-Status: ' . $status);
+    http_response_code($wire_status);
     header('Content-Type: text/plain; charset=UTF-8');
     echo $prefix . $response_message;
     exit;
   }
 
   public static function publicMessage(string $error_id, bool $english): string {
+    return $english
+      ? 'An internal error occurred. ' . self::publicErrorReference($error_id, true)
+      : '内部エラーが発生しました。' . self::publicErrorReference($error_id, false);
+  }
+
+  private static function publicErrorReference(string $error_id, bool $english): string {
     $date = substr($error_id, 0, 8);
     return $english
-      ? 'An internal error occurred. Date: ' . $date
+      ? 'Date: ' . $date
         . ' / Please inform the administrator of error ID: ' . $error_id
-      : '内部エラーが発生しました。発生日: ' . $date
+      : '発生日: ' . $date
         . ' / 設置者へ次のエラーIDをお知らせください: ' . $error_id;
   }
 

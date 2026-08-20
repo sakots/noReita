@@ -2,7 +2,7 @@
 //Petit Note (c)さとぴあ @satopian 2021-2025 MIT License
 //https://paintbbs.sakura.ne.jp/
 
-const SAVE_INC_VER = 20260817; //save.inc.phpのバージョン
+const SAVE_INC_VER = 20260820; //save.inc.phpのバージョン
 
 final class PaintSaveCapacityException extends RuntimeException {}
 
@@ -429,12 +429,18 @@ class image_save{
       $errtext="";
     }
 
+    // LitaChixは非2xx応答の本文を読まず、HTTPステータスだけを一般的なエラー文に置き換える。
+    // CHIBIERROR本文を表示させるため、実際の失敗コードはヘッダーとログに残しつつ200で返す。
+    $is_litachix = $this->error_type === 'chi';
     ApplicationErrorHandler::respondPlainError(
       $http_status,
       $message,
       (bool)$this->en,
       $errtext,
-      'Drawing save API: ' . str_replace(["\r", "\n"], ' ', $message)
+      'Drawing save API: ' . str_replace(["\r", "\n"], ' ', $message),
+      null,
+      $is_litachix,
+      $is_litachix ? 200 : null
     );
   }
 }

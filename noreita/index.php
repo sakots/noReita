@@ -23,7 +23,7 @@ if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
 }
 
 // 公開画面へのPHPエラー詳細表示を止め、非公開ログへ記録する。
-if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260817) {
+if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260820) {
   die($en ? 'Please update the error handler.' : 'エラーハンドラーを最新版に更新してください。');
 }
 
@@ -100,7 +100,7 @@ if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260817) {
 // save.inc
 check_file(__DIR__.'/save.inc.php');
 require_once(__DIR__.'/save.inc.php');
-if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260817) {
+if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260820) {
   die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 

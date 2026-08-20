@@ -525,6 +525,31 @@ PHP;
       && $invalid_paint_logged;
   });
 
+  [$litachix_error_status, $litachix_error_body, , $litachix_error_headers] = http_request(
+    $base_url . '?mode=saveimage&tool=chi&stime=1', $cookie_jar, ['header' => 'stime=1']
+  );
+  preg_match('/\b\d{14}-[a-f0-9]{8}\b/', $litachix_error_body, $litachix_error_id_match);
+  $litachix_error_id = (string)($litachix_error_id_match[0] ?? '');
+  $litachix_error_logged = false;
+  foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
+    $contents = (string)file_get_contents($error_log_file);
+    if (str_contains($contents, $litachix_error_id) && str_contains($contents, '"http_status":400')) {
+      $litachix_error_logged = true;
+      break;
+    }
+  }
+  integration_test('LitaChix displays a logged drawing error reference despite its non-2xx response limitation', static function () use (
+    $litachix_error_status, $litachix_error_body, $litachix_error_headers,
+    $litachix_error_id, $litachix_error_logged
+  ): bool {
+    return $litachix_error_status === 200
+      && ($litachix_error_headers['x-noreita-error-status'] ?? '') === '400'
+      && str_starts_with($litachix_error_body, 'CHIBIERROR ')
+      && $litachix_error_id !== ''
+      && str_contains($litachix_error_body, $litachix_error_id)
+      && $litachix_error_logged;
+  });
+
   $animation_png = $root . DIRECTORY_SEPARATOR . 'animation-upload.png';
   $animation_png_data = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
   if ($animation_png_data === false || file_put_contents($animation_png, $animation_png_data) === false) {
