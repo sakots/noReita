@@ -136,7 +136,7 @@
     </footer>
     <!-- scripts -->
     <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
-    @if ($use_animation_upload)
+    @if ($use_image_upload)
     <script src="animation-upload.js?v={{$animation_upload_version}}" data-endpoint="{{$self}}?mode=animation_upload"
       data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"
       data-tegaki-enabled="{{$use_tegaki ? '1' : '0'}}"

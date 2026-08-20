@@ -256,6 +256,50 @@
     return { filename: lines[1], previewUrl: lines[2] };
   }
 
+  // 投稿途中画像・通常画像・動画は一つだけを投稿対象にする。
+  // 動画機能を無効にした構成でも、通常画像と投稿途中画像の選択は排他的に扱う。
+  document.querySelectorAll('form').forEach((form) => {
+    const temporaryImage = form.querySelector('select[name="picfile"]');
+    const directUpload = form.querySelector('[name="image_upload"]');
+    const animationUpload = form.querySelector('[data-animation-upload-file]');
+    const status = form.querySelector('[data-animation-upload-status]');
+    if (!temporaryImage || (!directUpload && !animationUpload)) return;
+
+    const clearTemporaryImage = () => {
+      if (temporaryImage.value === '') return false;
+      temporaryImage.value = '';
+      return true;
+    };
+    const clearFileInput = (input) => {
+      if (!input || !input.files || !input.files[0]) return false;
+      input.value = '';
+      return true;
+    };
+
+    temporaryImage.addEventListener('change', () => {
+      if (temporaryImage.value === '') return;
+      const clearedImage = clearFileInput(directUpload);
+      const clearedAnimation = clearFileInput(animationUpload);
+      if (status && (clearedImage || clearedAnimation)) {
+        status.textContent = '投稿途中の画像を選択したため、画像・動画の選択を解除しました。';
+      }
+    });
+    if (directUpload) {
+      directUpload.addEventListener('change', () => {
+        if (directUpload.files && directUpload.files[0] && clearTemporaryImage() && status) {
+          status.textContent = '画像を選択したため、投稿途中の画像の選択を解除しました。';
+        }
+      });
+    }
+    if (animationUpload) {
+      animationUpload.addEventListener('change', () => {
+        if (animationUpload.files && animationUpload.files[0] && clearTemporaryImage() && status) {
+          status.textContent = '動画を選択したため、投稿途中の画像の選択を解除しました。';
+        }
+      });
+    }
+  });
+
   document.querySelectorAll('[data-animation-upload-file]').forEach((input) => {
     const form = input.closest('form');
     const status = form && form.querySelector('[data-animation-upload-status]');

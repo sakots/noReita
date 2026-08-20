@@ -64,9 +64,11 @@ smoke_test('PHP 8.5 deprecated imagedestroy is not used', static function (): bo
   return is_string($save) && !preg_match('/\bimagedestroy\s*\(/i', $save);
 });
 
-smoke_test('image and animation file selections replace each other in the post form', static function (): bool {
+smoke_test('post image candidates replace each other in the post form', static function (): bool {
   $script = file_get_contents(dirname(__DIR__) . '/noreita/animation-upload.js');
   return is_string($script)
+    && str_contains($script, "select[name=\"picfile\"]")
+    && str_contains($script, 'clearTemporaryImage')
     && str_contains($script, "directUpload.addEventListener('change'")
     && str_contains($script, "input.value = '';")
     && str_contains($script, "directUpload.value = '';");
