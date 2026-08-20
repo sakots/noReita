@@ -84,6 +84,7 @@
     "iconselect",
     "imageavif",
     "imagecreatefromavif",
+    "imagedestroy",
     "imgdata",
     "imgext",
     "imgfile",
