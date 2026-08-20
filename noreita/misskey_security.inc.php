@@ -25,8 +25,7 @@ final class MisskeyServerSecurity {
     return 'https://' . $host;
   }
 
-  /** @return string|false */
-  public static function resolvePublicIp(string $host) {
+  public static function resolvePublicIp(string $host): string|false {
     if (filter_var($host, FILTER_VALIDATE_IP)) {
       $addresses = [$host];
     } else {

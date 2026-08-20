@@ -214,8 +214,7 @@ final class ExternalImageService {
   }
 
   // URLのホストを公開IPに解決する。全ての解決結果が安全な場合だけ返す。
-  /** @return string|false */
-  public static function resolvePublicIp(string $host) {
+  public static function resolvePublicIp(string $host): string|false {
     if (filter_var($host, FILTER_VALIDATE_IP)) {
       $addresses = [$host];
     } else {
