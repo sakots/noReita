@@ -352,6 +352,13 @@ $_SESSION['usercode'] = $usercode;
 $mode = (string)filter_input_data('POST','mode');
 $mode = $mode ?: (string)filter_input_data('GET','mode');
 
+// 共有用URLの ?resno=123 形式を受け付ける。
+// 従来の ?mode=res&res=123 形式も res() で引き続き受け付ける。
+$shared_resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
+if ($mode === '' && $shared_resno !== false && $shared_resno !== null) {
+  $mode = 'res';
+}
+
 // Ajaxリクエストかどうかをチェック
 $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
@@ -1173,7 +1180,10 @@ function sodane(): void {
 function res(): void {
   global $template_engine, $dat;
   global $en;
-  $resno = filter_input(INPUT_GET, 'res',FILTER_VALIDATE_INT);
+  $resno = filter_input_data('GET', 'res', FILTER_VALIDATE_INT);
+  if ($resno === false || $resno === null) {
+    $resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
+  }
   $uuid = trim((string)filter_input(INPUT_GET, 'uuid'));
 
   //csrfトークンをセット

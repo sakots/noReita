@@ -963,6 +963,21 @@ PHP;
       && urldecode((string)cookie_value($cookie_jar, 'name_c')) === $raw_trip_name;
   });
 
+  $shared_thread_id = (int)($row['tid'] ?? 0);
+  [$shared_thread_status, $shared_thread_body] = http_request(
+    $base_url . '?resno=' . $shared_thread_id, $cookie_jar
+  );
+  [$legacy_thread_status, $legacy_thread_body] = http_request(
+    $base_url . '?mode=res&res=' . $shared_thread_id, $cookie_jar
+  );
+  integration_test('thread links use the shared format and accept legacy URLs', static function () use (
+    $shared_thread_status, $shared_thread_body, $legacy_thread_status, $legacy_thread_body, $marker
+  ): bool {
+    return $shared_thread_status === 200 && $legacy_thread_status === 200
+      && str_contains($shared_thread_body, $marker)
+      && str_contains($legacy_thread_body, $marker);
+  });
+
   $subject_escape_probe = '<b>XSS</b>';
   $subject_escape_stmt = $db->prepare('UPDATE board_log SET sub = :sub WHERE tid = :tid');
   $subject_escape_stmt->execute([':sub' => $subject_escape_probe, ':tid' => (int)($row['tid'] ?? 0)]);
