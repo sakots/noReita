@@ -1504,7 +1504,7 @@ function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): v
     // 認証済みの投稿番号はセッションに保持する。パスワードをURLやクライアントへ渡さない。
     $authorization = $_SESSION['image_replacement_authorization'] ?? null;
     if (!is_array($authorization) || (int)($authorization['post_id'] ?? 0) !== (int)$no) {
-      error($en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
+      render_error($context, $en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
       return;
     }
     $repcode = bin2hex(random_bytes(16));
@@ -1554,7 +1554,7 @@ function open_pch(ApplicationContext $context, string $sp = ""): void {
     $playback = ImageService::animationPlaybackData(Config::string('paths.images'), $pch, (int)($sp ?: Config::int('drawing.animation_speed')));
   } catch (Throwable $e) {
     ApplicationErrorHandler::reportThrowable($e, 'animation-open-error');
-    error(Config::string('site.language') === 'English' ? 'Failed to open animation.' : '動画を開けませんでした。', 404);
+    render_error($context, $context->english ? 'Failed to open animation.' : '動画を開けませんでした。', 404);
     return;
   }
   $template = $playback['template_type'] === 'tegaki' ? ANIMEFILE_TEGAKI : ANIMEFILE;
@@ -1666,7 +1666,7 @@ function animation_upload(ApplicationContext $context): void {
 
   header('Content-Type: text/plain; charset=UTF-8');
   if (!Config::bool('features.image_upload') || !Config::bool('features.animation')) {
-    error($en ? 'Animation uploads are disabled.' : '動画ファイルのアップロードは無効です。', 403);
+    render_error($context, $en ? 'Animation uploads are disabled.' : '動画ファイルのアップロードは無効です。', 403);
     return;
   }
   try {
@@ -1717,9 +1717,9 @@ function animation_upload(ApplicationContext $context): void {
     $_SESSION['pending_picfile'] = $result['picfile'];
     echo "ok\n" . $result['picfile'] . "\n" . temporary_image_url($result['preview']);
   } catch (RequestSecurityException|PaintSaveCapacityException|ImageUploadException $e) {
-    error($en ? $e->getMessage() : animation_upload_error_message($e), $e->getCode() ?: 400, $e);
+    render_error($context, $en ? $e->getMessage() : animation_upload_error_message($e), $e->getCode() ?: 400, $e);
   } catch (Throwable $e) {
-    error($en ? 'Animation upload failed.' : '動画ファイルの保存に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Animation upload failed.' : '動画ファイルの保存に失敗しました。', 500, $e);
   }
 }
 
@@ -1769,7 +1769,7 @@ function in_continue(ApplicationContext $context): void {
 
   $no = trim((string)filter_input(INPUT_GET, 'no')); // 画像ファイル名なので文字列として取得
   if (!ImageService::isSafePostedImageFilename($no)) {
-    error($en ? 'The image does not exist.' : '画像が存在しません。', 404);
+    render_error($context, $en ? 'The image does not exist.' : '画像が存在しません。', 404);
     return;
   }
 
@@ -1778,11 +1778,11 @@ function in_continue(ApplicationContext $context): void {
     $repository = new BoardRepository();
     $oya = $repository->findPostsByImage($no);
   } catch (Throwable $e) {
-    error($en ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500, $e);
     return;
   }
   if (empty($oya) || !is_file(Config::string('paths.images') . $no) || !is_readable(Config::string('paths.images') . $no)) {
-    error($en ? 'The image does not exist.' : '画像が存在しません。', 404);
+    render_error($context, $en ? 'The image does not exist.' : '画像が存在しません。', 404);
     return;
   }
 
@@ -1851,9 +1851,8 @@ function in_continue(ApplicationContext $context): void {
       $dat['ctype_pch'] = true;
     }
 
-    $db = null; //db切断
   } catch (Throwable $e) {
-    error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500, $e);
   }
 
   echo $template_engine->render(OTHERFILE, $dat);
@@ -1873,10 +1872,10 @@ function delmode(ApplicationContext $context): void {
     try {
       RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
     if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
-      error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+      render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
     }
     $p_pwd = '';
   }
@@ -1886,13 +1885,13 @@ function delmode(ApplicationContext $context): void {
     $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
     $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ない気がします。', 404);
+    render_error($context, $en ? 'That post does not exist.' : 'そんな記事ない気がします。', 404);
     return;
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
+    render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     return;
   } catch (Throwable $e) {
-    error($en ? 'Deletion failed.' : '削除に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Deletion failed.' : '削除に失敗しました。', 500, $e);
     return;
   }
   //変数クリア
@@ -1912,7 +1911,7 @@ function picreplace(ApplicationContext $context): void {
   $repcode = filter_input(INPUT_GET, 'repcode');
   $repcode = $repcode ?: filter_input(INPUT_POST, 'repcode');
   if (!$no || !$repcode) {
-    error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
+    render_error($context, $en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
   }
   RequestSecurity::startSession();
   $authorization = $_SESSION['image_replacement_authorization'] ?? null;
@@ -1921,13 +1920,13 @@ function picreplace(ApplicationContext $context): void {
   $expires_at = is_array($authorization) ? (int)($authorization['expires_at'] ?? 0) : 0;
   if ($authorized_post_id !== (int)$no || $encrypted_password === '' || $expires_at < time()) {
     unset($_SESSION['image_replacement_authorization']);
-    error($en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
+    render_error($context, $en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
     return;
   }
   $pwd_f = openssl_decrypt($encrypted_password, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV);
   if ($pwd_f === false) {
     unset($_SESSION['image_replacement_authorization']);
-    error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
+    render_error($context, $en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
     return;
   }
   $nsfw_flag = filter_input(INPUT_POST, 'nsfw');
@@ -1936,12 +1935,12 @@ function picreplace(ApplicationContext $context): void {
   $host = gethostbyaddr(RequestInfo::clientIp());
 
   foreach (Config::array("spam.bad_hosts") as $value) { //拒絶host
-    if (preg_match("/$value$/i", $host)) error($en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。', 403);
+    if (preg_match("/$value$/i", $host)) render_error($context, $en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。', 403);
   }
 
   $temporary_image = ImageService::findTemporaryImageByReplacementCode(Config::string('paths.temporary'), (string)$repcode);
   if ($temporary_image === null) {
-    error($en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。', 404);
+    render_error($context, $en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。', 404);
   }
   $filename = $temporary_image['base_name'];
   $imgext = $temporary_image['image_extension'];
@@ -2002,11 +2001,11 @@ function picreplace(ApplicationContext $context): void {
       ImageService::completePostedReplacement($replacement);
       unset($_SESSION['image_replacement_authorization']);
     } else {
-      error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
+      render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     }
   } catch (Throwable $e) {
     if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
-    error($en ? 'Image replacement failed.' : '画像差し替えに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Image replacement failed.' : '画像差し替えに失敗しました。', 500, $e);
   }
   editform($context, (int)$no, (string)$pwd_f);
 }
@@ -2030,14 +2029,14 @@ function editform(ApplicationContext $context, ?int $authorized_post_id = null, 
 
   $edit_no = $authorized_post_id ?? filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
   if ($edit_no == "") {
-    error($en ? 'Please enter the post number.' : '記事番号を入力してください');
+    render_error($context, $en ? 'Please enter the post number.' : '記事番号を入力してください');
   }
 
   //記事呼び出し
   try {
     if ($authorized_as_admin
       && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
-      error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+      render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
     }
     $service = new PostService(new BoardRepository(), Config::string('paths.images'));
     $authorization = $service->authorize((int)$edit_no, (string)$post_pwd, $authorized_as_admin);
@@ -2061,11 +2060,11 @@ function editform(ApplicationContext $context, ?int $authorized_post_id = null, 
     $dat['othermode'] = 'edit'; //編集モード
     echo $template_engine->render(OTHERFILE, $dat);
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
+    render_error($context, $en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
+    render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
   } catch (Throwable $e) {
-    error($en ? 'Failed to open edit mode.' : '編集画面を開けませんでした。', 500, $e);
+    render_error($context, $en ? 'Failed to open edit mode.' : '編集画面を開けませんでした。', 500, $e);
   }
 }
 
@@ -2080,7 +2079,7 @@ function editexec(ApplicationContext $context): void {
     try {
       RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
   }
 
@@ -2099,7 +2098,7 @@ function editexec(ApplicationContext $context): void {
   $edit_as_admin = filter_input_data('POST', 'admin_edit') === '1';
   if ($edit_as_admin
     && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
-    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
 
   //ホスト取得
@@ -2110,7 +2109,7 @@ function editexec(ApplicationContext $context): void {
     );
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
-    error($e->getMessage(), $e->getCode() ?: 400);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 400);
     return;
   }
   //↑セキュリティ関連ここまで
@@ -2133,13 +2132,13 @@ function editexec(ApplicationContext $context): void {
     }
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
+    render_error($context, $en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
     return;
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
+    render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     return;
   } catch (Throwable $e) {
-    error($en ? 'Editing failed.' : '編集に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Editing failed.' : '編集に失敗しました。', 500, $e);
     return;
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
