@@ -21,9 +21,17 @@ if (!class_exists('Database', false)) {
 
 const CONNECT_MISSKEY_API_VER = 20260817;
 
-$lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
-? explode( ',', $http_langs )[0] : '';
-$en= (stripos($lang,'ja')!==0);
+final class MisskeyApiContext {
+  public function __construct(
+    public readonly bool $english,
+    public readonly string $baseUrl,
+  ) {}
+
+  public static function englishFromRequest(): bool {
+    $language = explode(',', (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''))[0];
+    return stripos($language, 'ja') !== 0;
+  }
+}
 
 function misskey_api_error(
 	string $public_message,
@@ -31,11 +39,10 @@ function misskey_api_error(
 	string $diagnostic,
 	?Throwable $cause = null
 ): void {
-	global $en;
 	ApplicationErrorHandler::respondPlainError(
 		$status,
 		$public_message,
-		(bool)$en,
+		MisskeyApiContext::englishFromRequest(),
 		'Error: ',
 		'Misskey API: ' . $diagnostic,
 		$cause
@@ -44,6 +51,7 @@ function misskey_api_error(
 
 // 認証チェック
 class connect_misskey_api{
+	/** @param CurlHandle|resource|false $curl */
 	private static function applySecurity($curl, string $base_url, int $timeout = 15): bool {
 		if ($curl === false) return false;
 		$options = MisskeyServerSecurity::curlOptions($base_url, $timeout);
@@ -74,8 +82,9 @@ class connect_misskey_api{
 		}
 	}
 
-	public static function mi_auth_check(): void {
-		global $en,$baseUrl;
+	public static function mi_auth_check(MisskeyApiContext $context): void {
+		$en = $context->english;
+		$baseUrl = $context->baseUrl;
 		$sns_api_session_id = $_SESSION['sns_api_session_id'];
 		$checkUrl = $baseUrl . "/api/miauth/{$sns_api_session_id}/check";
 
@@ -123,12 +132,12 @@ class connect_misskey_api{
 		}
 		$accessToken = $responseData['token'];
 		$_SESSION['accessToken'] = $accessToken;
-		self::create_misskey_note();
+		self::create_misskey_note($context);
 	}
 
-	public static function create_misskey_note(): void {
-
-		global $en,$baseUrl;
+	public static function create_misskey_note(MisskeyApiContext $context): void {
+		$en = $context->english;
+		$baseUrl = $context->baseUrl;
 
 		$accessToken = $_SESSION['accessToken'] ?? '';
 		if(!is_string($accessToken) || $accessToken === ''){
@@ -350,9 +359,9 @@ class connect_misskey_api{
 }
 
 function connect_misskey_api_dispatch(): void {
-	global $en, $baseUrl;
-
 	RequestSecurity::startSession();
+	$context = new MisskeyApiContext(MisskeyApiContext::englishFromRequest(), '');
+	$en = $context->english;
 
 	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
 		misskey_api_error(
@@ -373,6 +382,7 @@ function connect_misskey_api_dispatch(): void {
 		);
 	}
 	$_SESSION['misskey_server_radio'] = $baseUrl;
+	$context = new MisskeyApiContext($context->english, $baseUrl);
 
 	$skip_auth_check = (bool)filter_input_data('GET','skip_auth_check',FILTER_VALIDATE_BOOLEAN);
 	if($skip_auth_check){
@@ -383,11 +393,11 @@ function connect_misskey_api_dispatch(): void {
 				'Misskey callback state did not match the session.'
 			);
 		}
-		connect_misskey_api::create_misskey_note();
+		connect_misskey_api::create_misskey_note($context);
 		return;
 	}
 
-	connect_misskey_api::mi_auth_check();
+	connect_misskey_api::mi_auth_check($context);
 }
 
 if (realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) === realpath(__FILE__)) {

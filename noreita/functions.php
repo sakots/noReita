@@ -26,8 +26,7 @@ function charconvert(string $str): string {
 }
 
 //念のため画像タイプチェック
-function get_image_type(string $img_type, ?string $dest = null): string {
-  global $en;
+function get_image_type(string $img_type): string {
   // 既にMIMEタイプが渡されている場合はそのまま使用
   if (strpos($img_type, 'image/') === 0) {
     $mime_type = $img_type;
@@ -47,8 +46,7 @@ function get_image_type(string $img_type, ?string $dest = null): string {
   if (isset($map[$mime_type])) {
     return $map[$mime_type];
   }
-  error($en ? "Invalid image type." : "無効な画像タイプです。", 415);
-  return ''; // この行は実際には実行されないが、リンターを満足させるために必要
+  throw new InvalidArgumentException('Invalid image type.');
 }
 
 /**
@@ -248,8 +246,8 @@ function zero_check($str): bool {
 }
 
 // ファイル存在チェック
-function check_file(string $path): void {
-  $msg = initial_error_message();
+function check_file(string $path, bool $english): void {
+  $msg = initial_error_message($english);
 
   if (!is_file($path)){
     die(h(basename($path)) . $msg['001']);
@@ -295,12 +293,12 @@ function get_pch_size(string $src): ?array {
   return[(int)$width,(int)$height];
 }
 
-function initial_error_message(): array {
-  global $en;
-  $msg['001'] = $en ? ' does not exist.':'がありません。';
-  $msg['002'] = $en ? ' is not readable.':'を読めません。';
-  $msg['003'] = $en ? ' is not writable.':'を書けません。';
-return $msg;
+function initial_error_message(bool $english): array {
+  return [
+    '001' => $english ? ' does not exist.' : 'がありません。',
+    '002' => $english ? ' is not readable.' : 'を読めません。',
+    '003' => $english ? ' is not writable.' : 'を書けません。',
+  ];
 }
 
 function switch_tool(string $tool): string {
@@ -325,14 +323,12 @@ function switch_tool(string $tool): string {
 }
 
 //sessionの確認
-function admin_post_valid(): bool {
-  global $second_pass;
+function admin_post_valid(?string $second_pass): bool {
   RequestSecurity::startSession();
   return isset($_SESSION['admin_post'])
     && AdminAuth::secondaryPasswordMatches($_SESSION['admin_post'], $second_pass ?? null);
 }
-function admin_del_valid(): bool {
-  global $second_pass;
+function admin_del_valid(?string $second_pass): bool {
   RequestSecurity::startSession();
   return isset($_SESSION['admin_del'])
     && AdminAuth::secondaryPasswordMatches($_SESSION['admin_del'], $second_pass ?? null);

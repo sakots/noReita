@@ -83,12 +83,12 @@ final class RequestSecurity {
 
   }
 
-  public static function assertCurrentCsrfRequest(bool $english): void {
-    self::assertCsrfRequest((string)($GLOBALS['usercode'] ?? ''), $english);
+  public static function assertCurrentCsrfRequest(string $usercode, bool $english): void {
+    self::assertCsrfRequest($usercode, $english);
   }
 
-  public static function assertCurrentSameOriginRequest(bool $english): void {
-    self::assertSameOriginRequest((string)($GLOBALS['usercode'] ?? ''), $english);
+  public static function assertCurrentSameOriginRequest(string $usercode, bool $english): void {
+    self::assertSameOriginRequest($usercode, $english);
   }
 
   /** @param mixed $default @return mixed */
@@ -197,6 +197,7 @@ final class AdminAuth {
     unset($_SESSION['token']);
   }
 
+  /** @param array<string,mixed> $session */
   public static function hasValidSession(array $session, string $admin_password, int $lifetime, int $now): bool {
     $fingerprint = $session[self::SESSION_FINGERPRINT] ?? null;
     $last_activity = $session[self::SESSION_LAST_ACTIVITY] ?? null;
@@ -328,6 +329,10 @@ final class AdminLoginRateLimiter {
     return $this->directory . DIRECTORY_SEPARATOR . 'admin-login-' . $identifier . '.json';
   }
 
+  /**
+   * @param resource $handle
+   * @return array<string,int>|array<string,mixed>
+   */
   private function readRecord($handle): array {
     rewind($handle);
     $json = stream_get_contents($handle, 4096);
@@ -343,6 +348,10 @@ final class AdminLoginRateLimiter {
     ];
   }
 
+  /**
+   * @param resource $handle
+   * @param array<string,int>|array<string,mixed> $record
+   */
   private function writeRecord($handle, array $record): void {
     $json = json_encode($record, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     rewind($handle);

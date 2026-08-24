@@ -5,10 +5,15 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.2.3 lot.260824.0';
+const REITA_VER = 'v4.2.4 lot.260824.1';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
+require_once __DIR__ . '/application_context.inc.php';
+require_once __DIR__ . '/board_controller.inc.php';
+require_once __DIR__ . '/post_controller.inc.php';
+require_once __DIR__ . '/paint_controller.inc.php';
+require_once __DIR__ . '/admin_controller.inc.php';
 
 // functions.phpのバージョンを確認
 if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
@@ -21,94 +26,94 @@ if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260820) {
 }
 
 // request_security.inc
-check_file(__DIR__.'/request_security.inc.php');
+check_file(__DIR__.'/request_security.inc.php', $en);
 require_once(__DIR__.'/request_security.inc.php');
 if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260726) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
 // request_info.inc
-check_file(__DIR__.'/request_info.inc.php');
+check_file(__DIR__.'/request_info.inc.php', $en);
 require_once(__DIR__.'/request_info.inc.php');
 if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
   die($en ? 'Please update request_info.inc.php to the latest version.' : 'request_info.inc.phpを最新版に更新してください。');
 }
 
 // database.inc
-check_file(__DIR__.'/database.inc.php');
+check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
 if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260817) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
 // initialization.inc
-check_file(__DIR__.'/initialization.inc.php');
+check_file(__DIR__.'/initialization.inc.php', $en);
 require_once(__DIR__.'/initialization.inc.php');
 if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260817) {
   die($en ? 'Please update initialization.inc.php to the latest version.' : 'initialization.inc.phpを最新版に更新してください。');
 }
 
 // image.inc
-check_file(__DIR__.'/image.inc.php');
+check_file(__DIR__.'/image.inc.php', $en);
 require_once(__DIR__.'/image.inc.php');
 if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260818) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
 // post.inc
-check_file(__DIR__.'/post.inc.php');
+check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
 if(!defined('POST_INC_VER') || POST_INC_VER < 20260807) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
 // share.inc
-check_file(__DIR__.'/share.inc.php');
+check_file(__DIR__.'/share.inc.php', $en);
 require_once(__DIR__.'/share.inc.php');
 if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
   die($en ? 'Please update share.inc.php to the latest version.' : 'share.inc.phpを最新版に更新してください。');
 }
 
 // misskey_security.inc
-check_file(__DIR__.'/misskey_security.inc.php');
+check_file(__DIR__.'/misskey_security.inc.php', $en);
 require_once(__DIR__.'/misskey_security.inc.php');
 if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20260816) {
   die($en ? 'Please update misskey_security.inc.php to the latest version.' : 'misskey_security.inc.phpを最新版に更新してください。');
 }
 
 // misskey_note.inc
-check_file(__DIR__.'/misskey_note.inc.php');
+check_file(__DIR__.'/misskey_note.inc.php', $en);
 require_once(__DIR__.'/misskey_note.inc.php');
 if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260817) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
-check_file(__DIR__.'/connect_misskey_api.php');
+check_file(__DIR__.'/connect_misskey_api.php', $en);
 require_once(__DIR__.'/connect_misskey_api.php');
 if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260817) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
 // save.inc
-check_file(__DIR__.'/save.inc.php');
+check_file(__DIR__.'/save.inc.php', $en);
 require_once(__DIR__.'/save.inc.php');
 if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260820) {
   die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
 // thumbnail.inc
-check_file(__DIR__.'/thumbnail.inc.php');
+check_file(__DIR__.'/thumbnail.inc.php', $en);
 require_once(__DIR__.'/thumbnail.inc.php');
 if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260820) {
-  error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
+  render_bootstrap_error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
 // external_image.inc
-check_file(__DIR__.'/external_image.inc.php');
+check_file(__DIR__.'/external_image.inc.php', $en);
 require_once(__DIR__.'/external_image.inc.php');
 if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260820) {
-  error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
+  render_bootstrap_error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
 }
 
 // テーマ
@@ -117,7 +122,7 @@ $theme_runtime = null;
 try {
   $theme_runtime = ThemeRuntime::load(__DIR__ . '/theme', Config::string('paths.theme'));
 } catch (Throwable $e) {
-  error($en ? 'Theme configuration failed.' : 'テーマ設定の読み込みに失敗しました。', 500, $e);
+  render_bootstrap_error($en ? 'Theme configuration failed.' : 'テーマ設定の読み込みに失敗しました。', 500, $e);
 }
 if (!is_array($theme_runtime)) exit;
 $theme_directory = $theme_runtime['active_directory'];
@@ -163,11 +168,6 @@ $dat = array(); // テンプレートに格納する変数
 
 // var_dump($_POST);
 
-// 絶対パス取得
-$path = realpath("./") . '/' . Config::string('paths.images');
-$temp_path = realpath("./") . '/' . Config::string('paths.temporary');
-
-$message = "";
 $self = Config::string('site.script_name');
 
 $dat['path'] = Config::string('paths.images');
@@ -183,7 +183,7 @@ $dat['base'] = Config::string('site.base_url');
 $dat['board_title'] = Config::string('site.title');
 $dat['home'] = Config::string('site.home_url');
 $dat['self'] = Config::string('site.script_name');
-$dat['message'] = $message;
+$dat['message'] = '';
 $dat['pdef_w'] = Config::int('limits.paint_default_width');
 $dat['pdef_h'] = Config::int('limits.paint_default_height');
 $dat['pmax_w'] = Config::int('limits.paint_max_width');
@@ -287,21 +287,19 @@ init();
 $dat['theme_settings'] = [];
 $dat['theme_settings_json'] = '{}';
 try {
-  $theme_settings = theme_settings_provider();
+  $theme_settings = theme_settings_provider($theme_directory);
   if ($theme_settings !== null) {
     $template_data = $theme_settings->templateData();
     if (!is_array($template_data)) throw new RuntimeException('Theme settings template data is invalid.');
     $dat = array_merge($dat, $template_data);
   }
 } catch (Throwable $e) {
-  error($en ? 'Theme settings initialization failed.' : 'テーマ設定の初期化に失敗しました。', 500, $e);
+  render_bootstrap_error($en ? 'Theme settings initialization failed.' : 'テーマ設定の初期化に失敗しました。', 500, $e);
 }
 
 del_temp();
 
 clean_old_thumbnails();
-
-$message = "";
 
 //var_dump($_COOKIE);
 
@@ -338,6 +336,10 @@ if(!$usercode){ //user-codeがなければ発行
 setcookie("usercode", $usercode, time()+(86400*365),"","",$https_only,true); //1年間
 $_SESSION['usercode'] = $usercode;
 
+$application_context = new ApplicationContext(
+  $en, $template_engine, $dat, $usercode, $req_method, $theme_directory,
+  ['message' => '']
+);
 //var_dump($_GET);
 
 /*-----------mode-------------*/
@@ -351,6 +353,7 @@ $shared_resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
 if ($mode === '' && $shared_resno !== false && $shared_resno !== null) {
   $mode = 'res';
 }
+$application_context->request['mode'] = $mode;
 
 // Ajaxリクエストかどうかをチェック
 $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
@@ -359,99 +362,104 @@ $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTT
 
 switch ($mode) {
   case 'regist': // スレ立て
-    return regist();
+    PostController::register($application_context); return;
   case 'reply':
-    return regist();
+    PostController::register($application_context); return;
   case 'res':
-    return res();
+    BoardController::response($application_context);
+    return;
   case 'sodane': // そうだね
-    return sodane();
+    return sodane($application_context);
   case 'paint':
     if (!diary_post_allowed((string)filter_input(INPUT_POST, 'resto') !== '')) {
-      error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
+      render_error($application_context, $en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
     }
-    return paint_form("", filter_input_data('POST','modid',FILTER_VALIDATE_INT));
+    PaintController::paint($application_context, '', filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'piccom':
-    return paint_com("");
+    PaintController::editImage($application_context); return;
   case 'pictmp':
     if (!diary_post_allowed(false)) {
-      error($en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
+      render_error($application_context, $en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
     }
-    return paint_com("tmp");
+    PaintController::temporary($application_context); return;
   case 'anime':
-    return open_pch();
+    PaintController::animation($application_context); return;
   case 'continue':
-    return in_continue();
+    PaintController::continue($application_context); return;
   case 'contpaint':
     $type = filter_input(INPUT_POST, 'type');
-    if (Config::bool('features.continue_password') || $type === 'rep') usrchk();
-    return paint_form($type, filter_input_data('POST','modid',FILTER_VALIDATE_INT));
+    if (Config::bool('features.continue_password') || $type === 'rep') usrchk($application_context);
+    PaintController::paint($application_context, $type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'picrep':
-    return picreplace();
+    PostController::replaceImage($application_context); return;
   case 'catalog': // カタログ表示
-    return catalog();
+    BoardController::catalog($application_context);
+    return;
   case 'search': // 検索
-    return search();
+    BoardController::search($application_context);
+    return;
   case 'edit':
-    return editform();
+    PostController::edit($application_context); return;
   case 'editexec':
-    return editexec();
+    PostController::saveEdit($application_context); return;
   case 'del':
-    return delmode();
+    PostController::delete($application_context); return;
   case 'saveimage': // 画像保存
     return save_image();
   case 'animation_upload': // 動画ファイルをPNGと組にして一時保存
-    return animation_upload();
+    PaintController::uploadAnimation($application_context); return;
   case 'admin_in': // 管理モードin
-    return admin_in();
+    return admin_in($application_context);
   case 'admin_login':
-    return admin_login();
+    AdminController::login($application_context); return;
   case 'admin_logout':
-    return admin_logout();
+    AdminController::logout($application_context); return;
   case 'admin_delete':
-    return admin_delete();
+    return admin_delete($application_context);
   case 'admin_manage':
-    return admin_manage();
+    AdminController::manage($application_context); return;
   case 'admin_theme_settings':
-    return admin_theme_settings();
+    AdminController::themeSettings($application_context); return;
   case 'admin_errorlog':
-    return admin_errorlog();
+    AdminController::errorLog($application_context); return;
   case 'admin_auditlog':
-    return admin_auditlog();
+    AdminController::auditLog($application_context); return;
   case 'admin_temporary_images':
-    return admin_temporary_images();
+    AdminController::temporaryImages($application_context); return;
   case 'admin_temporary_images_manage':
-    return admin_temporary_images_manage();
+    AdminController::manageTemporaryImages($application_context); return;
   case 'temporary_image':
-    return temporary_image();
+    PaintController::temporaryImage($application_context); return;
   case 'admin_post':
-    return admin_post();
+    AdminController::post($application_context); return;
   case 'admin_edit':
-    return admin_edit();
+    AdminController::edit($application_context); return;
   case 'admin': // 管理モード
-    return admin();
+    AdminController::dashboard($application_context); return;
   case 'set_share_server':
-    return show_share_server_form();
+    return show_share_server_form($application_context);
   case 'post_share_server':
-    return submit_share_server();
+    return submit_share_server($application_context);
   case 'before_misskey_note':
-    return misskey_note::before_misskey_note();
+    return misskey_note::before_misskey_note($application_context);
   case 'misskey_note_edit_form':
-    return misskey_note::misskey_note_edit_form();
+    return misskey_note::misskey_note_edit_form($application_context);
   case 'create_misskey_note_sessiondata':
-    return misskey_note::create_misskey_note_sessiondata();
+    return misskey_note::create_misskey_note_sessiondata($application_context);
   case 'create_misskey_authrequesturl':
-    return misskey_note::create_misskey_authrequesturl();
+    return misskey_note::create_misskey_authrequesturl($application_context);
   case 'misskey_success':
-    return misskey_note::misskey_success();
+    return misskey_note::misskey_success($application_context);
   default: // 通常表示モード
-    return def();
+    BoardController::index($application_context);
+    return;
 }
 
 /*-----------Main-------------*/
 
 function init(): void {
-  global $en;
+  // ApplicationContext is created after startup has prepared the request user code.
+  $en = ApplicationBootstrap::english();
   $initializer = new ApplicationInitializer(
     DB_PDO, DB_FILE, __DIR__ . '/backup', __DIR__,
     [
@@ -485,13 +493,14 @@ function init(): void {
       );
     }
   } catch (Throwable $e) {
-    error($en ? 'Application initialization failed.' : 'アプリケーションの初期化に失敗しました。', 500, $e);
+    render_bootstrap_error($en ? 'Application initialization failed.' : 'アプリケーションの初期化に失敗しました。', 500, $e);
     return;
   }
 }
 
-function show_share_server_form(): void {
-  global $template_engine, $dat;
+function show_share_server_form(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
 
   $dat['servers'] = ShareService::servers(Config::array('social.servers'));
   $dat['encoded_t'] = (string)filter_input_data('GET', 'encoded_t');
@@ -503,14 +512,14 @@ function show_share_server_form(): void {
   echo $template_engine->render(SET_SHARE_SERVER, $dat);
 }
 
-function submit_share_server(): void {
-  global $en;
+function submit_share_server(ApplicationContext $context): void {
+  $en = $context->english;
 
   if (Config::bool('features.csrf')) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
   }
   $selected_server = (string)filter_input_data('POST', 'sns_server_radio');
@@ -523,7 +532,7 @@ function submit_share_server(): void {
       (string)filter_input_data('POST', 'encoded_u')
     );
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Please select a sharing destination for SNS.' : 'SNSの共有先を選択してください。');
+    render_error($context, $en ? 'Please select a sharing destination for SNS.' : 'SNSの共有先を選択してください。');
     return;
   }
 
@@ -538,25 +547,26 @@ function submit_share_server(): void {
 
 // 投稿があればデータベースへ保存する
 /* 記事書き込み スレ立てとリプライ */
-function regist(): void {
-  global $en, $usercode;
-  global $req_method;
-  global $dat;
+function regist(ApplicationContext $context): void {
+  $en = $context->english;
+  $usercode = $context->usercode;
+  $req_method = $context->requestMethod;
+  $dat =& $context->data;
 
   $dat['en'] = $en;
 
   // CSRFトークンをチェック
   if (Config::bool('features.csrf')) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
   }
 
   $input = PostValidator::inputFromHttp();
   if (!diary_post_allowed($input['resto'] !== '')) {
-    error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
+    render_error($context, $en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
     return;
   }
   $sub = $input['sub'];
@@ -579,7 +589,7 @@ function regist(): void {
     && (!is_array($raw_animation_file)
       || ($raw_animation_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
   if ($has_uploaded_file && $has_unconverted_animation) {
-    error(
+    render_error($context,
       $en
         ? 'Choose either an image or an animation file.'
         : '画像と動画は同時に投稿できません。どちらか一方だけを選択してください。',
@@ -588,7 +598,7 @@ function regist(): void {
     return;
   }
   if ($has_unconverted_animation) {
-    error(
+    render_error($context,
       $en
         ? 'The animation could not be checked. Enable JavaScript, reload the page, and try again.'
         : '動画を確認できませんでした。JavaScriptを有効にしてページを再読み込みし、もう一度お試しください。',
@@ -617,7 +627,7 @@ function regist(): void {
       $picfile = '';
     } else {
       if ($has_uploaded_file) {
-        error(
+        render_error($context,
           $en
             ? 'Check the option to replace the drawing image with the uploaded image.'
             : 'お絵かき画像をアップロード画像に差し替えるには、差し替えのチェックを入れてください。',
@@ -669,15 +679,15 @@ function regist(): void {
     );
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
-    error($e->getMessage(), $e->getCode() ?: 400);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 400);
     return;
   }
   if ($has_uploaded_file && !Config::bool('features.image_upload')) {
-    error($en ? 'Image uploads are disabled.' : '画像アップロードは無効です。', 403);
+    render_error($context, $en ? 'Image uploads are disabled.' : '画像アップロードは無効です。', 403);
     return;
   }
   if ($has_uploaded_file && $picfile) {
-    error($en ? 'Choose either a drawing image or an uploaded image.' : 'お絵かき画像とアップロード画像を同時に投稿することはできません。', 400);
+    render_error($context, $en ? 'Choose either a drawing image or an uploaded image.' : 'お絵かき画像とアップロード画像を同時に投稿することはできません。', 400);
     return;
   }
   //セキュリティ関連ここまで
@@ -708,7 +718,7 @@ function regist(): void {
         ]);
       } catch (DuplicatePostException $e) {
         if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
-        error($en ? 'Duplicate post?' : '二重投稿ですか ?', 409);
+        render_error($context, $en ? 'Duplicate post?' : '二重投稿ですか ?', 409);
         return;
       }
 
@@ -754,10 +764,10 @@ function regist(): void {
       : ($e->getCode() === 415
         ? 'このサーバーでは、この画像形式を処理できません。'
         : '画像ファイルを受け付けられませんでした。');
-    error($upload_error, $e->getCode() ?: 400, $e);
+    render_error($context, $upload_error, $e->getCode() ?: 400, $e);
   } catch (Throwable $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
-    error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
@@ -768,11 +778,11 @@ function regist(): void {
     $repository = new BoardRepository();
     $th_cnt = $repository->countThreads();
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   if ($th_cnt > Config::int('board.max_threads')) {
-    logdel();
+    logdel($context);
   }
 
   //そろそろ消えるスレッドのフラグを設定
@@ -782,7 +792,7 @@ function regist(): void {
     try {
       (new BoardRepository())->markOldThreads($th_cnt - $th_id);
     } catch (PDOException $e) {
-      error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+      render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     }
   }
 
@@ -792,13 +802,14 @@ function regist(): void {
   $dat['th_id'] = $th_id;
   $dat['will_delete_count'] = max(0, $th_cnt - $th_id);
 
-  ok($en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
+  ok($context, $en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
 }
 
 //通常表示モード
-function def(): void {
-  global $dat, $template_engine;
-  global $en;
+function def(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $template_engine = $context->templates;
+  $en = $context->english;
   $dsp_res = Config::int('board.replies_shown');
   $page_def = Config::int('board.page_size');
 
@@ -811,11 +822,11 @@ function def(): void {
     $repository = new BoardRepository();
     $th_cnt = $repository->countThreads();
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   if ($th_cnt > Config::int('board.max_threads')) {
-    logdel();
+    logdel($context);
   }
 
   //古いスレのレスボタンを表示しない
@@ -863,7 +874,7 @@ function def(): void {
     $dat['next'] = ($page + 1);
 
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
   //読み込み
@@ -976,13 +987,15 @@ function def(): void {
 
     echo $template_engine->render(MAINFILE, $dat);
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
 //カタログモード
-function catalog(): void {
-  global $template_engine, $dat;
+function catalog(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $template_engine = $context->templates;
+  $en = $context->english;
   $page_def = Config::int('board.catalog_size');
 
   $start = 0;
@@ -1004,7 +1017,7 @@ function catalog(): void {
     $dat['catalog_paging_enabled'] = true;
 
   } catch (PDOException $e) {
-    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   //読み込み
@@ -1033,7 +1046,7 @@ function catalog(): void {
     $dat['catalogmode'] = 'catalog';
     echo $template_engine->render(CATALOGFILE, $dat);
   } catch (PDOException $e) {
-    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -1077,8 +1090,10 @@ function public_search_criteria(): array {
 }
 
 //検索モード
-function search(): void {
-  global $template_engine, $dat;
+function search(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $template_engine = $context->templates;
+  $en = $context->english;
 
   try {
     $criteria = public_search_criteria();
@@ -1122,14 +1137,14 @@ function search(): void {
     $dat['next'] = $pagination['next'];
     echo $template_engine->render(CATALOGFILE, $dat);
   } catch (InvalidArgumentException $e) {
-    error(Config::string('site.language') === 'English' ? 'Invalid search criteria.' : '検索条件が不正です。', 400, $e);
+    render_error($context, $en ? 'Invalid search criteria.' : '検索条件が不正です。', 400, $e);
   } catch (PDOException $e) {
-    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
 //そうだね
-function sodane(): void {
+function sodane(ApplicationContext $context): void {
   $resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
 
   // Ajaxリクエストかどうかをチェック
@@ -1160,19 +1175,20 @@ function sodane(): void {
       ]);
       return;
     } else {
-      error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+      render_error($context, $context->english ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     }
   }
 
   // 通常のリクエストの場合は従来通りリダイレクト
   header('Location:' . Config::string('site.script_name'));
-  def();
+  def($context);
 }
 
 //レス画面
-function res(): void {
-  global $template_engine, $dat;
-  global $en;
+function res(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $template_engine = $context->templates;
+  $en = $context->english;
   $resno = filter_input_data('GET', 'res', FILTER_VALIDATE_INT);
   if ($resno === false || $resno === null) {
     $resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
@@ -1287,9 +1303,8 @@ function res(): void {
       $dat['oya'] = $oya;
       $dat['ko'] = $ko;
     }
-    $db = null;
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
   $dat['path'] = Config::string('paths.images');
@@ -1298,10 +1313,16 @@ function res(): void {
 }
 
 //お絵描き画面
-function paint_form(string $rep, ?int $reply_to): void {
-  global $message, $usercode, $quality, $qualitys, $no;
-  global $mode, $ctype, $pch, $type;
-  global $template_engine, $dat, $en;
+function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
+  $message = (string)($context->request['message'] ?? '');
+  $usercode = $context->usercode;
+  $mode = (string)($context->request['mode'] ?? '');
+  $ctype = null;
+  $pch = '';
+  $type = '';
 
   $imgfile = filter_input(INPUT_POST, 'img');
 
@@ -1481,7 +1502,7 @@ function paint_form(string $rep, ?int $reply_to): void {
     // 認証済みの投稿番号はセッションに保持する。パスワードをURLやクライアントへ渡さない。
     $authorization = $_SESSION['image_replacement_authorization'] ?? null;
     if (!is_array($authorization) || (int)($authorization['post_id'] ?? 0) !== (int)$no) {
-      error($en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
+      render_error($context, $en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
       return;
     }
     $repcode = bin2hex(random_bytes(16));
@@ -1522,15 +1543,16 @@ function paint_form(string $rep, ?int $reply_to): void {
 
 //アニメ再生
 
-function open_pch(string $sp = ""): void {
-  global $template_engine, $dat;
+function open_pch(ApplicationContext $context, string $sp = ""): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
 
   $pch = (string)filter_input(INPUT_GET, 'pch');
   try {
     $playback = ImageService::animationPlaybackData(Config::string('paths.images'), $pch, (int)($sp ?: Config::int('drawing.animation_speed')));
   } catch (Throwable $e) {
     ApplicationErrorHandler::reportThrowable($e, 'animation-open-error');
-    error(Config::string('site.language') === 'English' ? 'Failed to open animation.' : '動画を開けませんでした。', 404);
+    render_error($context, $context->english ? 'Failed to open animation.' : '動画を開けませんでした。', 404);
     return;
   }
   $template = $playback['template_type'] === 'tegaki' ? ANIMEFILE_TEGAKI : ANIMEFILE;
@@ -1541,9 +1563,10 @@ function open_pch(string $sp = ""): void {
 }
 
 //お絵かき投稿
-function paint_com(string $tmpmode): void {
-  global $usercode, $ptime;
-  global $template_engine, $dat;
+function paint_com(ApplicationContext $context, string $tmpmode): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $usercode = $context->usercode;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
   $resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
@@ -1635,19 +1658,20 @@ function temporary_image_url(string $filename): string {
 }
 
 /** Accept a browser-rendered PNG together with its original NEO/Tegaki replay. */
-function animation_upload(): void {
-  global $en, $usercode;
+function animation_upload(ApplicationContext $context): void {
+  $en = $context->english;
+  $usercode = $context->usercode;
 
   header('Content-Type: text/plain; charset=UTF-8');
   if (!Config::bool('features.image_upload') || !Config::bool('features.animation')) {
-    error($en ? 'Animation uploads are disabled.' : '動画ファイルのアップロードは無効です。', 403);
+    render_error($context, $en ? 'Animation uploads are disabled.' : '動画ファイルのアップロードは無効です。', 403);
     return;
   }
   try {
     if (Config::bool('features.csrf')) {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } else {
-      RequestSecurity::assertCurrentSameOriginRequest($en);
+      RequestSecurity::assertCurrentSameOriginRequest($context->usercode, $en);
     }
     PaintSaveRequestGuard::assertWithinLimits(
       $_SERVER,
@@ -1691,9 +1715,9 @@ function animation_upload(): void {
     $_SESSION['pending_picfile'] = $result['picfile'];
     echo "ok\n" . $result['picfile'] . "\n" . temporary_image_url($result['preview']);
   } catch (RequestSecurityException|PaintSaveCapacityException|ImageUploadException $e) {
-    error($en ? $e->getMessage() : animation_upload_error_message($e), $e->getCode() ?: 400, $e);
+    render_error($context, $en ? $e->getMessage() : animation_upload_error_message($e), $e->getCode() ?: 400, $e);
   } catch (Throwable $e) {
-    error($en ? 'Animation upload failed.' : '動画ファイルの保存に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Animation upload failed.' : '動画ファイルの保存に失敗しました。', 500, $e);
   }
 }
 
@@ -1708,8 +1732,8 @@ function animation_upload_error_message(Throwable $error): string {
 }
 
 /** Serve the PNG/JPEG/GIF/WebP/AVIF preview of a pending drawing after authorization. */
-function temporary_image(): void {
-  global $usercode;
+function temporary_image(ApplicationContext $context): void {
+  $usercode = $context->usercode;
 
   $filename = (string)filter_input_data('GET', 'file');
   $is_administrator = AdminAuth::isAuthenticated(
@@ -1736,13 +1760,14 @@ function temporary_image(): void {
 }
 
 //コンティニュー画面in
-function in_continue(): void {
-  global $template_engine, $dat;
-  global $en;
+function in_continue(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   $no = trim((string)filter_input(INPUT_GET, 'no')); // 画像ファイル名なので文字列として取得
   if (!ImageService::isSafePostedImageFilename($no)) {
-    error($en ? 'The image does not exist.' : '画像が存在しません。', 404);
+    render_error($context, $en ? 'The image does not exist.' : '画像が存在しません。', 404);
     return;
   }
 
@@ -1751,11 +1776,11 @@ function in_continue(): void {
     $repository = new BoardRepository();
     $oya = $repository->findPostsByImage($no);
   } catch (Throwable $e) {
-    error($en ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500, $e);
     return;
   }
   if (empty($oya) || !is_file(Config::string('paths.images') . $no) || !is_readable(Config::string('paths.images') . $no)) {
-    error($en ? 'The image does not exist.' : '画像が存在しません。', 404);
+    render_error($context, $en ? 'The image does not exist.' : '画像が存在しません。', 404);
     return;
   }
 
@@ -1824,9 +1849,8 @@ function in_continue(): void {
       $dat['ctype_pch'] = true;
     }
 
-    $db = null; //db切断
   } catch (Throwable $e) {
-    error($en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to prepare the continuation screen.' : '続きを描く画面の準備に失敗しました。', 500, $e);
   }
 
   echo $template_engine->render(OTHERFILE, $dat);
@@ -1834,9 +1858,9 @@ function in_continue(): void {
 
 //削除くん
 
-function delmode(): void {
-  global $dat;
-  global $en;
+function delmode(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $en = $context->english;
 
   $delno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 
@@ -1844,12 +1868,12 @@ function delmode(): void {
   $admin_delete = isset($_POST['admindel']);
   if ($admin_delete) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
     if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
-      error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+      render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
     }
     $p_pwd = '';
   }
@@ -1859,26 +1883,24 @@ function delmode(): void {
     $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
     $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ない気がします。', 404);
+    render_error($context, $en ? 'That post does not exist.' : 'そんな記事ない気がします。', 404);
     return;
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
+    render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     return;
   } catch (Throwable $e) {
-    error($en ? 'Deletion failed.' : '削除に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Deletion failed.' : '削除に失敗しました。', 500, $e);
     return;
   }
   //変数クリア
   unset($delno);
   //header('Location:'.Config::string('site.script_name'));
-  ok($en ? 'Successfully deleted. Switching screen.' : '削除しました。画面を切り替えます。');
+  ok($context, $en ? 'Successfully deleted. Switching screen.' : '削除しました。画面を切り替えます。');
 }
 
 //画像差し替え
-function picreplace(): void {
-  global $type;
-  global $path;
-  global $en;
+function picreplace(ApplicationContext $context): void {
+  $en = $context->english;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
   $stime = $stime ?: ($_SERVER['REQUEST_TIME'] ?? time());
@@ -1887,7 +1909,7 @@ function picreplace(): void {
   $repcode = filter_input(INPUT_GET, 'repcode');
   $repcode = $repcode ?: filter_input(INPUT_POST, 'repcode');
   if (!$no || !$repcode) {
-    error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
+    render_error($context, $en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
   }
   RequestSecurity::startSession();
   $authorization = $_SESSION['image_replacement_authorization'] ?? null;
@@ -1896,13 +1918,13 @@ function picreplace(): void {
   $expires_at = is_array($authorization) ? (int)($authorization['expires_at'] ?? 0) : 0;
   if ($authorized_post_id !== (int)$no || $encrypted_password === '' || $expires_at < time()) {
     unset($_SESSION['image_replacement_authorization']);
-    error($en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
+    render_error($context, $en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
     return;
   }
   $pwd_f = openssl_decrypt($encrypted_password, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV);
   if ($pwd_f === false) {
     unset($_SESSION['image_replacement_authorization']);
-    error($en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
+    render_error($context, $en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
     return;
   }
   $nsfw_flag = filter_input(INPUT_POST, 'nsfw');
@@ -1911,12 +1933,12 @@ function picreplace(): void {
   $host = gethostbyaddr(RequestInfo::clientIp());
 
   foreach (Config::array("spam.bad_hosts") as $value) { //拒絶host
-    if (preg_match("/$value$/i", $host)) error($en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。', 403);
+    if (preg_match("/$value$/i", $host)) render_error($context, $en ? 'Your host is blocked.' : 'あなたのホストは拒絶されています。', 403);
   }
 
   $temporary_image = ImageService::findTemporaryImageByReplacementCode(Config::string('paths.temporary'), (string)$repcode);
   if ($temporary_image === null) {
-    error($en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。', 404);
+    render_error($context, $en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。', 404);
   }
   $filename = $temporary_image['base_name'];
   $imgext = $temporary_image['image_extension'];
@@ -1933,7 +1955,7 @@ function picreplace(): void {
     if (password_verify($pwd_f, $msg_d["pwd"])) {
       $replacement = ImageService::replacePostedFiles(
         Config::string('paths.temporary'), Config::string('paths.images'), $filename, $imgext, (int)$stime,
-        (string)$msg_d['picfile'], (string)$msg_d['pchfile'], Config::int('permissions.public_file')
+        (string)$msg_d['picfile'], (string)$msg_d['pchfile'], Config::int('permissions.public_file'), $en
       );
       $new_picfile = $replacement['picfile'];
       $new_pchfile = $replacement['pchfile'];
@@ -1977,19 +1999,24 @@ function picreplace(): void {
       ImageService::completePostedReplacement($replacement);
       unset($_SESSION['image_replacement_authorization']);
     } else {
-      error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
+      render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     }
+  } catch (InvalidArgumentException $e) {
+    if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
+    render_error($context, $en ? 'Invalid image type.' : '無効な画像タイプです。', 415, $e);
+    return;
   } catch (Throwable $e) {
     if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
-    error($en ? 'Image replacement failed.' : '画像差し替えに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Image replacement failed.' : '画像差し替えに失敗しました。', 500, $e);
   }
-  editform((int)$no, (string)$pwd_f);
+  editform($context, (int)$no, (string)$pwd_f);
 }
 
 //編集モードくん入口
-function editform(?int $authorized_post_id = null, ?string $authorized_password = null, bool $authorized_as_admin = false): void {
-  global $template_engine, $dat;
-  global $en;
+function editform(ApplicationContext $context, ?int $authorized_post_id = null, ?string $authorized_password = null, bool $authorized_as_admin = false): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   //csrfトークンをセット
   $dat['token'] = '';
@@ -2004,14 +2031,14 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
 
   $edit_no = $authorized_post_id ?? filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
   if ($edit_no == "") {
-    error($en ? 'Please enter the post number.' : '記事番号を入力してください');
+    render_error($context, $en ? 'Please enter the post number.' : '記事番号を入力してください');
   }
 
   //記事呼び出し
   try {
     if ($authorized_as_admin
       && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
-      error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+      render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
     }
     $service = new PostService(new BoardRepository(), Config::string('paths.images'));
     $authorization = $service->authorize((int)$edit_no, (string)$post_pwd, $authorized_as_admin);
@@ -2035,26 +2062,26 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
     $dat['othermode'] = 'edit'; //編集モード
     echo $template_engine->render(OTHERFILE, $dat);
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
+    render_error($context, $en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
+    render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
   } catch (Throwable $e) {
-    error($en ? 'Failed to open edit mode.' : '編集画面を開けませんでした。', 500, $e);
+    render_error($context, $en ? 'Failed to open edit mode.' : '編集画面を開けませんでした。', 500, $e);
   }
 }
 
 //編集モードくん本体
-function editexec(): void {
-  global $req_method;
-  global $dat;
-  global $en;
+function editexec(ApplicationContext $context): void {
+  $req_method = $context->requestMethod;
+  $dat =& $context->data;
+  $en = $context->english;
 
   //CSRFトークンをチェック
   if (Config::bool('features.csrf')) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
   }
 
@@ -2073,7 +2100,7 @@ function editexec(): void {
   $edit_as_admin = filter_input_data('POST', 'admin_edit') === '1';
   if ($edit_as_admin
     && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
-    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
 
   //ホスト取得
@@ -2084,7 +2111,7 @@ function editexec(): void {
     );
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
-    error($e->getMessage(), $e->getCode() ?: 400);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 400);
     return;
   }
   //↑セキュリティ関連ここまで
@@ -2107,23 +2134,24 @@ function editexec(): void {
     }
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
   } catch (PostNotFoundException $e) {
-    error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
+    render_error($context, $en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
     return;
   } catch (PostAuthorizationException $e) {
-    error($en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
+    render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     return;
   } catch (Throwable $e) {
-    error($en ? 'Editing failed.' : '編集に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Editing failed.' : '編集に失敗しました。', 500, $e);
     return;
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
-  ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
+  ok($context, $en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }
 
 //管理モードin
-function admin_in(): void {
-  global $template_engine, $dat;
+function admin_in(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
   admin_no_store();
   if (AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     redirect(Config::string('site.script_name') . '?mode=admin');
@@ -2134,13 +2162,13 @@ function admin_in(): void {
   echo $template_engine->render(OTHERFILE, $dat);
 }
 
-function admin_login(): void {
-  global $en;
+function admin_login(ApplicationContext $context): void {
+  $en = $context->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
   $client_ip = RequestInfo::clientIp();
   $client_ip = $client_ip !== '' ? $client_ip : 'unknown';
@@ -2158,11 +2186,11 @@ function admin_login(): void {
     if (random_int(1, 100) === 1) $limiter->cleanupExpired();
     $retry_after = $limiter->retryAfter($client_ip);
   } catch (Throwable $e) {
-    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
   if ($retry_after > 0) {
     header('Retry-After: ' . $retry_after);
-    error($en ? 'Too many administrator login attempts. Please try again later.'
+    render_error($context, $en ? 'Too many administrator login attempts. Please try again later.'
       : '管理者ログインの試行回数が多すぎます。時間をおいて再試行してください。', 429);
   }
   $password = (string)filter_input_data('POST', 'adminpass');
@@ -2171,58 +2199,58 @@ function admin_login(): void {
     try {
       $retry_after = $limiter->recordFailure($client_ip);
     } catch (Throwable $e) {
-      error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
+      render_error($context, $en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
     }
     if ($retry_after > 0) {
       header('Retry-After: ' . $retry_after);
-      error($en ? 'Too many administrator login attempts. Please try again later.'
+      render_error($context, $en ? 'Too many administrator login attempts. Please try again later.'
         : '管理者ログインの試行回数が多すぎます。時間をおいて再試行してください。', 429);
     }
-    error($en ? 'Administrator password is incorrect.' : '管理パスが違います。', 403);
+    render_error($context, $en ? 'Administrator password is incorrect.' : '管理パスが違います。', 403);
   }
   try {
     $limiter->clear($client_ip);
   } catch (Throwable $e) {
-    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
   ApplicationErrorHandler::reportAdminAudit('login');
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
 
-function admin_logout(): void {
-  global $en;
+function admin_logout(ApplicationContext $context): void {
+  $en = $context->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
   ApplicationErrorHandler::reportAdminAudit('logout');
   AdminAuth::logout();
   redirect(Config::string('site.script_name') . '?mode=admin_in');
 }
 
-function admin_delete(): void {
-  admin_manage('delete');
+function admin_delete(ApplicationContext $context): void {
+  admin_manage($context, 'delete');
 }
 
-function admin_manage(?string $forced_operation = null): void {
-  global $en;
+function admin_manage(ApplicationContext $context, ?string $forced_operation = null): void {
+  $en = $context->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
-    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
 
   $selected = filter_input_data('POST', 'delno');
   if (!is_array($selected)) $selected = [];
   $operation = $forced_operation ?? (string)filter_input_data('POST', 'operation');
   if (!in_array($operation, ['hide', 'show', 'delete'], true)) {
-    error($en ? 'Invalid administration operation.' : '管理操作が不正です。', 400);
+    render_error($context, $en ? 'Invalid administration operation.' : '管理操作が不正です。', 400);
   }
   try {
     /** @var AdminPostManagementService $service */
@@ -2245,19 +2273,17 @@ function admin_manage(?string $forced_operation = null): void {
         : "選択した{$count}件の記事を" . ($hidden ? '非表示にしました。' : '再表示しました。');
     }
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Please select at least one post.' : '操作する記事を選択してください。', 400);
+    render_error($context, $en ? 'Please select at least one post.' : '操作する記事を選択してください。', 400);
   } catch (PostNotFoundException $e) {
-    error($en ? 'The selected posts do not exist.' : '選択した記事が見つかりません。', 404);
+    render_error($context, $en ? 'The selected posts do not exist.' : '選択した記事が見つかりません。', 404);
   } catch (Throwable $e) {
-    error($en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500, $e);
   }
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
 
 /** @return object|null Theme providers implement templateData(), save(array), and reset(). */
-function theme_settings_provider(): ?object {
-  global $theme_directory;
-
+function theme_settings_provider(string $theme_directory): ?object {
   if (!defined('THEME_SETTINGS_CLASS')) return null;
   $class = constant('THEME_SETTINGS_CLASS');
   if (!is_string($class) || $class === '' || !class_exists($class)) {
@@ -2274,31 +2300,31 @@ function theme_settings_provider(): ?object {
   return $provider;
 }
 
-function admin_theme_settings(): void {
-  global $en;
+function admin_theme_settings(ApplicationContext $context): void {
+  $en = $context->english;
 
   admin_no_store();
   $settings = null;
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
-  require_admin_session();
+  require_admin_session($context);
   try {
-    $settings = theme_settings_provider();
+    $settings = theme_settings_provider($context->themeDirectory);
   } catch (Throwable $e) {
-    error($en ? 'Theme settings are unavailable.' : 'テーマ設定を利用できません。', 500, $e);
+    render_error($context, $en ? 'Theme settings are unavailable.' : 'テーマ設定を利用できません。', 500, $e);
     return;
   }
   if ($settings === null) {
-    error($en ? 'Theme color settings are unavailable for this theme.' : 'このテーマでは配色設定を利用できません。', 404);
+    render_error($context, $en ? 'Theme color settings are unavailable for this theme.' : 'このテーマでは配色設定を利用できません。', 404);
     return;
   }
 
   $operation = (string)filter_input_data('POST', 'operation');
   if (!in_array($operation, ['save', 'reset'], true)) {
-    error($en ? 'Invalid theme settings operation.' : 'テーマ設定の操作が不正です。', 400);
+    render_error($context, $en ? 'Invalid theme settings operation.' : 'テーマ設定の操作が不正です。', 400);
   }
   try {
     if ($operation === 'reset') {
@@ -2313,9 +2339,9 @@ function admin_theme_settings(): void {
       $_SESSION['theme_settings_message'] = $en ? 'Theme settings were saved.' : 'テーマ設定をサイト全体に保存しました。';
     }
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Invalid theme settings values.' : 'テーマ設定の値が不正です。', 400);
+    render_error($context, $en ? 'Invalid theme settings values.' : 'テーマ設定の値が不正です。', 400);
   } catch (Throwable $e) {
-    error($en ? 'Failed to save theme settings.' : 'テーマ設定を保存できませんでした。', 500, $e);
+    render_error($context, $en ? 'Failed to save theme settings.' : 'テーマ設定を保存できませんでした。', 500, $e);
   }
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
@@ -2327,42 +2353,43 @@ function admin_no_store(): void {
   }
 }
 
-function admin_post_id(): int {
-  global $en;
+function admin_post_id(ApplicationContext $context): int {
+  $en = $context->english;
 
   $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
   if ($id === false || $id === null) {
-    error($en ? 'Invalid post number.' : '記事番号が不正です。', 400);
+    render_error($context, $en ? 'Invalid post number.' : '記事番号が不正です。', 400);
   }
   return (int)$id;
 }
 
-function require_admin_session(): void {
-  global $en;
+function require_admin_session(ApplicationContext $context): void {
+  $en = $context->english;
 
   admin_no_store();
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
-    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
 }
 
 // 管理者向けエラーログ閲覧
-function admin_errorlog(): void {
-  global $template_engine, $dat;
-  global $en;
+function admin_errorlog(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
-  require_admin_session();
+  require_admin_session($context);
   $dates = ErrorLogReader::availableDates(__DIR__ . '/errorlog');
   $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
   if ($date_input !== '' && !in_array($date_input, $dates, true)) {
-    error($en ? 'The requested error log date does not exist.' : '指定されたエラーログの日付は存在しません。', 404);
+    render_error($context, $en ? 'The requested error log date does not exist.' : '指定されたエラーログの日付は存在しません。', 404);
   }
   $date = $date_input !== '' ? $date_input : ($dates[0] ?? '');
   $type = (string)(filter_input_data('GET', 'log_type') ?? 'all');
   $status_group = (string)(filter_input_data('GET', 'log_status') ?? 'all');
   if (!in_array($status_group, ['all', '4xx', '5xx'], true)
     || ($type !== 'all' && preg_match('/\A[a-z][a-z0-9-]{0,63}\z/D', $type) !== 1)) {
-    error($en ? 'Invalid error log filter.' : 'エラーログの絞り込み条件が不正です。', 400);
+    render_error($context, $en ? 'Invalid error log filter.' : 'エラーログの絞り込み条件が不正です。', 400);
   }
 
   try {
@@ -2382,20 +2409,21 @@ function admin_errorlog(): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINERRORLOGFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the error log.' : 'エラーログの読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load the error log.' : 'エラーログの読み込みに失敗しました。', 500, $e);
   }
 }
 
 // 管理者向け監査ログ閲覧
-function admin_auditlog(): void {
-  global $template_engine, $dat;
-  global $en;
+function admin_auditlog(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
-  require_admin_session();
+  require_admin_session($context);
   $dates = AuditLogReader::availableDates(__DIR__ . '/auditlog');
   $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
   if ($date_input !== '' && !in_array($date_input, $dates, true)) {
-    error($en ? 'The requested audit log date does not exist.' : '指定された監査ログの日付は存在しません。', 404);
+    render_error($context, $en ? 'The requested audit log date does not exist.' : '指定された監査ログの日付は存在しません。', 404);
   }
   $date = $date_input !== '' ? $date_input : ($dates[0] ?? '');
 
@@ -2416,22 +2444,23 @@ function admin_auditlog(): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINERRORLOGFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the audit log.' : '監査ログの読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load the audit log.' : '監査ログの読み込みに失敗しました。', 500, $e);
   }
 }
 
 // 管理者向け一時画像管理
-function admin_temporary_images(): void {
-  global $template_engine, $dat;
-  global $en;
+function admin_temporary_images(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
-  require_admin_session();
+  require_admin_session($context);
   $page_input = filter_input_data('GET', 'page');
   $page = 1;
   if ($page_input !== null && $page_input !== '') {
     $validated_page = filter_var($page_input, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     if ($validated_page === false) {
-      error($en ? 'Invalid temporary image page number.' : '一時画像一覧のページ番号が不正です。', 400);
+      render_error($context, $en ? 'Invalid temporary image page number.' : '一時画像一覧のページ番号が不正です。', 400);
     }
     $page = (int)$validated_page;
   }
@@ -2443,7 +2472,7 @@ function admin_temporary_images(): void {
     $per_page = Config::int('admin.temporary_images_per_page');
     $total_pages = max(1, (int)ceil($total / $per_page));
     if ($page > $total_pages) {
-      error($en ? 'The temporary image page does not exist.' : '指定された一時画像一覧のページはありません。', 404);
+      render_error($context, $en ? 'The temporary image page does not exist.' : '指定された一時画像一覧のページはありません。', 404);
     }
     $offset = ($page - 1) * $per_page;
     $temporary_images = array_slice($temporary_images, $offset, $per_page);
@@ -2467,20 +2496,20 @@ function admin_temporary_images(): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINTEMPORARYFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load temporary images.' : '一時画像の読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load temporary images.' : '一時画像の読み込みに失敗しました。', 500, $e);
   }
 }
 
-function admin_temporary_images_manage(): void {
-  global $en;
+function admin_temporary_images_manage(ApplicationContext $context): void {
+  $en = $context->english;
 
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
-  require_admin_session();
+  require_admin_session($context);
   $operation = (string)filter_input_data('POST', 'operation');
   try {
     if ($operation === 'delete_selected') {
@@ -2507,9 +2536,9 @@ function admin_temporary_images_manage(): void {
       throw new InvalidArgumentException('Invalid temporary image operation.');
     }
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Invalid temporary image operation.' : '一時画像の管理操作が不正です。', 400);
+    render_error($context, $en ? 'Invalid temporary image operation.' : '一時画像の管理操作が不正です。', 400);
   } catch (Throwable $e) {
-    error($en ? 'Failed to manage temporary images.' : '一時画像の管理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to manage temporary images.' : '一時画像の管理に失敗しました。', 500, $e);
   }
   redirect(Config::string('site.script_name') . '?mode=admin_temporary_images');
 }
@@ -2523,18 +2552,19 @@ function diary_post_allowed(bool $is_reply): bool {
   );
 }
 
-function admin_post(): void {
-  global $template_engine, $dat;
-  global $en;
+function admin_post(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
-  require_admin_session();
-  $id = admin_post_id();
+  require_admin_session($context);
+  $id = admin_post_id($context);
 
   try {
     $repository = new BoardRepository();
     $post = $repository->findPost($id);
     if (!$post) {
-      error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
+      render_error($context, $en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
     }
 
     $parent = false;
@@ -2563,23 +2593,24 @@ function admin_post(): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINPOSTFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500, $e);
   }
 }
 
-function admin_edit(): void {
-  require_admin_session();
-  editform(admin_post_id(), '', true);
+function admin_edit(ApplicationContext $context): void {
+  require_admin_session($context);
+  editform($context, admin_post_id($context), '', true);
 }
 
 //管理モード
-function admin(): void {
-  global $template_engine, $dat;
-  global $en;
+function admin(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   admin_no_store();
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
-    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
   $dat['path'] = Config::string('paths.images');
   $dat['token'] = RequestSecurity::csrfToken();
@@ -2604,7 +2635,7 @@ function admin(): void {
       'isAdministrator' => filter_input_data('GET', 'isAdministrator') ?: 'all',
     ]);
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Invalid administration search criteria.' : '管理画面の検索条件が不正です。', 400);
+    render_error($context, $en ? 'Invalid administration search criteria.' : '管理画面の検索条件が不正です。', 400);
   }
   $dat['admin_filters'] = $filters;
   $filter_query = AdminPostFilter::query($filters);
@@ -2616,7 +2647,7 @@ function admin(): void {
   if ($page_input !== null && $page_input !== '') {
     $validated_page = filter_var($page_input, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     if ($validated_page === false) {
-      error($en ? 'Invalid administration page number.' : '管理画面のページ番号が不正です。', 400);
+      render_error($context, $en ? 'Invalid administration page number.' : '管理画面のページ番号が不正です。', 400);
     }
     $page = (int)$validated_page;
   }
@@ -2640,7 +2671,7 @@ function admin(): void {
     $total_threads = $repository->countAdminThreads($filters);
     $total_pages = max(1, (int)ceil($total_threads / $per_page));
     if ($page > $total_pages) {
-      error($en ? 'The administration page does not exist.' : '指定された管理画面のページはありません。', 404);
+      render_error($context, $en ? 'The administration page does not exist.' : '指定された管理画面のページはありません。', 404);
     }
     $offset = ($page - 1) * $per_page;
 
@@ -2670,13 +2701,13 @@ function admin(): void {
     $dat['admin_page_posts'] = count($oya) + array_sum(array_map('count', $ko));
     echo $template_engine->render(ADMINFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500, $e);
   }
 }
 
 // コンティニュー認証 (画像)
-function usrchk(): void {
-  global $en;
+function usrchk(ApplicationContext $context): void {
+  $en = $context->english;
 
   $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
   $pwd_f = filter_input(INPUT_POST, 'pwd');
@@ -2691,7 +2722,7 @@ function usrchk(): void {
           (string)$pwd_f, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV
         );
         if ($encrypted_password === false) {
-          error($en ? 'Could not prepare image replacement authorization.' : '画像差し替えの認証を準備できませんでした。', 500);
+          render_error($context, $en ? 'Could not prepare image replacement authorization.' : '画像差し替えの認証を準備できませんでした。', 500);
           return;
         }
         $_SESSION['image_replacement_authorization'] = [
@@ -2704,16 +2735,17 @@ function usrchk(): void {
       $flag = false;
     }
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   if (!$flag) {
-    error($en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています", 403);
+    render_error($context, $en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています", 403);
   }
 }
 
 //OK画面
-function ok(string $mes): void {
-  global $template_engine, $dat;
+function ok(ApplicationContext $context, string $mes): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
   $dat['okmes'] = $mes;
   $dat['othermode'] = 'ok';
   $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
@@ -2766,7 +2798,11 @@ function clean_old_thumbnails(): void {
 //画像保存
 function save_image(): void {
   $tool = filter_input(INPUT_GET,"tool");
-  $image_save = new image_save;
+  $image_save = new image_save(
+    0,
+    Config::int('limits.paint_max_width'),
+    Config::int('limits.paint_max_height')
+  );
   header('Content-type: text/plain');
   switch($tool){
     case "neo":
@@ -2788,8 +2824,8 @@ function save_image(): void {
 }
 
 //ログの行数が最大値を超えていたら削除
-function logdel(): void {
-  global $en;
+function logdel(ApplicationContext $context): void {
+  $en = $context->english;
   //オーバーした行の画像とスレ番号を取得
   try {
     $repository = new BoardRepository();
@@ -2802,15 +2838,14 @@ function logdel(): void {
 
     $repository->deletePost($del_id, true);
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
-//エラー画面
-function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
-  global $db;
-  global $template_engine, $dat;
-  global $en;
+function render_error(ApplicationContext $context, string $mes, int $status = 400, ?Throwable $cause = null): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
   if ($status < 400 || $status > 599) $status = 500;
   // 4xxも含め、利用者へエラー画面を返すすべての異常を記録する。
   $error_id = ApplicationErrorHandler::reportHttpError($status, strip_tags($mes), $cause);
@@ -2818,7 +2853,6 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
     $mes = h(ApplicationErrorHandler::publicMessage($error_id, $en));
   }
   http_response_code($status);
-  $db = null; //db切断
   $dat['errmes'] = $mes;
   $dat['othermode'] = 'err';
   $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
@@ -2831,15 +2865,25 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   exit;
 }
 
+function render_bootstrap_error(string $mes, int $status = 400, ?Throwable $cause = null): void {
+  if ($status < 400 || $status > 599) $status = 500;
+  $error_id = ApplicationErrorHandler::reportHttpError($status, strip_tags($mes), $cause);
+  if ($status >= 500) {
+    $mes = h(ApplicationErrorHandler::publicMessage($error_id, ApplicationBootstrap::english()));
+  }
+  http_response_code($status);
+  header('Content-Type: text/plain; charset=UTF-8');
+  exit($mes);
+}
+
 //画像差し替え失敗
-function error2(): void {
-  global $db;
-  global $template_engine, $dat;
-  global $self;
-  global $en;
+function error2(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
   http_response_code(500);
 
-  $db = null; //db切断
+  $self = Config::string('site.script_name');
   $dat['othermode'] = 'err2';
   $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
   $http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
