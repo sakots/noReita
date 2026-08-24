@@ -186,9 +186,10 @@ function create_res(array $post): array {
 class misskey_note {
 
   //投稿済みの記事をMisskeyにノートするための前処理
-  public static function before_misskey_note(): void {
-    global $home, $set_nsfw, $en, $deny_all_posts;
-    global $template_engine, $dat;
+  public static function before_misskey_note(ApplicationContext $context): void {
+    $en = $context->english;
+    $template_engine = $context->templates;
+    $dat =& $context->data;
     //管理者判定処理
     RequestSecurity::startSession();
     $admin_post = admin_post_valid();
@@ -230,9 +231,10 @@ class misskey_note {
   }
 
   //投稿済みの画像をMisskeyにNoteするための投稿フォーム
-  public static function misskey_note_edit_form(): void {
-    global $home, $set_nsfw, $en, $max_kb, $use_upload, $admin;
-    global $template_engine, $dat;
+  public static function misskey_note_edit_form(ApplicationContext $context): void {
+    $en = $context->english;
+    $template_engine = $context->templates;
+    $dat =& $context->data;
 
     try {
       RequestSecurity::assertCurrentSameOriginRequest($en);
@@ -301,8 +303,8 @@ class misskey_note {
   }
 
   //Misskeyに投稿するSESSIONデータを作成
-  public static function create_misskey_note_sessiondata(): void {
-    global $en, $usercode;
+  public static function create_misskey_note_sessiondata(ApplicationContext $context): void {
+    $en = $context->english;
 
     try {
       RequestSecurity::assertCurrentCsrfRequest($en);
@@ -367,12 +369,12 @@ class misskey_note {
     ];
 
     // Misskeyサーバー認証URLを生成する処理を直接呼び出す
-    self::create_misskey_authrequesturl();
+    self::create_misskey_authrequesturl($context);
   }
 
   // Misskeyサーバー認証URLを生成
-  public static function create_misskey_authrequesturl(): void {
-    global $en;
+  public static function create_misskey_authrequesturl(ApplicationContext $context): void {
+    $en = $context->english;
 
     try {
       RequestSecurity::assertCurrentSameOriginRequest($en);
@@ -476,8 +478,9 @@ class misskey_note {
   }
 
   // Misskeyへの投稿が成功した事を知らせる画面
-  public static function misskey_success(): void {
-    global $en, $template_engine, $dat;
+  public static function misskey_success(ApplicationContext $context): void {
+    $template_engine = $context->templates;
+    $dat =& $context->data;
     $no = (string)filter_input_data('GET', 'no', FILTER_VALIDATE_INT);
 
     RequestSecurity::startSession();

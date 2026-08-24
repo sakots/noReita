@@ -447,15 +447,15 @@ switch ($mode) {
   case 'post_share_server':
     return submit_share_server();
   case 'before_misskey_note':
-    return misskey_note::before_misskey_note();
+    return misskey_note::before_misskey_note($application_context);
   case 'misskey_note_edit_form':
-    return misskey_note::misskey_note_edit_form();
+    return misskey_note::misskey_note_edit_form($application_context);
   case 'create_misskey_note_sessiondata':
-    return misskey_note::create_misskey_note_sessiondata();
+    return misskey_note::create_misskey_note_sessiondata($application_context);
   case 'create_misskey_authrequesturl':
-    return misskey_note::create_misskey_authrequesturl();
+    return misskey_note::create_misskey_authrequesturl($application_context);
   case 'misskey_success':
-    return misskey_note::misskey_success();
+    return misskey_note::misskey_success($application_context);
   default: // 通常表示モード
     BoardController::index($application_context);
     return;
