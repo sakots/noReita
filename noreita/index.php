@@ -9,6 +9,7 @@ const REITA_VER = 'v4.2.3 lot.260824.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
+require_once __DIR__ . '/board_controller.inc.php';
 
 // functions.phpのバージョンを確認
 if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
@@ -363,7 +364,8 @@ switch ($mode) {
   case 'reply':
     return regist();
   case 'res':
-    return res();
+    BoardController::response();
+    return;
   case 'sodane': // そうだね
     return sodane();
   case 'paint':
@@ -389,9 +391,11 @@ switch ($mode) {
   case 'picrep':
     return picreplace();
   case 'catalog': // カタログ表示
-    return catalog();
+    BoardController::catalog();
+    return;
   case 'search': // 検索
-    return search();
+    BoardController::search();
+    return;
   case 'edit':
     return editform();
   case 'editexec':
@@ -445,7 +449,8 @@ switch ($mode) {
   case 'misskey_success':
     return misskey_note::misskey_success();
   default: // 通常表示モード
-    return def();
+    BoardController::index();
+    return;
 }
 
 /*-----------Main-------------*/
