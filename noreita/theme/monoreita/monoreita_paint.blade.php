@@ -5,8 +5,8 @@
     <title>{{$board_title}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('components.monoreita_headCss')
-    <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$stime}}" type="text/css">
-    <script src="{{$neo_dir}}neo.js?{{$stime}}" charset="utf-8"></script>
+    <script src="theme/monoreita/js/neoLoader.js?{{$stime}}" charset="utf-8"></script>
+    <script>loadPaintBbsNeo({!! json_encode($neo_dir, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!});</script>
     <!-- アプレットフィット -->
     <script>
       const originalWidth = {{$w}};

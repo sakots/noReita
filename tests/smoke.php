@@ -162,6 +162,35 @@ smoke_test('asynchronous paint replacements display the returned edit form', sta
   return true;
 });
 
+smoke_test('PaintBBS NEO loads from GitHub with the configured mirror as fallback', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $loaders = [
+    'eda/js/neoLoader.js',
+    'monoreita/js/neoLoader.js',
+  ];
+  foreach ($loaders as $loader) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $loader);
+    if (!is_string($source)
+      || !str_contains($source, 'api.github.com/repos/funige/neo/contents/dist/')
+      || !str_contains($source, "?ref=master")
+      || !str_contains($source, "fetchSource('neo.css')")
+      || !str_contains($source, "fetchSource('neo.js')")
+      || !str_contains($source, 'loadFallback')) {
+      return false;
+    }
+  }
+
+  $templates = [
+    'eda/eda_paint.twig', 'eda/eda_anime.twig',
+    'monoreita/monoreita_paint.blade.php', 'monoreita/monoreita_anime.blade.php',
+  ];
+  foreach ($templates as $template) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
+    if (!is_string($source) || !str_contains($source, 'loadPaintBbsNeo(')) return false;
+  }
+  return true;
+});
+
 smoke_test('simple theme stylesheets load after page-specific styles', static function (): bool {
   $themes = [
     [

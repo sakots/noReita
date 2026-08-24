@@ -16,8 +16,8 @@
       }
     }
 	</script>
-  <link rel="stylesheet" href="{{ neo_dir }}neo.css?{{ a_stime }}" type="text/css">
-  <script src="{{ neo_dir }}neo.js?{{ a_stime }}" charset="utf-8"></script>
+  <script src="theme/eda/js/neoLoader.js?{{ a_stime }}" charset="utf-8"></script>
+  <script>loadPaintBbsNeo({{ neo_dir|json_encode|raw }});</script>
   {% include 'components/eda_customCss.twig' %}
 </head>
 

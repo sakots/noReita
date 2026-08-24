@@ -16,8 +16,8 @@
       }
     }
 	</script>
-  <link rel="stylesheet" href="{{$neo_dir}}neo.css?{{$a_stime}}" type="text/css">
-  <script src="{{$neo_dir}}neo.js?{{$a_stime}}" charset="utf-8"></script>
+  <script src="theme/monoreita/js/neoLoader.js?{{$a_stime}}" charset="utf-8"></script>
+  <script>loadPaintBbsNeo({!! json_encode($neo_dir, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!});</script>
   @include('components.monoreita_customCss')
 </head>
 
