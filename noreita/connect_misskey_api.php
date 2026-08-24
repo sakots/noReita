@@ -51,6 +51,7 @@ function misskey_api_error(
 
 // 認証チェック
 class connect_misskey_api{
+	/** @param CurlHandle|resource|false $curl */
 	private static function applySecurity($curl, string $base_url, int $timeout = 15): bool {
 		if ($curl === false) return false;
 		$options = MisskeyServerSecurity::curlOptions($base_url, $timeout);
