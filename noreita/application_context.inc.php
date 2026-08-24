@@ -29,10 +29,11 @@ final class ApplicationContext {
   }
 }
 
-final class ApplicationContextRegistry {
+/** Holds rendering dependencies only for legacy error() calls during migration. */
+final class ApplicationErrorRenderer {
   private static ?ApplicationContext $current = null;
 
-  public static function set(ApplicationContext $context): void {
+  public static function initialize(ApplicationContext $context): void {
     self::$current = $context;
   }
 

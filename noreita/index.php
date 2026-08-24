@@ -346,7 +346,7 @@ $application_context = new ApplicationContext(
   $en, $template_engine, $dat, $usercode, $req_method, $theme_directory,
   ['message' => $message]
 );
-ApplicationContextRegistry::set($application_context);
+ApplicationErrorRenderer::initialize($application_context);
 
 //var_dump($_GET);
 
@@ -2882,10 +2882,10 @@ function render_bootstrap_error(string $mes, int $status = 400, ?Throwable $caus
 
 //エラー画面
 function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
-  if (!ApplicationContextRegistry::isInitialized()) {
+  if (!ApplicationErrorRenderer::isInitialized()) {
     render_bootstrap_error($mes, $status, $cause);
   }
-  render_error(ApplicationContextRegistry::current(), $mes, $status, $cause);
+  render_error(ApplicationErrorRenderer::current(), $mes, $status, $cause);
 }
 
 //画像差し替え失敗
