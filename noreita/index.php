@@ -9,6 +9,7 @@ const REITA_VER = 'v4.2.3 lot.260824.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
+require_once __DIR__ . '/application_context.inc.php';
 require_once __DIR__ . '/board_controller.inc.php';
 require_once __DIR__ . '/post_controller.inc.php';
 require_once __DIR__ . '/paint_controller.inc.php';
@@ -341,6 +342,10 @@ if(!$usercode){ //user-codeがなければ発行
 }
 setcookie("usercode", $usercode, time()+(86400*365),"","",$https_only,true); //1年間
 $_SESSION['usercode'] = $usercode;
+
+$application_context = new ApplicationContext(
+  $en, $template_engine, $dat, $usercode, $req_method, $theme_directory
+);
 
 //var_dump($_GET);
 
