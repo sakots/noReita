@@ -162,6 +162,7 @@ return [
 - `index.php`から役割を分散する
 -  PHP の`global`と`$GLOBALS`を使わないようにした
 - `error()`を廃止
+- luminousのcssがおかしくて矢印の表示が変だったの修正
 
 ### [2026/08/24] v4.2.3
 
