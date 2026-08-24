@@ -197,6 +197,7 @@ final class AdminAuth {
     unset($_SESSION['token']);
   }
 
+  /** @param array<string,mixed> $session */
   public static function hasValidSession(array $session, string $admin_password, int $lifetime, int $now): bool {
     $fingerprint = $session[self::SESSION_FINGERPRINT] ?? null;
     $last_activity = $session[self::SESSION_LAST_ACTIVITY] ?? null;
@@ -328,6 +329,10 @@ final class AdminLoginRateLimiter {
     return $this->directory . DIRECTORY_SEPARATOR . 'admin-login-' . $identifier . '.json';
   }
 
+  /**
+   * @param resource $handle
+   * @return array<string,int>|array<string,mixed>
+   */
   private function readRecord($handle): array {
     rewind($handle);
     $json = stream_get_contents($handle, 4096);
