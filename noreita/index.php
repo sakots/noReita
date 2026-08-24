@@ -2166,7 +2166,7 @@ function admin_login(ApplicationContext $context): void {
   try {
     RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
   $client_ip = RequestInfo::clientIp();
   $client_ip = $client_ip !== '' ? $client_ip : 'unknown';
@@ -2184,11 +2184,11 @@ function admin_login(ApplicationContext $context): void {
     if (random_int(1, 100) === 1) $limiter->cleanupExpired();
     $retry_after = $limiter->retryAfter($client_ip);
   } catch (Throwable $e) {
-    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
   if ($retry_after > 0) {
     header('Retry-After: ' . $retry_after);
-    error($en ? 'Too many administrator login attempts. Please try again later.'
+    render_error($context, $en ? 'Too many administrator login attempts. Please try again later.'
       : '管理者ログインの試行回数が多すぎます。時間をおいて再試行してください。', 429);
   }
   $password = (string)filter_input_data('POST', 'adminpass');
@@ -2197,19 +2197,19 @@ function admin_login(ApplicationContext $context): void {
     try {
       $retry_after = $limiter->recordFailure($client_ip);
     } catch (Throwable $e) {
-      error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
+      render_error($context, $en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
     }
     if ($retry_after > 0) {
       header('Retry-After: ' . $retry_after);
-      error($en ? 'Too many administrator login attempts. Please try again later.'
+      render_error($context, $en ? 'Too many administrator login attempts. Please try again later.'
         : '管理者ログインの試行回数が多すぎます。時間をおいて再試行してください。', 429);
     }
-    error($en ? 'Administrator password is incorrect.' : '管理パスが違います。', 403);
+    render_error($context, $en ? 'Administrator password is incorrect.' : '管理パスが違います。', 403);
   }
   try {
     $limiter->clear($client_ip);
   } catch (Throwable $e) {
-    error($en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Administrator login protection failed.' : '管理者ログイン保護の処理に失敗しました。', 500, $e);
   }
   ApplicationErrorHandler::reportAdminAudit('login');
   redirect(Config::string('site.script_name') . '?mode=admin');
@@ -2221,7 +2221,7 @@ function admin_logout(ApplicationContext $context): void {
   try {
     RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
   ApplicationErrorHandler::reportAdminAudit('logout');
   AdminAuth::logout();
@@ -2238,17 +2238,17 @@ function admin_manage(ApplicationContext $context, ?string $forced_operation = n
   try {
     RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
-    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
 
   $selected = filter_input_data('POST', 'delno');
   if (!is_array($selected)) $selected = [];
   $operation = $forced_operation ?? (string)filter_input_data('POST', 'operation');
   if (!in_array($operation, ['hide', 'show', 'delete'], true)) {
-    error($en ? 'Invalid administration operation.' : '管理操作が不正です。', 400);
+    render_error($context, $en ? 'Invalid administration operation.' : '管理操作が不正です。', 400);
   }
   try {
     /** @var AdminPostManagementService $service */
@@ -2271,11 +2271,11 @@ function admin_manage(ApplicationContext $context, ?string $forced_operation = n
         : "選択した{$count}件の記事を" . ($hidden ? '非表示にしました。' : '再表示しました。');
     }
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Please select at least one post.' : '操作する記事を選択してください。', 400);
+    render_error($context, $en ? 'Please select at least one post.' : '操作する記事を選択してください。', 400);
   } catch (PostNotFoundException $e) {
-    error($en ? 'The selected posts do not exist.' : '選択した記事が見つかりません。', 404);
+    render_error($context, $en ? 'The selected posts do not exist.' : '選択した記事が見つかりません。', 404);
   } catch (Throwable $e) {
-    error($en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to update the selected posts.' : '選択した記事の更新に失敗しました。', 500, $e);
   }
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
@@ -2306,23 +2306,23 @@ function admin_theme_settings(ApplicationContext $context): void {
   try {
     RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
   require_admin_session($context);
   try {
     $settings = theme_settings_provider($context->themeDirectory);
   } catch (Throwable $e) {
-    error($en ? 'Theme settings are unavailable.' : 'テーマ設定を利用できません。', 500, $e);
+    render_error($context, $en ? 'Theme settings are unavailable.' : 'テーマ設定を利用できません。', 500, $e);
     return;
   }
   if ($settings === null) {
-    error($en ? 'Theme color settings are unavailable for this theme.' : 'このテーマでは配色設定を利用できません。', 404);
+    render_error($context, $en ? 'Theme color settings are unavailable for this theme.' : 'このテーマでは配色設定を利用できません。', 404);
     return;
   }
 
   $operation = (string)filter_input_data('POST', 'operation');
   if (!in_array($operation, ['save', 'reset'], true)) {
-    error($en ? 'Invalid theme settings operation.' : 'テーマ設定の操作が不正です。', 400);
+    render_error($context, $en ? 'Invalid theme settings operation.' : 'テーマ設定の操作が不正です。', 400);
   }
   try {
     if ($operation === 'reset') {
@@ -2337,9 +2337,9 @@ function admin_theme_settings(ApplicationContext $context): void {
       $_SESSION['theme_settings_message'] = $en ? 'Theme settings were saved.' : 'テーマ設定をサイト全体に保存しました。';
     }
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Invalid theme settings values.' : 'テーマ設定の値が不正です。', 400);
+    render_error($context, $en ? 'Invalid theme settings values.' : 'テーマ設定の値が不正です。', 400);
   } catch (Throwable $e) {
-    error($en ? 'Failed to save theme settings.' : 'テーマ設定を保存できませんでした。', 500, $e);
+    render_error($context, $en ? 'Failed to save theme settings.' : 'テーマ設定を保存できませんでした。', 500, $e);
   }
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
@@ -2356,7 +2356,7 @@ function admin_post_id(ApplicationContext $context): int {
 
   $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
   if ($id === false || $id === null) {
-    error($en ? 'Invalid post number.' : '記事番号が不正です。', 400);
+    render_error($context, $en ? 'Invalid post number.' : '記事番号が不正です。', 400);
   }
   return (int)$id;
 }
@@ -2366,7 +2366,7 @@ function require_admin_session(ApplicationContext $context): void {
 
   admin_no_store();
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
-    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
 }
 
@@ -2380,14 +2380,14 @@ function admin_errorlog(ApplicationContext $context): void {
   $dates = ErrorLogReader::availableDates(__DIR__ . '/errorlog');
   $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
   if ($date_input !== '' && !in_array($date_input, $dates, true)) {
-    error($en ? 'The requested error log date does not exist.' : '指定されたエラーログの日付は存在しません。', 404);
+    render_error($context, $en ? 'The requested error log date does not exist.' : '指定されたエラーログの日付は存在しません。', 404);
   }
   $date = $date_input !== '' ? $date_input : ($dates[0] ?? '');
   $type = (string)(filter_input_data('GET', 'log_type') ?? 'all');
   $status_group = (string)(filter_input_data('GET', 'log_status') ?? 'all');
   if (!in_array($status_group, ['all', '4xx', '5xx'], true)
     || ($type !== 'all' && preg_match('/\A[a-z][a-z0-9-]{0,63}\z/D', $type) !== 1)) {
-    error($en ? 'Invalid error log filter.' : 'エラーログの絞り込み条件が不正です。', 400);
+    render_error($context, $en ? 'Invalid error log filter.' : 'エラーログの絞り込み条件が不正です。', 400);
   }
 
   try {
@@ -2407,7 +2407,7 @@ function admin_errorlog(ApplicationContext $context): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINERRORLOGFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the error log.' : 'エラーログの読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load the error log.' : 'エラーログの読み込みに失敗しました。', 500, $e);
   }
 }
 
@@ -2421,7 +2421,7 @@ function admin_auditlog(ApplicationContext $context): void {
   $dates = AuditLogReader::availableDates(__DIR__ . '/auditlog');
   $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
   if ($date_input !== '' && !in_array($date_input, $dates, true)) {
-    error($en ? 'The requested audit log date does not exist.' : '指定された監査ログの日付は存在しません。', 404);
+    render_error($context, $en ? 'The requested audit log date does not exist.' : '指定された監査ログの日付は存在しません。', 404);
   }
   $date = $date_input !== '' ? $date_input : ($dates[0] ?? '');
 
@@ -2442,7 +2442,7 @@ function admin_auditlog(ApplicationContext $context): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINERRORLOGFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the audit log.' : '監査ログの読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load the audit log.' : '監査ログの読み込みに失敗しました。', 500, $e);
   }
 }
 
@@ -2458,7 +2458,7 @@ function admin_temporary_images(ApplicationContext $context): void {
   if ($page_input !== null && $page_input !== '') {
     $validated_page = filter_var($page_input, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     if ($validated_page === false) {
-      error($en ? 'Invalid temporary image page number.' : '一時画像一覧のページ番号が不正です。', 400);
+      render_error($context, $en ? 'Invalid temporary image page number.' : '一時画像一覧のページ番号が不正です。', 400);
     }
     $page = (int)$validated_page;
   }
@@ -2470,7 +2470,7 @@ function admin_temporary_images(ApplicationContext $context): void {
     $per_page = Config::int('admin.temporary_images_per_page');
     $total_pages = max(1, (int)ceil($total / $per_page));
     if ($page > $total_pages) {
-      error($en ? 'The temporary image page does not exist.' : '指定された一時画像一覧のページはありません。', 404);
+      render_error($context, $en ? 'The temporary image page does not exist.' : '指定された一時画像一覧のページはありません。', 404);
     }
     $offset = ($page - 1) * $per_page;
     $temporary_images = array_slice($temporary_images, $offset, $per_page);
@@ -2494,7 +2494,7 @@ function admin_temporary_images(ApplicationContext $context): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINTEMPORARYFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load temporary images.' : '一時画像の読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load temporary images.' : '一時画像の読み込みに失敗しました。', 500, $e);
   }
 }
 
@@ -2505,7 +2505,7 @@ function admin_temporary_images_manage(ApplicationContext $context): void {
   try {
     RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
-    error($e->getMessage(), $e->getCode() ?: 403);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   }
   require_admin_session($context);
   $operation = (string)filter_input_data('POST', 'operation');
@@ -2534,9 +2534,9 @@ function admin_temporary_images_manage(ApplicationContext $context): void {
       throw new InvalidArgumentException('Invalid temporary image operation.');
     }
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Invalid temporary image operation.' : '一時画像の管理操作が不正です。', 400);
+    render_error($context, $en ? 'Invalid temporary image operation.' : '一時画像の管理操作が不正です。', 400);
   } catch (Throwable $e) {
-    error($en ? 'Failed to manage temporary images.' : '一時画像の管理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to manage temporary images.' : '一時画像の管理に失敗しました。', 500, $e);
   }
   redirect(Config::string('site.script_name') . '?mode=admin_temporary_images');
 }
@@ -2562,7 +2562,7 @@ function admin_post(ApplicationContext $context): void {
     $repository = new BoardRepository();
     $post = $repository->findPost($id);
     if (!$post) {
-      error($en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
+      render_error($context, $en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
     }
 
     $parent = false;
@@ -2591,7 +2591,7 @@ function admin_post(ApplicationContext $context): void {
     $dat['token'] = RequestSecurity::csrfToken();
     echo $template_engine->render(ADMINPOSTFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load the post details.' : '投稿詳細の読み込みに失敗しました。', 500, $e);
   }
 }
 
@@ -2608,7 +2608,7 @@ function admin(ApplicationContext $context): void {
 
   admin_no_store();
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
-    error($en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
+    render_error($context, $en ? 'Administrator login is required.' : '管理者ログインが必要です。', 403);
   }
   $dat['path'] = Config::string('paths.images');
   $dat['token'] = RequestSecurity::csrfToken();
@@ -2633,7 +2633,7 @@ function admin(ApplicationContext $context): void {
       'isAdministrator' => filter_input_data('GET', 'isAdministrator') ?: 'all',
     ]);
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Invalid administration search criteria.' : '管理画面の検索条件が不正です。', 400);
+    render_error($context, $en ? 'Invalid administration search criteria.' : '管理画面の検索条件が不正です。', 400);
   }
   $dat['admin_filters'] = $filters;
   $filter_query = AdminPostFilter::query($filters);
@@ -2645,7 +2645,7 @@ function admin(ApplicationContext $context): void {
   if ($page_input !== null && $page_input !== '') {
     $validated_page = filter_var($page_input, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     if ($validated_page === false) {
-      error($en ? 'Invalid administration page number.' : '管理画面のページ番号が不正です。', 400);
+      render_error($context, $en ? 'Invalid administration page number.' : '管理画面のページ番号が不正です。', 400);
     }
     $page = (int)$validated_page;
   }
@@ -2669,7 +2669,7 @@ function admin(ApplicationContext $context): void {
     $total_threads = $repository->countAdminThreads($filters);
     $total_pages = max(1, (int)ceil($total_threads / $per_page));
     if ($page > $total_pages) {
-      error($en ? 'The administration page does not exist.' : '指定された管理画面のページはありません。', 404);
+      render_error($context, $en ? 'The administration page does not exist.' : '指定された管理画面のページはありません。', 404);
     }
     $offset = ($page - 1) * $per_page;
 
@@ -2699,7 +2699,7 @@ function admin(ApplicationContext $context): void {
     $dat['admin_page_posts'] = count($oya) + array_sum(array_map('count', $ko));
     echo $template_engine->render(ADMINFILE, $dat);
   } catch (Throwable $e) {
-    error($en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500, $e);
+    render_error($context, $en ? 'Failed to load the administration screen.' : '管理画面の読み込みに失敗しました。', 500, $e);
   }
 }
 
@@ -2720,7 +2720,7 @@ function usrchk(ApplicationContext $context): void {
           (string)$pwd_f, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV
         );
         if ($encrypted_password === false) {
-          error($en ? 'Could not prepare image replacement authorization.' : '画像差し替えの認証を準備できませんでした。', 500);
+          render_error($context, $en ? 'Could not prepare image replacement authorization.' : '画像差し替えの認証を準備できませんでした。', 500);
           return;
         }
         $_SESSION['image_replacement_authorization'] = [
@@ -2733,10 +2733,10 @@ function usrchk(ApplicationContext $context): void {
       $flag = false;
     }
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   if (!$flag) {
-    error($en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています", 403);
+    render_error($context, $en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています", 403);
   }
 }
 
