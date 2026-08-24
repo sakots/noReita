@@ -169,7 +169,6 @@ $dat = array(); // テンプレートに格納する変数
 // var_dump($_POST);
 
 // 絶対パス取得
-$path = realpath("./") . '/' . Config::string('paths.images');
 $temp_path = realpath("./") . '/' . Config::string('paths.temporary');
 
 $message = "";
@@ -344,7 +343,8 @@ setcookie("usercode", $usercode, time()+(86400*365),"","",$https_only,true); //1
 $_SESSION['usercode'] = $usercode;
 
 $application_context = new ApplicationContext(
-  $en, $template_engine, $dat, $usercode, $req_method, $theme_directory
+  $en, $template_engine, $dat, $usercode, $req_method, $theme_directory,
+  ['message' => $message]
 );
 
 //var_dump($_GET);
@@ -360,6 +360,7 @@ $shared_resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
 if ($mode === '' && $shared_resno !== false && $shared_resno !== null) {
   $mode = 'res';
 }
+$application_context->request['mode'] = $mode;
 
 // Ajaxリクエストかどうかをチェック
 $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
@@ -1326,13 +1327,16 @@ function res(ApplicationContext $context): void {
 }
 
 //お絵描き画面
-function paint_form(string $rep, ?int $reply_to): void {
-  global $message, $usercode, $quality, $qualitys, $no;
-  global $mode, $ctype, $pch, $type;
-  $context = current_application_context();
+function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
+  $message = (string)($context->request['message'] ?? '');
+  $usercode = $context->usercode;
+  $mode = (string)($context->request['mode'] ?? '');
+  $ctype = null;
+  $pch = '';
+  $type = '';
 
   $imgfile = filter_input(INPUT_POST, 'img');
 
@@ -1574,11 +1578,10 @@ function open_pch(string $sp = ""): void {
 }
 
 //お絵かき投稿
-function paint_com(string $tmpmode): void {
-  global $usercode, $ptime;
-  $context = current_application_context();
+function paint_com(ApplicationContext $context, string $tmpmode): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
+  $usercode = $context->usercode;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
   $resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
@@ -1670,8 +1673,9 @@ function temporary_image_url(string $filename): string {
 }
 
 /** Accept a browser-rendered PNG together with its original NEO/Tegaki replay. */
-function animation_upload(): void {
-  global $en, $usercode;
+function animation_upload(ApplicationContext $context): void {
+  $en = $context->english;
+  $usercode = $context->usercode;
 
   header('Content-Type: text/plain; charset=UTF-8');
   if (!Config::bool('features.image_upload') || !Config::bool('features.animation')) {
@@ -1743,8 +1747,8 @@ function animation_upload_error_message(Throwable $error): string {
 }
 
 /** Serve the PNG/JPEG/GIF/WebP/AVIF preview of a pending drawing after authorization. */
-function temporary_image(): void {
-  global $usercode;
+function temporary_image(ApplicationContext $context): void {
+  $usercode = $context->usercode;
 
   $filename = (string)filter_input_data('GET', 'file');
   $is_administrator = AdminAuth::isAuthenticated(
@@ -1913,8 +1917,6 @@ function delmode(ApplicationContext $context): void {
 
 //画像差し替え
 function picreplace(ApplicationContext $context): void {
-  global $type;
-  global $path;
   $en = $context->english;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
@@ -2866,7 +2868,6 @@ function logdel(): void {
 
 //エラー画面
 function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
-  global $db;
   $context = current_application_context();
   $template_engine = $context->templates;
   $dat =& $context->data;
@@ -2878,7 +2879,6 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
     $mes = h(ApplicationErrorHandler::publicMessage($error_id, $en));
   }
   http_response_code($status);
-  $db = null; //db切断
   $dat['errmes'] = $mes;
   $dat['othermode'] = 'err';
   $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
@@ -2893,15 +2893,13 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
 
 //画像差し替え失敗
 function error2(): void {
-  global $db;
-  global $self;
   $context = current_application_context();
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
   http_response_code(500);
 
-  $db = null; //db切断
+  $self = Config::string('site.script_name');
   $dat['othermode'] = 'err2';
   $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
   $http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
