@@ -83,12 +83,12 @@ final class RequestSecurity {
 
   }
 
-  public static function assertCurrentCsrfRequest(bool $english): void {
-    self::assertCsrfRequest((string)($GLOBALS['usercode'] ?? ''), $english);
+  public static function assertCurrentCsrfRequest(string $usercode, bool $english): void {
+    self::assertCsrfRequest($usercode, $english);
   }
 
-  public static function assertCurrentSameOriginRequest(bool $english): void {
-    self::assertSameOriginRequest((string)($GLOBALS['usercode'] ?? ''), $english);
+  public static function assertCurrentSameOriginRequest(string $usercode, bool $english): void {
+    self::assertSameOriginRequest($usercode, $english);
   }
 
   /** @param mixed $default @return mixed */

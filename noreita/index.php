@@ -530,7 +530,7 @@ function submit_share_server(): void {
 
   if (Config::bool('features.csrf')) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
@@ -571,7 +571,7 @@ function regist(ApplicationContext $context): void {
   // CSRFトークンをチェック
   if (Config::bool('features.csrf')) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
@@ -1682,9 +1682,9 @@ function animation_upload(ApplicationContext $context): void {
   }
   try {
     if (Config::bool('features.csrf')) {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } else {
-      RequestSecurity::assertCurrentSameOriginRequest($en);
+      RequestSecurity::assertCurrentSameOriginRequest($context->usercode, $en);
     }
     PaintSaveRequestGuard::assertWithinLimits(
       $_SERVER,
@@ -1883,7 +1883,7 @@ function delmode(ApplicationContext $context): void {
   $admin_delete = isset($_POST['admindel']);
   if ($admin_delete) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
@@ -2090,7 +2090,7 @@ function editexec(ApplicationContext $context): void {
   //CSRFトークンをチェック
   if (Config::bool('features.csrf')) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
@@ -2178,7 +2178,7 @@ function admin_login(): void {
   $en = current_application_context()->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
@@ -2233,7 +2233,7 @@ function admin_logout(): void {
   $en = current_application_context()->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
@@ -2250,7 +2250,7 @@ function admin_manage(?string $forced_operation = null): void {
   $en = current_application_context()->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
@@ -2318,7 +2318,7 @@ function admin_theme_settings(ApplicationContext $context): void {
   admin_no_store();
   $settings = null;
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
@@ -2520,7 +2520,7 @@ function admin_temporary_images_manage(): void {
 
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest($en);
+    RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }

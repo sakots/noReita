@@ -175,7 +175,7 @@ class misskey_note {
     $dat =& $context->data;
 
     try {
-      RequestSecurity::assertCurrentSameOriginRequest($en);
+      RequestSecurity::assertCurrentSameOriginRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
@@ -245,7 +245,7 @@ class misskey_note {
     $en = $context->english;
 
     try {
-      RequestSecurity::assertCurrentCsrfRequest($en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
@@ -315,7 +315,7 @@ class misskey_note {
     $en = $context->english;
 
     try {
-      RequestSecurity::assertCurrentSameOriginRequest($en);
+      RequestSecurity::assertCurrentSameOriginRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
