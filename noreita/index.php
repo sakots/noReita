@@ -780,7 +780,7 @@ function regist(ApplicationContext $context): void {
     $repository = new BoardRepository();
     $th_cnt = $repository->countThreads();
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   if ($th_cnt > Config::int('board.max_threads')) {
@@ -824,7 +824,7 @@ function def(ApplicationContext $context): void {
     $repository = new BoardRepository();
     $th_cnt = $repository->countThreads();
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   if ($th_cnt > Config::int('board.max_threads')) {
@@ -876,7 +876,7 @@ function def(ApplicationContext $context): void {
     $dat['next'] = ($page + 1);
 
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
   //読み込み
@@ -989,7 +989,7 @@ function def(ApplicationContext $context): void {
 
     echo $template_engine->render(MAINFILE, $dat);
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -997,6 +997,7 @@ function def(ApplicationContext $context): void {
 function catalog(ApplicationContext $context): void {
   $dat =& $context->data;
   $template_engine = $context->templates;
+  $en = $context->english;
   $page_def = Config::int('board.catalog_size');
 
   $start = 0;
@@ -1018,7 +1019,7 @@ function catalog(ApplicationContext $context): void {
     $dat['catalog_paging_enabled'] = true;
 
   } catch (PDOException $e) {
-    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     return;
   }
   //読み込み
@@ -1047,7 +1048,7 @@ function catalog(ApplicationContext $context): void {
     $dat['catalogmode'] = 'catalog';
     echo $template_engine->render(CATALOGFILE, $dat);
   } catch (PDOException $e) {
-    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -1094,6 +1095,7 @@ function public_search_criteria(): array {
 function search(ApplicationContext $context): void {
   $dat =& $context->data;
   $template_engine = $context->templates;
+  $en = $context->english;
 
   try {
     $criteria = public_search_criteria();
@@ -1137,9 +1139,9 @@ function search(ApplicationContext $context): void {
     $dat['next'] = $pagination['next'];
     echo $template_engine->render(CATALOGFILE, $dat);
   } catch (InvalidArgumentException $e) {
-    error(Config::string('site.language') === 'English' ? 'Invalid search criteria.' : '検索条件が不正です。', 400, $e);
+    render_error($context, $en ? 'Invalid search criteria.' : '検索条件が不正です。', 400, $e);
   } catch (PDOException $e) {
-    error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -1175,7 +1177,7 @@ function sodane(ApplicationContext $context): void {
       ]);
       return;
     } else {
-      error(Config::string('site.language') === 'English' ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+      render_error($context, $context->english ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     }
   }
 
@@ -1303,9 +1305,8 @@ function res(ApplicationContext $context): void {
       $dat['oya'] = $oya;
       $dat['ko'] = $ko;
     }
-    $db = null;
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
   $dat['path'] = Config::string('paths.images');
