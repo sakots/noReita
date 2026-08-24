@@ -348,6 +348,10 @@ final class AdminLoginRateLimiter {
     ];
   }
 
+  /**
+   * @param resource $handle
+   * @param array<string,int>|array<string,mixed> $record
+   */
   private function writeRecord($handle, array $record): void {
     $json = json_encode($record, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     rewind($handle);
