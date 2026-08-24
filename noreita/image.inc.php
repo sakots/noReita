@@ -7,7 +7,7 @@ final class ImageUploadException extends RuntimeException {
 }
 
 final class ImageService {
-  private const RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'tgkr'];
+  private const RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'psd', 'tgkr'];
   private const TEMPORARY_RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'psd', 'tgkr'];
   private const PLAYABLE_ANIMATION_EXTENSIONS = ['pch', 'spch', 'tgkr'];
   private const UPLOADABLE_ANIMATION_EXTENSIONS = ['pch', 'tgkr'];
@@ -1062,6 +1062,13 @@ final class ImageService {
           break;
         }
       }
+    }
+    $psd = $base_name . '.psd';
+    if (is_file($temp_dir . $psd)) {
+      if (!rename($temp_dir . $psd, $image_dir . $psd)) {
+        throw new RuntimeException('Failed to save PSD working file.');
+      }
+      chmod($image_dir . $psd, $permission);
     }
     safe_unlink($metadata_file);
 

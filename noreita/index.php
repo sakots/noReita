@@ -1480,8 +1480,20 @@ function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): v
     $dat['animeform'] = false;
     $dat['anime'] = false;
     $dat['useanime'] = false; // 動画機能を無効化
-    $imgfile = filter_input(INPUT_POST, 'img');
-    $dat['imgfile'] = Config::string('paths.images') . $imgfile;
+    $imgfile = basename((string)filter_input(INPUT_POST, 'img'));
+    $image_dir = Config::string('paths.images');
+    $dat['imgfile'] = $image_dir . $imgfile;
+    if ($tool === 'klecks' && ImageService::isSafePostedImageFilename($imgfile)) {
+      $base_name = pathinfo($imgfile, PATHINFO_FILENAME);
+      $psd_name = $base_name . '.psd';
+      $stored_psd = $image_dir . $psd_name;
+      $legacy_psd = Config::string('paths.temporary') . $psd_name;
+      // v4.2.4以前にテンポラリへ残ったPSDも、続き描き時に永続保存へ移行する。
+      if (!is_file($stored_psd) && is_file($legacy_psd) && rename($legacy_psd, $stored_psd)) {
+        chmod($stored_psd, Config::int('permissions.public_file'));
+      }
+      if (is_file($stored_psd)) $dat['psdfile'] = $stored_psd;
+    }
     // 画像から続きを描く場合はpchfileを設定しない
     $dat['pchfile'] = null;
   } else {

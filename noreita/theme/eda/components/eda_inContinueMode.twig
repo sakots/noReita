@@ -27,6 +27,9 @@
             <option value="pch" selected>動画から</option>
           {% endif %}
           <option value="img" {% if not ctype_pch %} selected {% endif %}>画像から</option>
+          {% if has_psd and not ctype_pch %}
+            <option value="psd" class="klecks-psd-option" hidden>PSDから</option>
+          {% endif %}
         </select>
         <select class="form" name="type">
           <option value="rep">差し替え</option>
@@ -35,13 +38,29 @@
         {% if passflag %} Pass<input class="form" type="password" name="pwd" size="8" value=""> {% endif %}
         {% if not ctype_pch %}
           <label for="tools">ツール</label>
-          <select name="tools">
+          <select name="tools" class="continue-tools">
             <option value="neo">PaintBBS NEO</option>
             {% if use_chicken %}<option value="chicken">ChickenPaint</option> {% endif %}
             {% if use_klecks %}<option value="klecks">Klecks</option> {% endif %}
             {% if use_tegaki %}<option value="tegaki">Tegaki</option> {% endif %}
             {% if use_axnos %}<option value="axnos">Axnos</option> {% endif %}
           </select>
+          {% if has_psd %}
+            <script>
+              (() => {
+                const form = document.currentScript.closest('form');
+                const tools = form.querySelector('.continue-tools');
+                const psd = form.querySelector('.klecks-psd-option');
+                if (!tools || !psd) return;
+                const updatePsdOption = () => {
+                  psd.hidden = tools.value !== 'klecks';
+                  if (psd.hidden && psd.selected) form.querySelector('[name="ctype"]').value = 'img';
+                };
+                tools.addEventListener('change', updatePsdOption);
+                updatePsdOption();
+              })();
+            </script>
+          {% endif %}
         {% else %}
           <input type="hidden" name="tools" value="{{ tool }}">
         {% endif %}

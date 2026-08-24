@@ -1821,7 +1821,7 @@ smoke_test('related image files are deleted together', static function (): bool 
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_images_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
   try {
-    foreach (['png', 'webp', 'pch', 'dat'] as $extension) {
+    foreach (['png', 'webp', 'pch', 'psd', 'dat'] as $extension) {
       file_put_contents($directory . DIRECTORY_SEPARATOR . 'post.' . $extension, 'test');
     }
     ImageService::deleteRelatedFiles($directory, 'post.png');
@@ -2102,6 +2102,7 @@ smoke_test('new post image and animation are finalized', static function (): boo
     imagepng($source, $temp . DIRECTORY_SEPARATOR . 'post.png');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.pch', 'NEO');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.psd', 'PSD');
 
     $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 100, false, 0600);
     return $result['img_w'] === 4 && $result['img_h'] === 3
@@ -2109,6 +2110,8 @@ smoke_test('new post image and animation are finalized', static function (): boo
       && $result['pchfile'] === 'post.pch'
       && is_file($images . DIRECTORY_SEPARATOR . 'post.png')
       && is_file($images . DIRECTORY_SEPARATOR . 'post.pch')
+      && is_file($images . DIRECTORY_SEPARATOR . 'post.psd')
+      && !is_file($temp . DIRECTORY_SEPARATOR . 'post.psd')
       && !is_file($temp . DIRECTORY_SEPARATOR . 'post.dat');
   } finally {
     foreach ([$temp, $images] as $directory) {

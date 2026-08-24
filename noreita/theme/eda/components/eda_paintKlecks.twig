@@ -30,7 +30,7 @@
   - on continuing a drawing, read psd that was stored on server (klecks.readPsd -> klecks.openProject)
   */
 
-  const psdURL = '{% if imgfile is defined %} {{ imgfile }} {% endif %}';
+  const psdURL = '{% if psdfile is defined %}{{ psdfile }}{% endif %}';
 
   let saveData = (function() {
     let a = document.createElement("a");
