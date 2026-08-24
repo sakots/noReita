@@ -1843,6 +1843,10 @@ smoke_test('GD thumbnails preserve transparent pixels for supported input format
         imagesetpixel($image, 2, 2, imagecolorallocatealpha($image, 220, 20, 20, 0));
       }
       if (!$writer($image, $input)) return false;
+      $input_size = @getimagesize($input);
+      // PHP/GDの対応状況によっては、エンコーダ関数だけ存在しても
+      // 有効なAVIFを生成できないことがある。その形式はこの環境では対象外とする。
+      if ($input_size === false || (int)$input_size[0] <= 0 || (int)$input_size[1] <= 0) continue;
 
       $thumbnail = new Thumbnail($input, $directory, 20, false, 'thumbnail-' . $extension);
       if (!$thumbnail->createThumbnail()) return false;

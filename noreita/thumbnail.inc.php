@@ -70,6 +70,9 @@ class Thumbnail {
 
     $src_width = $info[0];
     $src_height = $info[1];
+    if ($src_width <= 0 || $src_height <= 0 || $this->thumb_width <= 0) {
+      return false;
+    }
     $mime = $info['mime'];
 
     // 出力ファイルのベースネーム
