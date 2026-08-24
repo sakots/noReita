@@ -106,14 +106,14 @@ if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260820) {
 check_file(__DIR__.'/thumbnail.inc.php', $en);
 require_once(__DIR__.'/thumbnail.inc.php');
 if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260820) {
-  error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
+  render_bootstrap_error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
 // external_image.inc
 check_file(__DIR__.'/external_image.inc.php', $en);
 require_once(__DIR__.'/external_image.inc.php');
 if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260820) {
-  error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
+  render_bootstrap_error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
 }
 
 // テーマ
@@ -122,7 +122,7 @@ $theme_runtime = null;
 try {
   $theme_runtime = ThemeRuntime::load(__DIR__ . '/theme', Config::string('paths.theme'));
 } catch (Throwable $e) {
-  error($en ? 'Theme configuration failed.' : 'テーマ設定の読み込みに失敗しました。', 500, $e);
+  render_bootstrap_error($en ? 'Theme configuration failed.' : 'テーマ設定の読み込みに失敗しました。', 500, $e);
 }
 if (!is_array($theme_runtime)) exit;
 $theme_directory = $theme_runtime['active_directory'];
@@ -294,7 +294,7 @@ try {
     $dat = array_merge($dat, $template_data);
   }
 } catch (Throwable $e) {
-  error($en ? 'Theme settings initialization failed.' : 'テーマ設定の初期化に失敗しました。', 500, $e);
+  render_bootstrap_error($en ? 'Theme settings initialization failed.' : 'テーマ設定の初期化に失敗しました。', 500, $e);
 }
 
 del_temp();
