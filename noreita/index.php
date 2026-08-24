@@ -2789,7 +2789,11 @@ function clean_old_thumbnails(): void {
 //画像保存
 function save_image(): void {
   $tool = filter_input(INPUT_GET,"tool");
-  $image_save = new image_save;
+  $image_save = new image_save(
+    0,
+    Config::int('limits.paint_max_width'),
+    Config::int('limits.paint_max_height')
+  );
   header('Content-type: text/plain');
   switch($tool){
     case "neo":

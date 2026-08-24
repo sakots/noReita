@@ -145,12 +145,10 @@ class image_save{
   /** @var int|string */
   private $tool,$repcode,$stime,$resto,$timer,$error_type,$hide_animation,$pmax_w,$pmax_h,$usercode_header;
   
-  function __construct(){
-
-    global $security_timer,$pmax_w,$pmax_h;
-
-  // $security_timer=60;
-  $this->security_timer = $security_timer ?? 0;
+  function __construct(int $security_timer = 0, int $pmax_w = 0, int $pmax_h = 0){
+  $this->security_timer = $security_timer;
+  $this->pmax_w = $pmax_w;
+  $this->pmax_h = $pmax_h;
   if(($_SERVER["REQUEST_METHOD"]) !== "POST"){
     redirect("./");
   }
