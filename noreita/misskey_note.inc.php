@@ -46,7 +46,7 @@ function get_post_from_db(int $no, ApplicationContext $context): ?array {
       'pwd'      => $post['pwd'],
     ];
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   return null;
 }
@@ -64,7 +64,7 @@ function check_post_exists(int $no, ApplicationContext $context): bool {
 
     return $result['count'] > 0;
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   return false;
 }
@@ -86,7 +86,7 @@ function verify_post_password(int $no, string $id, string $pwd, ApplicationConte
 
     return password_verify($pwd, $post['pwd']);
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   return false;
 }
@@ -116,7 +116,7 @@ function check_edit_permission(int $no, string $id, string $pwd, bool $admin, Ap
 
     return verify_post_password($no, $id, $pwd, $context);
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   return false;
 }
@@ -138,16 +138,16 @@ class misskey_note {
     $dat['no'] = $dat['no'] ? $dat['no'] : t(filter_input_data('GET', 'no', FILTER_VALIDATE_INT));
 
     if (!$dat['no']) {
-      error($en ? 'Invalid post number.' : '投稿番号が無効です。');
+      render_error($context, $en ? 'Invalid post number.' : '投稿番号が無効です。');
     }
 
     if (!check_post_exists($dat['no'], $context)) {
-      error($en ? 'The article does not exist.' : '記事がありません。', 404);
+      render_error($context, $en ? 'The article does not exist.' : '記事がありません。', 404);
     }
 
     $post = get_post_from_db($dat['no'], $context);
     if (!$post) {
-        error($en ? 'The article was not found.' : '記事が見つかりません。', 404);
+        render_error($context, $en ? 'The article was not found.' : '記事が見つかりません。', 404);
     }
     $dat['post'] = $post;
 
@@ -177,7 +177,7 @@ class misskey_note {
     try {
       RequestSecurity::assertCurrentSameOriginRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
 
     $dat['token'] = RequestSecurity::csrfToken();
@@ -195,22 +195,22 @@ class misskey_note {
     list($id, $no) = explode(",", trim($id_and_no));
 
     if (!$no) {
-      error($en ? 'Invalid post number.' : '投稿番号が無効です。');
+      render_error($context, $en ? 'Invalid post number.' : '投稿番号が無効です。');
     }
 
     if (!check_post_exists($no, $context)) {
-      error($en ? 'The article does not exist.' : '記事がありません。', 404);
+      render_error($context, $en ? 'The article does not exist.' : '記事がありません。', 404);
     }
 
     if (!check_edit_permission($no, $id, $pwd, $dat['admin'], $context)) {
-      error($en ? 'Password is incorrect.' : 'パスワードが違います。', 403);
+      render_error($context, $en ? 'Password is incorrect.' : 'パスワードが違います。', 403);
     }
 
     check_AsyncRequest();
 
     $post = get_post_from_db($no, $context);
     if (!$post) {
-      error($en ? 'The article was not found.' : '記事が見つかりません。', 404);
+      render_error($context, $en ? 'The article was not found.' : '記事が見つかりません。', 404);
     }
     $dat['path'] = Config::string('paths.images');
     $dat['post'] = $post;
@@ -247,7 +247,7 @@ class misskey_note {
     try {
       RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
 
     $userip = t(RequestInfo::clientIp());
@@ -263,7 +263,7 @@ class misskey_note {
     $cw = t(filter_input_data('POST', 'cw'));
 
     if ($hide_content && !$cw) {
-      error($en ? 'Content warning field is empty.' : '注釈がありません。', 400);
+      render_error($context, $en ? 'Content warning field is empty.' : '注釈がありません。', 400);
     }
 
     check_AsyncRequest();
@@ -317,7 +317,7 @@ class misskey_note {
     try {
       RequestSecurity::assertCurrentSameOriginRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
 
     // ラジオボタンの値
@@ -342,7 +342,7 @@ class misskey_note {
 
     // どちらにも有効なURLがない場合エラー
     if (!$baseUrl_to_set_in_session) {
-      error($en
+      render_error($context, $en
         ? 'Please select a public HTTPS Misskey server.'
         : '公開HTTPSのMisskeyサーバーを指定してください。', 400);
     }
