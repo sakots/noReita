@@ -297,10 +297,11 @@ function get_pch_size(string $src): ?array {
 
 function initial_error_message(): array {
   global $en;
-  $msg['001'] = $en ? ' does not exist.':'がありません。';
-  $msg['002'] = $en ? ' is not readable.':'を読めません。';
-  $msg['003'] = $en ? ' is not writable.':'を書けません。';
-return $msg;
+  return [
+    '001' => $en ? ' does not exist.' : 'がありません。',
+    '002' => $en ? ' is not readable.' : 'を読めません。',
+    '003' => $en ? ' is not writable.' : 'を書けません。',
+  ];
 }
 
 function switch_tool(string $tool): string {
