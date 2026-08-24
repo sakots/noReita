@@ -564,9 +564,6 @@ final class ApplicationErrorHandler {
 
   private static function redact(string $value): string {
     $secrets = [];
-    foreach (['second_pass'] as $name) {
-      if (isset($GLOBALS[$name]) && is_string($GLOBALS[$name])) $secrets[] = $GLOBALS[$name];
-    }
     if (class_exists('Config', false) && Config::isLoaded()) {
       $secrets[] = Config::string('admin.password');
       $secrets[] = Config::string('security.paint_password');
