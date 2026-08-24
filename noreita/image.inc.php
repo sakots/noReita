@@ -1097,7 +1097,7 @@ final class ImageService {
     }
     chmod($work_file, $permission);
 
-    $extension = get_image_type((string)mime_content_type($work_file), $english, $work_file);
+    $extension = get_image_type((string)mime_content_type($work_file));
     $new_image = $filename . $extension;
     $new_image_path = $image_dir . $new_image;
     $old_image_path = $image_dir . basename($old_image);

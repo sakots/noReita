@@ -28,23 +28,3 @@ final class ApplicationContext {
     $this->request = $request;
   }
 }
-
-/** Holds rendering dependencies only for legacy error() calls during migration. */
-final class ApplicationErrorRenderer {
-  private static ?ApplicationContext $current = null;
-
-  public static function initialize(ApplicationContext $context): void {
-    self::$current = $context;
-  }
-
-  public static function isInitialized(): bool {
-    return self::$current !== null;
-  }
-
-  public static function current(): ApplicationContext {
-    if (self::$current === null) {
-      throw new LogicException('ApplicationContext has not been initialized.');
-    }
-    return self::$current;
-  }
-}

@@ -340,8 +340,6 @@ $application_context = new ApplicationContext(
   $en, $template_engine, $dat, $usercode, $req_method, $theme_directory,
   ['message' => '']
 );
-ApplicationErrorRenderer::initialize($application_context);
-
 //var_dump($_GET);
 
 /*-----------mode-------------*/
@@ -374,14 +372,14 @@ switch ($mode) {
     return sodane($application_context);
   case 'paint':
     if (!diary_post_allowed((string)filter_input(INPUT_POST, 'resto') !== '')) {
-      error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
+      render_error($application_context, $en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
     }
     PaintController::paint($application_context, '', filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'piccom':
     PaintController::editImage($application_context); return;
   case 'pictmp':
     if (!diary_post_allowed(false)) {
-      error($en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
+      render_error($application_context, $en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
     }
     PaintController::temporary($application_context); return;
   case 'anime':
@@ -495,7 +493,7 @@ function init(): void {
       );
     }
   } catch (Throwable $e) {
-    error($en ? 'Application initialization failed.' : 'アプリケーションの初期化に失敗しました。', 500, $e);
+    render_bootstrap_error($en ? 'Application initialization failed.' : 'アプリケーションの初期化に失敗しました。', 500, $e);
     return;
   }
 }
@@ -2003,6 +2001,10 @@ function picreplace(ApplicationContext $context): void {
     } else {
       render_error($context, $en ? 'Invalid password or post number.' : 'パスワードまたは記事番号が違います。', 403);
     }
+  } catch (InvalidArgumentException $e) {
+    if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
+    render_error($context, $en ? 'Invalid image type.' : '無効な画像タイプです。', 415, $e);
+    return;
   } catch (Throwable $e) {
     if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
     render_error($context, $en ? 'Image replacement failed.' : '画像差し替えに失敗しました。', 500, $e);
@@ -2836,7 +2838,7 @@ function logdel(ApplicationContext $context): void {
 
     $repository->deletePost($del_id, true);
   } catch (PDOException $e) {
-    error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }
 
@@ -2872,14 +2874,6 @@ function render_bootstrap_error(string $mes, int $status = 400, ?Throwable $caus
   http_response_code($status);
   header('Content-Type: text/plain; charset=UTF-8');
   exit($mes);
-}
-
-//エラー画面
-function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
-  if (!ApplicationErrorRenderer::isInitialized()) {
-    render_bootstrap_error($mes, $status, $cause);
-  }
-  render_error(ApplicationErrorRenderer::current(), $mes, $status, $cause);
 }
 
 //画像差し替え失敗

@@ -26,7 +26,7 @@ function charconvert(string $str): string {
 }
 
 //念のため画像タイプチェック
-function get_image_type(string $img_type, bool $english = false, ?string $dest = null): string {
+function get_image_type(string $img_type): string {
   // 既にMIMEタイプが渡されている場合はそのまま使用
   if (strpos($img_type, 'image/') === 0) {
     $mime_type = $img_type;
@@ -46,8 +46,7 @@ function get_image_type(string $img_type, bool $english = false, ?string $dest =
   if (isset($map[$mime_type])) {
     return $map[$mime_type];
   }
-  error($english ? "Invalid image type." : "無効な画像タイプです。", 415);
-  return ''; // この行は実際には実行されないが、リンターを満足させるために必要
+  throw new InvalidArgumentException('Invalid image type.');
 }
 
 /**
