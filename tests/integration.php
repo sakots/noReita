@@ -216,9 +216,8 @@ require_once __DIR__ . '/connect_misskey_api.php';
 RequestSecurity::startSession();
 $_SESSION['accessToken'] = 'misskey-probe-token';
 $_SESSION['sns_api_val'] = ['', 'missing-probe.png', '', 0, false, 1, false, ''];
-$en = true;
-$baseUrl = 'https://misskey.io';
-connect_misskey_api::create_misskey_note();
+$context = new MisskeyApiContext(true, 'https://misskey.io');
+connect_misskey_api::create_misskey_note($context);
 PHP;
   if (file_put_contents($webroot . '/misskey-missing-image-probe.php', $misskey_missing_image_probe) === false) {
     throw new RuntimeException('Could not create Misskey missing-image probe.');
