@@ -562,13 +562,13 @@ function regist(ApplicationContext $context): void {
     try {
       RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
   }
 
   $input = PostValidator::inputFromHttp();
   if (!diary_post_allowed($input['resto'] !== '')) {
-    error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
+    render_error($context, $en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
     return;
   }
   $sub = $input['sub'];
@@ -591,7 +591,7 @@ function regist(ApplicationContext $context): void {
     && (!is_array($raw_animation_file)
       || ($raw_animation_file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
   if ($has_uploaded_file && $has_unconverted_animation) {
-    error(
+    render_error($context,
       $en
         ? 'Choose either an image or an animation file.'
         : '画像と動画は同時に投稿できません。どちらか一方だけを選択してください。',
@@ -600,7 +600,7 @@ function regist(ApplicationContext $context): void {
     return;
   }
   if ($has_unconverted_animation) {
-    error(
+    render_error($context,
       $en
         ? 'The animation could not be checked. Enable JavaScript, reload the page, and try again.'
         : '動画を確認できませんでした。JavaScriptを有効にしてページを再読み込みし、もう一度お試しください。',
@@ -629,7 +629,7 @@ function regist(ApplicationContext $context): void {
       $picfile = '';
     } else {
       if ($has_uploaded_file) {
-        error(
+        render_error($context,
           $en
             ? 'Check the option to replace the drawing image with the uploaded image.'
             : 'お絵かき画像をアップロード画像に差し替えるには、差し替えのチェックを入れてください。',
@@ -681,15 +681,15 @@ function regist(ApplicationContext $context): void {
     );
     PostValidator::validate($input, $rules);
   } catch (PostValidationException $e) {
-    error($e->getMessage(), $e->getCode() ?: 400);
+    render_error($context, $e->getMessage(), $e->getCode() ?: 400);
     return;
   }
   if ($has_uploaded_file && !Config::bool('features.image_upload')) {
-    error($en ? 'Image uploads are disabled.' : '画像アップロードは無効です。', 403);
+    render_error($context, $en ? 'Image uploads are disabled.' : '画像アップロードは無効です。', 403);
     return;
   }
   if ($has_uploaded_file && $picfile) {
-    error($en ? 'Choose either a drawing image or an uploaded image.' : 'お絵かき画像とアップロード画像を同時に投稿することはできません。', 400);
+    render_error($context, $en ? 'Choose either a drawing image or an uploaded image.' : 'お絵かき画像とアップロード画像を同時に投稿することはできません。', 400);
     return;
   }
   //セキュリティ関連ここまで
@@ -720,7 +720,7 @@ function regist(ApplicationContext $context): void {
         ]);
       } catch (DuplicatePostException $e) {
         if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
-        error($en ? 'Duplicate post?' : '二重投稿ですか ?', 409);
+        render_error($context, $en ? 'Duplicate post?' : '二重投稿ですか ?', 409);
         return;
       }
 
@@ -766,10 +766,10 @@ function regist(ApplicationContext $context): void {
       : ($e->getCode() === 415
         ? 'このサーバーでは、この画像形式を処理できません。'
         : '画像ファイルを受け付けられませんでした。');
-    error($upload_error, $e->getCode() ?: 400, $e);
+    render_error($context, $upload_error, $e->getCode() ?: 400, $e);
   } catch (Throwable $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
-    error($en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
+    render_error($context, $en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
@@ -794,7 +794,7 @@ function regist(ApplicationContext $context): void {
     try {
       (new BoardRepository())->markOldThreads($th_cnt - $th_id);
     } catch (PDOException $e) {
-      error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+      render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
     }
   }
 
