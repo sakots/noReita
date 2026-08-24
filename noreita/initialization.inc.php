@@ -26,6 +26,7 @@ final class ApplicationInitializer {
 </IfModule>
 HTACCESS;
 
+  /** @param array<string,int> $directories Directory paths mapped to their permission modes. */
   public function __construct(
     string $database_dsn,
     string $database_file,
@@ -44,6 +45,7 @@ HTACCESS;
     $this->temporary_directory = $temporary_directory;
   }
 
+  /** @return array<int,string> */
   public static function securityHeaders(): array {
     return [
       'X-Content-Type-Options: nosniff',
