@@ -372,7 +372,7 @@ switch ($mode) {
   case 'reply':
     PostController::register(); return;
   case 'res':
-    BoardController::response();
+    BoardController::response($application_context);
     return;
   case 'sodane': // そうだね
     return sodane();
@@ -399,10 +399,10 @@ switch ($mode) {
   case 'picrep':
     PostController::replaceImage(); return;
   case 'catalog': // カタログ表示
-    BoardController::catalog();
+    BoardController::catalog($application_context);
     return;
   case 'search': // 検索
-    BoardController::search();
+    BoardController::search($application_context);
     return;
   case 'edit':
     PostController::edit(); return;
@@ -457,7 +457,7 @@ switch ($mode) {
   case 'misskey_success':
     return misskey_note::misskey_success();
   default: // 通常表示モード
-    BoardController::index();
+    BoardController::index($application_context);
     return;
 }
 
@@ -809,9 +809,12 @@ function regist(): void {
 }
 
 //通常表示モード
-function def(): void {
-  global $dat, $template_engine;
-  global $en;
+function def(?ApplicationContext $context = null): void {
+  global $application_context;
+  $context ??= $application_context;
+  $dat =& $context->data;
+  $template_engine = $context->templates;
+  $en = $context->english;
   $dsp_res = Config::int('board.replies_shown');
   $page_def = Config::int('board.page_size');
 
@@ -994,8 +997,9 @@ function def(): void {
 }
 
 //カタログモード
-function catalog(): void {
-  global $template_engine, $dat;
+function catalog(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $template_engine = $context->templates;
   $page_def = Config::int('board.catalog_size');
 
   $start = 0;
@@ -1090,8 +1094,9 @@ function public_search_criteria(): array {
 }
 
 //検索モード
-function search(): void {
-  global $template_engine, $dat;
+function search(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $template_engine = $context->templates;
 
   try {
     $criteria = public_search_criteria();
@@ -1183,9 +1188,10 @@ function sodane(): void {
 }
 
 //レス画面
-function res(): void {
-  global $template_engine, $dat;
-  global $en;
+function res(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $template_engine = $context->templates;
+  $en = $context->english;
   $resno = filter_input_data('GET', 'res', FILTER_VALIDATE_INT);
   if ($resno === false || $resno === null) {
     $resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
