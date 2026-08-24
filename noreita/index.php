@@ -346,6 +346,7 @@ $application_context = new ApplicationContext(
   $en, $template_engine, $dat, $usercode, $req_method, $theme_directory,
   ['message' => $message]
 );
+ApplicationContextRegistry::set($application_context);
 
 //var_dump($_GET);
 
@@ -376,7 +377,7 @@ switch ($mode) {
     BoardController::response($application_context);
     return;
   case 'sodane': // そうだね
-    return sodane();
+    return sodane($application_context);
   case 'paint':
     if (!diary_post_allowed((string)filter_input(INPUT_POST, 'resto') !== '')) {
       error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
@@ -465,8 +466,7 @@ switch ($mode) {
 /*-----------Main-------------*/
 
 function current_application_context(): ApplicationContext {
-  global $application_context;
-  return $application_context;
+  return ApplicationContextRegistry::current();
 }
 
 function init(): void {
@@ -819,9 +819,7 @@ function regist(ApplicationContext $context): void {
 }
 
 //通常表示モード
-function def(?ApplicationContext $context = null): void {
-  global $application_context;
-  $context ??= $application_context;
+function def(ApplicationContext $context): void {
   $dat =& $context->data;
   $template_engine = $context->templates;
   $en = $context->english;
@@ -1157,7 +1155,7 @@ function search(ApplicationContext $context): void {
 }
 
 //そうだね
-function sodane(): void {
+function sodane(ApplicationContext $context): void {
   $resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
 
   // Ajaxリクエストかどうかをチェック
@@ -1194,7 +1192,7 @@ function sodane(): void {
 
   // 通常のリクエストの場合は従来通りリダイレクト
   header('Location:' . Config::string('site.script_name'));
-  def();
+  def($context);
 }
 
 //レス画面
@@ -2022,13 +2020,11 @@ function picreplace(ApplicationContext $context): void {
     if (is_array($replacement)) ImageService::rollbackPostedReplacement($replacement);
     error($en ? 'Image replacement failed.' : '画像差し替えに失敗しました。', 500, $e);
   }
-  editform((int)$no, (string)$pwd_f);
+  editform($context, (int)$no, (string)$pwd_f);
 }
 
 //編集モードくん入口
-function editform(?int $authorized_post_id = null, ?string $authorized_password = null, bool $authorized_as_admin = false, ?ApplicationContext $context = null): void {
-  global $application_context;
-  $context ??= $application_context;
+function editform(ApplicationContext $context, ?int $authorized_post_id = null, ?string $authorized_password = null, bool $authorized_as_admin = false): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
@@ -2621,7 +2617,7 @@ function admin_post(): void {
 
 function admin_edit(): void {
   require_admin_session();
-  editform(admin_post_id(), '', true);
+  editform(current_application_context(), admin_post_id(), '', true);
 }
 
 //管理モード

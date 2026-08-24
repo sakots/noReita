@@ -28,3 +28,18 @@ final class ApplicationContext {
     $this->request = $request;
   }
 }
+
+final class ApplicationContextRegistry {
+  private static ?ApplicationContext $current = null;
+
+  public static function set(ApplicationContext $context): void {
+    self::$current = $context;
+  }
+
+  public static function current(): ApplicationContext {
+    if (self::$current === null) {
+      throw new LogicException('ApplicationContext has not been initialized.');
+    }
+    return self::$current;
+  }
+}
