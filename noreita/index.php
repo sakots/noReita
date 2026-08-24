@@ -463,8 +463,14 @@ switch ($mode) {
 
 /*-----------Main-------------*/
 
+function current_application_context(): ApplicationContext {
+  global $application_context;
+  return $application_context;
+}
+
 function init(): void {
-  global $en;
+  // ApplicationContext is created after startup has prepared the request user code.
+  $en = ApplicationBootstrap::english();
   $initializer = new ApplicationInitializer(
     DB_PDO, DB_FILE, __DIR__ . '/backup', __DIR__,
     [
@@ -504,7 +510,9 @@ function init(): void {
 }
 
 function show_share_server_form(): void {
-  global $template_engine, $dat;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
 
   $dat['servers'] = ShareService::servers(Config::array('social.servers'));
   $dat['encoded_t'] = (string)filter_input_data('GET', 'encoded_t');
@@ -517,7 +525,7 @@ function show_share_server_form(): void {
 }
 
 function submit_share_server(): void {
-  global $en;
+  $en = current_application_context()->english;
 
   if (Config::bool('features.csrf')) {
     try {
@@ -1321,7 +1329,10 @@ function res(ApplicationContext $context): void {
 function paint_form(string $rep, ?int $reply_to): void {
   global $message, $usercode, $quality, $qualitys, $no;
   global $mode, $ctype, $pch, $type;
-  global $template_engine, $dat, $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   $imgfile = filter_input(INPUT_POST, 'img');
 
@@ -1543,7 +1554,9 @@ function paint_form(string $rep, ?int $reply_to): void {
 //アニメ再生
 
 function open_pch(string $sp = ""): void {
-  global $template_engine, $dat;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
 
   $pch = (string)filter_input(INPUT_GET, 'pch');
   try {
@@ -1563,7 +1576,9 @@ function open_pch(string $sp = ""): void {
 //お絵かき投稿
 function paint_com(string $tmpmode): void {
   global $usercode, $ptime;
-  global $template_engine, $dat;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
   $resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
@@ -1757,8 +1772,10 @@ function temporary_image(): void {
 
 //コンティニュー画面in
 function in_continue(): void {
-  global $template_engine, $dat;
-  global $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   $no = trim((string)filter_input(INPUT_GET, 'no')); // 画像ファイル名なので文字列として取得
   if (!ImageService::isSafePostedImageFilename($no)) {
@@ -2146,7 +2163,9 @@ function editexec(ApplicationContext $context): void {
 
 //管理モードin
 function admin_in(): void {
-  global $template_engine, $dat;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
   admin_no_store();
   if (AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
     redirect(Config::string('site.script_name') . '?mode=admin');
@@ -2158,7 +2177,7 @@ function admin_in(): void {
 }
 
 function admin_login(): void {
-  global $en;
+  $en = current_application_context()->english;
   admin_no_store();
   try {
     RequestSecurity::assertCurrentCsrfRequest($en);
@@ -2213,7 +2232,7 @@ function admin_login(): void {
 }
 
 function admin_logout(): void {
-  global $en;
+  $en = current_application_context()->english;
   admin_no_store();
   try {
     RequestSecurity::assertCurrentCsrfRequest($en);
@@ -2230,7 +2249,7 @@ function admin_delete(): void {
 }
 
 function admin_manage(?string $forced_operation = null): void {
-  global $en;
+  $en = current_application_context()->english;
   admin_no_store();
   try {
     RequestSecurity::assertCurrentCsrfRequest($en);
@@ -2298,7 +2317,7 @@ function theme_settings_provider(): ?object {
 }
 
 function admin_theme_settings(): void {
-  global $en;
+  $en = current_application_context()->english;
 
   admin_no_store();
   $settings = null;
@@ -2351,7 +2370,7 @@ function admin_no_store(): void {
 }
 
 function admin_post_id(): int {
-  global $en;
+  $en = current_application_context()->english;
 
   $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
   if ($id === false || $id === null) {
@@ -2361,7 +2380,7 @@ function admin_post_id(): int {
 }
 
 function require_admin_session(): void {
-  global $en;
+  $en = current_application_context()->english;
 
   admin_no_store();
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
@@ -2371,8 +2390,10 @@ function require_admin_session(): void {
 
 // 管理者向けエラーログ閲覧
 function admin_errorlog(): void {
-  global $template_engine, $dat;
-  global $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   require_admin_session();
   $dates = ErrorLogReader::availableDates(__DIR__ . '/errorlog');
@@ -2411,8 +2432,10 @@ function admin_errorlog(): void {
 
 // 管理者向け監査ログ閲覧
 function admin_auditlog(): void {
-  global $template_engine, $dat;
-  global $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   require_admin_session();
   $dates = AuditLogReader::availableDates(__DIR__ . '/auditlog');
@@ -2445,8 +2468,10 @@ function admin_auditlog(): void {
 
 // 管理者向け一時画像管理
 function admin_temporary_images(): void {
-  global $template_engine, $dat;
-  global $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   require_admin_session();
   $page_input = filter_input_data('GET', 'page');
@@ -2495,7 +2520,7 @@ function admin_temporary_images(): void {
 }
 
 function admin_temporary_images_manage(): void {
-  global $en;
+  $en = current_application_context()->english;
 
   admin_no_store();
   try {
@@ -2547,8 +2572,10 @@ function diary_post_allowed(bool $is_reply): bool {
 }
 
 function admin_post(): void {
-  global $template_engine, $dat;
-  global $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   require_admin_session();
   $id = admin_post_id();
@@ -2597,8 +2624,10 @@ function admin_edit(): void {
 
 //管理モード
 function admin(): void {
-  global $template_engine, $dat;
-  global $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   admin_no_store();
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
@@ -2699,7 +2728,7 @@ function admin(): void {
 
 // コンティニュー認証 (画像)
 function usrchk(): void {
-  global $en;
+  $en = current_application_context()->english;
 
   $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
   $pwd_f = filter_input(INPUT_POST, 'pwd');
@@ -2736,7 +2765,9 @@ function usrchk(): void {
 
 //OK画面
 function ok(string $mes): void {
-  global $template_engine, $dat;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
   $dat['okmes'] = $mes;
   $dat['othermode'] = 'ok';
   $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
@@ -2816,7 +2847,7 @@ function save_image(): void {
 
 //ログの行数が最大値を超えていたら削除
 function logdel(): void {
-  global $en;
+  $en = current_application_context()->english;
   //オーバーした行の画像とスレ番号を取得
   try {
     $repository = new BoardRepository();
@@ -2836,8 +2867,10 @@ function logdel(): void {
 //エラー画面
 function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   global $db;
-  global $template_engine, $dat;
-  global $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
   if ($status < 400 || $status > 599) $status = 500;
   // 4xxも含め、利用者へエラー画面を返すすべての異常を記録する。
   $error_id = ApplicationErrorHandler::reportHttpError($status, strip_tags($mes), $cause);
@@ -2861,9 +2894,11 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
 //画像差し替え失敗
 function error2(): void {
   global $db;
-  global $template_engine, $dat;
   global $self;
-  global $en;
+  $context = current_application_context();
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
   http_response_code(500);
 
   $db = null; //db切断
