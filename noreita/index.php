@@ -368,9 +368,9 @@ $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTT
 
 switch ($mode) {
   case 'regist': // スレ立て
-    PostController::register(); return;
+    PostController::register($application_context); return;
   case 'reply':
-    PostController::register(); return;
+    PostController::register($application_context); return;
   case 'res':
     BoardController::response($application_context);
     return;
@@ -380,24 +380,24 @@ switch ($mode) {
     if (!diary_post_allowed((string)filter_input(INPUT_POST, 'resto') !== '')) {
       error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
     }
-    PaintController::paint('', filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
+    PaintController::paint($application_context, '', filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'piccom':
-    PaintController::editImage(); return;
+    PaintController::editImage($application_context); return;
   case 'pictmp':
     if (!diary_post_allowed(false)) {
       error($en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
     }
-    PaintController::temporary(); return;
+    PaintController::temporary($application_context); return;
   case 'anime':
-    PaintController::animation(); return;
+    PaintController::animation($application_context); return;
   case 'continue':
-    PaintController::continue(); return;
+    PaintController::continue($application_context); return;
   case 'contpaint':
     $type = filter_input(INPUT_POST, 'type');
     if (Config::bool('features.continue_password') || $type === 'rep') usrchk();
-    PaintController::paint($type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
+    PaintController::paint($application_context, $type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'picrep':
-    PostController::replaceImage(); return;
+    PostController::replaceImage($application_context); return;
   case 'catalog': // カタログ表示
     BoardController::catalog($application_context);
     return;
@@ -405,25 +405,25 @@ switch ($mode) {
     BoardController::search($application_context);
     return;
   case 'edit':
-    PostController::edit(); return;
+    PostController::edit($application_context); return;
   case 'editexec':
-    PostController::saveEdit(); return;
+    PostController::saveEdit($application_context); return;
   case 'del':
-    PostController::delete(); return;
+    PostController::delete($application_context); return;
   case 'saveimage': // 画像保存
     return save_image();
   case 'animation_upload': // 動画ファイルをPNGと組にして一時保存
-    PaintController::uploadAnimation(); return;
+    PaintController::uploadAnimation($application_context); return;
   case 'admin_in': // 管理モードin
     return admin_in();
   case 'admin_login':
-    AdminController::login(); return;
+    AdminController::login($application_context); return;
   case 'admin_logout':
-    AdminController::logout(); return;
+    AdminController::logout($application_context); return;
   case 'admin_delete':
     return admin_delete();
   case 'admin_manage':
-    AdminController::manage(); return;
+    AdminController::manage($application_context); return;
   case 'admin_theme_settings':
     AdminController::themeSettings(); return;
   case 'admin_errorlog':
@@ -435,13 +435,13 @@ switch ($mode) {
   case 'admin_temporary_images_manage':
     AdminController::manageTemporaryImages(); return;
   case 'temporary_image':
-    PaintController::temporaryImage(); return;
+    PaintController::temporaryImage($application_context); return;
   case 'admin_post':
     AdminController::post(); return;
   case 'admin_edit':
     AdminController::edit(); return;
   case 'admin': // 管理モード
-    AdminController::dashboard(); return;
+    AdminController::dashboard($application_context); return;
   case 'set_share_server':
     return show_share_server_form();
   case 'post_share_server':
@@ -551,10 +551,11 @@ function submit_share_server(): void {
 
 // 投稿があればデータベースへ保存する
 /* 記事書き込み スレ立てとリプライ */
-function regist(): void {
-  global $en, $usercode;
-  global $req_method;
-  global $dat;
+function regist(ApplicationContext $context): void {
+  $en = $context->english;
+  $usercode = $context->usercode;
+  $req_method = $context->requestMethod;
+  $dat =& $context->data;
 
   $dat['en'] = $en;
 
@@ -1853,9 +1854,9 @@ function in_continue(): void {
 
 //削除くん
 
-function delmode(): void {
-  global $dat;
-  global $en;
+function delmode(ApplicationContext $context): void {
+  $dat =& $context->data;
+  $en = $context->english;
 
   $delno = filter_input(INPUT_POST, 'delno',FILTER_VALIDATE_INT);
 
@@ -1894,10 +1895,10 @@ function delmode(): void {
 }
 
 //画像差し替え
-function picreplace(): void {
+function picreplace(ApplicationContext $context): void {
   global $type;
   global $path;
-  global $en;
+  $en = $context->english;
 
   $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
   $stime = $stime ?: ($_SERVER['REQUEST_TIME'] ?? time());
@@ -2006,9 +2007,12 @@ function picreplace(): void {
 }
 
 //編集モードくん入口
-function editform(?int $authorized_post_id = null, ?string $authorized_password = null, bool $authorized_as_admin = false): void {
-  global $template_engine, $dat;
-  global $en;
+function editform(?int $authorized_post_id = null, ?string $authorized_password = null, bool $authorized_as_admin = false, ?ApplicationContext $context = null): void {
+  global $application_context;
+  $context ??= $application_context;
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
 
   //csrfトークンをセット
   $dat['token'] = '';
@@ -2063,10 +2067,10 @@ function editform(?int $authorized_post_id = null, ?string $authorized_password 
 }
 
 //編集モードくん本体
-function editexec(): void {
-  global $req_method;
-  global $dat;
-  global $en;
+function editexec(ApplicationContext $context): void {
+  $req_method = $context->requestMethod;
+  $dat =& $context->data;
+  $en = $context->english;
 
   //CSRFトークンをチェック
   if (Config::bool('features.csrf')) {
