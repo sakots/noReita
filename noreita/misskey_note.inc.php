@@ -13,8 +13,8 @@ global $en, $home, $set_nsfw, $deny_all_posts, $autolink, $use_hashtag;
 require_once __DIR__ . '/index.php';
 
 // データベースから投稿を取得する
-function get_post_from_db(int $no): ?array {
-  global $en;
+function get_post_from_db(int $no, ApplicationContext $context): ?array {
+  $en = $context->english;
   try {
     $db = Database::connect();
 
@@ -55,8 +55,8 @@ function get_post_from_db(int $no): ?array {
 }
 
 // 投稿の存在確認
-function check_post_exists(int $no): bool {
-  global $en;
+function check_post_exists(int $no, ApplicationContext $context): bool {
+  $en = $context->english;
   try {
     $db = Database::connect();
 
@@ -73,8 +73,8 @@ function check_post_exists(int $no): bool {
 }
 
 // 投稿のパスワード検証
-function verify_post_password(int $no, string $id, string $pwd): bool {
-  global $en;
+function verify_post_password(int $no, string $id, string $pwd, ApplicationContext $context): bool {
+  $en = $context->english;
   try {
     $db = Database::connect();
 
@@ -95,8 +95,8 @@ function verify_post_password(int $no, string $id, string $pwd): bool {
 }
 
 // 投稿の編集権限チェック
-function check_edit_permission(int $no, string $id, string $pwd, bool $admin): bool {
-  global $en;
+function check_edit_permission(int $no, string $id, string $pwd, bool $admin, ApplicationContext $context): bool {
+  $en = $context->english;
   try {
     $db = Database::connect();
 
@@ -117,7 +117,7 @@ function check_edit_permission(int $no, string $id, string $pwd, bool $admin): b
       return false;
     }
 
-    return verify_post_password($no, $id, $pwd);
+    return verify_post_password($no, $id, $pwd, $context);
   } catch (PDOException $e) {
     error($en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
@@ -203,11 +203,11 @@ class misskey_note {
       error($en ? 'Invalid post number.' : '投稿番号が無効です。');
     }
 
-    if (!check_post_exists($dat['no'])) {
+    if (!check_post_exists($dat['no'], $context)) {
       error($en ? 'The article does not exist.' : '記事がありません。', 404);
     }
 
-    $post = get_post_from_db($dat['no']);
+    $post = get_post_from_db($dat['no'], $context);
     if (!$post) {
         error($en ? 'The article was not found.' : '記事が見つかりません。', 404);
     }
@@ -260,17 +260,17 @@ class misskey_note {
       error($en ? 'Invalid post number.' : '投稿番号が無効です。');
     }
 
-    if (!check_post_exists($no)) {
+    if (!check_post_exists($no, $context)) {
       error($en ? 'The article does not exist.' : '記事がありません。', 404);
     }
 
-    if (!check_edit_permission($no, $id, $pwd, $dat['admin'])) {
+    if (!check_edit_permission($no, $id, $pwd, $dat['admin'], $context)) {
       error($en ? 'Password is incorrect.' : 'パスワードが違います。', 403);
     }
 
     check_AsyncRequest();
 
-    $post = get_post_from_db($no);
+    $post = get_post_from_db($no, $context);
     if (!$post) {
       error($en ? 'The article was not found.' : '記事が見つかりません。', 404);
     }
