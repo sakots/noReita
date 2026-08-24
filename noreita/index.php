@@ -396,7 +396,7 @@ switch ($mode) {
     PaintController::continue($application_context); return;
   case 'contpaint':
     $type = filter_input(INPUT_POST, 'type');
-    if (Config::bool('features.continue_password') || $type === 'rep') usrchk();
+    if (Config::bool('features.continue_password') || $type === 'rep') usrchk($application_context);
     PaintController::paint($application_context, $type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'picrep':
     PostController::replaceImage($application_context); return;
@@ -417,37 +417,37 @@ switch ($mode) {
   case 'animation_upload': // 動画ファイルをPNGと組にして一時保存
     PaintController::uploadAnimation($application_context); return;
   case 'admin_in': // 管理モードin
-    return admin_in();
+    return admin_in($application_context);
   case 'admin_login':
     AdminController::login($application_context); return;
   case 'admin_logout':
     AdminController::logout($application_context); return;
   case 'admin_delete':
-    return admin_delete();
+    return admin_delete($application_context);
   case 'admin_manage':
     AdminController::manage($application_context); return;
   case 'admin_theme_settings':
     AdminController::themeSettings($application_context); return;
   case 'admin_errorlog':
-    AdminController::errorLog(); return;
+    AdminController::errorLog($application_context); return;
   case 'admin_auditlog':
-    AdminController::auditLog(); return;
+    AdminController::auditLog($application_context); return;
   case 'admin_temporary_images':
-    AdminController::temporaryImages(); return;
+    AdminController::temporaryImages($application_context); return;
   case 'admin_temporary_images_manage':
-    AdminController::manageTemporaryImages(); return;
+    AdminController::manageTemporaryImages($application_context); return;
   case 'temporary_image':
     PaintController::temporaryImage($application_context); return;
   case 'admin_post':
-    AdminController::post(); return;
+    AdminController::post($application_context); return;
   case 'admin_edit':
-    AdminController::edit(); return;
+    AdminController::edit($application_context); return;
   case 'admin': // 管理モード
     AdminController::dashboard($application_context); return;
   case 'set_share_server':
-    return show_share_server_form();
+    return show_share_server_form($application_context);
   case 'post_share_server':
-    return submit_share_server();
+    return submit_share_server($application_context);
   case 'before_misskey_note':
     return misskey_note::before_misskey_note($application_context);
   case 'misskey_note_edit_form':
@@ -510,8 +510,7 @@ function init(): void {
   }
 }
 
-function show_share_server_form(): void {
-  $context = current_application_context();
+function show_share_server_form(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
 
@@ -525,12 +524,12 @@ function show_share_server_form(): void {
   echo $template_engine->render(SET_SHARE_SERVER, $dat);
 }
 
-function submit_share_server(): void {
-  $en = current_application_context()->english;
+function submit_share_server(ApplicationContext $context): void {
+  $en = $context->english;
 
   if (Config::bool('features.csrf')) {
     try {
-      RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
       error($e->getMessage(), $e->getCode() ?: 403);
     }
@@ -795,7 +794,7 @@ function regist(ApplicationContext $context): void {
     return;
   }
   if ($th_cnt > Config::int('board.max_threads')) {
-    logdel();
+    logdel($context);
   }
 
   //そろそろ消えるスレッドのフラグを設定
@@ -815,7 +814,7 @@ function regist(ApplicationContext $context): void {
   $dat['th_id'] = $th_id;
   $dat['will_delete_count'] = max(0, $th_cnt - $th_id);
 
-  ok($en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
+  ok($context, $en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
 }
 
 //通常表示モード
@@ -839,7 +838,7 @@ function def(ApplicationContext $context): void {
     return;
   }
   if ($th_cnt > Config::int('board.max_threads')) {
-    logdel();
+    logdel($context);
   }
 
   //古いスレのレスボタンを表示しない
@@ -1555,8 +1554,7 @@ function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): v
 
 //アニメ再生
 
-function open_pch(string $sp = ""): void {
-  $context = current_application_context();
+function open_pch(ApplicationContext $context, string $sp = ""): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
 
@@ -1773,8 +1771,7 @@ function temporary_image(ApplicationContext $context): void {
 }
 
 //コンティニュー画面in
-function in_continue(): void {
-  $context = current_application_context();
+function in_continue(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
@@ -1910,7 +1907,7 @@ function delmode(ApplicationContext $context): void {
   //変数クリア
   unset($delno);
   //header('Location:'.Config::string('site.script_name'));
-  ok($en ? 'Successfully deleted. Switching screen.' : '削除しました。画面を切り替えます。');
+  ok($context, $en ? 'Successfully deleted. Switching screen.' : '削除しました。画面を切り替えます。');
 }
 
 //画像差し替え
@@ -2156,12 +2153,11 @@ function editexec(ApplicationContext $context): void {
   }
   unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
-  ok($en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
+  ok($context, $en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }
 
 //管理モードin
-function admin_in(): void {
-  $context = current_application_context();
+function admin_in(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   admin_no_store();
@@ -2174,11 +2170,11 @@ function admin_in(): void {
   echo $template_engine->render(OTHERFILE, $dat);
 }
 
-function admin_login(): void {
-  $en = current_application_context()->english;
+function admin_login(ApplicationContext $context): void {
+  $en = $context->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
@@ -2229,11 +2225,11 @@ function admin_login(): void {
   redirect(Config::string('site.script_name') . '?mode=admin');
 }
 
-function admin_logout(): void {
-  $en = current_application_context()->english;
+function admin_logout(ApplicationContext $context): void {
+  $en = $context->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
@@ -2242,15 +2238,15 @@ function admin_logout(): void {
   redirect(Config::string('site.script_name') . '?mode=admin_in');
 }
 
-function admin_delete(): void {
-  admin_manage('delete');
+function admin_delete(ApplicationContext $context): void {
+  admin_manage($context, 'delete');
 }
 
-function admin_manage(?string $forced_operation = null): void {
-  $en = current_application_context()->english;
+function admin_manage(ApplicationContext $context, ?string $forced_operation = null): void {
+  $en = $context->english;
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
@@ -2322,7 +2318,7 @@ function admin_theme_settings(ApplicationContext $context): void {
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
-  require_admin_session();
+  require_admin_session($context);
   try {
     $settings = theme_settings_provider($context->themeDirectory);
   } catch (Throwable $e) {
@@ -2365,8 +2361,8 @@ function admin_no_store(): void {
   }
 }
 
-function admin_post_id(): int {
-  $en = current_application_context()->english;
+function admin_post_id(ApplicationContext $context): int {
+  $en = $context->english;
 
   $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
   if ($id === false || $id === null) {
@@ -2375,8 +2371,8 @@ function admin_post_id(): int {
   return (int)$id;
 }
 
-function require_admin_session(): void {
-  $en = current_application_context()->english;
+function require_admin_session(ApplicationContext $context): void {
+  $en = $context->english;
 
   admin_no_store();
   if (!AdminAuth::isAuthenticated(Config::string("admin.password"), Config::int('admin.session_lifetime'))) {
@@ -2385,13 +2381,12 @@ function require_admin_session(): void {
 }
 
 // 管理者向けエラーログ閲覧
-function admin_errorlog(): void {
-  $context = current_application_context();
+function admin_errorlog(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
 
-  require_admin_session();
+  require_admin_session($context);
   $dates = ErrorLogReader::availableDates(__DIR__ . '/errorlog');
   $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
   if ($date_input !== '' && !in_array($date_input, $dates, true)) {
@@ -2427,13 +2422,12 @@ function admin_errorlog(): void {
 }
 
 // 管理者向け監査ログ閲覧
-function admin_auditlog(): void {
-  $context = current_application_context();
+function admin_auditlog(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
 
-  require_admin_session();
+  require_admin_session($context);
   $dates = AuditLogReader::availableDates(__DIR__ . '/auditlog');
   $date_input = (string)(filter_input_data('GET', 'log_date') ?? '');
   if ($date_input !== '' && !in_array($date_input, $dates, true)) {
@@ -2463,13 +2457,12 @@ function admin_auditlog(): void {
 }
 
 // 管理者向け一時画像管理
-function admin_temporary_images(): void {
-  $context = current_application_context();
+function admin_temporary_images(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
 
-  require_admin_session();
+  require_admin_session($context);
   $page_input = filter_input_data('GET', 'page');
   $page = 1;
   if ($page_input !== null && $page_input !== '') {
@@ -2515,16 +2508,16 @@ function admin_temporary_images(): void {
   }
 }
 
-function admin_temporary_images_manage(): void {
-  $en = current_application_context()->english;
+function admin_temporary_images_manage(ApplicationContext $context): void {
+  $en = $context->english;
 
   admin_no_store();
   try {
-    RequestSecurity::assertCurrentCsrfRequest(current_application_context()->usercode, $en);
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
   } catch (RequestSecurityException $e) {
     error($e->getMessage(), $e->getCode() ?: 403);
   }
-  require_admin_session();
+  require_admin_session($context);
   $operation = (string)filter_input_data('POST', 'operation');
   try {
     if ($operation === 'delete_selected') {
@@ -2567,14 +2560,13 @@ function diary_post_allowed(bool $is_reply): bool {
   );
 }
 
-function admin_post(): void {
-  $context = current_application_context();
+function admin_post(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
 
-  require_admin_session();
-  $id = admin_post_id();
+  require_admin_session($context);
+  $id = admin_post_id($context);
 
   try {
     $repository = new BoardRepository();
@@ -2613,14 +2605,13 @@ function admin_post(): void {
   }
 }
 
-function admin_edit(): void {
-  require_admin_session();
-  editform(current_application_context(), admin_post_id(), '', true);
+function admin_edit(ApplicationContext $context): void {
+  require_admin_session($context);
+  editform($context, admin_post_id($context), '', true);
 }
 
 //管理モード
-function admin(): void {
-  $context = current_application_context();
+function admin(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
@@ -2723,8 +2714,8 @@ function admin(): void {
 }
 
 // コンティニュー認証 (画像)
-function usrchk(): void {
-  $en = current_application_context()->english;
+function usrchk(ApplicationContext $context): void {
+  $en = $context->english;
 
   $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
   $pwd_f = filter_input(INPUT_POST, 'pwd');
@@ -2760,8 +2751,7 @@ function usrchk(): void {
 }
 
 //OK画面
-function ok(string $mes): void {
-  $context = current_application_context();
+function ok(ApplicationContext $context, string $mes): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $dat['okmes'] = $mes;
@@ -2842,8 +2832,8 @@ function save_image(): void {
 }
 
 //ログの行数が最大値を超えていたら削除
-function logdel(): void {
-  $en = current_application_context()->english;
+function logdel(ApplicationContext $context): void {
+  $en = $context->english;
   //オーバーした行の画像とスレ番号を取得
   try {
     $repository = new BoardRepository();
