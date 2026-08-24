@@ -4,11 +4,11 @@ return [
   'format' => 1,
   'id' => 'monoreita',
   'name' => 'monoreita',
-  'version' => 'lot.260820.0',
+  'version' => 'lot.260824.0',
   'engine' => 'blade',
   'requires' => [
     'php' => '8.1.0',
-    'noreita' => '4.0.0',
+    'noreita' => '4.2.3',
   ],
   'templates' => [
     'main' => 'monoreita_main', 'response' => 'monoreita_res', 'paint' => 'monoreita_paint',
