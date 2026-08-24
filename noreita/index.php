@@ -7,15 +7,8 @@
 // スクリプトのバージョン
 const REITA_VER = 'v4.2.3 lot.260824.0';
 
-// 全エントリーポイント共通の設定・エラー処理を初期化する。
-require_once __DIR__ . '/bootstrap.php';
-try {
-  ApplicationBootstrap::boot(__DIR__);
-} catch (ConfigException $e) {
-  http_response_code(500);
-  die('Configuration error: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
-}
-$en = ApplicationBootstrap::english();
+require_once __DIR__ . '/app_bootstrap.inc.php';
+$en = app_bootstrap(__DIR__);
 
 // functions.phpのバージョンを確認
 if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
