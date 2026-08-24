@@ -1476,14 +1476,14 @@ function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): v
   if ($ctype == 'pch' || $ctype == 'spch') {
     $pchfile = filter_input(INPUT_POST, 'pch');
     $dat['pchfile'] = Config::string('paths.images') . $pchfile;
-  } elseif ($ctype == 'img') {
+  } elseif ($ctype == 'img' || $ctype == 'psd') {
     $dat['animeform'] = false;
     $dat['anime'] = false;
     $dat['useanime'] = false; // 動画機能を無効化
     $imgfile = basename((string)filter_input(INPUT_POST, 'img'));
     $image_dir = Config::string('paths.images');
     $dat['imgfile'] = $image_dir . $imgfile;
-    if ($tool === 'klecks' && ImageService::isSafePostedImageFilename($imgfile)) {
+    if ($tool === 'klecks' && $ctype === 'psd' && ImageService::isSafePostedImageFilename($imgfile)) {
       $base_name = pathinfo($imgfile, PATHINFO_FILENAME);
       $psd_name = $base_name . '.psd';
       $stored_psd = $image_dir . $psd_name;
@@ -1820,6 +1820,8 @@ function in_continue(ApplicationContext $context): void {
     $dat['oya'] = $continue_posts;
     $hist_ope = pathinfo($no, PATHINFO_FILENAME); //拡張子除去
     $hist_filename = Config::string('paths.images') . $hist_ope;
+    $dat['has_psd'] = is_file($hist_filename . '.psd')
+      || is_file(Config::string('paths.temporary') . $hist_ope . '.psd');
 
     // データベースからctypeを取得
     $db_ctype = $continue_posts[0]['ctype'] ?? null;
