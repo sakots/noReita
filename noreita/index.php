@@ -291,7 +291,7 @@ init();
 $dat['theme_settings'] = [];
 $dat['theme_settings_json'] = '{}';
 try {
-  $theme_settings = theme_settings_provider();
+  $theme_settings = theme_settings_provider($theme_directory);
   if ($theme_settings !== null) {
     $template_data = $theme_settings->templateData();
     if (!is_array($template_data)) throw new RuntimeException('Theme settings template data is invalid.');
@@ -427,7 +427,7 @@ switch ($mode) {
   case 'admin_manage':
     AdminController::manage($application_context); return;
   case 'admin_theme_settings':
-    AdminController::themeSettings(); return;
+    AdminController::themeSettings($application_context); return;
   case 'admin_errorlog':
     AdminController::errorLog(); return;
   case 'admin_auditlog':
@@ -2295,9 +2295,7 @@ function admin_manage(?string $forced_operation = null): void {
 }
 
 /** @return object|null Theme providers implement templateData(), save(array), and reset(). */
-function theme_settings_provider(): ?object {
-  global $theme_directory;
-
+function theme_settings_provider(string $theme_directory): ?object {
   if (!defined('THEME_SETTINGS_CLASS')) return null;
   $class = constant('THEME_SETTINGS_CLASS');
   if (!is_string($class) || $class === '' || !class_exists($class)) {
@@ -2314,8 +2312,8 @@ function theme_settings_provider(): ?object {
   return $provider;
 }
 
-function admin_theme_settings(): void {
-  $en = current_application_context()->english;
+function admin_theme_settings(ApplicationContext $context): void {
+  $en = $context->english;
 
   admin_no_store();
   $settings = null;
@@ -2326,7 +2324,7 @@ function admin_theme_settings(): void {
   }
   require_admin_session();
   try {
-    $settings = theme_settings_provider();
+    $settings = theme_settings_provider($context->themeDirectory);
   } catch (Throwable $e) {
     error($en ? 'Theme settings are unavailable.' : 'テーマ設定を利用できません。', 500, $e);
     return;
