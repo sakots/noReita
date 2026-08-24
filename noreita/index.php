@@ -10,6 +10,9 @@ const REITA_VER = 'v4.2.3 lot.260824.0';
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
 require_once __DIR__ . '/board_controller.inc.php';
+require_once __DIR__ . '/post_controller.inc.php';
+require_once __DIR__ . '/paint_controller.inc.php';
+require_once __DIR__ . '/admin_controller.inc.php';
 
 // functions.phpのバージョンを確認
 if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
@@ -360,9 +363,9 @@ $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTT
 
 switch ($mode) {
   case 'regist': // スレ立て
-    return regist();
+    PostController::register(); return;
   case 'reply':
-    return regist();
+    PostController::register(); return;
   case 'res':
     BoardController::response();
     return;
@@ -372,24 +375,24 @@ switch ($mode) {
     if (!diary_post_allowed((string)filter_input(INPUT_POST, 'resto') !== '')) {
       error($en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
     }
-    return paint_form("", filter_input_data('POST','modid',FILTER_VALIDATE_INT));
+    PaintController::paint('', filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'piccom':
-    return paint_com("");
+    PaintController::editImage(); return;
   case 'pictmp':
     if (!diary_post_allowed(false)) {
       error($en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
     }
-    return paint_com("tmp");
+    PaintController::temporary(); return;
   case 'anime':
-    return open_pch();
+    PaintController::animation(); return;
   case 'continue':
-    return in_continue();
+    PaintController::continue(); return;
   case 'contpaint':
     $type = filter_input(INPUT_POST, 'type');
     if (Config::bool('features.continue_password') || $type === 'rep') usrchk();
-    return paint_form($type, filter_input_data('POST','modid',FILTER_VALIDATE_INT));
+    PaintController::paint($type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'picrep':
-    return picreplace();
+    PostController::replaceImage(); return;
   case 'catalog': // カタログ表示
     BoardController::catalog();
     return;
@@ -397,43 +400,43 @@ switch ($mode) {
     BoardController::search();
     return;
   case 'edit':
-    return editform();
+    PostController::edit(); return;
   case 'editexec':
-    return editexec();
+    PostController::saveEdit(); return;
   case 'del':
-    return delmode();
+    PostController::delete(); return;
   case 'saveimage': // 画像保存
     return save_image();
   case 'animation_upload': // 動画ファイルをPNGと組にして一時保存
-    return animation_upload();
+    PaintController::uploadAnimation(); return;
   case 'admin_in': // 管理モードin
     return admin_in();
   case 'admin_login':
-    return admin_login();
+    AdminController::login(); return;
   case 'admin_logout':
-    return admin_logout();
+    AdminController::logout(); return;
   case 'admin_delete':
     return admin_delete();
   case 'admin_manage':
-    return admin_manage();
+    AdminController::manage(); return;
   case 'admin_theme_settings':
-    return admin_theme_settings();
+    AdminController::themeSettings(); return;
   case 'admin_errorlog':
-    return admin_errorlog();
+    AdminController::errorLog(); return;
   case 'admin_auditlog':
-    return admin_auditlog();
+    AdminController::auditLog(); return;
   case 'admin_temporary_images':
-    return admin_temporary_images();
+    AdminController::temporaryImages(); return;
   case 'admin_temporary_images_manage':
-    return admin_temporary_images_manage();
+    AdminController::manageTemporaryImages(); return;
   case 'temporary_image':
-    return temporary_image();
+    PaintController::temporaryImage(); return;
   case 'admin_post':
-    return admin_post();
+    AdminController::post(); return;
   case 'admin_edit':
-    return admin_edit();
+    AdminController::edit(); return;
   case 'admin': // 管理モード
-    return admin();
+    AdminController::dashboard(); return;
   case 'set_share_server':
     return show_share_server_form();
   case 'post_share_server':
