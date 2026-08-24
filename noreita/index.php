@@ -521,7 +521,7 @@ function submit_share_server(ApplicationContext $context): void {
     try {
       RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
-      error($e->getMessage(), $e->getCode() ?: 403);
+      render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
   }
   $selected_server = (string)filter_input_data('POST', 'sns_server_radio');
@@ -534,7 +534,7 @@ function submit_share_server(ApplicationContext $context): void {
       (string)filter_input_data('POST', 'encoded_u')
     );
   } catch (InvalidArgumentException $e) {
-    error($en ? 'Please select a sharing destination for SNS.' : 'SNSの共有先を選択してください。');
+    render_error($context, $en ? 'Please select a sharing destination for SNS.' : 'SNSの共有先を選択してください。');
     return;
   }
 
