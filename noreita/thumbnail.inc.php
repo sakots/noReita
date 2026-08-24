@@ -50,6 +50,17 @@ class Thumbnail {
     return $this->last_output_path ? basename($this->last_output_path) : null;
   }
 
+  /** @return GdImage|false */
+  private static function createTransparentCanvas(int $width, int $height) {
+    $image = imagecreatetruecolor($width, $height);
+    if ($image === false) return false;
+    imagealphablending($image, false);
+    $transparent = imagecolorallocatealpha($image, 0, 0, 0, 127);
+    imagefill($image, 0, 0, $transparent);
+    imagesavealpha($image, true);
+    return $image;
+  }
+
   public function createThumbnail(): bool {
     // 入力画像の情報を取得
     $info = getimagesize($this->image_url);
@@ -104,7 +115,7 @@ class Thumbnail {
     }
 
     // サムネイル用の空の画像を作成
-    $thumb_image = imagecreatetruecolor($this->thumb_width, $thumb_height);
+    $thumb_image = self::createTransparentCanvas($this->thumb_width, $thumb_height);
     if ($thumb_image === false) {
       return false; // サムネイル画像の作成に失敗
     }
@@ -121,7 +132,8 @@ class Thumbnail {
       $small_height = (int)($thumb_height / $blur_strength);
 
       // 小さい画像を作成
-      $small_image = imagecreatetruecolor($small_width, $small_height);
+      $small_image = self::createTransparentCanvas($small_width, $small_height);
+      if ($small_image === false) return false;
       imagecopyresampled($small_image, $thumb_image, 0, 0, 0, 0, $small_width, $small_height, $this->thumb_width, $thumb_height);
 
       // 小さい画像を元のサイズに拡大してぼかす
@@ -144,7 +156,12 @@ class Thumbnail {
       }
     } else {
       $filename_jpg = $output_base . '.jpg';
-      $result = imagejpeg($thumb_image, $filename_jpg, 80);
+      // JPEGはアルファチャンネルを持たないため、透明部分を黒ではなく白で合成する。
+      $jpeg_image = imagecreatetruecolor($this->thumb_width, $thumb_height);
+      if ($jpeg_image === false) return false;
+      imagefill($jpeg_image, 0, 0, imagecolorallocate($jpeg_image, 255, 255, 255));
+      imagecopy($jpeg_image, $thumb_image, 0, 0, 0, 0, $this->thumb_width, $thumb_height);
+      $result = imagejpeg($jpeg_image, $filename_jpg, 80);
       if ($result) {
         $this->last_output_path = $filename_jpg;
       }

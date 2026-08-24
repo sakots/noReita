@@ -1817,6 +1817,53 @@ smoke_test('GD thumbnail generation', static function (): bool {
   }
 });
 
+smoke_test('GD thumbnails preserve transparent pixels for supported input formats', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_transparent_thumbnail_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    if (!function_exists('imageavif') && !function_exists('imagewebp')) return true;
+    $formats = ['png' => 'imagepng', 'gif' => 'imagegif'];
+    if (function_exists('imagewebp') && function_exists('imagecreatefromwebp')) $formats['webp'] = 'imagewebp';
+    if (function_exists('imageavif') && function_exists('imagecreatefromavif')) $formats['avif'] = 'imageavif';
+    foreach ($formats as $extension => $writer) {
+      $input = $directory . DIRECTORY_SEPARATOR . 'source.' . $extension;
+      if ($extension === 'gif') {
+        $image = imagecreate(4, 4);
+        if ($image === false) return false;
+        $transparent = imagecolorallocate($image, 0, 0, 0);
+        imagecolortransparent($image, $transparent);
+        imagefill($image, 0, 0, $transparent);
+        imagesetpixel($image, 2, 2, imagecolorallocate($image, 220, 20, 20));
+      } else {
+        $image = imagecreatetruecolor(4, 4);
+        if ($image === false) return false;
+        imagealphablending($image, false);
+        imagefill($image, 0, 0, imagecolorallocatealpha($image, 0, 0, 0, 127));
+        imagesavealpha($image, true);
+        imagesetpixel($image, 2, 2, imagecolorallocatealpha($image, 220, 20, 20, 0));
+      }
+      if (!$writer($image, $input)) return false;
+
+      $thumbnail = new Thumbnail($input, $directory, 20, false, 'thumbnail-' . $extension);
+      if (!$thumbnail->createThumbnail()) return false;
+      $output = $thumbnail->getOutputPath();
+      if ($output === null || !is_file($output)) return false;
+      $output_image = match (mime_content_type($output)) {
+        'image/avif' => function_exists('imagecreatefromavif') ? imagecreatefromavif($output) : false,
+        'image/webp' => function_exists('imagecreatefromwebp') ? imagecreatefromwebp($output) : false,
+        default => false,
+      };
+      if ($output_image === false || ((imagecolorat($output_image, 0, 0) >> 24) & 0x7f) === 0) return false;
+    }
+    return true;
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('related image files are deleted together', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_images_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
