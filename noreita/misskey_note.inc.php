@@ -130,8 +130,8 @@ class misskey_note {
     $dat =& $context->data;
     //管理者判定処理
     RequestSecurity::startSession();
-    $admin_post = admin_post_valid();
-    $admin_del = admin_del_valid();
+    $admin_post = admin_post_valid(null);
+    $admin_del = admin_del_valid(null);
 
     $dat['pwd_cookie'] = (string)filter_input_data('COOKIE', 'pwd_cookie');
     $dat['no'] = t(filter_input_data('POST', 'no', FILTER_VALIDATE_INT));
@@ -182,8 +182,8 @@ class misskey_note {
 
     $dat['token'] = RequestSecurity::csrfToken();
 
-    $dat['admin_del'] = admin_del_valid();
-    $dat['admin_post'] = admin_post_valid();
+    $dat['admin_del'] = admin_del_valid(null);
+    $dat['admin_post'] = admin_post_valid(null);
     $dat['admin'] = ($dat['admin_del'] || $dat['admin_post']);
 
     $pwd = (string)filter_input_data('POST', 'pwd');

@@ -1080,7 +1080,8 @@ final class ImageService {
     int $_temporary_name,
     string $old_image,
     string $old_animation,
-    int $permission
+    int $permission,
+    bool $english = false
   ): array {
     $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
@@ -1096,7 +1097,7 @@ final class ImageService {
     }
     chmod($work_file, $permission);
 
-    $extension = get_image_type((string)mime_content_type($work_file), $work_file);
+    $extension = get_image_type((string)mime_content_type($work_file), $english, $work_file);
     $new_image = $filename . $extension;
     $new_image_path = $image_dir . $new_image;
     $old_image_path = $image_dir . basename($old_image);

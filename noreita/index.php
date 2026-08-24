@@ -26,91 +26,91 @@ if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260820) {
 }
 
 // request_security.inc
-check_file(__DIR__.'/request_security.inc.php');
+check_file(__DIR__.'/request_security.inc.php', $en);
 require_once(__DIR__.'/request_security.inc.php');
 if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260726) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
 // request_info.inc
-check_file(__DIR__.'/request_info.inc.php');
+check_file(__DIR__.'/request_info.inc.php', $en);
 require_once(__DIR__.'/request_info.inc.php');
 if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
   die($en ? 'Please update request_info.inc.php to the latest version.' : 'request_info.inc.phpを最新版に更新してください。');
 }
 
 // database.inc
-check_file(__DIR__.'/database.inc.php');
+check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
 if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260817) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
 // initialization.inc
-check_file(__DIR__.'/initialization.inc.php');
+check_file(__DIR__.'/initialization.inc.php', $en);
 require_once(__DIR__.'/initialization.inc.php');
 if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260817) {
   die($en ? 'Please update initialization.inc.php to the latest version.' : 'initialization.inc.phpを最新版に更新してください。');
 }
 
 // image.inc
-check_file(__DIR__.'/image.inc.php');
+check_file(__DIR__.'/image.inc.php', $en);
 require_once(__DIR__.'/image.inc.php');
 if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260818) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
 // post.inc
-check_file(__DIR__.'/post.inc.php');
+check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
 if(!defined('POST_INC_VER') || POST_INC_VER < 20260807) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
 // share.inc
-check_file(__DIR__.'/share.inc.php');
+check_file(__DIR__.'/share.inc.php', $en);
 require_once(__DIR__.'/share.inc.php');
 if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
   die($en ? 'Please update share.inc.php to the latest version.' : 'share.inc.phpを最新版に更新してください。');
 }
 
 // misskey_security.inc
-check_file(__DIR__.'/misskey_security.inc.php');
+check_file(__DIR__.'/misskey_security.inc.php', $en);
 require_once(__DIR__.'/misskey_security.inc.php');
 if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20260816) {
   die($en ? 'Please update misskey_security.inc.php to the latest version.' : 'misskey_security.inc.phpを最新版に更新してください。');
 }
 
 // misskey_note.inc
-check_file(__DIR__.'/misskey_note.inc.php');
+check_file(__DIR__.'/misskey_note.inc.php', $en);
 require_once(__DIR__.'/misskey_note.inc.php');
 if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260817) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
-check_file(__DIR__.'/connect_misskey_api.php');
+check_file(__DIR__.'/connect_misskey_api.php', $en);
 require_once(__DIR__.'/connect_misskey_api.php');
 if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260817) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
 // save.inc
-check_file(__DIR__.'/save.inc.php');
+check_file(__DIR__.'/save.inc.php', $en);
 require_once(__DIR__.'/save.inc.php');
 if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260820) {
   die($en ? 'Please update save.inc.php to the latest version.' : 'save.inc.phpを最新版に更新してください。');
 }
 
 // thumbnail.inc
-check_file(__DIR__.'/thumbnail.inc.php');
+check_file(__DIR__.'/thumbnail.inc.php', $en);
 require_once(__DIR__.'/thumbnail.inc.php');
 if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260820) {
   error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 
 // external_image.inc
-check_file(__DIR__.'/external_image.inc.php');
+check_file(__DIR__.'/external_image.inc.php', $en);
 require_once(__DIR__.'/external_image.inc.php');
 if(!defined('EXTERNAL_IMAGE_INC_VER') || EXTERNAL_IMAGE_INC_VER < 20260820) {
   error($en ? 'Please update external_image.inc.php to the latest version.' : 'external_image.inc.phpを最新版に更新してください。', 500);
@@ -1970,7 +1970,7 @@ function picreplace(ApplicationContext $context): void {
     if (password_verify($pwd_f, $msg_d["pwd"])) {
       $replacement = ImageService::replacePostedFiles(
         Config::string('paths.temporary'), Config::string('paths.images'), $filename, $imgext, (int)$stime,
-        (string)$msg_d['picfile'], (string)$msg_d['pchfile'], Config::int('permissions.public_file')
+        (string)$msg_d['picfile'], (string)$msg_d['pchfile'], Config::int('permissions.public_file'), $en
       );
       $new_picfile = $replacement['picfile'];
       $new_pchfile = $replacement['pchfile'];
