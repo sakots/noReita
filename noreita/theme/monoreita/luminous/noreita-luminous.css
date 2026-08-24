@@ -1,0 +1,13 @@
+/* Keep gallery controls independent from the board theme's generic button styles. */
+.lum-gallery-button {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.lum-gallery-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, .9);
+  outline-offset: -4px;
+}
