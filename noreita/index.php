@@ -465,10 +465,6 @@ switch ($mode) {
 
 /*-----------Main-------------*/
 
-function current_application_context(): ApplicationContext {
-  return ApplicationContextRegistry::current();
-}
-
 function init(): void {
   // ApplicationContext is created after startup has prepared the request user code.
   $en = ApplicationBootstrap::english();
@@ -2850,9 +2846,7 @@ function logdel(ApplicationContext $context): void {
   }
 }
 
-//エラー画面
-function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
-  $context = current_application_context();
+function render_error(ApplicationContext $context, string $mes, int $status = 400, ?Throwable $cause = null): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
@@ -2875,9 +2869,27 @@ function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
   exit;
 }
 
+function render_bootstrap_error(string $mes, int $status = 400, ?Throwable $cause = null): void {
+  if ($status < 400 || $status > 599) $status = 500;
+  $error_id = ApplicationErrorHandler::reportHttpError($status, strip_tags($mes), $cause);
+  if ($status >= 500) {
+    $mes = h(ApplicationErrorHandler::publicMessage($error_id, ApplicationBootstrap::english()));
+  }
+  http_response_code($status);
+  header('Content-Type: text/plain; charset=UTF-8');
+  exit($mes);
+}
+
+//エラー画面
+function error(string $mes, int $status = 400, ?Throwable $cause = null): void {
+  if (!ApplicationContextRegistry::isInitialized()) {
+    render_bootstrap_error($mes, $status, $cause);
+  }
+  render_error(ApplicationContextRegistry::current(), $mes, $status, $cause);
+}
+
 //画像差し替え失敗
-function error2(): void {
-  $context = current_application_context();
+function error2(ApplicationContext $context): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;

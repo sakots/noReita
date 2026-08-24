@@ -36,6 +36,10 @@ final class ApplicationContextRegistry {
     self::$current = $context;
   }
 
+  public static function isInitialized(): bool {
+    return self::$current !== null;
+  }
+
   public static function current(): ApplicationContext {
     if (self::$current === null) {
       throw new LogicException('ApplicationContext has not been initialized.');
