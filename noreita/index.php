@@ -171,7 +171,6 @@ $dat = array(); // テンプレートに格納する変数
 // 絶対パス取得
 $temp_path = realpath("./") . '/' . Config::string('paths.temporary');
 
-$message = "";
 $self = Config::string('site.script_name');
 
 $dat['path'] = Config::string('paths.images');
@@ -187,7 +186,7 @@ $dat['base'] = Config::string('site.base_url');
 $dat['board_title'] = Config::string('site.title');
 $dat['home'] = Config::string('site.home_url');
 $dat['self'] = Config::string('site.script_name');
-$dat['message'] = $message;
+$dat['message'] = '';
 $dat['pdef_w'] = Config::int('limits.paint_default_width');
 $dat['pdef_h'] = Config::int('limits.paint_default_height');
 $dat['pmax_w'] = Config::int('limits.paint_max_width');
@@ -305,8 +304,6 @@ del_temp();
 
 clean_old_thumbnails();
 
-$message = "";
-
 //var_dump($_COOKIE);
 
 $pwd_cookie = filter_input(INPUT_COOKIE, 'pwd_cookie');
@@ -344,7 +341,7 @@ $_SESSION['usercode'] = $usercode;
 
 $application_context = new ApplicationContext(
   $en, $template_engine, $dat, $usercode, $req_method, $theme_directory,
-  ['message' => $message]
+  ['message' => '']
 );
 ApplicationErrorRenderer::initialize($application_context);
 
