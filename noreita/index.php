@@ -168,9 +168,6 @@ $dat = array(); // テンプレートに格納する変数
 
 // var_dump($_POST);
 
-// 絶対パス取得
-$temp_path = realpath("./") . '/' . Config::string('paths.temporary');
-
 $self = Config::string('site.script_name');
 
 $dat['path'] = Config::string('paths.images');
