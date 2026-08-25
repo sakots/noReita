@@ -472,6 +472,9 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['2001:db8::/129']]],
     ['admin' => ['password' => 'admin_pass'], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://example.com/noreita/']],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_threshold' => -1]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_rules' => [['valid', 0]]]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_rules' => [['[', 1]]]],
   ];
   foreach ($invalid as $override) {
     try {
@@ -1353,6 +1356,19 @@ smoke_test('post validation is independent from HTTP rendering', static function
     array_merge($input, ['com' => 'https://example.com']),
     array_merge($rules, ['japanese_filter' => false, 'is_admin' => true])
   );
+  try {
+    PostValidator::validate(
+      array_merge($input, ['com' => 'promo cheap']),
+      array_merge($rules, [
+        'japanese_filter' => false,
+        'comment_score_rules' => [['promo', 1], ['cheap', 2]],
+        'comment_score_threshold' => 3,
+      ])
+    );
+    return false;
+  } catch (PostValidationException $e) {
+    if ($e->getMessage() !== 'コメントはスパムとして拒否されました。') return false;
+  }
   return true;
 });
 

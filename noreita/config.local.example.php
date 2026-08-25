@@ -43,6 +43,15 @@ return [
     'diary_allow_public_replies' => true,
   ],
 
+  'spam' => [
+    // 本文で一致した規則の点数を合計し、threshold以上なら投稿を拒否します。0なら無効です。
+    'comment_score_rules' => [
+      ['spam-pattern-one', 1],
+      ['spam-pattern-two', 2],
+    ],
+    'comment_score_threshold' => 3,
+  ],
+
   'limits' => [
     // 直接アップロードする画像の容量、幅、高さの上限です。
     'upload_kb' => 10000,

@@ -48,7 +48,11 @@ final class Config {
     self::$root = $resolved_root;
   }
 
-  /** @return array<string,mixed> */
+  /**
+   * @param array<string,mixed> $defaults
+   * @param array<string,mixed> $overrides
+   * @return array<string,mixed>
+   */
   public static function resolve(array $defaults, array $overrides): array {
     if (($defaults['_version'] ?? null) !== self::FORMAT_VERSION) {
       throw new ConfigException('config.php has an incompatible format version.');
@@ -220,6 +224,7 @@ final class Config {
       'error_log.max_files_per_day' => [1, 1000],
       'audit_log.max_bytes' => [1024, 1073741824],
       'audit_log.max_files_per_day' => [1, 1000],
+      'spam.comment_score_threshold' => [0, 1000000],
     ];
     foreach ($ranges as $key => $range) {
       $value = self::valueAt($values, $key);
@@ -270,6 +275,15 @@ final class Config {
       'spam.bad_files', 'spam.bad_hosts', 'board.additional_info'] as $key) {
       foreach (self::valueAt($values, $key) as $value) {
         if (!is_string($value)) throw new ConfigException("Configuration list must contain strings: {$key}");
+      }
+    }
+    foreach (self::valueAt($values, 'spam.comment_score_rules') as $rule) {
+      if (!is_array($rule) || count($rule) !== 2 || !is_string($rule[0] ?? null)
+        || $rule[0] === '' || !is_int($rule[1] ?? null) || $rule[1] < 1) {
+        throw new ConfigException('Configuration value must contain [pattern, positive score] pairs: spam.comment_score_rules');
+      }
+      if (@preg_match('/' . $rule[0] . '/ui', '') === false) {
+        throw new ConfigException('Configuration value contains an invalid regular expression: spam.comment_score_rules');
       }
     }
   }

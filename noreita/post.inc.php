@@ -330,6 +330,8 @@ final class PostValidator {
       'bad_names' => Config::array('spam.bad_names'),
       'bad_strings_a' => Config::array('spam.bad_strings_a'),
       'bad_strings_b' => Config::array('spam.bad_strings_b'),
+      'comment_score_rules' => Config::array('spam.comment_score_rules'),
+      'comment_score_threshold' => Config::int('spam.comment_score_threshold'),
     ];
   }
 
@@ -392,6 +394,11 @@ final class PostValidator {
     if (is_ngword($rules['bad_strings_a'] ?? [], $values) && is_ngword($rules['bad_strings_b'] ?? [], $values)) {
       throw new PostValidationException(self::message($en, 'Invalid combination of characters found in comment.', 'コメントに無効な文字の組み合わせが含まれています。'));
     }
+    if (self::commentRejectionScore($com, $rules['comment_score_rules'] ?? [])
+      >= (int)($rules['comment_score_threshold'] ?? 0)
+      && (int)($rules['comment_score_threshold'] ?? 0) > 0) {
+      throw new PostValidationException(self::message($en, 'Your comment was rejected as spam.', 'コメントはスパムとして拒否されました。'));
+    }
 
     if (!empty($rules['require_name']) && $name === '') {
       throw new PostValidationException(self::message($en, 'Name is required.', '名前は必須です。'));
@@ -425,6 +432,15 @@ final class PostValidator {
         );
       }
     }
+  }
+
+  /** @param array<int, array{0:string, 1:int}> $rules */
+  private static function commentRejectionScore(string $comment, array $rules): int {
+    $score = 0;
+    foreach ($rules as $rule) {
+      if (preg_match('/' . $rule[0] . '/ui', $comment) === 1) $score += $rule[1];
+    }
+    return $score;
   }
 
   private static function message(bool $en, string $english, string $japanese): string {
