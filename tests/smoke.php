@@ -155,7 +155,10 @@ smoke_test('asynchronous paint replacements display the returned edit form', sta
     $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
     if (!is_string($source)
       || !str_contains($source, 'formData.append("mode", "picrep")')
-      || !str_contains($source, 'document.write(text)')) {
+      || !str_contains($source, "new DOMParser().parseFromString(text, 'text/html')")
+      || !str_contains($source, 'document.head.replaceWith(nextDocument.head)')
+      || !str_contains($source, 'document.body.replaceWith(nextDocument.body)')
+      || str_contains($source, 'document.write(')) {
       return false;
     }
   }

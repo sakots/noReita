@@ -203,9 +203,10 @@
               return window.location.href = "{{$self}}?mode=piccom";
             }
             // picrepは編集フォームのHTMLを返すため、非同期保存後にその画面へ切り替える。
-            document.open();
-            document.write(text);
-            document.close();
+            const nextDocument = new DOMParser().parseFromString(text, 'text/html');
+            document.title = nextDocument.title;
+            document.head.replaceWith(nextDocument.head);
+            document.body.replaceWith(nextDocument.body);
           })
         }
       })

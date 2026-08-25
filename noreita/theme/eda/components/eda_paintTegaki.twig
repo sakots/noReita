@@ -113,9 +113,10 @@
             }
             Tegaki.hide(); //｢このサイトを離れますか?｣を解除
             // picrepは編集フォームのHTMLを返すため、非同期保存後にその画面へ切り替える。
-            document.open();
-            document.write(text);
-            document.close();
+            const nextDocument = new DOMParser().parseFromString(text, 'text/html');
+            document.title = nextDocument.title;
+            document.head.replaceWith(nextDocument.head);
+            document.body.replaceWith(nextDocument.body);
           })
           .catch(error => {
             console.error('There was a problem with the fetch operation:', error);
