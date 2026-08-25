@@ -121,7 +121,7 @@ return [
     // 投稿者IDを生成して投稿に表示します。
     'display_id' => true,
     // 日本語を含まない投稿をスパムとして拒否します。
-    'japanese_filter' => true,
+    'japanese_filter' => false,
     // 本文にURLが含まれる投稿を拒否します。
     'deny_comment_urls' => false,
     // 本文中のURLを自動的にリンクへ変換します。
