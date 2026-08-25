@@ -1194,6 +1194,7 @@ function res(ApplicationContext $context): void {
   $dat['og_description'] = '';
   $dat['og_image'] = '';
   $dat['og_image_alt'] = '';
+  $dat['og_twitter_card'] = 'summary';
   $resno = filter_input_data('GET', 'res', FILTER_VALIDATE_INT);
   if ($resno === false || $resno === null) {
     $resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
@@ -1312,6 +1313,7 @@ function res(ApplicationContext $context): void {
         $dat['og_image'] = Config::string('site.base_url') . Config::string('paths.images')
           . rawurlencode(basename($og_image_name));
         $dat['og_image_alt'] = (string)$bbsline['sub'];
+        $dat['og_twitter_card'] = 'summary_large_image';
       }
       $dat['og_title'] = '[' . $bbsline['tid'] . '] ' . $bbsline['sub']
         . ($bbsline['a_name'] !== '' ? ' by ' . $bbsline['a_name'] : '')

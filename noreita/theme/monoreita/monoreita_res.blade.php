@@ -9,7 +9,7 @@
   @include('components.monoreita_headCss')
   <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/noreita-luminous.css">
   @if (!empty($og_url))
-    <meta name="twitter:card" content="@if (!empty($og_image))summary_large_image@else summary@endif">
+    <meta name="twitter:card" content="{{$og_twitter_card}}">
     <meta property="og:title" content="{{$og_title}}">
     <meta property="og:type" content="article">
     <meta property="og:url" content="{{$og_url}}">
