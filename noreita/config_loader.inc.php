@@ -108,7 +108,11 @@ final class Config {
     return self::$values !== null;
   }
 
-  /** Test processes may load one isolated configuration at a time. */
+  /**
+   * Test processes may load one isolated configuration at a time.
+   * @param array<string,mixed> $defaults
+   * @param array<string,mixed> $overrides
+   */
   public static function initializeForTesting(array $defaults, array $overrides = []): void {
     self::$values = self::resolve($defaults, $overrides);
     self::$root = '[test]';
@@ -120,7 +124,11 @@ final class Config {
     self::$root = null;
   }
 
-  /** @return array<string,mixed> */
+  /**
+   * @param array<string,mixed> $defaults
+   * @param array<string,mixed> $overrides
+   * @return array<string,mixed>
+   */
   private static function merge(array $defaults, array $overrides, string $prefix): array {
     foreach ($overrides as $key => $value) {
       if (!is_string($key) || !array_key_exists($key, $defaults)) {
@@ -138,6 +146,10 @@ final class Config {
     return $defaults;
   }
 
+  /**
+   * @param array<string,mixed> $defaults
+   * @param array<string,mixed> $values
+   */
   private static function validateTypes(array $defaults, array $values, string $prefix): void {
     foreach ($defaults as $key => $expected) {
       $path = $prefix === '' ? (string)$key : $prefix . '.' . $key;
@@ -154,6 +166,7 @@ final class Config {
     }
   }
 
+  /** @param array<string,mixed> $values */
   private static function validateValues(array $values): void {
     $required_strings = [
       'admin.password', 'admin.name', 'site.base_url', 'site.title', 'site.timezone',
@@ -297,6 +310,7 @@ final class Config {
     }
   }
 
+  /** @param array<int, array<int, string>> $pairs */
   private static function validatePairs(array $pairs, string $key, bool $url): void {
     foreach ($pairs as $pair) {
       if (!is_array($pair) || count($pair) !== 2 || !is_string($pair[0] ?? null)
@@ -343,7 +357,10 @@ final class Config {
     }
   }
 
-  /** @return mixed */
+  /**
+   * @param array<string,mixed> $values
+   * @return mixed
+   */
   private static function valueAt(array $values, string $key) {
     $current = $values;
     foreach (explode('.', $key) as $segment) {
@@ -355,6 +372,7 @@ final class Config {
     return $current;
   }
 
+  /** @param array<mixed> $value */
   private static function isList(array $value): bool {
     $index = 0;
     foreach ($value as $key => $_) {
