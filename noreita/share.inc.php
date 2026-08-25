@@ -17,6 +17,10 @@ final class ShareService {
     ['sushi.ski', 'https://sushi.ski'],
   ];
 
+  /**
+   * @param array<int, array<int, string>>|null $configured
+   * @return array<int, array<int, string>>
+   */
   public static function servers(?array $configured = null): array {
     $servers = $configured ?? self::DEFAULT_SERVERS;
     $servers[] = ['直接入力', 'direct'];

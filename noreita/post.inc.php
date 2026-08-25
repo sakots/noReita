@@ -101,6 +101,9 @@ final class PostService implements AdminPostManagementService {
     return 'deleted';
   }
 
+  /**
+   * @param array<int, int|string> $post_ids
+   */
   public function deleteManyAsAdmin(array $post_ids): int {
     $ids = self::normalizePostIds($post_ids);
 
