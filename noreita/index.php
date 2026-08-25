@@ -1189,6 +1189,11 @@ function res(ApplicationContext $context): void {
   $dat =& $context->data;
   $template_engine = $context->templates;
   $en = $context->english;
+  $dat['og_url'] = '';
+  $dat['og_title'] = '';
+  $dat['og_description'] = '';
+  $dat['og_image'] = '';
+  $dat['og_image_alt'] = '';
   $resno = filter_input_data('GET', 'res', FILTER_VALIDATE_INT);
   if ($resno === false || $resno === null) {
     $resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
@@ -1224,6 +1229,7 @@ function res(ApplicationContext $context): void {
     $oya = array();
     $ko = array();
     foreach ($posts as $bbsline) {
+      $og_description = trim((string)preg_replace('/\s+/u', ' ', strip_tags((string)$bbsline['com'])));
       $bbsline['thumb'] = $bbsline['thumbnail'] ?? '';
       $bbsline['thumb_avif'] = '';
       //スレッドの記事を取得
@@ -1297,6 +1303,22 @@ function res(ApplicationContext $context): void {
 
       $bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.Config::string('site.title'));
       $bbsline['encoded_u'] = urlencode(Config::string('site.base_url').'?resno='.$bbsline['tid']);
+
+      // SNSクローラー向けのOGP。NSFW投稿はぼかし済みサムネイルだけを公開する。
+      $og_image_name = (bool)$bbsline['nsfw'] && $bbsline['thumb'] !== ''
+        ? (string)$bbsline['thumb']
+        : (string)$bbsline['picfile'];
+      if ($og_image_name !== '') {
+        $dat['og_image'] = Config::string('site.base_url') . Config::string('paths.images')
+          . rawurlencode(basename($og_image_name));
+        $dat['og_image_alt'] = (string)$bbsline['sub'];
+      }
+      $dat['og_title'] = '[' . $bbsline['tid'] . '] ' . $bbsline['sub']
+        . ($bbsline['a_name'] !== '' ? ' by ' . $bbsline['a_name'] : '')
+        . ' - ' . Config::string('site.title');
+      $dat['og_url'] = Config::string('site.base_url') . Config::string('site.script_name')
+        . '?resno=' . $bbsline['tid'];
+      $dat['og_description'] = $og_description;
 
       $oya[] = $bbsline;
 

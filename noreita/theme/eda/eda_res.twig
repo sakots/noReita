@@ -8,18 +8,18 @@
   <link rel="stylesheet" href="theme/{{ theme_dir }}/luminous/luminous-basic.min.css">
   {% include 'components/eda_headCss.twig' %}
   <link rel="stylesheet" href="theme/{{ theme_dir }}/luminous/noreita-luminous.css">
-  {% if oya is not empty %}
-    {% for bbsline in oya %}
-    <meta name="twitter:card" content="summary">
-    <meta property="og:title" content="[{{ bbsline['tid'] }}] {{ bbsline['sub'] }} by {{ bbsline['a_name'] }} - {{ board_title }}">
+  {% if og_url is not empty %}
+    <meta name="twitter:card" content="{% if og_image is not empty %}summary_large_image{% else %}summary{% endif %}">
+    <meta property="og:title" content="{{ og_title }}">
     <meta property="og:type" content="article">
-    <meta property="og:url" content="{{ base }}{{ self }}?mode=res&amp;res={{ resno }}">
-    {% if bbsline['picfile'] is defined %}
-      <meta property="og:image" content="{{ base }}{{ path }}{{ bbsline['picfile'] }}">
+    <meta property="og:url" content="{{ og_url }}">
+    {% if og_image is not empty %}
+      <meta property="og:image" content="{{ og_image }}">
+      <meta property="og:image:alt" content="{{ og_image_alt }}">
+      <meta name="twitter:image" content="{{ og_image }}">
     {% endif %}
-    <meta property="og:site_name" content="">
-    <meta property="og:description" content="{{ bbsline['com'] }}">
-    {% endfor %}
+    <meta property="og:site_name" content="{{ board_title }}">
+    <meta property="og:description" content="{{ og_description|default('') }}">
   {% endif %}
   {% include 'components/eda_customCss.twig' %}
 </head>

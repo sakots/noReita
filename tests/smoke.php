@@ -165,6 +165,21 @@ smoke_test('asynchronous paint replacements display the returned edit form', sta
   return true;
 });
 
+smoke_test('response templates provide image OGP metadata for SNS sharing', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $templates = ['eda/eda_res.twig', 'monoreita/monoreita_res.blade.php'];
+  foreach ($templates as $template) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
+    if (!is_string($source) || !str_contains($source, 'og:image')
+      || !str_contains($source, 'twitter:image') || !str_contains($source, 'og_url')) {
+      return false;
+    }
+  }
+  $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
+  return is_string($index) && str_contains($index, "'?resno='")
+    && str_contains($index, "['og_image']");
+});
+
 smoke_test('PaintBBS NEO loads from GitHub with the configured mirror as fallback', static function (): bool {
   $root = dirname(__DIR__) . '/noreita/theme';
   $loaders = [

@@ -8,18 +8,18 @@
   <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/luminous-basic.min.css">
   @include('components.monoreita_headCss')
   <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/noreita-luminous.css">
-  @if (!empty($oya))
-    @foreach ($oya as $bbsline)
-    <meta name="twitter:card" content="summary">
-    <meta property="og:title" content="[{{$bbsline['tid']}}] {{$bbsline['sub']}} by {{$bbsline['a_name']}} - {{$board_title}}">
+  @if (!empty($og_url))
+    <meta name="twitter:card" content="@if (!empty($og_image))summary_large_image@else summary@endif">
+    <meta property="og:title" content="{{$og_title}}">
     <meta property="og:type" content="article">
-    <meta property="og:url" content="{{$base}}{{$self}}?mode=res&amp;res={{$resno}}">
-    @if (isset($bbsline['picfile']))
-      <meta property="og:image" content="{{$base}}{{$path}}{{$bbsline['picfile']}}">
+    <meta property="og:url" content="{{$og_url}}">
+    @if (!empty($og_image))
+      <meta property="og:image" content="{{$og_image}}">
+      <meta property="og:image:alt" content="{{$og_image_alt}}">
+      <meta name="twitter:image" content="{{$og_image}}">
     @endif
-    <meta property="og:site_name" content="">
-    <meta property="og:description" content="{{$bbsline['com']}}">
-    @endforeach
+    <meta property="og:site_name" content="{{$board_title}}">
+    <meta property="og:description" content="{{$og_description ?? ''}}">
   @endif
   @include('components.monoreita_customCss')
 </head>
