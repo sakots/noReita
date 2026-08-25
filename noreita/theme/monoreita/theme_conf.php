@@ -8,7 +8,7 @@
 const THEME_NAME = "monoreita";
 
 //テーマのバージョン
-const THEME_VER = "lot.260824.1";
+const THEME_VER = "lot.260825.0";
 
 // テンプレートエンジン。Twigテーマでは'twig'に変更します。
 const THEME_TEMPLATE_ENGINE = 'blade';

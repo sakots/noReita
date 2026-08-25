@@ -157,6 +157,13 @@ return [
 
 [すべての履歴はこちら](changelog.md)
 
+### [2026/08/25] v4.3.0
+
+- `document.white()`がまだ残っていたので削除
+- 日本語がないと拒否の設定をデフォルトではオフにした
+- 本文のスコア式スパム判定機能追加
+  - `config.local.php` の `spam.comment_score_rules` で、本文に含まれる正規表現ごとの拒否スコアを設定できます。一致した規則の点数を合計し、`comment_score_threshold` 以上になる投稿を拒否します。
+
 ### [2026/08/25] v4.2.5
 
 - テーマから非推奨の`document.white()`を除去
@@ -166,7 +173,7 @@ return [
 ### [2026/08/24] v4.2.4
 
 - `index.php`から役割を分散する
--  PHP の`global`と`$GLOBALS`を使わないようにした
+- PHP の`global`と`$GLOBALS`を使わないようにした
 - `error()`を廃止
 - luminousのcssがおかしくて矢印の表示が変だったの修正
 
