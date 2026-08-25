@@ -15,7 +15,9 @@ final class DiaryPostPolicy {
 }
 
 interface AdminPostManagementService {
+  /** @param array<int, int|string> $post_ids */
   public function deleteManyAsAdmin(array $post_ids): int;
+  /** @param array<int, int|string> $post_ids */
   public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int;
 }
 
@@ -50,6 +52,7 @@ final class PostService implements AdminPostManagementService {
     $this->deletion_quarantine_retention_days = max(1, min(3650, $deletion_quarantine_retention_days));
   }
 
+  /** @return array<string,mixed> */
   public function authorize(int $post_id, string $password, bool $authorize_as_admin = false): array {
     $post = $this->repository->findPost($post_id);
     if (empty($post)) throw new PostNotFoundException('Post was not found.');
@@ -62,6 +65,7 @@ final class PostService implements AdminPostManagementService {
     throw new PostAuthorizationException('Invalid password.');
   }
 
+  /** @param array<string,mixed> $values */
   public function edit(int $post_id, string $password, array $values, bool $edit_as_admin = false): string {
     $authorization = $this->authorize($post_id, $password, $edit_as_admin);
     $post = $authorization['post'];
@@ -125,6 +129,10 @@ final class PostService implements AdminPostManagementService {
     return count($deleted_ids);
   }
 
+  /**
+   * @param array<int,array<string,mixed>> $posts
+   * @param callable():void $delete_database_rows
+   */
   private function deletePostsAtomically(array $posts, callable $delete_database_rows): void {
     $image_names = array_map(static fn(array $post): string => (string)($post['picfile'] ?? ''), $posts);
     $staged = ImageService::stageRelatedFilesForDeletion(
@@ -147,6 +155,7 @@ final class PostService implements AdminPostManagementService {
     ImageService::completeStagedDeletion($staged);
   }
 
+  /** @return array<string,int> */
   public function recoverInterruptedDeletions(): array {
     return ImageService::recoverStagedDeletions(
       $this->image_dir,
@@ -159,6 +168,7 @@ final class PostService implements AdminPostManagementService {
     );
   }
 
+  /** @param array<int, int|string> $post_ids */
   public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int {
     $ids = self::normalizePostIds($post_ids);
     $existing = 0;
@@ -170,6 +180,10 @@ final class PostService implements AdminPostManagementService {
     return $existing;
   }
 
+  /**
+   * @param array<int,int|string> $post_ids
+   * @return array<int,int>
+   */
   private static function normalizePostIds(array $post_ids): array {
     $ids = [];
     foreach ($post_ids as $post_id) {
@@ -180,6 +194,11 @@ final class PostService implements AdminPostManagementService {
     return $ids;
   }
 
+  /**
+   * @param array<string,mixed> $input
+   * @param array<string,mixed> $settings
+   * @return array<string,mixed>
+   */
   public function prepareNewPost(array $input, string $host, array $settings): array {
     $comment_was_present = (string)($input['com'] ?? '') !== '';
     $name = generate_trip((string)($input['name'] ?? ''));
@@ -211,6 +230,10 @@ final class PostService implements AdminPostManagementService {
     ]);
   }
 
+  /**
+   * @param array<string,mixed> $post
+   * @param array<string,mixed> $image
+   */
   public function createPreparedPost(array $post, array $image): int {
     $now = time();
     $resto = (string)($post['resto'] ?? '');
@@ -264,10 +287,12 @@ final class PostInput {
     return self::resolveCtype(['session_usercode' => $_SESSION['usercode'] ?? null]);
   }
 
+  /** @param array<string,mixed> $sources */
   public static function resolveCtype(array $sources): string {
     return self::firstCtype($sources) ?? 'new';
   }
 
+  /** @param array<string,mixed> $sources */
   private static function firstCtype(array $sources): ?string {
     $direct = self::validCtype($sources['direct'] ?? null);
     if ($direct !== null) return $direct;
@@ -277,6 +302,7 @@ final class PostInput {
 
     $send_header = $sources['send_header'] ?? null;
     if (is_string($send_header) && $send_header !== '') {
+      $header_values = [];
       parse_str($send_header, $header_values);
       $header_usercode = $header_values['usercode'] ?? null;
       $ctype = self::ctypeFromQuery(is_string($header_usercode) ? $header_usercode : null);
@@ -291,6 +317,7 @@ final class PostInput {
   /** @param mixed $query */
   private static function ctypeFromQuery($query): ?string {
     if (!is_string($query) || $query === '') return null;
+    $values = [];
     parse_str($query, $values);
     return self::validCtype($values['ctype'] ?? null);
   }
@@ -302,6 +329,10 @@ final class PostInput {
 }
 
 final class PostValidator {
+  /**
+   * @param array<int,string> $blocked_hosts
+   * @return array<string,mixed>
+   */
   public static function configuredRules(
     bool $en,
     string $request_method,
@@ -335,6 +366,7 @@ final class PostValidator {
     ];
   }
 
+  /** @return array<string,mixed> */
   public static function inputFromHttp(): array {
     return [
       'sub' => (string)filter_input(INPUT_POST, 'sub'),
@@ -361,6 +393,10 @@ final class PostValidator {
     ];
   }
 
+  /**
+   * @param array<string,mixed> $input
+   * @param array<string,mixed> $rules
+   */
   public static function validate(array $input, array $rules): void {
     $en = (bool)($rules['en'] ?? false);
     if (($rules['request_method'] ?? '') !== 'POST') {

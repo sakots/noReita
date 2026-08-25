@@ -294,6 +294,7 @@ final class ImageService {
     return $paths;
   }
 
+  /** @return array<string,mixed> */
   public static function animationPlaybackData(string $image_dir, string $animation_name, int $speed): array {
     if (!self::isSafeAnimationFilename($animation_name)) {
       throw new InvalidArgumentException('Invalid animation filename.');
@@ -335,6 +336,7 @@ final class ImageService {
     ];
   }
 
+  /** @param array<int,string> $allowed_types */
   public static function validateUpload(string $file_path, array $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
     if (!is_file($file_path) || !is_readable($file_path)) return false;
     $file_size = filesize($file_path);
@@ -355,6 +357,7 @@ final class ImageService {
    * Stores a browser-uploaded image using the same time + microsecond basename
    * used by the drawing applications. The client filename is never retained.
    *
+   * @param array<string,mixed> $upload
    * @return array{picfile:string,img_w:int,img_h:int,pchfile:string,psec:int,utime:string,tool:string,thumbnail:string,nsfw:bool,ctype:string}
    */
   public static function storeUploadedImage(
@@ -493,6 +496,8 @@ final class ImageService {
    * Store a replay and the final PNG rendered from it by the browser as one pending drawing.
    * The .dat metadata is renamed last and therefore acts as the commit marker seen by readers.
    *
+   * @param array<string,mixed> $picture_upload
+   * @param array<string,mixed> $animation_upload
    * @return array{picfile:string,preview:string}
    */
   public static function storeUploadedAnimation(
@@ -592,7 +597,10 @@ final class ImageService {
     }
   }
 
-  /** @return array{path:string,size:int} */
+  /**
+   * @param array<string,mixed> $upload
+   * @return array{path:string,size:int}
+   */
   private static function checkedUploadedFile(array $upload, int $max_bytes, string $label): array {
     $error = $upload['error'] ?? UPLOAD_ERR_NO_FILE;
     $path = $upload['tmp_name'] ?? null;
@@ -626,6 +634,11 @@ final class ImageService {
     foreach (self::relatedFilePaths($image_dir, [$image_name]) as $path) safe_unlink($path);
   }
 
+  /**
+   * @param array<int,string> $image_names
+   * @param array<int,array<string,mixed>> $posts
+   * @return array<string,mixed>
+   */
   public static function stageRelatedFilesForDeletion(
     string $image_dir,
     string $staging_root,
@@ -677,6 +690,7 @@ final class ImageService {
     }
   }
 
+  /** @param array<string,mixed> $staged */
   public static function rollbackStagedDeletion(array $staged): void {
     $failed = false;
     foreach (array_reverse($staged['files'] ?? []) as $file) {
@@ -693,6 +707,7 @@ final class ImageService {
     self::removeDeletionStagingOperation($staged);
   }
 
+  /** @param array<string,mixed> $staged */
   public static function completeStagedDeletion(array $staged): void {
     foreach ($staged['files'] ?? [] as $file) {
       safe_unlink((string)($file['staged'] ?? ''));
@@ -700,6 +715,10 @@ final class ImageService {
     self::removeDeletionStagingOperation($staged);
   }
 
+  /**
+   * @param callable(array<int,array{id:int,picfile:string}>):bool $should_restore
+   * @return array<string,int>
+   */
   public static function recoverStagedDeletions(
     string $image_dir,
     string $staging_root,
@@ -794,6 +813,7 @@ final class ImageService {
     return $removed;
   }
 
+  /** @param array<int,string> $manifest_files */
   private static function deletionStagingContentsAreExpected(string $directory, array $manifest_files): bool {
     $allowed = array_fill_keys(array_merge($manifest_files, ['manifest.json', '.lock']), true);
     foreach (new DirectoryIterator($directory) as $entry) {
@@ -853,6 +873,7 @@ final class ImageService {
     return @rmdir($directory);
   }
 
+  /** @param array<int,string> $image_names */
   private static function relatedFilePaths(string $image_dir, array $image_names): array {
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
     $paths = [];
@@ -871,6 +892,7 @@ final class ImageService {
     return array_values($paths);
   }
 
+  /** @param array<int,array<string,mixed>> $posts */
   private static function normalizeDeletionManifestPosts(array $posts): array {
     $normalized = [];
     foreach ($posts as $post) {
@@ -884,6 +906,7 @@ final class ImageService {
     return array_values($normalized);
   }
 
+  /** @param array<string,mixed> $manifest */
   private static function writeDeletionManifest(string $directory, array $manifest): void {
     $json = json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     $temporary = $directory . DIRECTORY_SEPARATOR . '.manifest.tmp';
@@ -924,6 +947,7 @@ final class ImageService {
     return ['posts' => $posts, 'files' => array_values($files)];
   }
 
+  /** @param array<string,mixed> $staged */
   private static function removeDeletionStagingOperation(array $staged): void {
     $directory = (string)($staged['directory'] ?? '');
     if ($directory === '') return;
@@ -934,6 +958,7 @@ final class ImageService {
     if (is_dir($directory)) @rmdir($directory);
   }
 
+  /** @param array<string,mixed> $staged */
   private static function releaseDeletionLock(array $staged): void {
     $handle = $staged['lock_handle'] ?? null;
     if (is_resource($handle)) {
@@ -1000,6 +1025,7 @@ final class ImageService {
     return $new_thumbnail;
   }
 
+  /** @return array<string,mixed> */
   public static function finalizeNewPost(
     string $temp_dir,
     string $image_dir,
@@ -1079,6 +1105,7 @@ final class ImageService {
     ];
   }
 
+  /** @return array<string,mixed> */
   public static function replacePostedFiles(
     string $temp_dir,
     string $image_dir,
@@ -1175,12 +1202,14 @@ final class ImageService {
     ];
   }
 
+  /** @param array<string,mixed> $replacement */
   public static function rollbackPostedReplacement(array $replacement): void {
     foreach ($replacement['created_files'] ?? [] as $created_file) {
       safe_unlink((string)$created_file);
     }
   }
 
+  /** @param array<string,mixed> $replacement */
   public static function completePostedReplacement(array $replacement): void {
     foreach ($replacement['old_files'] ?? [] as $old_file) {
       safe_unlink((string)$old_file);
