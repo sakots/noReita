@@ -47,7 +47,8 @@ return [
     // 本文で一致した規則の点数を合計し、threshold以上なら投稿を拒否します。0なら無効です。
     'comment_score_rules' => [
       ['未承諾広告', 2],
-      ['https?://', 2],
+      // / は正規表現の区切り文字なので \ でエスケープします。
+      ['https?:\\/\\/', 2],
     ],
     'comment_score_threshold' => 3,
   ],
