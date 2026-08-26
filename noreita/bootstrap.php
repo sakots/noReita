@@ -5,7 +5,7 @@ require_once __DIR__ . '/config_loader.inc.php';
 
 const NOREITA_MIN_PHP_VERSION = '8.1.0';
 const NOREITA_MIN_PHP_VERSION_ID = 80100;
-const NOREITA_VERSION = '4.3.0';
+const NOREITA_VERSION = '4.3.1';
 
 if (PHP_VERSION_ID < NOREITA_MIN_PHP_VERSION_ID) {
   if (!headers_sent()) {
