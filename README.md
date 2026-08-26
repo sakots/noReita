@@ -145,7 +145,6 @@ return [
       ['PCCS_HSL', 'p_PCCS.txt'],
       ['マンセルHV/C', 'p_munsellHVC.txt'],
       ['マンセルV2', 'p_munsell_V2_.txt'],
-      ['やこうさん', 'palette.dat'],
     ],
   ],
 ];
