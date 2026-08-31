@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.3.1 lot.260826.0';
+const REITA_VER = 'v4.4.0 lot.260901.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -934,6 +934,9 @@ function def(ApplicationContext $context): void {
         if (Config::bool('features.external_image_thumbnail')) {
           $res['com'] = external_image_service()->addThumbnailLinks($res['com']);
         }
+        if (Config::bool('features.external_link_preview')) {
+          $res['com'] = external_link_preview_service()->addCards($res['com']);
+        }
         //ハッシュタグ
         if (Config::bool('features.hashtag')) $res['com'] = hashtag_link($res['com']);
         //空行を縮める
@@ -959,6 +962,9 @@ function def(ApplicationContext $context): void {
       //画像URLにサムネイルを追加
       if (Config::bool('features.external_image_thumbnail')) {
         $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
+      }
+      if (Config::bool('features.external_link_preview')) {
+        $bbsline['com'] = external_link_preview_service()->addCards($bbsline['com']);
       }
       //ハッシュタグ
       if (Config::bool('features.hashtag')) $bbsline['com'] = hashtag_link($bbsline['com']);
@@ -1244,6 +1250,12 @@ function res(ApplicationContext $context): void {
         if (Config::bool('features.autolink')) {
           $res['com'] = auto_link($res['com']);
         }
+        if (Config::bool('features.external_image_thumbnail')) {
+          $res['com'] = external_image_service()->addThumbnailLinks($res['com']);
+        }
+        if (Config::bool('features.external_link_preview')) {
+          $res['com'] = external_link_preview_service()->addCards($res['com']);
+        }
         //ハッシュタグ
         if (Config::bool('features.hashtag')) {
           $res['com'] = hashtag_link($res['com']);
@@ -1276,6 +1288,9 @@ function res(ApplicationContext $context): void {
       //画像URLにサムネイルを追加
       if (Config::bool('features.external_image_thumbnail')) {
         $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
+      }
+      if (Config::bool('features.external_link_preview')) {
+        $bbsline['com'] = external_link_preview_service()->addCards($bbsline['com']);
       }
       //ハッシュタグ
       if (Config::bool('features.hashtag')) {

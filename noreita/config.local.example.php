@@ -41,6 +41,8 @@ return [
     'diary_mode' => false,
     // 日記モード中に一般利用者からの返信を許可する場合はtrueにします。
     'diary_allow_public_replies' => true,
+    // 本文中の外部リンクをOGPリンクカードとして表示します。
+    'external_link_preview' => true,
   ],
 
   'spam' => [
