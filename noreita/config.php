@@ -116,6 +116,8 @@ return [
     'misskey_note' => true,
     // 本文中の外部画像URLをサムネイル表示します。
     'external_image_thumbnail' => true,
+    // 本文中の外部リンクからOGP情報を取得してリンクカードを表示します。
+    'external_link_preview' => true,
     // NSFW指定と、該当画像を隠して表示する機能を有効にします。
     'nsfw' => true,
     // 投稿者IDを生成して投稿に表示します。

@@ -72,6 +72,14 @@ final class ExternalImageService {
     return $comment;
   }
 
+  // OGP画像など、拡張子を持たない画像URLにもキャッシュ済みサムネイルを返す。
+  public function thumbnailUrlFor(string $url): ?string {
+    if (!filter_var($url, FILTER_VALIDATE_URL)) return null;
+    $thumbnail_base = rtrim($this->thumbnail_dir, '/\\') . DIRECTORY_SEPARATOR . md5($url) . '_thumb';
+    $thumbnail_path = $this->findThumbnail($thumbnail_base) ?? $this->createThumbnailWithinLimits($url, $thumbnail_base);
+    return $thumbnail_path === null ? null : rtrim($this->thumbnail_url, '/') . '/' . rawurlencode(basename($thumbnail_path));
+  }
+
   private function createThumbnailWithinLimits(string $url, string $thumbnail_base): ?string {
     if ($this->fetch_count >= $this->max_fetches_per_request) return null;
     if (!$this->prepareFailureCacheDirectory()) return null;
@@ -327,6 +335,197 @@ final class ExternalImageService {
     }
     return false;
   }
+}
+
+final class ExternalLinkPreviewService {
+  private const MAX_BYTES = 524288;
+  private const MAX_URLS_PER_POST = 2;
+  private const MAX_FETCHES_PER_REQUEST = 2;
+  private const CACHE_TTL = 86400;
+  private const FAILURE_CACHE_TTL = 300;
+  private const MAX_REDIRECTS = 5;
+  private string $cache_dir;
+  private int $file_permission;
+  private int $directory_permission;
+  private int $fetch_count = 0;
+
+  public function __construct(string $cache_dir, int $file_permission, int $directory_permission) {
+    $this->cache_dir = rtrim($cache_dir, '/\\') . DIRECTORY_SEPARATOR . '.external-link-previews';
+    $this->file_permission = $file_permission;
+    $this->directory_permission = $directory_permission;
+  }
+
+  // 自動リンク済みの本文へ、各URLにつき一枚だけカードを追加する。
+  public function addCards(string $comment): string {
+    $seen = [];
+    $added = 0;
+    return preg_replace_callback('~<a\\b[^>]*\\bhref="([^"]+)"[^>]*>.*?</a>~is', function (array $match) use (&$seen, &$added): string {
+      $url = html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5);
+      if ($added >= self::MAX_URLS_PER_POST || isset($seen[$url]) || self::isImageUrl($url)) return $match[0];
+      $seen[$url] = true;
+      $preview = $this->preview($url);
+      if ($preview === null) return $match[0];
+      $added++;
+      return $match[0] . $this->cardHtml($url, $preview);
+    }, $comment) ?? $comment;
+  }
+
+  /** @return array{title:string,description:string,image:string}|null */
+  public function preview(string $url): ?array {
+    if (!self::isPublicHttpUrl($url)) return null;
+    $path = $this->cache_dir . DIRECTORY_SEPARATOR . hash('sha256', $url) . '.json';
+    $cached = $this->readCachedPreview($path);
+    if ($cached !== null) return $cached;
+    $failure_path = $this->cache_dir . DIRECTORY_SEPARATOR . hash('sha256', $url) . '.failure';
+    if ($this->hasFreshFailure($failure_path) || $this->fetch_count >= self::MAX_FETCHES_PER_REQUEST) return null;
+    $this->fetch_count++;
+    $html = self::downloadHtml($url);
+    if ($html === false) {
+      $this->writeFailure($failure_path);
+      return null;
+    }
+    $preview = self::metadataFromHtml($html, $url);
+    if ($preview === null) {
+      $this->writeFailure($failure_path);
+      return null;
+    }
+    if (!is_dir($this->cache_dir) && !@mkdir($this->cache_dir, $this->directory_permission, true) && !is_dir($this->cache_dir)) return $preview;
+    $payload = json_encode(['stored_at' => time(), 'preview' => $preview], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (is_string($payload) && @file_put_contents($path, $payload, LOCK_EX) !== false) @chmod($path, $this->file_permission);
+    @unlink($failure_path);
+    return $preview;
+  }
+
+  /** @return array{title:string,description:string,image:string}|null */
+  public static function metadataFromHtml(string $html, string $base_url): ?array {
+    $values = [];
+    if (preg_match_all('~<meta\\s+[^>]*>~is', $html, $tags)) {
+      foreach ($tags[0] as $tag) {
+        if (!preg_match('~(?:property|name)\\s*=\\s*(["\\\'])([^"\\\']+)\\1~i', $tag, $name_match)
+          || !preg_match('~content\\s*=\\s*(["\\\'])(.*?)\\1~is', $tag, $content_match)) continue;
+        $name = strtolower($name_match[2]);
+        if (in_array($name, ['og:title', 'twitter:title', 'og:description', 'twitter:description', 'og:image', 'twitter:image'], true)
+          && !isset($values[$name])) $values[$name] = self::cleanText($content_match[2], 500);
+      }
+    }
+    $title = $values['og:title'] ?? $values['twitter:title'] ?? '';
+    if ($title === '' && preg_match('~<title[^>]*>(.*?)</title>~is', $html, $title_match)) $title = self::cleanText($title_match[1], 200);
+    $description = $values['og:description'] ?? $values['twitter:description'] ?? '';
+    $image = $values['og:image'] ?? $values['twitter:image'] ?? '';
+    $image = $image === '' ? '' : ExternalImageService::resolveRedirectUrl($base_url, $image);
+    if (!is_string($image) || !self::isHttpUrl($image)) $image = '';
+    return $title === '' && $description === '' && $image === '' ? null : ['title' => $title, 'description' => $description, 'image' => $image];
+  }
+
+  private function readCachedPreview(string $path): ?array {
+    if (!is_file($path) || @filemtime($path) < time() - self::CACHE_TTL) return null;
+    $data = json_decode((string)@file_get_contents($path), true);
+    $preview = is_array($data) ? ($data['preview'] ?? null) : null;
+    if (!is_array($preview) || !is_string($preview['title'] ?? null) || !is_string($preview['description'] ?? null) || !is_string($preview['image'] ?? null)) return null;
+    return ['title' => $preview['title'], 'description' => $preview['description'], 'image' => $preview['image']];
+  }
+
+  private function hasFreshFailure(string $path): bool {
+    $modified = @filemtime($path);
+    if (!is_int($modified)) return false;
+    if ($modified >= time() - self::FAILURE_CACHE_TTL) return true;
+    @unlink($path);
+    return false;
+  }
+
+  private function writeFailure(string $path): void {
+    if (!is_dir($this->cache_dir) && !@mkdir($this->cache_dir, $this->directory_permission, true) && !is_dir($this->cache_dir)) return;
+    if (@file_put_contents($path, (string)time(), LOCK_EX) !== false) @chmod($path, $this->file_permission);
+  }
+
+  /** @param array{title:string,description:string,image:string} $preview */
+  private function cardHtml(string $url, array $preview): string {
+    $title = $preview['title'] !== '' ? $preview['title'] : parse_url($url, PHP_URL_HOST);
+    $image = $preview['image'] !== '' ? external_image_service()->thumbnailUrlFor($preview['image']) : null;
+    $html = '<aside class="external-link-card"><a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_HTML5)
+      . '" target="_blank" rel="nofollow noopener noreferrer">';
+    if ($image !== null) $html .= '<img src="' . htmlspecialchars($image, ENT_QUOTES | ENT_HTML5) . '" alt="" loading="lazy">';
+    $html .= '<span class="external-link-card-body"><strong>' . htmlspecialchars((string)$title, ENT_QUOTES | ENT_HTML5) . '</strong>';
+    if ($preview['description'] !== '') $html .= '<span>' . htmlspecialchars($preview['description'], ENT_QUOTES | ENT_HTML5) . '</span>';
+    $html .= '<small>' . htmlspecialchars((string)parse_url($url, PHP_URL_HOST), ENT_QUOTES | ENT_HTML5) . '</small></span></a></aside>';
+    return $html;
+  }
+
+  private static function cleanText(string $value, int $limit): string {
+    $value = trim((string)preg_replace('/\\s+/u', ' ', html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5)));
+    return function_exists('mb_substr') ? mb_substr($value, 0, $limit) : substr($value, 0, $limit);
+  }
+
+  private static function isImageUrl(string $url): bool {
+    return preg_match('/\\.(?:jpg|jpeg|png|gif|webp|avif)(?:[?#].*)?$/i', $url) === 1;
+  }
+
+  private static function isPublicHttpUrl(string $url): bool {
+    if (!self::isHttpUrl($url)) return false;
+    $parts = parse_url($url);
+    return ExternalImageService::resolvePublicIp((string)$parts['host']) !== false;
+  }
+
+  private static function isHttpUrl(string $url): bool {
+    $parts = parse_url($url);
+    return is_array($parts) && in_array(strtolower((string)($parts['scheme'] ?? '')), ['http', 'https'], true)
+      && isset($parts['host']) && !isset($parts['user']) && !isset($parts['pass']);
+  }
+
+  /** @return string|false */
+  private static function downloadHtml(string $url) {
+    if (!function_exists('curl_init')) return false;
+    for ($redirects = 0; $redirects <= self::MAX_REDIRECTS; $redirects++) {
+      if (!self::isPublicHttpUrl($url)) return false;
+      $parts = parse_url($url);
+      $scheme = strtolower((string)$parts['scheme']);
+      $port = isset($parts['port']) ? (int)$parts['port'] : ($scheme === 'https' ? 443 : 80);
+      if ($port < 1 || $port > 65535) return false;
+      $ip = ExternalImageService::resolvePublicIp((string)$parts['host']);
+      if ($ip === false) return false;
+      $body = '';
+      $location = '';
+      $content_type = '';
+      $too_large = false;
+      $curl = curl_init();
+      curl_setopt_array($curl, [
+        CURLOPT_URL => $url, CURLOPT_RETURNTRANSFER => false, CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_TIMEOUT => 5, CURLOPT_USERAGENT => 'noReita link preview/1.0',
+        CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+        CURLOPT_PROXY => '', CURLOPT_RESOLVE => [$parts['host'] . ':' . $port . ':' . $ip],
+        CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$location, &$content_type, &$too_large): int {
+          if (stripos($header, 'Location:') === 0) $location = trim(substr($header, 9));
+          elseif (stripos($header, 'Content-Type:') === 0) $content_type = strtolower(trim(explode(';', substr($header, 13))[0]));
+          elseif (stripos($header, 'Content-Length:') === 0 && (int)trim(substr($header, 15)) > self::MAX_BYTES) { $too_large = true; return 0; }
+          return strlen($header);
+        },
+        CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk) use (&$body, &$too_large): int {
+          if (strlen($body) + strlen($chunk) > self::MAX_BYTES) { $too_large = true; return 0; }
+          $body .= $chunk;
+          return strlen($chunk);
+        },
+      ]);
+      $success = curl_exec($curl);
+      $code = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+      curl_close($curl);
+      if ($success && $code === 200 && !$too_large && $body !== '' && ($content_type === '' || str_starts_with($content_type, 'text/html'))) return $body;
+      if ($too_large || !in_array($code, [301, 302, 303, 307, 308], true) || $location === '') return false;
+      $url = ExternalImageService::resolveRedirectUrl($url, $location);
+      if ($url === false) return false;
+    }
+    return false;
+  }
+}
+
+function external_link_preview_service(): ExternalLinkPreviewService {
+  static $service = null;
+  if ($service === null) {
+    $service = new ExternalLinkPreviewService(
+      __DIR__ . '/thumbnail', Config::int('permissions.private_file'), Config::int('permissions.private_directory')
+    );
+  }
+  return $service;
 }
 
 function external_image_service(): ExternalImageService {

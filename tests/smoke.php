@@ -1720,6 +1720,29 @@ smoke_test('external URL security boundaries', static function (): bool {
     && ExternalImageService::resolveRedirectUrl('https://example.com/a/b.png', "https://example.com/x\nInjected: yes") === false;
 });
 
+smoke_test('external link previews parse cached OGP metadata without fetching in the browser', static function (): bool {
+  $html = '<html><head><meta property="og:title" content="Example title"><meta property="og:description" content="Example description"><meta property="og:image" content="/card.png"></head></html>';
+  $metadata = ExternalLinkPreviewService::metadataFromHtml($html, 'https://example.com/page');
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_link_preview_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $cache = $directory . DIRECTORY_SEPARATOR . '.external-link-previews';
+    if (!mkdir($cache, 0700)) return false;
+    $url = 'https://93.184.216.34/example';
+    $payload = json_encode(['stored_at' => time(), 'preview' => ['title' => 'Cached title', 'description' => 'Cached description', 'image' => '']]);
+    if (!is_string($payload) || file_put_contents($cache . DIRECTORY_SEPARATOR . hash('sha256', $url) . '.json', $payload) === false) return false;
+    $service = new ExternalLinkPreviewService($directory, 0600, 0700);
+    $card = $service->addCards('<a href="' . $url . '">' . $url . '</a>');
+    return $metadata === ['title' => 'Example title', 'description' => 'Example description', 'image' => 'https://example.com/card.png']
+      && str_contains($card, 'external-link-card') && str_contains($card, 'Cached title')
+      && !str_contains($service->addCards('<a href="https://93.184.216.34/image.png">image</a>'), 'external-link-card');
+  } finally {
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '.external-link-previews' . DIRECTORY_SEPARATOR . '*') ?: [] as $file) unlink($file);
+    if (is_dir($directory . DIRECTORY_SEPARATOR . '.external-link-previews')) rmdir($directory . DIRECTORY_SEPARATOR . '.external-link-previews');
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
 smoke_test('Misskey server URLs reject SSRF destinations', static function (): bool {
   return MisskeyServerSecurity::resolvePublicIp('127.0.0.1') === false
     && MisskeyServerSecurity::resolvePublicIp('169.254.169.254') === false
