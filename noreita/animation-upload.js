@@ -310,7 +310,14 @@
     const directUpload = form.querySelector('[name="image_upload"]');
     const animationUpload = form.querySelector('[data-animation-upload-file]');
     const status = form.querySelector('[data-animation-upload-status]');
-    if (!temporaryImage || (!directUpload && !animationUpload)) return;
+    if (directUpload) {
+      directUpload.addEventListener('change', () => {
+        const file = directUpload.files && directUpload.files[0];
+        if (file) showImageUploadPreview(form, file);
+        else clearImageUploadPreview(form);
+      });
+    }
+    if (!temporaryImage) return;
 
     const clearTemporaryImage = () => {
       if (temporaryImage.value === '') return false;
@@ -327,13 +334,13 @@
       if (temporaryImage.value === '') return;
       const clearedImage = clearFileInput(directUpload);
       const clearedAnimation = clearFileInput(animationUpload);
+      if (clearedImage) clearImageUploadPreview(form);
       if (status && (clearedImage || clearedAnimation)) {
         status.textContent = '投稿途中の画像を選択したため、画像・動画の選択を解除しました。';
       }
     });
     if (directUpload) {
       directUpload.addEventListener('change', () => {
-        showImageUploadPreview(form, directUpload.files && directUpload.files[0]);
         if (directUpload.files && directUpload.files[0] && clearTemporaryImage() && status) {
           status.textContent = '画像を選択したため、投稿途中の画像の選択を解除しました。';
         }
