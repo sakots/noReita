@@ -73,7 +73,8 @@ smoke_test('post image candidates replace each other in the post form', static f
     && str_contains($script, "input.value = '';")
     && str_contains($script, "directUpload.value = '';")
     && str_contains($script, 'showPreparedPreview')
-    && str_contains($script, 'プレビューを確認してから「書き込む」を押してください。');
+    && str_contains($script, 'プレビューを確認してから「書き込む」を押してください。')
+    && !str_contains($script, '別の動画へ変更する場合はページを再読み込みしてください。');
 });
 
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {

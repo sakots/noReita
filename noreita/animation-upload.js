@@ -14,8 +14,6 @@
     maxWidth: Number(loader.dataset.maxWidth || 0),
     maxHeight: Number(loader.dataset.maxHeight || 0),
   };
-  let engineUsed = false;
-
   const assetUrl = (directory, filename) => `${directory.replace(/\/?$/, '/')}${filename}`;
   const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
@@ -356,6 +354,7 @@
     if (!form || !status) return;
     const directUpload = form.querySelector('[name="image_upload"]');
     let processing = false;
+    let preparing = false;
     let preparedPicture = null;
     let preparation = null;
 
@@ -364,6 +363,8 @@
         if (!directUpload.files || !directUpload.files[0]) return;
         if (input.files && input.files[0]) {
           input.value = '';
+          preparedPicture = null;
+          preparation = null;
           status.textContent = '画像を選択したため、動画の選択を解除しました。';
         }
       });
@@ -376,21 +377,29 @@
         status.textContent = '';
         return;
       }
+      if (preparing) {
+        status.textContent = '動画を確認中です。完了してから選択を変更してください。';
+        return;
+      }
       if (directUpload && directUpload.files && directUpload.files[0]) {
         directUpload.value = '';
         clearImageUploadPreview(form);
         status.textContent = '動画を選択したため、画像の選択を解除しました。';
         return;
       }
-      if (engineUsed) {
-        status.textContent = '別の動画へ変更する場合はページを再読み込みしてください。';
-        return;
-      }
-      engineUsed = true;
+      preparedPicture = null;
+      preparing = true;
       status.textContent = '動画を確認してプレビューを生成しています…';
       const file = input.files[0];
       preparation = prepareAnimation(file, status)
         .then((picture) => {
+          // 確認中に別のファイルが選ばれた場合は、古い結果を表示せず新しい選択を続けて処理する。
+          if (!input.files || input.files[0] !== file) {
+            preparation = null;
+            preparing = false;
+            window.setTimeout(() => input.dispatchEvent(new Event('change')), 0);
+            return picture;
+          }
           preparedPicture = picture;
           showPreparedPreview(form, picture);
           status.textContent = 'プレビューを確認してから「書き込む」を押してください。';
@@ -398,10 +407,10 @@
         })
         .catch((error) => {
           preparedPicture = null;
-          engineUsed = false;
           status.textContent = error instanceof Error ? error.message : String(error);
           throw error;
-        });
+        })
+        .finally(() => { preparing = false; });
       preparation.catch(() => {});
     });
 
@@ -419,9 +428,9 @@
       form.querySelectorAll('[type="submit"]').forEach((submit) => { submit.disabled = true; });
       try {
         if (!preparation) {
-          engineUsed = true;
+          preparing = true;
           status.textContent = '動画を確認してプレビューを生成しています…';
-          preparation = prepareAnimation(file, status);
+          preparation = prepareAnimation(file, status).finally(() => { preparing = false; });
         }
         const picture = preparedPicture || await preparation;
         preparedPicture = picture;
@@ -448,7 +457,6 @@
         }
       } catch (error) {
         document.querySelectorAll('[aria-label="PCH変換"]').forEach((overlay) => overlay.remove());
-        engineUsed = false;
         processing = false;
         status.textContent = error instanceof Error ? error.message : String(error);
         form.querySelectorAll('[type="submit"]').forEach((submit) => { submit.disabled = false; });
