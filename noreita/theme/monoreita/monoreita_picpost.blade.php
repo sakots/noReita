@@ -96,6 +96,7 @@
               <td>画像</td>
               <td>
                 <input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
+                <div data-image-upload-preview></div>
               </td>
             </tr>
             @endif
@@ -104,7 +105,7 @@
               <td>動画</td>
               <td>
                 <input type="file" name="animation_upload" accept="{{$animation_upload_accept}}" data-animation-upload-file>
-                （{{$animation_upload_format_label}}、{{$animation_upload_max_kb}}KBまで。「書き込む」で確認・投稿）
+                （{{$animation_upload_format_label}}、{{$animation_upload_max_kb}}KBまで。選択するとプレビューを生成します）
                 <span data-animation-upload-status aria-live="polite"></span>
                 <div data-animation-upload-preview></div>
               </td>

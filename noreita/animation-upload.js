@@ -236,6 +236,55 @@
     }
   }
 
+  function showPreparedPreview(form, picture) {
+    const preview = form.querySelector('[data-animation-upload-preview]');
+    if (!preview) return;
+    const previousUrl = preview.dataset.objectUrl;
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+    const objectUrl = URL.createObjectURL(picture);
+    preview.dataset.objectUrl = objectUrl;
+    preview.replaceChildren();
+    const image = document.createElement('img');
+    image.src = objectUrl;
+    image.alt = '動画から生成した投稿プレビュー';
+    image.style.maxWidth = '240px';
+    image.style.maxHeight = '240px';
+    preview.appendChild(image);
+  }
+
+  function clearImageUploadPreview(form) {
+    const preview = form.querySelector('[data-image-upload-preview]');
+    if (!preview) return;
+    if (preview.dataset.objectUrl) URL.revokeObjectURL(preview.dataset.objectUrl);
+    delete preview.dataset.objectUrl;
+    preview.replaceChildren();
+  }
+
+  function showImageUploadPreview(form, file) {
+    const preview = form.querySelector('[data-image-upload-preview]');
+    if (!preview || !file) return;
+    clearImageUploadPreview(form);
+    const objectUrl = URL.createObjectURL(file);
+    preview.dataset.objectUrl = objectUrl;
+    const image = document.createElement('img');
+    image.src = objectUrl;
+    image.alt = 'アップロード画像の投稿プレビュー';
+    image.style.maxWidth = '240px';
+    image.style.maxHeight = '240px';
+    preview.appendChild(image);
+  }
+
+  async function prepareAnimation(file, status) {
+    const extension = file.name.toLowerCase().split('.').pop();
+    if (extension !== 'pch' && extension !== 'tgkr') throw new Error('PCHまたはTGKRファイルを選択してください。');
+    if (extension === 'tgkr' && !settings.tegakiEnabled) throw new Error('Tegaki.jsが無効なためTGKRは利用できません。');
+    if (settings.maxWorkBytes < 1 || file.size < 1 || file.size > settings.maxWorkBytes) throw new Error('動画ファイルの容量が上限を超えています。');
+    const buffer = await file.arrayBuffer();
+    return extension === 'pch'
+      ? convertPch(buffer)
+      : convertTgkr(buffer, (message) => { status.textContent = message; });
+  }
+
   async function uploadConverted(form, file, picture) {
     const data = new FormData();
     const token = form.querySelector('[name="token"]');
@@ -286,6 +335,7 @@
     });
     if (directUpload) {
       directUpload.addEventListener('change', () => {
+        showImageUploadPreview(form, directUpload.files && directUpload.files[0]);
         if (directUpload.files && directUpload.files[0] && clearTemporaryImage() && status) {
           status.textContent = '画像を選択したため、投稿途中の画像の選択を解除しました。';
         }
@@ -306,6 +356,8 @@
     if (!form || !status) return;
     const directUpload = form.querySelector('[name="image_upload"]');
     let processing = false;
+    let preparedPicture = null;
+    let preparation = null;
 
     if (directUpload) {
       directUpload.addEventListener('change', () => {
@@ -319,15 +371,38 @@
 
     input.addEventListener('change', () => {
       if (!input.files || !input.files[0]) {
+        preparedPicture = null;
+        preparation = null;
         status.textContent = '';
         return;
       }
       if (directUpload && directUpload.files && directUpload.files[0]) {
         directUpload.value = '';
+        clearImageUploadPreview(form);
         status.textContent = '動画を選択したため、画像の選択を解除しました。';
         return;
       }
-      status.textContent = '「書き込む」を押すと、動画を確認して投稿します。';
+      if (engineUsed) {
+        status.textContent = '別の動画へ変更する場合はページを再読み込みしてください。';
+        return;
+      }
+      engineUsed = true;
+      status.textContent = '動画を確認してプレビューを生成しています…';
+      const file = input.files[0];
+      preparation = prepareAnimation(file, status)
+        .then((picture) => {
+          preparedPicture = picture;
+          showPreparedPreview(form, picture);
+          status.textContent = 'プレビューを確認してから「書き込む」を押してください。';
+          return picture;
+        })
+        .catch((error) => {
+          preparedPicture = null;
+          engineUsed = false;
+          status.textContent = error instanceof Error ? error.message : String(error);
+          throw error;
+        });
+      preparation.catch(() => {});
     });
 
     form.addEventListener('submit', async (event) => {
@@ -340,33 +415,17 @@
         status.textContent = '画像と動画は同時に投稿できません。片方を選び直してください。';
         return;
       }
-      const extension = file.name.toLowerCase().split('.').pop();
-      if (extension !== 'pch' && extension !== 'tgkr') {
-        status.textContent = 'PCHまたはTGKRファイルを選択してください。';
-        return;
-      }
-      if (extension === 'tgkr' && !settings.tegakiEnabled) {
-        status.textContent = 'Tegaki.jsが無効なためTGKRは利用できません。';
-        return;
-      }
-      if (settings.maxWorkBytes < 1 || file.size < 1 || file.size > settings.maxWorkBytes) {
-        status.textContent = '動画ファイルの容量が上限を超えています。';
-        return;
-      }
-      if (engineUsed) {
-        status.textContent = '別の動画へ変更する場合はページを再読み込みしてください。';
-        return;
-      }
       processing = true;
-      engineUsed = true;
       form.querySelectorAll('[type="submit"]').forEach((submit) => { submit.disabled = true; });
-      status.textContent = '動画を確認しています。投稿が完了するまでお待ちください…';
       try {
-        const buffer = await file.arrayBuffer();
-        const picture = extension === 'pch'
-          ? await convertPch(buffer)
-          : await convertTgkr(buffer, (message) => { status.textContent = message; });
-        status.textContent = '生成した画像と動画を保存しています…';
+        if (!preparation) {
+          engineUsed = true;
+          status.textContent = '動画を確認してプレビューを生成しています…';
+          preparation = prepareAnimation(file, status);
+        }
+        const picture = preparedPicture || await preparation;
+        preparedPicture = picture;
+        status.textContent = 'プレビュー確認済みの画像と動画を保存しています…';
         const result = await uploadConverted(form, file, picture);
         setFormImage(form, result.filename, result.previewUrl);
         input.value = '';

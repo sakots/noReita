@@ -71,7 +71,9 @@ smoke_test('post image candidates replace each other in the post form', static f
     && str_contains($script, 'clearTemporaryImage')
     && str_contains($script, "directUpload.addEventListener('change'")
     && str_contains($script, "input.value = '';")
-    && str_contains($script, "directUpload.value = '';");
+    && str_contains($script, "directUpload.value = '';")
+    && str_contains($script, 'showPreparedPreview')
+    && str_contains($script, 'プレビューを確認してから「書き込む」を押してください。');
 });
 
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {

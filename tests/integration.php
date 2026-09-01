@@ -453,7 +453,7 @@ PHP;
       && str_contains($pictmp_body, 'data-animation-upload-file')
       && str_contains($pictmp_body, 'name="animation_upload"')
       && str_contains($pictmp_body, 'accept=".pch,.tgkr"')
-      && str_contains($pictmp_body, '「書き込む」で確認・投稿')
+      && str_contains($pictmp_body, '選択するとプレビューを生成します')
       && !str_contains($pictmp_body, 'data-animation-upload-button')
       && str_contains($pictmp_body, 'animation-upload.js?');
   });
