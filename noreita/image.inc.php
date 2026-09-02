@@ -49,12 +49,78 @@ final class ImageService {
     if (!is_string($decoder) || !function_exists($decoder)) return false;
     try {
       $image = @call_user_func($decoder, $file_path);
-      if ($image === false) return false;
+      // GD 2.x cannot decode animated WebP even when WebP support is enabled.
+      // Its RIFF container and dimensions are validated by the caller; recognize only
+      // a structurally valid animated container here so ordinary malformed WebP remains rejected.
+      if ($image === false) return $mime_type === 'image/webp' && self::isAnimatedWebp($file_path);
       unset($image);
       return true;
     } catch (Throwable) {
+      return $mime_type === 'image/webp' && self::isAnimatedWebp($file_path);
+    }
+  }
+
+  /**
+   * Check the bounded RIFF chunk layout used by animated WebP files.
+   *
+   * @param string $file_path
+   * @return bool
+   */
+  private static function isAnimatedWebp(string $file_path): bool {
+    $data = @file_get_contents($file_path);
+    if (!is_string($data) || strlen($data) < 20 || substr($data, 0, 4) !== 'RIFF' || substr($data, 8, 4) !== 'WEBP') {
       return false;
     }
+    $declared_size = unpack('Vsize', substr($data, 4, 4));
+    if (!is_array($declared_size) || (int)($declared_size['size'] ?? 0) !== strlen($data) - 8) return false;
+
+    $offset = 12;
+    $has_animation_flag = false;
+    $has_animation_header = false;
+    $has_animation_frame = false;
+    $length = strlen($data);
+    while ($offset + 8 <= $length) {
+      $chunk = substr($data, $offset, 4);
+      $size_data = unpack('Vsize', substr($data, $offset + 4, 4));
+      $size = is_array($size_data) ? (int)($size_data['size'] ?? -1) : -1;
+      $offset += 8;
+      if ($size < 0 || $size > $length - $offset) return false;
+      if ($chunk === 'VP8X' && $size >= 1 && (ord($data[$offset]) & 0x02) !== 0) $has_animation_flag = true;
+      if ($chunk === 'ANIM') $has_animation_header = true;
+      if ($chunk === 'ANMF') $has_animation_frame = true;
+      $offset += $size + ($size % 2);
+    }
+    return $offset === $length && $has_animation_flag && $has_animation_header && $has_animation_frame;
+  }
+
+  /**
+   * Extract the first ANMF frame as a standalone WebP that GD can decode.
+   *
+   * @param string $file_path
+   * @param string $destination
+   * @return bool
+   */
+  private static function extractAnimatedWebpFirstFrame(string $file_path, string $destination): bool {
+    $data = @file_get_contents($file_path);
+    if (!is_string($data) || !self::isAnimatedWebp($file_path)) return false;
+    $offset = 12;
+    $length = strlen($data);
+    while ($offset + 8 <= $length) {
+      $chunk = substr($data, $offset, 4);
+      $size_data = unpack('Vsize', substr($data, $offset + 4, 4));
+      $size = is_array($size_data) ? (int)($size_data['size'] ?? -1) : -1;
+      $payload_offset = $offset + 8;
+      if ($size < 0 || $size > $length - $payload_offset) return false;
+      if ($chunk === 'ANMF' && $size > 16) {
+        // ANMF starts with a 16-byte frame header. Its remaining nested chunks form a WebP image.
+        $frame_chunks = substr($data, $payload_offset + 16, $size - 16);
+        $frame = 'RIFF' . pack('V', 4 + strlen($frame_chunks)) . 'WEBP' . $frame_chunks;
+        return @file_put_contents($destination, $frame, LOCK_EX) === strlen($frame)
+          && self::isDecodableImage($destination, 'image/webp');
+      }
+      $offset = $payload_offset + $size + ($size % 2);
+    }
+    return false;
   }
 
   public static function isSafePostedImageFilename(string $filename): bool {
@@ -995,7 +1061,30 @@ final class ImageService {
       $temporary_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_thumbnail_' . bin2hex(random_bytes(8));
       if (!mkdir($temporary_dir, 0700)) throw new RuntimeException('Failed to prepare thumbnail directory.');
       try {
-        $temporary_thumbnail = self::createThumbnail($source, $temporary_dir, $thumbnail_width, $nsfw);
+        // GD 2.x cannot read animated WebP directly. Extract its first ANMF frame before
+        // thumbnailing; if that fails, never fall back to the original NSFW image.
+        $animated_webp = (($size['mime'] ?? '') === 'image/webp') && self::isAnimatedWebp($source);
+        $thumbnail_source = $source;
+        if ($animated_webp) {
+          $first_frame = $temporary_dir . DIRECTORY_SEPARATOR . 'animated-webp-first-frame.webp';
+          if (self::extractAnimatedWebpFirstFrame($source, $first_frame)) {
+            $thumbnail_source = $first_frame;
+          } elseif (!$nsfw) {
+            $current_thumbnail = basename($current_thumbnail);
+            if ($delete_current && $current_thumbnail !== '' && $current_thumbnail !== $image_name) {
+              safe_unlink($image_dir . $current_thumbnail);
+            }
+            return '';
+          }
+        }
+        $temporary_thumbnail = $thumbnail_source === $source && $animated_webp
+          ? ''
+          : self::createThumbnail($thumbnail_source, $temporary_dir, $thumbnail_width, $nsfw);
+        if ($temporary_thumbnail === '' && $nsfw) {
+          $temporary_thumbnail = self::createNsfwPlaceholderThumbnail(
+            $temporary_dir, $thumbnail_width, (int)$size[0], (int)$size[1]
+          );
+        }
         $temporary_path = $temporary_dir . DIRECTORY_SEPARATOR . $temporary_thumbnail;
         if ($temporary_thumbnail === '' || !is_file($temporary_path)) {
           throw new RuntimeException('Failed to update thumbnail.');
@@ -1023,6 +1112,38 @@ final class ImageService {
       safe_unlink($image_dir . $current_thumbnail);
     }
     return $new_thumbnail;
+  }
+
+  /**
+   * Create a non-revealing thumbnail when GD cannot decode an otherwise valid animated image.
+   *
+   * @param string $directory
+   * @param int $width
+   * @param int $source_width
+   * @param int $source_height
+   * @return string
+   */
+  private static function createNsfwPlaceholderThumbnail(string $directory, int $width, int $source_width, int $source_height): string {
+    if ($width < 1 || $source_width < 1 || $source_height < 1) return '';
+    $height = max(1, (int)floor($width * $source_height / $source_width));
+    $image = imagecreatetruecolor($width, $height);
+    if ($image === false) return '';
+    imagefill($image, 0, 0, imagecolorallocate($image, 0, 0, 0));
+    $base = $directory . DIRECTORY_SEPARATOR . 'nsfw-placeholder';
+    $result = false;
+    $name = '';
+    if (function_exists('imageavif')) {
+      $name = 'nsfw-placeholder.avif';
+      $result = imageavif($image, $base . '.avif', 70);
+    } elseif (function_exists('imagewebp')) {
+      $name = 'nsfw-placeholder.webp';
+      $result = imagewebp($image, $base . '.webp', 80);
+    } else {
+      $name = 'nsfw-placeholder.jpg';
+      $result = imagejpeg($image, $base . '.jpg', 80);
+    }
+    unset($image);
+    return $result ? $name : '';
   }
 
   /** @return array<string,mixed> */

@@ -1560,6 +1560,34 @@ smoke_test('image MIME mapping', static function (): bool {
     && get_image_type('image/avif') === '.avif';
 });
 
+smoke_test('animated WebP is accepted without GD frame decoding and remains intact for NSFW', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_animated_webp_' . bin2hex(random_bytes(8));
+  $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  if (!mkdir($temp, 0700, true) || !mkdir($images, 0700, true)) return false;
+  $webp = base64_decode('UklGRsAAAABXRUJQVlA4WAoAAAACAAAABwAABwAAQU5JTQYAAAD/////AABBTk1GSAAAAAAAAAAAAAcAAAcAAGQAAAJWUDggMAAAANABAJ0BKggACAACADQloAJ0ugH4AAOwAP7wxAv/ILlhdcjX/yA/5Af8gP/48gAAAEFOTUZEAAAAAAAAAAAABwAABwAAyAAAAFZQOCAsAAAAlAEAnQEqCAAIAAAANCWgAnS6AAOYAP75k2//kB//kB//kB//ID/iF3sgMAA=', true);
+  try {
+    if ($webp === false || file_put_contents($temp . DIRECTORY_SEPARATOR . 'animated.webp', $webp) !== strlen($webp)) return false;
+    $source_hash = hash_file('sha256', $temp . DIRECTORY_SEPARATOR . 'animated.webp');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'animated.dat', "ip\thost\tagent\t.webp\tcode\trep\t100\t160\t\tneo");
+    $result = ImageService::finalizeNewPost($temp, $images, 'animated.webp', 'new', true, 100, true, 0600);
+    $thumbnail = $images . DIRECTORY_SEPARATOR . (string)$result['thumbnail'];
+    $thumbnail_image = is_file($thumbnail) ? @imagecreatefromstring((string)file_get_contents($thumbnail)) : false;
+    $thumbnail_color = $thumbnail_image === false ? 0 : imagecolorat($thumbnail_image, 0, 0);
+    unset($thumbnail_image);
+    return hash_file('sha256', $images . DIRECTORY_SEPARATOR . 'animated.webp') === $source_hash
+      && str_starts_with((string)$result['thumbnail'], 'animated_thumb_nsfw_')
+      && is_file($thumbnail)
+      && (($thumbnail_color >> 16) & 0xff) > 0;
+  } finally {
+    foreach ([$temp, $images] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) if (is_file($file)) unlink($file);
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 smoke_test('image upload formats follow available GD decoders', static function (): bool {
   $without_avif = static fn(string $function): bool => $function !== 'imagecreatefromavif';
   $with_everything = static fn(string $function): bool => true;
