@@ -18,8 +18,10 @@
 </h5>
 <div class="item_image">
   <a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
-    <span @if ($bbsline['nsfw'] == 1) class="nsfw" @endif>
-      @if ($bbsline['thumb'])
+    <span @if ($bbsline['nsfw'] == 1) class="nsfw@if (str_ends_with($bbsline['picfile'], '.avif')) nsfw-browser-blur@endif" @endif>
+      @if ($bbsline['nsfw'] == 1 && str_ends_with($bbsline['picfile'], '.avif'))
+        <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
+      @elseif ($bbsline['thumb'])
         <img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">
       @else
         <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['picfile']}}" loading="lazy" class="image">

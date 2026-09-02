@@ -1588,6 +1588,20 @@ smoke_test('animated WebP is accepted without GD frame decoding and remains inta
   }
 });
 
+smoke_test('animated AVIF NSFW thumbnails use the largest declared frame dimensions', static function (): bool {
+  $file = tempnam(sys_get_temp_dir(), 'noreita_animated_avif_');
+  if ($file === false) return false;
+  $avif = base64_decode('AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAARdtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAANGlsb2MAAAAAREAAAgABAAAAAAE7AAEAAAAAAAAAIAACAAAAAAFbAAEAAAAAAAAAIQAAADhpaW5mAAAAAAACAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAFWluZmUCAAAAAAIAAGF2MDEAAAAAcGlwcnAAAABMaXBjbwAAAAxhdjFDgUBsAAAAABRpc3BlAAAAAAAAAAgAAAAIAAAAEHBpeGkAAAAAAwwMDAAAABRpc3BlAAAAAAAAABAAAAAMAAAAHGlwbWEAAAAAAAAAAgABA4ECAwACA4EEAwAAAEltZGF0EgAKCVgIv2NAQ0G4QDIRGAAOOOOEAACwE1TtMKTrDPwSAAoJWAz+2NAQ0G4QMhIYAA4444QAAKmOWC/DBU5Nq4A=', true);
+  try {
+    if ($avif === false || file_put_contents($file, $avif) !== strlen($avif)) return false;
+    $method = new ReflectionMethod(ImageService::class, 'animatedAvifDimensions');
+    $dimensions = $method->invoke(null, $file, 8, 8);
+    return $dimensions === ['width' => 16, 'height' => 12];
+  } finally {
+    if (is_file($file)) unlink($file);
+  }
+});
+
 smoke_test('image upload formats follow available GD decoders', static function (): bool {
   $without_avif = static fn(string $function): bool => $function !== 'imagecreatefromavif';
   $with_everything = static fn(string $function): bool => true;

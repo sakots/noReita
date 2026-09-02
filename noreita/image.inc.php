@@ -123,6 +123,85 @@ final class ImageService {
     return false;
   }
 
+  /**
+   * Return the largest image extent declared by AVIF ispe boxes when it differs from the primary image.
+   *
+   * @param string $file_path
+   * @param int $primary_width
+   * @param int $primary_height
+   * @return array{width:int,height:int}|null
+   */
+  private static function animatedAvifDimensions(string $file_path, int $primary_width, int $primary_height): ?array {
+    $data = @file_get_contents($file_path);
+    if (!is_string($data) || strlen($data) < 24 || substr($data, 4, 4) !== 'ftyp') return null;
+    $maximum_width = $primary_width;
+    $maximum_height = $primary_height;
+    $offset = 0;
+    while (($position = strpos($data, 'ispe', $offset)) !== false) {
+      // ispe is a FullBox: type + 4 bytes version/flags + 4-byte width + 4-byte height.
+      if ($position >= 4 && $position + 16 <= strlen($data)) {
+        $box_size = unpack('Nsize', substr($data, $position - 4, 4));
+        $width_data = unpack('Nwidth', substr($data, $position + 8, 4));
+        $height_data = unpack('Nheight', substr($data, $position + 12, 4));
+        $box_length = is_array($box_size) ? (int)($box_size['size'] ?? 0) : 0;
+        $width = is_array($width_data) ? (int)($width_data['width'] ?? 0) : 0;
+        $height = is_array($height_data) ? (int)($height_data['height'] ?? 0) : 0;
+        if ($box_length >= 20 && $width > 0 && $height > 0) {
+          $maximum_width = max($maximum_width, $width);
+          $maximum_height = max($maximum_height, $height);
+        }
+      }
+      $offset = $position + 4;
+    }
+    return ($maximum_width !== $primary_width || $maximum_height !== $primary_height)
+      ? ['width' => $maximum_width, 'height' => $maximum_height]
+      : null;
+  }
+
+  /**
+   * Put AVIF's decodable first frame on the full animation canvas so the thumbnail keeps its display ratio.
+   *
+   * @param string $source
+   * @param string $directory
+   * @param int $thumbnail_width
+   * @param int $canvas_width
+   * @param int $canvas_height
+   * @return string
+   */
+  private static function animatedAvifThumbnailSource(
+    string $source,
+    string $directory,
+    int $thumbnail_width,
+    int $canvas_width,
+    int $canvas_height
+  ): string {
+    if (!function_exists('imagecreatefromavif') || $thumbnail_width < 1 || $canvas_width < 1 || $canvas_height < 1) return '';
+    $frame = @imagecreatefromavif($source);
+    if ($frame === false) return '';
+    $target_height = max(1, (int)round($thumbnail_width * $canvas_height / $canvas_width));
+    $canvas = imagecreatetruecolor($thumbnail_width, $target_height);
+    if ($canvas === false) return '';
+    imagealphablending($canvas, false);
+    $transparent = imagecolorallocatealpha($canvas, 0, 0, 0, 127);
+    imagefill($canvas, 0, 0, $transparent);
+    imagesavealpha($canvas, true);
+    $frame_width = imagesx($frame);
+    $frame_height = imagesy($frame);
+    if ($frame_width < 1 || $frame_height < 1) return '';
+    // Cover the animation canvas so the blurred thumbnail has no content-revealing margins.
+    $scale = max($thumbnail_width / $frame_width, $target_height / $frame_height);
+    $draw_width = max(1, (int)round($frame_width * $scale));
+    $draw_height = max(1, (int)round($frame_height * $scale));
+    if (!imagecopyresampled(
+      $canvas, $frame, (int)floor(($thumbnail_width - $draw_width) / 2), (int)floor(($target_height - $draw_height) / 2),
+      0, 0, $draw_width, $draw_height, $frame_width, $frame_height
+    )) return '';
+    $path = $directory . DIRECTORY_SEPARATOR . 'animated-avif-first-frame.png';
+    $saved = imagepng($canvas, $path);
+    unset($frame, $canvas);
+    return $saved ? $path : '';
+  }
+
   public static function isSafePostedImageFilename(string $filename): bool {
     if ($filename === '' || strlen($filename) > 255 || basename($filename) !== $filename) {
       return false;
@@ -1064,6 +1143,9 @@ final class ImageService {
         // GD 2.x cannot read animated WebP directly. Extract its first ANMF frame before
         // thumbnailing; if that fails, never fall back to the original NSFW image.
         $animated_webp = (($size['mime'] ?? '') === 'image/webp') && self::isAnimatedWebp($source);
+        $animated_avif_size = (($size['mime'] ?? '') === 'image/avif')
+          ? self::animatedAvifDimensions($source, (int)$size[0], (int)$size[1])
+          : null;
         $thumbnail_source = $source;
         if ($animated_webp) {
           $first_frame = $temporary_dir . DIRECTORY_SEPARATOR . 'animated-webp-first-frame.webp';
@@ -1077,9 +1159,21 @@ final class ImageService {
             return '';
           }
         }
-        $temporary_thumbnail = $thumbnail_source === $source && $animated_webp
+        if ($animated_avif_size !== null && $nsfw) {
+          $normalized_avif = self::animatedAvifThumbnailSource(
+            $source, $temporary_dir, $thumbnail_width, $animated_avif_size['width'], $animated_avif_size['height']
+          );
+          if ($normalized_avif !== '') $thumbnail_source = $normalized_avif;
+        }
+        $temporary_thumbnail = $animated_avif_size !== null && $nsfw
+          ? ($thumbnail_source !== $source
+            ? self::createThumbnail($thumbnail_source, $temporary_dir, $thumbnail_width, true)
+            : self::createNsfwPlaceholderThumbnail(
+              $temporary_dir, $thumbnail_width, $animated_avif_size['width'], $animated_avif_size['height']
+            ))
+          : ($thumbnail_source === $source && $animated_webp
           ? ''
-          : self::createThumbnail($thumbnail_source, $temporary_dir, $thumbnail_width, $nsfw);
+          : self::createThumbnail($thumbnail_source, $temporary_dir, $thumbnail_width, $nsfw));
         if ($temporary_thumbnail === '' && $nsfw) {
           $temporary_thumbnail = self::createNsfwPlaceholderThumbnail(
             $temporary_dir, $thumbnail_width, (int)$size[0], (int)$size[1]
