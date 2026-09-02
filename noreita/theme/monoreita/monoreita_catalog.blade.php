@@ -56,7 +56,7 @@
             <div>
               @if ($bbsline['picfile'])
                 <p>
-                  <a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}" title="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})">@if ($bbsline['thumb'])<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})" loading="lazy">@else<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})" loading="lazy">@endif</a>
+                  <a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}" title="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})">@if ($bbsline['nsfw'] == 1 && str_ends_with($bbsline['picfile'], '.avif'))<span class="nsfw-browser-blur"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})" loading="lazy"></span>@elseif ($bbsline['thumb'])<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})" loading="lazy">@else<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})" loading="lazy">@endif</a>
                 </p>
               @else
                 <p>
@@ -76,7 +76,7 @@
           <div>
             @if ($res['picfile'])
               <p>
-                <a href="{{$self}}?mode=res&amp;res={{$res['parent']}}" title="{{$res['sub']}} (by {{$res['a_name']}})">@if ($res['thumb'])<img src="{{$res['thumb']}}" alt="{{$res['sub']}} (by {{$res['a_name']}})" loading="lazy">@else<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['sub']}} (by {{$res['a_name']}})" loading="lazy">@endif</a>
+                <a href="{{$self}}?mode=res&amp;res={{$res['parent']}}" title="{{$res['sub']}} (by {{$res['a_name']}})">@if ($res['nsfw'] == 1 && str_ends_with($res['picfile'], '.avif'))<span class="nsfw-browser-blur"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res['sub']}} (by {{$res['a_name']}})" loading="lazy"></span>@elseif ($res['thumb'])<img src="{{$res['thumb']}}" alt="{{$res['sub']}} (by {{$res['a_name']}})" loading="lazy">@else<img src="{{$path}}{{$res['picfile']}}" alt="{{$res['sub']}} (by {{$res['a_name']}})" loading="lazy">@endif</a>
               </p>
             @else
               <p>

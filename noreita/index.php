@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.4.0 lot.260901.0';
+const REITA_VER = 'v4.5.0 lot.260902.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -254,6 +254,10 @@ $animation_upload_modified = @filemtime(__DIR__ . '/animation-upload.js');
 $dat['animation_upload_version'] = $animation_upload_modified === false
   ? REITA_VER
   : (string)$animation_upload_modified;
+$trip_preview_modified = @filemtime(__DIR__ . '/trip-preview.js');
+$dat['trip_preview_version'] = $trip_preview_modified === false
+  ? REITA_VER
+  : (string)$trip_preview_modified;
 $dat['diary_mode'] = Config::bool('features.diary_mode');
 $dat['can_create_thread'] = diary_post_allowed(false);
 $dat['can_post_reply'] = diary_post_allowed(true);
@@ -408,6 +412,8 @@ switch ($mode) {
     return save_image();
   case 'animation_upload': // 動画ファイルをPNGと組にして一時保存
     PaintController::uploadAnimation($application_context); return;
+  case 'trip_preview':
+    trip_preview($application_context); return;
   case 'admin_in': // 管理モードin
     return admin_in($application_context);
   case 'admin_login':
@@ -453,6 +459,34 @@ switch ($mode) {
   default: // 通常表示モード
     BoardController::index($application_context);
     return;
+}
+
+/**
+ * Generate a preview with the same PHP implementation used when posting.
+ * The browser sends the name in a POST body, so a trip key is not placed in a URL.
+ *
+ * @param ApplicationContext $context
+ */
+function trip_preview(ApplicationContext $context): void {
+  header('Content-Type: application/json; charset=UTF-8');
+  header('X-Content-Type-Options: nosniff');
+
+  if ($context->requestMethod !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    echo json_encode(['error' => 'Method not allowed.']);
+    return;
+  }
+
+  $name = filter_input_data('POST', 'name');
+  if (!is_string($name) || mb_strlen($name, 'UTF-8') > Config::int('limits.name_length')) {
+    http_response_code(422);
+    echo json_encode(['error' => 'Invalid name.']);
+    return;
+  }
+
+  // Keep conversion in generate_trip(): it handles legacy crypt(), modern trips, and Shift_JIS.
+  echo json_encode(['preview' => generate_trip($name)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
 /*-----------Main-------------*/

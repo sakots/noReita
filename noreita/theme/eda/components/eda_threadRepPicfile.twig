@@ -21,8 +21,10 @@
 </h5>
 {% if res['nsfw'] == 1 %}
   <a class="luminous" href="{{ path }}{{ res['picfile'] }}">
-    <span class="nsfw">
-      {% if res['thumb'] %}
+    <span class="nsfw{% if res['picfile'] ends with '.avif' %} nsfw-browser-blur{% endif %}">
+      {% if res['picfile'] ends with '.avif' %}
+        <img src="{{ path }}{{ res['picfile'] }}" alt="{{ res['picfile'] }}" loading="lazy" class="image">
+      {% elseif res['thumb'] %}
         <img src="{{ path }}{{ res['thumb'] }}" alt="{{ res['picfile'] }}" loading="lazy" class="image">
       {% else %}
         <img src="{{ path }}{{ res['picfile'] }}" alt="{{ res['picfile'] }}" loading="lazy" class="image">

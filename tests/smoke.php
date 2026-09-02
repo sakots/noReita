@@ -77,6 +77,17 @@ smoke_test('post image candidates replace each other in the post form', static f
     && !str_contains($script, '別の動画へ変更する場合はページを再読み込みしてください。');
 });
 
+smoke_test('trip preview uses the server trip generator without sending secrets in URLs', static function (): bool {
+  $script = file_get_contents(dirname(__DIR__) . '/noreita/trip-preview.js');
+  $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
+  return is_string($script) && is_string($index)
+    && str_contains($script, "method: 'POST'")
+    && str_contains($script, 'URLSearchParams({ name })')
+    && !str_contains($script, 'endpoint +')
+    && str_contains($index, "case 'trip_preview':")
+    && str_contains($index, 'generate_trip($name)');
+});
+
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
   $views = $root . DIRECTORY_SEPARATOR . 'views';
@@ -1549,6 +1560,48 @@ smoke_test('image MIME mapping', static function (): bool {
     && get_image_type('image/avif') === '.avif';
 });
 
+smoke_test('animated WebP is accepted without GD frame decoding and remains intact for NSFW', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_animated_webp_' . bin2hex(random_bytes(8));
+  $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  if (!mkdir($temp, 0700, true) || !mkdir($images, 0700, true)) return false;
+  $webp = base64_decode('UklGRsAAAABXRUJQVlA4WAoAAAACAAAABwAABwAAQU5JTQYAAAD/////AABBTk1GSAAAAAAAAAAAAAcAAAcAAGQAAAJWUDggMAAAANABAJ0BKggACAACADQloAJ0ugH4AAOwAP7wxAv/ILlhdcjX/yA/5Af8gP/48gAAAEFOTUZEAAAAAAAAAAAABwAABwAAyAAAAFZQOCAsAAAAlAEAnQEqCAAIAAAANCWgAnS6AAOYAP75k2//kB//kB//kB//ID/iF3sgMAA=', true);
+  try {
+    if ($webp === false || file_put_contents($temp . DIRECTORY_SEPARATOR . 'animated.webp', $webp) !== strlen($webp)) return false;
+    $source_hash = hash_file('sha256', $temp . DIRECTORY_SEPARATOR . 'animated.webp');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'animated.dat', "ip\thost\tagent\t.webp\tcode\trep\t100\t160\t\tneo");
+    $result = ImageService::finalizeNewPost($temp, $images, 'animated.webp', 'new', true, 100, true, 0600);
+    $thumbnail = $images . DIRECTORY_SEPARATOR . (string)$result['thumbnail'];
+    $thumbnail_image = is_file($thumbnail) ? @imagecreatefromstring((string)file_get_contents($thumbnail)) : false;
+    $thumbnail_color = $thumbnail_image === false ? 0 : imagecolorat($thumbnail_image, 0, 0);
+    unset($thumbnail_image);
+    return hash_file('sha256', $images . DIRECTORY_SEPARATOR . 'animated.webp') === $source_hash
+      && str_starts_with((string)$result['thumbnail'], 'animated_thumb_nsfw_')
+      && is_file($thumbnail)
+      && (($thumbnail_color >> 16) & 0xff) > 0;
+  } finally {
+    foreach ([$temp, $images] as $directory) {
+      foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) if (is_file($file)) unlink($file);
+      if (is_dir($directory)) rmdir($directory);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
+smoke_test('animated AVIF NSFW thumbnails use the largest declared frame dimensions', static function (): bool {
+  $file = tempnam(sys_get_temp_dir(), 'noreita_animated_avif_');
+  if ($file === false) return false;
+  $avif = base64_decode('AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAARdtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAANGlsb2MAAAAAREAAAgABAAAAAAE7AAEAAAAAAAAAIAACAAAAAAFbAAEAAAAAAAAAIQAAADhpaW5mAAAAAAACAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAFWluZmUCAAAAAAIAAGF2MDEAAAAAcGlwcnAAAABMaXBjbwAAAAxhdjFDgUBsAAAAABRpc3BlAAAAAAAAAAgAAAAIAAAAEHBpeGkAAAAAAwwMDAAAABRpc3BlAAAAAAAAABAAAAAMAAAAHGlwbWEAAAAAAAAAAgABA4ECAwACA4EEAwAAAEltZGF0EgAKCVgIv2NAQ0G4QDIRGAAOOOOEAACwE1TtMKTrDPwSAAoJWAz+2NAQ0G4QMhIYAA4444QAAKmOWC/DBU5Nq4A=', true);
+  try {
+    if ($avif === false || file_put_contents($file, $avif) !== strlen($avif)) return false;
+    $method = new ReflectionMethod(ImageService::class, 'animatedAvifDimensions');
+    $dimensions = $method->invoke(null, $file, 8, 8);
+    return $dimensions === ['width' => 16, 'height' => 12];
+  } finally {
+    if (is_file($file)) unlink($file);
+  }
+});
+
 smoke_test('image upload formats follow available GD decoders', static function (): bool {
   $without_avif = static fn(string $function): bool => $function !== 'imagecreatefromavif';
   $with_everything = static fn(string $function): bool => true;
@@ -2211,15 +2264,19 @@ smoke_test('new post image and animation are finalized', static function (): boo
     $source = imagecreatetruecolor(4, 3);
     imagefill($source, 0, 0, imagecolorallocate($source, 20, 120, 220));
     imagepng($source, $temp . DIRECTORY_SEPARATOR . 'post.png');
+    $source_hash = hash_file('sha256', $temp . DIRECTORY_SEPARATOR . 'post.png');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.pch', 'NEO');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.psd', 'PSD');
 
-    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 100, false, 0600);
+    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 100, true, 0600);
     return $result['img_w'] === 4 && $result['img_h'] === 3
       && $result['psec'] === 60 && $result['tool'] === 'PaintBBS NEO'
       && $result['pchfile'] === 'post.pch'
       && is_file($images . DIRECTORY_SEPARATOR . 'post.png')
+      && hash_file('sha256', $images . DIRECTORY_SEPARATOR . 'post.png') === $source_hash
+      && str_starts_with((string)$result['thumbnail'], 'post_thumb_nsfw_')
+      && is_file($images . DIRECTORY_SEPARATOR . $result['thumbnail'])
       && is_file($images . DIRECTORY_SEPARATOR . 'post.pch')
       && is_file($images . DIRECTORY_SEPARATOR . 'post.psd')
       && !is_file($temp . DIRECTORY_SEPARATOR . 'post.psd')
