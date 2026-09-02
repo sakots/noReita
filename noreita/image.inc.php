@@ -1073,7 +1073,11 @@ final class ImageService {
 
     $thumbnail = '';
     if ((int)$size[0] > $thumbnail_width || $nsfw) {
-      $thumbnail = self::createThumbnail($destination, $image_dir, $thumbnail_width, $nsfw);
+      // Keep thumbnails separate from their source. Using the source basename directly can
+      // overwrite an animated WebP/AVIF when GD selects the same output format.
+      $thumbnail = self::refreshNsfwThumbnail(
+        $image_dir, $image_name, '', $nsfw, $thumbnail_width, $permission
+      );
     }
 
     $animation = '';

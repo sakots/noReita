@@ -2222,15 +2222,19 @@ smoke_test('new post image and animation are finalized', static function (): boo
     $source = imagecreatetruecolor(4, 3);
     imagefill($source, 0, 0, imagecolorallocate($source, 20, 120, 220));
     imagepng($source, $temp . DIRECTORY_SEPARATOR . 'post.png');
+    $source_hash = hash_file('sha256', $temp . DIRECTORY_SEPARATOR . 'post.png');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.pch', 'NEO');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.psd', 'PSD');
 
-    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 100, false, 0600);
+    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 100, true, 0600);
     return $result['img_w'] === 4 && $result['img_h'] === 3
       && $result['psec'] === 60 && $result['tool'] === 'PaintBBS NEO'
       && $result['pchfile'] === 'post.pch'
       && is_file($images . DIRECTORY_SEPARATOR . 'post.png')
+      && hash_file('sha256', $images . DIRECTORY_SEPARATOR . 'post.png') === $source_hash
+      && str_starts_with((string)$result['thumbnail'], 'post_thumb_nsfw_')
+      && is_file($images . DIRECTORY_SEPARATOR . $result['thumbnail'])
       && is_file($images . DIRECTORY_SEPARATOR . 'post.pch')
       && is_file($images . DIRECTORY_SEPARATOR . 'post.psd')
       && !is_file($temp . DIRECTORY_SEPARATOR . 'post.psd')
