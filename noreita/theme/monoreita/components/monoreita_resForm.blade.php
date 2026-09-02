@@ -3,7 +3,7 @@
   <table>
     <tr>
       <td>name @if ($use_name) * @endif</td>
-      <td><input type="text" name="name" size="18" value="{{$name_cookie}}" autocomplete="section-reply username" @if ($use_name) required @endif maxlength="{{$max_name}}"></td>
+      <td><input type="text" name="name" size="18" value="{{$name_cookie}}" autocomplete="section-reply username" @if ($use_name) required @endif maxlength="{{$max_name}}" data-trip-preview-input><output data-trip-preview hidden aria-live="polite"></output></td>
     </tr>
     <tr>
       <td>mail</td>

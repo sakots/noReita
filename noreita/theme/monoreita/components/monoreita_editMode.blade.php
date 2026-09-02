@@ -6,7 +6,7 @@
         <table>
           <tr>
             <td>name</td>
-            <td><input type="text" name="name" size="28" autocomplete="section-edit username" value="{{$bbsline['input_name'] ?? $bbsline['a_name']}}" maxlength="{{$max_name}}"></td>
+            <td><input type="text" name="name" size="28" autocomplete="section-edit username" value="{{$bbsline['input_name'] ?? $bbsline['a_name']}}" maxlength="{{$max_name}}" data-trip-preview-input><output data-trip-preview hidden aria-live="polite"></output></td>
           </tr>
           <tr>
             <td>mail</td>

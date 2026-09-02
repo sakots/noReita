@@ -77,6 +77,17 @@ smoke_test('post image candidates replace each other in the post form', static f
     && !str_contains($script, '別の動画へ変更する場合はページを再読み込みしてください。');
 });
 
+smoke_test('trip preview uses the server trip generator without sending secrets in URLs', static function (): bool {
+  $script = file_get_contents(dirname(__DIR__) . '/noreita/trip-preview.js');
+  $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
+  return is_string($script) && is_string($index)
+    && str_contains($script, "method: 'POST'")
+    && str_contains($script, 'URLSearchParams({ name })')
+    && !str_contains($script, 'endpoint +')
+    && str_contains($index, "case 'trip_preview':")
+    && str_contains($index, 'generate_trip($name)');
+});
+
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
   $views = $root . DIRECTORY_SEPARATOR . 'views';
