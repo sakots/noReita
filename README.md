@@ -49,6 +49,20 @@ FTPソフトをつかってサーバーにアップロードするだけです�
 
 管理者ログインが試行回数制限で拒否された場合は、[管理者ログインのロック解除手順](docs/admin-login.md)を参照してください。
 
+### React向け公開JSON API
+
+同一オリジンで動かすReactなどのフロントエンドは、読み取り専用の`api.php`を利用できます。
+投稿、ログイン、管理操作はこのAPIには含まれません。レスポンスには投稿パスワード、接続元、投稿者IDなどの非公開情報を含めません。
+
+| 用途 | 例 |
+| --- | --- |
+| スレッド一覧 | `api.php?mode=threads&page=1&per_page=20` |
+| スレッドと返信 | `api.php?mode=thread&id=123` |
+| カタログ | `api.php?mode=catalog&page=1&per_page=40` |
+| 検索 | `api.php?mode=search&q=検索語` |
+
+一覧・カタログ・検索は`pagination`に`page`、`per_page`、`total`、`total_pages`を返します。検索では既存の公開検索と同じ`target`、`match`、`post_type`、`image`、`nsfw`、`sort`も使えます。コメントはプレーンテキストとして返すため、React側ではHTMLとして挿入せず、必ずエスケープして表示してください。
+
 ### 画像アップロード
 
 投稿フォームでは、お絵かきに加えてPNG、JPEG、GIF、WebP、AVIF画像を直接アップロードできます。

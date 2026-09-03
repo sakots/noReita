@@ -24,6 +24,7 @@ require_once dirname(__DIR__) . '/noreita/save.inc.php';
 require_once dirname(__DIR__) . '/noreita/thumbnail.inc.php';
 require_once dirname(__DIR__) . '/noreita/external_image.inc.php';
 require_once dirname(__DIR__) . '/noreita/database.inc.php';
+require_once dirname(__DIR__) . '/noreita/api.inc.php';
 require_once dirname(__DIR__) . '/noreita/initialization.inc.php';
 require_once dirname(__DIR__) . '/noreita/theme/eda/theme_settings.php';
 require_once dirname(__DIR__) . '/noreita/image.inc.php';
@@ -1019,6 +1020,33 @@ smoke_test('SQLite read and write', static function (): bool {
   $statement = $db->prepare('INSERT INTO smoke (value) VALUES (:value)');
   $statement->execute(['value' => 'noReita']);
   return $db->query('SELECT value FROM smoke')->fetchColumn() === 'noReita';
+});
+
+smoke_test('public API exposes only visible React-safe post data', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $thread_id = $repository->insertPost([
+    'thread' => 1, 'parent' => null, 'comid' => null, 'tree' => 2,
+    'a_name' => 'API author', 'sub' => 'API subject', 'com' => 'API searchable comment',
+    'picfile' => 'api-image.png', 'img_w' => 640, 'img_h' => 480,
+    'pwd' => 'private-password-hash', 'host' => 'private.example', 'invz' => 0, 'nsfw' => 0,
+  ]);
+  $reply_id = $repository->insertPost([
+    'thread' => 0, 'parent' => $thread_id, 'comid' => 1, 'tree' => 1,
+    'a_name' => 'API reply', 'sub' => '', 'com' => 'API reply comment',
+    'pwd' => 'private-reply-password', 'host' => 'private-reply.example', 'invz' => 0, 'nsfw' => 0,
+  ]);
+  $threads = PublicApi::dispatch($repository, ['mode' => 'threads', 'per_page' => '1']);
+  $thread = PublicApi::dispatch($repository, ['mode' => 'thread', 'id' => (string)$thread_id]);
+  $catalog = PublicApi::dispatch($repository, ['mode' => 'catalog']);
+  $search = PublicApi::dispatch($repository, ['mode' => 'search', 'q' => 'searchable', 'target' => 'comment']);
+  $item = $threads['items'][0] ?? [];
+  return $threads['api_version'] === 'v1' && $threads['pagination']['total'] === 1
+    && ($item['id'] ?? 0) === $thread_id && !array_key_exists('pwd', $item) && !array_key_exists('host', $item)
+    && ($item['image']['url'] ?? '') === 'https://smoke.example/img/api-image.png'
+    && ($thread['thread']['id'] ?? 0) === $thread_id && ($thread['replies'][0]['id'] ?? 0) === $reply_id
+    && count($catalog['items']) === 1 && count($search['items']) === 1;
 });
 
 smoke_test('SQLite connections wait for a temporary write lock', static function (): bool {

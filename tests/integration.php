@@ -977,6 +977,32 @@ PHP;
       && str_contains($legacy_thread_body, $marker);
   });
 
+  $api_url = substr($base_url, 0, -strlen('index.php')) . 'api.php';
+  [$api_threads_status, $api_threads_body, , $api_threads_headers] = http_request(
+    $api_url . '?mode=threads&per_page=1', $cookie_jar
+  );
+  [$api_thread_status, $api_thread_body] = http_request(
+    $api_url . '?mode=thread&id=' . $shared_thread_id, $cookie_jar
+  );
+  [$api_search_status, $api_search_body] = http_request(
+    $api_url . '?mode=search&q=' . rawurlencode($marker), $cookie_jar
+  );
+  integration_test('public JSON API exposes visible posts without private fields', static function () use (
+    $api_threads_status, $api_threads_body, $api_threads_headers, $api_thread_status, $api_thread_body,
+    $api_search_status, $api_search_body, $shared_thread_id, $marker
+  ): bool {
+    $threads = json_decode($api_threads_body, true);
+    $thread = json_decode($api_thread_body, true);
+    $search = json_decode($api_search_body, true);
+    $item = is_array($threads) ? ($threads['items'][0] ?? null) : null;
+    return $api_threads_status === 200 && $api_thread_status === 200 && $api_search_status === 200
+      && ($api_threads_headers['content-type'] ?? '') === 'application/json; charset=UTF-8'
+      && is_array($item) && (int)($item['id'] ?? 0) > 0
+      && !array_key_exists('pwd', $item) && !array_key_exists('host', $item) && !array_key_exists('id_code', $item)
+      && is_array($thread) && (int)($thread['thread']['id'] ?? 0) === $shared_thread_id
+      && is_array($search) && str_contains(json_encode($search, JSON_UNESCAPED_UNICODE) ?: '', $marker);
+  });
+
   $subject_escape_probe = '<b>XSS</b>';
   $subject_escape_stmt = $db->prepare('UPDATE board_log SET sub = :sub WHERE tid = :tid');
   $subject_escape_stmt->execute([':sub' => $subject_escape_probe, ':tid' => (int)($row['tid'] ?? 0)]);
