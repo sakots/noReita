@@ -74,6 +74,8 @@ final class PostService implements AdminPostManagementService {
       ? $submitted_name
       : generate_trip($submitted_name);
     $values['pwdh'] = (string)$post['pwd'];
+    // 「そうだね」は閲覧者の評価であり、投稿編集・画像差し替えでは変更しない。
+    $values['sodane'] = (int)$post['sodane'];
     $values['nsfw'] = (int)$post['nsfw'];
     $values['thumbnail'] = (string)($post['thumbnail'] ?? '');
     if (array_key_exists('edit_nsfw', $values) && (string)$post['picfile'] !== '') {

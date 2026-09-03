@@ -1451,7 +1451,7 @@ smoke_test('post service centralizes edit and delete authorization', static func
       return $repository->insertPost([
         'thread' => 1, 'sub' => $subject, 'com' => '本文', 'a_name' => '名前',
         'pwd' => password_hash($password, PASSWORD_DEFAULT), 'picfile' => $image,
-        'invz' => 0, 'age' => 0, 'tree' => time(),
+        'invz' => 0, 'sodane' => 7, 'age' => 0, 'tree' => time(),
       ]);
     };
     $edit_id = $insert('編集前', 'owner-pass');
@@ -1474,7 +1474,8 @@ smoke_test('post service centralizes edit and delete authorization', static func
       'name' => '編集者', 'mail' => '', 'sub' => '編集後', 'com' => '編集本文',
       'url' => '', 'host' => 'localhost', 'sodane' => 0,
     ]);
-    if (($repository->findPost($edit_id)['sub'] ?? '') !== '編集後') return false;
+    $edited_post = $repository->findPost($edit_id);
+    if (($edited_post['sub'] ?? '') !== '編集後' || (int)($edited_post['sodane'] ?? 0) !== 7) return false;
 
     try {
       $service->delete($hide_id, 'admin-pass', false);
