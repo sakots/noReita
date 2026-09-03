@@ -163,7 +163,7 @@ final class ImageService {
   }
 
   /**
-   * Return the largest image extent declared by AVIF ispe boxes when it differs from the primary image.
+   * Return the largest image extent declared by ispe boxes under AVIF's meta/iprp/ipco hierarchy.
    *
    * @param string $file_path
    * @param int $primary_width
@@ -175,26 +175,58 @@ final class ImageService {
     if (!is_string($data) || strlen($data) < 24 || substr($data, 4, 4) !== 'ftyp') return null;
     $maximum_width = $primary_width;
     $maximum_height = $primary_height;
-    $offset = 0;
-    while (($position = strpos($data, 'ispe', $offset)) !== false) {
-      // ispe is a FullBox: type + 4 bytes version/flags + 4-byte width + 4-byte height.
-      if ($position >= 4 && $position + 16 <= strlen($data)) {
-        $box_size = unpack('Nsize', substr($data, $position - 4, 4));
-        $width_data = unpack('Nwidth', substr($data, $position + 8, 4));
-        $height_data = unpack('Nheight', substr($data, $position + 12, 4));
-        $box_length = is_array($box_size) ? (int)($box_size['size'] ?? 0) : 0;
-        $width = is_array($width_data) ? (int)($width_data['width'] ?? 0) : 0;
-        $height = is_array($height_data) ? (int)($height_data['height'] ?? 0) : 0;
-        if ($box_length >= 20 && $width > 0 && $height > 0) {
-          $maximum_width = max($maximum_width, $width);
-          $maximum_height = max($maximum_height, $height);
+    $maximum_allowed_width = Config::int('limits.paint_max_width');
+    $maximum_allowed_height = Config::int('limits.paint_max_height');
+    foreach (self::isoBoxes($data, 0, strlen($data)) as $meta) {
+      if ($meta['type'] !== 'meta' || $meta['payload_start'] + 4 > $meta['end']) continue;
+      foreach (self::isoBoxes($data, $meta['payload_start'] + 4, $meta['end']) as $property_reference) {
+        if ($property_reference['type'] !== 'iprp') continue;
+        foreach (self::isoBoxes($data, $property_reference['payload_start'], $property_reference['end']) as $property_container) {
+          if ($property_container['type'] !== 'ipco') continue;
+          foreach (self::isoBoxes($data, $property_container['payload_start'], $property_container['end']) as $property) {
+            // ispe is a FullBox: 4 bytes version/flags, then 4-byte width and height.
+            if ($property['type'] !== 'ispe' || $property['payload_start'] + 12 > $property['end']) continue;
+            $width_data = unpack('Nwidth', substr($data, $property['payload_start'] + 4, 4));
+            $height_data = unpack('Nheight', substr($data, $property['payload_start'] + 8, 4));
+            $width = is_array($width_data) ? (int)($width_data['width'] ?? 0) : 0;
+            $height = is_array($height_data) ? (int)($height_data['height'] ?? 0) : 0;
+            if ($width > 0 && $height > 0 && $width <= $maximum_allowed_width && $height <= $maximum_allowed_height) {
+              $maximum_width = max($maximum_width, $width);
+              $maximum_height = max($maximum_height, $height);
+            }
+          }
         }
       }
-      $offset = $position + 4;
     }
     return ($maximum_width !== $primary_width || $maximum_height !== $primary_height)
       ? ['width' => $maximum_width, 'height' => $maximum_height]
       : null;
+  }
+
+  /**
+   * Read complete 32-bit ISO BMFF boxes from one bounded container. Extended and malformed boxes are rejected.
+   *
+   * @param string $data
+   * @param int $start
+   * @param int $end
+   * @return array<int,array{type:string,payload_start:int,end:int}>
+   */
+  private static function isoBoxes(string $data, int $start, int $end): array {
+    if ($start < 0 || $end < $start || $end > strlen($data)) return [];
+    $boxes = [];
+    $offset = $start;
+    while ($offset + 8 <= $end) {
+      $size_data = unpack('Nsize', substr($data, $offset, 4));
+      $size = is_array($size_data) ? (int)($size_data['size'] ?? 0) : 0;
+      if ($size < 8 || $size === 1 || $size > $end - $offset) return [];
+      $boxes[] = [
+        'type' => substr($data, $offset + 4, 4),
+        'payload_start' => $offset + 8,
+        'end' => $offset + $size,
+      ];
+      $offset += $size;
+    }
+    return $offset === $end ? $boxes : [];
   }
 
   /**
