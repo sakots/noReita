@@ -1588,6 +1588,23 @@ smoke_test('animated WebP is accepted without GD frame decoding and remains inta
   }
 });
 
+smoke_test('animated WebP without a decodable ANMF frame is rejected', static function (): bool {
+  $file = tempnam(sys_get_temp_dir(), 'noreita_invalid_animated_webp_');
+  if ($file === false) return false;
+  // VP8X with the animation flag, ANIM, and an ANMF header but no nested VP8/VP8L image chunk.
+  $webp = 'RIFF' . pack('V', 60) . 'WEBP'
+    . 'VP8X' . pack('V', 10) . "\x02\x00\x00\x00\x07\x00\x00\x07\x00\x00"
+    . 'ANIM' . pack('V', 6) . "\x00\x00\x00\x00\x00\x00"
+    . 'ANMF' . pack('V', 16) . str_repeat("\x00", 16);
+  try {
+    if (file_put_contents($file, $webp) !== strlen($webp)) return false;
+    $method = new ReflectionMethod(ImageService::class, 'isDecodableImage');
+    return $method->invoke(null, $file, 'image/webp') === false;
+  } finally {
+    if (is_file($file)) unlink($file);
+  }
+});
+
 smoke_test('animated AVIF NSFW thumbnails use the largest declared frame dimensions', static function (): bool {
   $file = tempnam(sys_get_temp_dir(), 'noreita_animated_avif_');
   if ($file === false) return false;

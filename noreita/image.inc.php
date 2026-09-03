@@ -49,14 +49,13 @@ final class ImageService {
     if (!is_string($decoder) || !function_exists($decoder)) return false;
     try {
       $image = @call_user_func($decoder, $file_path);
-      // GD 2.x cannot decode animated WebP even when WebP support is enabled.
-      // Its RIFF container and dimensions are validated by the caller; recognize only
-      // a structurally valid animated container here so ordinary malformed WebP remains rejected.
-      if ($image === false) return $mime_type === 'image/webp' && self::isAnimatedWebp($file_path);
+      // GD 2.x cannot decode animated WebP as a complete image. Accept it only when
+      // an ANMF frame can be extracted and decoded independently.
+      if ($image === false) return $mime_type === 'image/webp' && self::hasDecodableAnimatedWebpFrame($file_path);
       unset($image);
       return true;
     } catch (Throwable) {
-      return $mime_type === 'image/webp' && self::isAnimatedWebp($file_path);
+      return $mime_type === 'image/webp' && self::hasDecodableAnimatedWebpFrame($file_path);
     }
   }
 
@@ -86,8 +85,8 @@ final class ImageService {
       $offset += 8;
       if ($size < 0 || $size > $length - $offset) return false;
       if ($chunk === 'VP8X' && $size >= 1 && (ord($data[$offset]) & 0x02) !== 0) $has_animation_flag = true;
-      if ($chunk === 'ANIM') $has_animation_header = true;
-      if ($chunk === 'ANMF') $has_animation_frame = true;
+      if ($chunk === 'ANIM' && $size === 6) $has_animation_header = true;
+      if ($chunk === 'ANMF' && self::animatedWebpFrameData($data, $offset, $size) !== null) $has_animation_frame = true;
       $offset += $size + ($size % 2);
     }
     return $offset === $length && $has_animation_flag && $has_animation_header && $has_animation_frame;
@@ -111,16 +110,56 @@ final class ImageService {
       $size = is_array($size_data) ? (int)($size_data['size'] ?? -1) : -1;
       $payload_offset = $offset + 8;
       if ($size < 0 || $size > $length - $payload_offset) return false;
-      if ($chunk === 'ANMF' && $size > 16) {
-        // ANMF starts with a 16-byte frame header. Its remaining nested chunks form a WebP image.
-        $frame_chunks = substr($data, $payload_offset + 16, $size - 16);
-        $frame = 'RIFF' . pack('V', 4 + strlen($frame_chunks)) . 'WEBP' . $frame_chunks;
+      if ($chunk === 'ANMF') {
+        $frame = self::animatedWebpFrameData($data, $payload_offset, $size);
+        if ($frame === null) {
+          $offset = $payload_offset + $size + ($size % 2);
+          continue;
+        }
         return @file_put_contents($destination, $frame, LOCK_EX) === strlen($frame)
           && self::isDecodableImage($destination, 'image/webp');
       }
       $offset = $payload_offset + $size + ($size % 2);
     }
     return false;
+  }
+
+  /**
+   * Return a standalone WebP from one valid ANMF frame, or null when its nested chunk layout is invalid.
+   *
+   * @param string $data
+   * @param int $payload_offset
+   * @param int $size
+   * @return string|null
+   */
+  private static function animatedWebpFrameData(string $data, int $payload_offset, int $size): ?string {
+    if ($size <= 16 || $payload_offset < 0 || $payload_offset + $size > strlen($data)) return null;
+    $frame_chunks = substr($data, $payload_offset + 16, $size - 16);
+    $offset = 0;
+    $length = strlen($frame_chunks);
+    $has_image_chunk = false;
+    while ($offset + 8 <= $length) {
+      $chunk = substr($frame_chunks, $offset, 4);
+      $size_data = unpack('Vsize', substr($frame_chunks, $offset + 4, 4));
+      $chunk_size = is_array($size_data) ? (int)($size_data['size'] ?? -1) : -1;
+      $offset += 8;
+      if ($chunk_size < 0 || $chunk_size > $length - $offset) return null;
+      if ($chunk === 'VP8 ' || $chunk === 'VP8L') $has_image_chunk = true;
+      $offset += $chunk_size + ($chunk_size % 2);
+    }
+    if ($offset !== $length || !$has_image_chunk) return null;
+    return 'RIFF' . pack('V', 4 + $length) . 'WEBP' . $frame_chunks;
+  }
+
+  /** @param string $file_path */
+  private static function hasDecodableAnimatedWebpFrame(string $file_path): bool {
+    $temporary = tempnam(sys_get_temp_dir(), 'noreita_webp_frame_');
+    if ($temporary === false) return false;
+    try {
+      return self::extractAnimatedWebpFirstFrame($file_path, $temporary);
+    } finally {
+      if (is_file($temporary)) @unlink($temporary);
+    }
   }
 
   /**
