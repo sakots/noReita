@@ -527,6 +527,11 @@ final class BoardRepository {
     return $this->db->query('SELECT * FROM board_log ORDER BY tid LIMIT 1')->fetch(PDO::FETCH_ASSOC);
   }
 
+  /** @return array|false */
+  public function oldestThread() {
+    return $this->db->query('SELECT * FROM board_log WHERE thread=1 ORDER BY tid LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+  }
+
   public function findPostsByImage(string $image_name): array {
     $statement = $this->db->prepare('SELECT * FROM board_log WHERE picfile = ? ORDER BY tree DESC');
     $statement->execute([$image_name]);

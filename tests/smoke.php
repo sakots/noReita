@@ -1531,6 +1531,23 @@ smoke_test('post service centralizes edit and delete authorization', static func
       if (is_file($image_dir . DIRECTORY_SEPARATOR . $image)) return false;
     }
 
+    $owner_parent = $insert('所有者削除親', 'owner-thread-pass', 'owner-thread-parent.png');
+    $owner_reply = $repository->insertPost([
+      'thread' => 0, 'parent' => $owner_parent, 'sub' => '所有者削除レス', 'com' => '本文',
+      'a_name' => '返信者', 'pwd' => password_hash('owner-reply-pass', PASSWORD_DEFAULT),
+      'picfile' => 'owner-thread-reply.webp', 'invz' => 0, 'age' => 0, 'tree' => time(),
+    ]);
+    $owner_thread_files = [
+      'owner-thread-parent.png', 'owner-thread-parent.pch',
+      'owner-thread-reply.webp', 'owner-thread-reply.psd', 'owner-thread-reply_thumb_nsfw_test.webp',
+    ];
+    foreach ($owner_thread_files as $image) file_put_contents($image_dir . DIRECTORY_SEPARATOR . $image, 'image');
+    if ($service->delete($owner_parent, 'owner-thread-pass', false) !== 'deleted'
+      || $repository->findPost($owner_parent) !== false || $repository->findPost($owner_reply) !== false) return false;
+    foreach ($owner_thread_files as $image) {
+      if (is_file($image_dir . DIRECTORY_SEPARATOR . $image)) return false;
+    }
+
     $new_input = [
       'name' => '投稿者#trip-secret', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
       'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,

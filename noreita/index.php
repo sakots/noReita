@@ -2916,15 +2916,17 @@ function logdel(ApplicationContext $context): void {
   //オーバーした行の画像とスレ番号を取得
   try {
     $repository = new BoardRepository();
-    $msg = $repository->oldestPost();
+    $msg = $repository->oldestThread();
     if (!$msg) return;
 
-    $del_id = (int)$msg["tid"]; //消す行のスレ番号
-    $msg_pic = $msg["picfile"]; //画像の名前取得できた
-    ImageService::deleteRelatedFiles(Config::string('paths.images'), (string)$msg_pic);
-
-    $repository->deletePost($del_id, true);
-  } catch (PDOException $e) {
+    $service = new PostService(
+      $repository,
+      Config::string('paths.images'),
+      Config::int('limits.paint_default_width'),
+      Config::int('permissions.public_file')
+    );
+    $service->deleteManyAsAdmin([(int)$msg['tid']]);
+  } catch (Throwable $e) {
     render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 }

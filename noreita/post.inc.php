@@ -99,7 +99,10 @@ final class PostService implements AdminPostManagementService {
 
   public function delete(int $post_id, string $password, bool $delete_as_admin): string {
     $authorization = $this->authorize($post_id, $password, $delete_as_admin);
-    $with_replies = $authorization['role'] === 'admin';
+    // A thread's replies cannot remain visible without its parent. Deleting a
+    // parent therefore removes the complete thread, irrespective of whether
+    // its owner or an administrator initiated the deletion.
+    $with_replies = (int)($authorization['post']['thread'] ?? 0) === 1;
     $posts = $this->repository->findPostsForDeletion($post_id, $with_replies);
     $this->deletePostsAtomically($posts, function () use ($post_id, $with_replies): void {
       $this->repository->deletePost($post_id, $with_replies);
