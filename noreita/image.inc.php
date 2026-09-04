@@ -11,13 +11,13 @@ final class ImageService {
   private const TEMPORARY_RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'psd', 'tgkr'];
   private const PLAYABLE_ANIMATION_EXTENSIONS = ['pch', 'spch', 'tgkr'];
   private const UPLOADABLE_ANIMATION_EXTENSIONS = ['pch', 'tgkr'];
-  /** @var array<string,array{extension:string,label:string,decoder:string}> */
+  /** @var array<string,array{extension:string,label:string,decoder:string,encoder:string}> */
   private const UPLOAD_IMAGE_TYPES = [
-    'image/png' => ['extension' => 'png', 'label' => 'PNG', 'decoder' => 'imagecreatefrompng'],
-    'image/jpeg' => ['extension' => 'jpg', 'label' => 'JPEG', 'decoder' => 'imagecreatefromjpeg'],
-    'image/gif' => ['extension' => 'gif', 'label' => 'GIF', 'decoder' => 'imagecreatefromgif'],
-    'image/webp' => ['extension' => 'webp', 'label' => 'WebP', 'decoder' => 'imagecreatefromwebp'],
-    'image/avif' => ['extension' => 'avif', 'label' => 'AVIF', 'decoder' => 'imagecreatefromavif'],
+    'image/png' => ['extension' => 'png', 'label' => 'PNG', 'decoder' => 'imagecreatefrompng', 'encoder' => 'imagepng'],
+    'image/jpeg' => ['extension' => 'jpg', 'label' => 'JPEG', 'decoder' => 'imagecreatefromjpeg', 'encoder' => 'imagejpeg'],
+    'image/gif' => ['extension' => 'gif', 'label' => 'GIF', 'decoder' => 'imagecreatefromgif', 'encoder' => 'imagegif'],
+    'image/webp' => ['extension' => 'webp', 'label' => 'WebP', 'decoder' => 'imagecreatefromwebp', 'encoder' => 'imagewebp'],
+    'image/avif' => ['extension' => 'avif', 'label' => 'AVIF', 'decoder' => 'imagecreatefromavif', 'encoder' => 'imageavif'],
   ];
 
   /**
@@ -28,7 +28,7 @@ final class ImageService {
     $function_exists ??= static fn(string $function): bool => function_exists($function);
     $supported = [];
     foreach (self::UPLOAD_IMAGE_TYPES as $mime => $format) {
-      if (!$function_exists($format['decoder'])) continue;
+      if (!$function_exists($format['decoder']) || !$function_exists($format['encoder'])) continue;
       $supported[$mime] = ['extension' => $format['extension'], 'label' => $format['label']];
     }
     return $supported;
@@ -56,6 +56,57 @@ final class ImageService {
       return true;
     } catch (Throwable) {
       return $mime_type === 'image/webp' && self::hasDecodableAnimatedWebpFrame($file_path);
+    }
+  }
+
+  /**
+   * Decode and re-encode a direct upload before it reaches the public image directory.
+   * GD output does not retain EXIF or other container metadata from the original file.
+   * Animated raster uploads are stored as their first frame because GD has no animation encoder.
+   *
+   * @param string $source
+   * @param string $destination
+   * @param string $mime_type
+   * @return void
+   */
+  private static function reencodeUploadedImage(string $source, string $destination, string $mime_type): void {
+    $format = self::UPLOAD_IMAGE_TYPES[$mime_type] ?? null;
+    if ($format === null || !function_exists($format['decoder']) || !function_exists($format['encoder'])) {
+      throw new ImageUploadException('The detected image format is not supported by this server.', 415);
+    }
+
+    $image = @call_user_func($format['decoder'], $source);
+    $frame = '';
+    if ($image === false && $mime_type === 'image/webp') {
+      $frame = tempnam(sys_get_temp_dir(), 'noreita_webp_frame_') ?: '';
+      if ($frame !== '' && self::extractAnimatedWebpFirstFrame($source, $frame)) {
+        $image = @imagecreatefromwebp($frame);
+      }
+    }
+    if ($image === false) {
+      if ($frame !== '') safe_unlink($frame);
+      throw new ImageUploadException('The uploaded image could not be processed.', 422);
+    }
+
+    try {
+      if ($mime_type === 'image/png' || $mime_type === 'image/webp' || $mime_type === 'image/avif') {
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+      }
+      $saved = match ($mime_type) {
+        'image/png' => @imagepng($image, $destination, 6),
+        'image/jpeg' => @imagejpeg($image, $destination, 90),
+        'image/gif' => @imagegif($image, $destination),
+        'image/webp' => @imagewebp($image, $destination, 90),
+        'image/avif' => @imageavif($image, $destination, 70),
+        default => false,
+      };
+      if (!$saved || !is_file($destination) || (filesize($destination) ?: 0) < 1) {
+        throw new ImageUploadException('The uploaded image could not be processed.', 422);
+      }
+    } finally {
+      if ($frame !== '') safe_unlink($frame);
+      unset($image);
     }
   }
 
@@ -640,14 +691,21 @@ final class ImageService {
     $extension = $types[$mime]['extension'];
     $filename = self::newOekakiImageFilename($image_dir, $extension);
     $destination = $image_dir . $filename;
-    $staged = tempnam($image_dir, '.noreita_upload_');
-    if ($staged === false) throw new RuntimeException('Failed to prepare uploaded image.');
+    $staged_source = tempnam($image_dir, '.noreita_upload_source_');
+    $staged_image = tempnam($image_dir, '.noreita_upload_image_');
+    if ($staged_source === false || $staged_image === false) {
+      if (is_string($staged_source)) safe_unlink($staged_source);
+      if (is_string($staged_image)) safe_unlink($staged_image);
+      throw new RuntimeException('Failed to prepare uploaded image.');
+    }
 
     try {
-      if (!move_uploaded_file($temporary_file, $staged)) {
+      if (!move_uploaded_file($temporary_file, $staged_source)) {
         throw new RuntimeException('Failed to store uploaded image.');
       }
-      if (is_file($destination) || !rename($staged, $destination)) {
+      self::reencodeUploadedImage($staged_source, $staged_image, $mime);
+      safe_unlink($staged_source);
+      if (is_file($destination) || !rename($staged_image, $destination)) {
         throw new RuntimeException('Failed to finalize uploaded image.');
       }
       @chmod($destination, $permission);
@@ -658,7 +716,8 @@ final class ImageService {
         'thumbnail' => $thumbnail, 'nsfw' => $nsfw, 'ctype' => 'img',
       ];
     } catch (Throwable $e) {
-      safe_unlink($staged);
+      safe_unlink($staged_source);
+      safe_unlink($staged_image);
       self::deleteRelatedFiles($image_dir, $filename);
       throw $e;
     }
