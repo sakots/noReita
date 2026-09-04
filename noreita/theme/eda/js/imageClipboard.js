@@ -5,9 +5,11 @@ document.addEventListener('click', async (event) => {
     || typeof createImageBitmap !== 'function') return;
 
   event.preventDefault();
-  const originalLabel = link.textContent;
+  const label = link.querySelector('.copy-image-label');
+  if (!label) return;
+  const originalLabel = label.textContent;
   link.setAttribute('aria-busy', 'true');
-  link.textContent = '●コピー中…';
+  label.textContent = 'コピー中…';
   try {
     const response = await fetch(link.dataset.imageUrl, {credentials: 'same-origin'});
     if (!response.ok) throw new Error('Image request failed.');
@@ -22,11 +24,11 @@ document.addEventListener('click', async (event) => {
       canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('PNG conversion failed.')), 'image/png');
     });
     await navigator.clipboard.write([new ClipboardItem({'image/png': png})]);
-    link.textContent = '●コピーしました';
+    label.textContent = 'コピーしました';
   } catch (error) {
-    link.textContent = '●コピーできませんでした';
+    label.textContent = 'コピーできませんでした';
   } finally {
     link.removeAttribute('aria-busy');
-    window.setTimeout(() => { link.textContent = originalLabel; }, 1800);
+    window.setTimeout(() => { label.textContent = originalLabel; }, 1800);
   }
 });

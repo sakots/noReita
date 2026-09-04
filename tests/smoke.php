@@ -206,12 +206,14 @@ smoke_test('post image templates provide a clipboard copy link', static function
   foreach ($templates as $template) {
     $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
     if (!is_string($source) || !str_contains($source, 'class="copy-image"')
-      || !str_contains($source, 'data-image-url')) return false;
+      || !str_contains($source, 'data-image-url')
+      || !str_contains($source, 'class="copy-image-label"')) return false;
   }
   foreach (['eda', 'monoreita'] as $theme) {
     $script = file_get_contents($root . DIRECTORY_SEPARATOR . $theme . '/js/imageClipboard.js');
     if (!is_string($script) || !str_contains($script, 'ClipboardItem')
-      || !str_contains($script, "'image/png'")) return false;
+      || !str_contains($script, "'image/png'")
+      || !str_contains($script, "querySelector('.copy-image-label')")) return false;
   }
   return true;
 });
