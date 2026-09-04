@@ -70,6 +70,7 @@
   </footer>
   <!-- scripts -->
   <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
+  <script src="theme/{{$theme_dir}}/js/imageClipboard.js"></script>
   <script src="trip-preview.js?v={{$trip_preview_version}}" data-endpoint="{{$self}}?mode=trip_preview"></script>
   @include('components.monoreita_togglePaletteVisibility')
   @include('components.monoreita_luminous')

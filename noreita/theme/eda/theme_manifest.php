@@ -19,6 +19,6 @@ return [
   ],
   'assets' => [
     'css' => ['css/eda_index.min.css', 'css/eda_admin.css', 'luminous/luminous-basic.min.css'],
-    'javascript' => ['js/appFit.js', 'js/dynamicPalette.js', 'js/sodane.js', 'js/themeColorManager.js', 'luminous/luminous.min.js'],
+    'javascript' => ['js/appFit.js', 'js/dynamicPalette.js', 'js/imageClipboard.js', 'js/sodane.js', 'js/themeColorManager.js', 'luminous/luminous.min.js'],
   ],
 ];
