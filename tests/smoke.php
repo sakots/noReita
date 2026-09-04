@@ -195,6 +195,27 @@ smoke_test('response templates provide image OGP metadata for SNS sharing', stat
     && str_contains($index, "['og_image']");
 });
 
+smoke_test('post image templates provide a clipboard copy link', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $templates = [
+    'eda/components/eda_threadOyaPicfile.twig',
+    'eda/components/eda_threadRepPicfile.twig',
+    'monoreita/components/monoreita_threadOyaPicfile.blade.php',
+    'monoreita/components/monoreita_threadRepPicfile.blade.php',
+  ];
+  foreach ($templates as $template) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
+    if (!is_string($source) || !str_contains($source, 'class="copy-image"')
+      || !str_contains($source, 'data-image-url')) return false;
+  }
+  foreach (['eda', 'monoreita'] as $theme) {
+    $script = file_get_contents($root . DIRECTORY_SEPARATOR . $theme . '/js/imageClipboard.js');
+    if (!is_string($script) || !str_contains($script, 'ClipboardItem')
+      || !str_contains($script, "'image/png'")) return false;
+  }
+  return true;
+});
+
 smoke_test('PaintBBS NEO loads from GitHub with the configured mirror as fallback', static function (): bool {
   $root = dirname(__DIR__) . '/noreita/theme';
   $loaders = [

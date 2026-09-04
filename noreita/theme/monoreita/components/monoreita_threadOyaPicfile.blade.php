@@ -9,11 +9,12 @@
 </h5>
 <h5>
   <a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
+  <a class="copy-image" href="{{$path}}{{$bbsline['picfile']}}" data-image-url="{{$path}}{{$bbsline['picfile']}}"><span class="carbon--copy-to-clipboard"></span> 画像をコピー</a>
   @if ($bbsline['pchfile'] && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img') && ($bbsline['tool'] == ("neo" || "PaintBBS NEO" || "Tegaki" || "Tegaki.js")))
-    <a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank">●動画</a>
+    <a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank"><span class="mdi--animation-play"></span>動画</a>
   @endif
   @if ($use_continue)
-    <a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}">●続きを描く</a>
+    <a href="{{$self}}?mode=continue&amp;no={{$bbsline['picfile']}}"><span class="fa7-solid--paint-brush"></span>続きを描く</a>
   @endif
 </h5>
 <div class="item_image">
