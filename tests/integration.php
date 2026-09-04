@@ -1677,6 +1677,38 @@ PHP;
       && is_file($webroot . '/img/' . $upload_row['picfile']);
   });
 
+  $jpeg_upload_source = $root . '/direct-upload-exif.jpg';
+  $jpeg_marker = 'noreita-exif-' . bin2hex(random_bytes(8));
+  $jpeg_canvas = imagecreatetruecolor(2, 2);
+  if ($jpeg_canvas === false || !imagejpeg($jpeg_canvas, $jpeg_upload_source, 100)) {
+    throw new RuntimeException('Could not create direct JPEG upload image.');
+  }
+  unset($jpeg_canvas);
+  $jpeg_source = file_get_contents($jpeg_upload_source);
+  $jpeg_metadata = "Exif\x00\x00" . $jpeg_marker;
+  if (!is_string($jpeg_source) || strlen($jpeg_source) < 2
+    || file_put_contents($jpeg_upload_source, substr($jpeg_source, 0, 2) . "\xff\xe1"
+      . pack('n', strlen($jpeg_metadata) + 2) . $jpeg_metadata . substr($jpeg_source, 2)) === false) {
+    throw new RuntimeException('Could not add EXIF metadata to direct JPEG upload image.');
+  }
+  $jpeg_upload_comment = 'direct-upload-exif-' . bin2hex(random_bytes(6));
+  $jpeg_files_before_upload = glob($webroot . '/img/*.jpg') ?: [];
+  [$jpeg_upload_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
+    'sub' => 'Direct JPEG upload', 'com' => "JPEGアップロード {$jpeg_upload_comment}", 'pwd' => 'upload-delete-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+    'image_upload' => new CURLFile($jpeg_upload_source, 'image/jpeg', 'metadata.jpg'),
+  ]);
+  $jpeg_files_after_upload = glob($webroot . '/img/*.jpg') ?: [];
+  $jpeg_uploaded_files = array_values(array_diff($jpeg_files_after_upload, $jpeg_files_before_upload));
+  integration_test('direct JPEG upload removes embedded EXIF metadata', static function () use (
+    $jpeg_upload_status, $jpeg_uploaded_files, $jpeg_marker
+  ): bool {
+    if ($jpeg_upload_status !== 200 || count($jpeg_uploaded_files) !== 1) return false;
+    $contents = file_get_contents($jpeg_uploaded_files[0]);
+    return is_string($contents) && !str_contains($contents, $jpeg_marker);
+  });
+
   [$pending_drawing_status, $pending_drawing_body] = http_request(
     $base_url . '?mode=animation_upload',
     $cookie_jar,

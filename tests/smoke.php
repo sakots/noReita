@@ -1531,6 +1531,23 @@ smoke_test('post service centralizes edit and delete authorization', static func
       if (is_file($image_dir . DIRECTORY_SEPARATOR . $image)) return false;
     }
 
+    $owner_parent = $insert('所有者削除親', 'owner-thread-pass', 'owner-thread-parent.png');
+    $owner_reply = $repository->insertPost([
+      'thread' => 0, 'parent' => $owner_parent, 'sub' => '所有者削除レス', 'com' => '本文',
+      'a_name' => '返信者', 'pwd' => password_hash('owner-reply-pass', PASSWORD_DEFAULT),
+      'picfile' => 'owner-thread-reply.webp', 'invz' => 0, 'age' => 0, 'tree' => time(),
+    ]);
+    $owner_thread_files = [
+      'owner-thread-parent.png', 'owner-thread-parent.pch',
+      'owner-thread-reply.webp', 'owner-thread-reply.psd', 'owner-thread-reply_thumb_nsfw_test.webp',
+    ];
+    foreach ($owner_thread_files as $image) file_put_contents($image_dir . DIRECTORY_SEPARATOR . $image, 'image');
+    if ($service->delete($owner_parent, 'owner-thread-pass', false) !== 'deleted'
+      || $repository->findPost($owner_parent) !== false || $repository->findPost($owner_reply) !== false) return false;
+    foreach ($owner_thread_files as $image) {
+      if (is_file($image_dir . DIRECTORY_SEPARATOR . $image)) return false;
+    }
+
     $new_input = [
       'name' => '投稿者#trip-secret', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
       'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,
@@ -1612,6 +1629,31 @@ smoke_test('image MIME mapping', static function (): bool {
     && get_image_type('image/avif') === '.avif';
 });
 
+smoke_test('direct image re-encoding removes JPEG metadata', static function (): bool {
+  $source = tempnam(sys_get_temp_dir(), 'noreita_exif_source_');
+  $destination = tempnam(sys_get_temp_dir(), 'noreita_exif_destination_');
+  if ($source === false || $destination === false) return false;
+  $marker = 'noreita-exif-' . bin2hex(random_bytes(8));
+  try {
+    $canvas = imagecreatetruecolor(2, 2);
+    if ($canvas === false || !imagejpeg($canvas, $source, 100)) return false;
+    unset($canvas);
+    $jpeg = file_get_contents($source);
+    $metadata = "Exif\x00\x00" . $marker;
+    if (!is_string($jpeg) || strlen($jpeg) < 2
+      || file_put_contents($source, substr($jpeg, 0, 2) . "\xff\xe1" . pack('n', strlen($metadata) + 2) . $metadata . substr($jpeg, 2)) === false) {
+      return false;
+    }
+    $method = new ReflectionMethod(ImageService::class, 'reencodeUploadedImage');
+    $method->invoke(null, $source, $destination, 'image/jpeg');
+    $saved = file_get_contents($destination);
+    return is_string($saved) && !str_contains($saved, $marker) && @getimagesize($destination) !== false;
+  } finally {
+    if (is_file($source)) unlink($source);
+    if (is_file($destination)) unlink($destination);
+  }
+});
+
 smoke_test('animated WebP is accepted without GD frame decoding and remains intact for NSFW', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_animated_webp_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
@@ -1687,13 +1729,16 @@ smoke_test('animated AVIF ignores ispe-like bytes outside its property container
   }
 });
 
-smoke_test('image upload formats follow available GD decoders', static function (): bool {
+smoke_test('image upload formats require matching GD decoders and encoders', static function (): bool {
   $without_avif = static fn(string $function): bool => $function !== 'imagecreatefromavif';
+  $without_webp_encoder = static fn(string $function): bool => $function !== 'imagewebp';
   $with_everything = static fn(string $function): bool => true;
   $limited = ImageService::supportedUploadFormats($without_avif);
+  $without_webp = ImageService::supportedUploadFormats($without_webp_encoder);
   $complete = ImageService::supportedUploadFormats($with_everything);
   return !isset($limited['image/avif'])
     && isset($limited['image/png'], $limited['image/jpeg'], $limited['image/gif'], $limited['image/webp'])
+    && !isset($without_webp['image/webp'])
     && isset($complete['image/avif'])
     && ImageService::uploadAccept($without_avif) === 'image/png,image/jpeg,image/gif,image/webp'
     && ImageService::uploadFormatLabel($without_avif) === 'PNG / JPEG / GIF / WebP'
