@@ -242,6 +242,8 @@ $dat['share_button'] = Config::bool('features.share_button');
 $dat['use_hashtag'] = Config::bool('features.hashtag');
 
 $dat['sodane'] = SODANE;
+// 「そうだね」は設定にかかわらずCSRFトークン付きPOSTで更新する。
+$dat['sodane_token'] = RequestSecurity::csrfToken();
 
 $dat['use_oekaki_reply'] = Config::bool('features.oekaki_reply');
 $dat['use_image_upload'] = Config::bool('features.image_upload');
@@ -1185,12 +1187,20 @@ function search(ApplicationContext $context): void {
 
 //そうだね
 function sodane(ApplicationContext $context): void {
-  $resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
+  $resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
 
   // Ajaxリクエストかどうかをチェック
   $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
   try {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+      header('Allow: POST');
+      throw new RequestSecurityException('Only POST is supported.', 405);
+    }
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $context->english);
+    if (!is_int($resto) || $resto < 1) {
+      throw new RequestSecurityException('Invalid post number.', 400);
+    }
     $new_sodane = (new BoardRepository())->incrementSodane((int)$resto);
 
     if ($is_ajax) {
@@ -1204,6 +1214,14 @@ function sodane(ApplicationContext $context): void {
       return;
     }
 
+  } catch (RequestSecurityException $e) {
+    if ($is_ajax) {
+      http_response_code($e->getCode() ?: 403);
+      header('Content-Type: application/json; charset=UTF-8');
+      echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+      return;
+    }
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   } catch (PDOException $e) {
     if ($is_ajax) {
       $error_id = ApplicationErrorHandler::reportThrowable($e);

@@ -963,6 +963,29 @@ PHP;
   });
 
   $shared_thread_id = (int)($row['tid'] ?? 0);
+  $sodane_count = static fn(): int => (int)$db->query('SELECT sodane FROM board_log WHERE tid = ' . $shared_thread_id)->fetchColumn();
+  foreach ([
+    'GET' => [null, 405],
+    'missing token' => [['resto' => (string)$shared_thread_id], 403],
+    'wrong token' => [['resto' => (string)$shared_thread_id, 'token' => 'invalid'], 403],
+  ] as $case => [$payload, $expected_status]) {
+    $before_count = $sodane_count();
+    [$reaction_status] = http_request($base_url . '?mode=sodane&resto=' . $shared_thread_id, $cookie_jar, $payload);
+    integration_test('sodane rejects ' . $case . ' without incrementing', static function () use (
+      $reaction_status, $expected_status, $before_count, $sodane_count
+    ): bool {
+      return $reaction_status === $expected_status && $sodane_count() === $before_count;
+    });
+  }
+  $before_count = $sodane_count();
+  [$reaction_status] = http_request($base_url . '?mode=sodane', $cookie_jar, [
+    'resto' => (string)$shared_thread_id, 'token' => $token,
+  ]);
+  integration_test('sodane accepts a POST with a valid CSRF token', static function () use (
+    $reaction_status, $before_count, $sodane_count
+  ): bool {
+    return $reaction_status === 302 && $sodane_count() === $before_count + 1;
+  });
   [$shared_thread_status, $shared_thread_body] = http_request(
     $base_url . '?resno=' . $shared_thread_id, $cookie_jar
   );
