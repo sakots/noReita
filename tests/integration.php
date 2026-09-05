@@ -1725,6 +1725,31 @@ PHP;
     throw new RuntimeException('Could not create direct upload image.');
   }
   $upload_marker = 'direct-upload-' . bin2hex(random_bytes(6));
+  // IHDRだけのPNGで検証順序を確認する。巨大な画像データは生成・展開しない。
+  $upload_defaults = require $webroot . '/config.php';
+  foreach ([
+    'width' => [$upload_defaults['limits']['image_width'] + 1, 1, 'dimensions exceed the limit'],
+    'height' => [1, $upload_defaults['limits']['image_height'] + 1, 'dimensions exceed the limit'],
+    'invalid pixels' => [1, 1, 'Unsupported image format'],
+  ] as $case => [$header_width, $header_height, $expected_error]) {
+    $header = 'IHDR' . pack('NNCCCCC', $header_width, $header_height, 8, 2, 0, 0, 0);
+    $header_file = $root . '/header-only.png';
+    file_put_contents($header_file, "\x89PNG\r\n\x1a\n" . pack('N', 13) . $header . pack('N', crc32($header)));
+    $before_rows = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+    $before_files = glob($webroot . '/img/*');
+    [$dimension_status, $dimension_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
+      'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'sub' => 'Invalid image',
+      'com' => '画像の寸法検証 ' . $case, 'pwd' => 'upload-delete-pass', 'token' => $token,
+      'image_upload' => new CURLFile($header_file, 'image/png', 'header-only.png'),
+    ]);
+    integration_test('upload validates dimensions before decoding: ' . $case, static function () use (
+      $dimension_status, $dimension_body, $expected_error, $before_rows, $before_files, $db, $webroot
+    ): bool {
+      return $dimension_status === 400 && str_contains($dimension_body, $expected_error)
+        && (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === $before_rows
+        && glob($webroot . '/img/*') === $before_files;
+    });
+  }
   [$direct_upload_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
     'sub' => 'Direct image upload', 'com' => "画像アップロード {$upload_marker}", 'pwd' => 'upload-delete-pass',

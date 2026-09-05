@@ -673,8 +673,7 @@ final class ImageService {
       throw new ImageUploadException('The detected image format is not supported by this server.', 415);
     }
     $image = @getimagesize($temporary_file);
-    if ($image === false || ($image['mime'] ?? null) !== $mime
-      || !self::isDecodableImage($temporary_file, $mime)) {
+    if ($image === false || ($image['mime'] ?? null) !== $mime) {
       throw new ImageUploadException('Unsupported image format.', 400);
     }
     $width = (int)$image[0];
@@ -682,6 +681,10 @@ final class ImageService {
     if ($max_width < 1 || $max_height < 1 || $width < 1 || $height < 1
       || $width > $max_width || $height > $max_height) {
       throw new ImageUploadException('The uploaded image dimensions exceed the limit.', 400);
+    }
+    // GDが画素データを展開する前に、ヘッダーの寸法を制限する。
+    if (!self::isDecodableImage($temporary_file, $mime)) {
+      throw new ImageUploadException('Unsupported image format.', 400);
     }
 
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
