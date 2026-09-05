@@ -125,6 +125,45 @@ smoke_test('BladeOne and Twig render through the template engine abstraction', s
   }
 });
 
+smoke_test('both themes limit animation links to supported tool names', static function (): bool {
+  $cache = sys_get_temp_dir() . '/noreita_animation_links_' . bin2hex(random_bytes(8));
+  mkdir($cache, 0700, true);
+  try {
+    foreach (['eda' => 'twig', 'monoreita' => 'blade'] as $theme => $type) {
+      mkdir($cache . '/' . $theme, 0700);
+      $engine = TemplateEngineFactory::create($type, dirname(__DIR__) . '/noreita/theme/' . $theme . '/components', $cache . '/' . $theme);
+      foreach (['Oya' => 'bbsline', 'Rep' => 'res'] as $component => $key) {
+        foreach (['neo', 'PaintBBS NEO', 'Tegaki', 'Tegaki.js', 'litaChix', 'Klecks', 'Upload', ''] as $tool) {
+          foreach (['new', 'img'] as $ctype) {
+            foreach (['record.pch', ''] as $animation) {
+              $post = ['tool' => $tool, 'img_w' => 4, 'img_h' => 3, 'psec' => 0, 'utime' => '',
+                'nsfw' => 0, 'picfile' => 'record.png', 'thumb' => '', 'pchfile' => $animation, 'ctype' => $ctype];
+              $html = $engine->render($theme . '_thread' . $component . 'Picfile', [
+                $key => $post, 'display_painttime' => false, 'path' => 'img/', 'self' => 'index.php', 'use_continue' => false,
+                'use_misskey_note' => false,
+              ]);
+              $expected = in_array($tool, ['neo', 'PaintBBS NEO', 'Tegaki', 'Tegaki.js'], true)
+                && $ctype !== 'img' && $animation !== '';
+              if (str_contains($html, '?mode=anime') !== $expected) {
+                throw new RuntimeException($theme . '/' . $component . ': unexpected animation link for ' . $tool);
+              }
+            }
+          }
+        }
+      }
+    }
+    return true;
+  } finally {
+    $iterator = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($cache, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $item) {
+      $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+    }
+    rmdir($cache);
+  }
+});
+
 smoke_test('eda Twig theme templates compile', static function (): bool {
   $views = dirname(__DIR__) . '/noreita/theme/eda';
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_eda_twig_' . bin2hex(random_bytes(8));
