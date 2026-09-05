@@ -1622,6 +1622,19 @@ PHP;
       && $hidden_search_status === 200 && str_contains($hidden_search_body, '0件');
   });
 
+  $hidden_uuid = (string)$db->query('SELECT uuid FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  foreach (['?resno=' . $post_id, '?mode=res&res=' . $post_id,
+    '?mode=res&uuid=' . rawurlencode($hidden_uuid), '?resno=2147483647'] as $query) {
+    [$private_status, $private_body] = http_request($base_url . $query, $root . '/anonymous-cookies.txt');
+    integration_test('public response rejects hidden or missing posts: ' . $query, static function () use (
+      $private_status, $private_body, $marker
+    ): bool {
+      return $private_status === 404 && !str_contains($private_body, $marker)
+        && !str_contains($private_body, 'property="og:description"')
+        && !str_contains($private_body, 'property="og:image"');
+    });
+  }
+
   [$show_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'show', 'delno' => [(string)$post_id], 'token' => $token,
   ]);

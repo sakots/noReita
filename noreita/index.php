@@ -1265,6 +1265,10 @@ function res(ApplicationContext $context): void {
     $dat['resno'] = $resno;
 
     $thread = $repository->findPost((int)$resno);
+    // 公開画面では、非表示の記事を本文・OGPへ渡さない。
+    if ($thread === false || (int)($thread['invz'] ?? 0) !== 0) {
+      render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
+    }
     $posts = $thread ? [$thread] : [];
 
     $oya = array();
