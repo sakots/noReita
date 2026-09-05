@@ -1963,6 +1963,9 @@ PHP;
     $pending_replacement_status, $pending_replacement_row, $pending_drawing_image,
     $pending_drawing_base, $webroot
   ): bool {
+    // HTTPサーバー側で削除されたファイルを、直前のロールバック検証で
+    // このテストプロセスに残ったstatキャッシュで判定しない。
+    clearstatcache();
     return $pending_replacement_status === 200 && is_array($pending_replacement_row)
       && $pending_replacement_row['picfile'] !== $pending_drawing_image
       && $pending_replacement_row['tool'] === 'Upload'

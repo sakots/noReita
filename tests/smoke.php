@@ -2260,8 +2260,11 @@ foreach ([
       $thumbnail = new Thumbnail($directory . '/input.png', $directory, $width, $nsfw, 'output');
       if (!$thumbnail->createThumbnail()) return false;
       $output = $thumbnail->getOutputPath();
-      $size = $output !== null ? getimagesize($output) : false;
-      return $size !== false && $size[0] === $width && $size[1] === $expected_height;
+      // PHP 8.1のgetimagesize()はAVIFの寸法を0として返すため、
+      // 生成した画像を実際にデコードして寸法を検証する。
+      $bytes = $output !== null ? file_get_contents($output) : false;
+      $decoded = is_string($bytes) ? imagecreatefromstring($bytes) : false;
+      return $decoded !== false && imagesx($decoded) === $width && imagesy($decoded) === $expected_height;
     } finally {
       foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
       rmdir($directory);
