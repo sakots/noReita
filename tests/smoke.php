@@ -1452,6 +1452,29 @@ smoke_test('post validation is independent from HTTP rendering', static function
   return true;
 });
 
+smoke_test('spam scoring skips disabled rules and avoids integer overflow', static function (): bool {
+  $rules = ['request_method' => 'POST', 'comment_score_threshold' => 0,
+    'comment_score_rules' => [['test', PHP_INT_MAX], ['test', 1]]];
+  PostValidator::validate(['com' => 'test'], $rules);
+  $rules['comment_score_threshold'] = 3;
+  foreach ([
+    [[['test', PHP_INT_MAX], ['test', 1]], true],
+    [[['test', 1], ['test', PHP_INT_MAX]], true],
+    [[['test', 1], ['test', 2]], true],
+    [[['test', 1], ['test', 1]], false],
+    [[['unmatched', PHP_INT_MAX]], false],
+  ] as [$patterns, $should_reject]) {
+    $rules['comment_score_rules'] = $patterns;
+    try {
+      PostValidator::validate(['com' => 'test'], $rules);
+      if ($should_reject) return false;
+    } catch (PostValidationException $e) {
+      if (!$should_reject || $e->getMessage() !== 'コメントはスパムとして拒否されました。') return false;
+    }
+  }
+  return true;
+});
+
 smoke_test('post validation rejects invalid UTF-8 before spam matching', static function (): bool {
   $input = ['com' => '日本語と絵文字🎨', 'name' => '名前', 'sub' => '題名', 'mail' => '', 'url' => ''];
   $rules = ['request_method' => 'POST', 'japanese_filter' => false,

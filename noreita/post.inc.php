@@ -443,9 +443,9 @@ final class PostValidator {
     if (is_ngword($rules['bad_strings_a'] ?? [], $values) && is_ngword($rules['bad_strings_b'] ?? [], $values)) {
       throw new PostValidationException(self::message($en, 'Invalid combination of characters found in comment.', 'コメントに無効な文字の組み合わせが含まれています。'));
     }
-    if (self::commentRejectionScore($com, $rules['comment_score_rules'] ?? [])
-      >= (int)($rules['comment_score_threshold'] ?? 0)
-      && (int)($rules['comment_score_threshold'] ?? 0) > 0) {
+    $score_threshold = (int)($rules['comment_score_threshold'] ?? 0);
+    if ($score_threshold > 0
+      && self::commentRejectionScore($com, $rules['comment_score_rules'] ?? [], $score_threshold) >= $score_threshold) {
       throw new PostValidationException(self::message($en, 'Your comment was rejected as spam.', 'コメントはスパムとして拒否されました。'));
     }
 
@@ -484,10 +484,14 @@ final class PostValidator {
   }
 
   /** @param array<int, array{0:string, 1:int}> $rules */
-  private static function commentRejectionScore(string $comment, array $rules): int {
+  private static function commentRejectionScore(string $comment, array $rules, int $threshold): int {
     $score = 0;
     foreach ($rules as $rule) {
-      if (preg_match('/' . $rule[0] . '/ui', $comment) === 1) $score += $rule[1];
+      if (preg_match('/' . $rule[0] . '/ui', $comment) === 1) {
+        // 加算前に残り点数と比較し、整数オーバーフローを防ぐ。
+        if ($rule[1] >= $threshold - $score) return $threshold;
+        $score += $rule[1];
+      }
     }
     return $score;
   }
