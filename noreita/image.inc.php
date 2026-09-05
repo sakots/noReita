@@ -1373,6 +1373,14 @@ final class ImageService {
     return $result ? $name : '';
   }
 
+  public static function toolDisplayName(string $tool): string {
+    $tool_names = [
+      'neo' => 'PaintBBS NEO', 'shi' => 'Shi Painter', 'chicken' => 'litaChix', 'chi' => 'litaChix',
+      'klecks' => 'Klecks', 'tegaki' => 'Tegaki.js', 'axnos' => 'AxnosPaint',
+    ];
+    return $tool_names[$tool] ?? '???';
+  }
+
   /**
    * @param callable(array<string,mixed>):void|null $save_post Save the database row before removing temporary files.
    * @return array<string,mixed>
@@ -1447,11 +1455,6 @@ final class ImageService {
     }
     $paint_seconds = ($show_paint_time && $start_time > 0) ? max(0, $posted_time - $start_time) : 0;
     $paint_time = $paint_seconds > 0 ? calcPtime($paint_seconds) : '';
-    $tool_names = [
-      'neo' => 'PaintBBS NEO', 'shi' => 'Shi Painter', 'chicken' => 'litaChix', 'chi' => 'litaChix',
-      'klecks' => 'Klecks', 'tegaki' => 'Tegaki.js', 'axnos' => 'AxnosPaint',
-    ];
-
     $thumbnail = '';
     if ((int)$size[0] > $thumbnail_width || $nsfw) {
       // Keep thumbnails separate from their source. Using the source basename directly can
@@ -1483,7 +1486,7 @@ final class ImageService {
 
     return [
       'img_w' => (int)$size[0], 'img_h' => (int)$size[1], 'pchfile' => $animation,
-      'psec' => $paint_seconds, 'utime' => $paint_time, 'tool' => $tool_names[$tool] ?? '???',
+      'psec' => $paint_seconds, 'utime' => $paint_time, 'tool' => self::toolDisplayName($tool),
       'thumbnail' => $thumbnail, 'nsfw' => $nsfw,
     ];
   }

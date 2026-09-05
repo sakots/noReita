@@ -343,7 +343,7 @@ final class BoardRepository {
   public function updateImage(int $id, array $values): void {
     $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), host = :host, picfile = :picfile,
       pchfile = :pchfile, id = :author_id, psec = :psec, utime = :utime, nsfw = :nsfw,
-      thumbnail = :thumbnail, img_w = :img_w, img_h = :img_h WHERE tid = :id AND picfile = :expected_picfile";
+      thumbnail = :thumbnail, img_w = :img_w, img_h = :img_h, tool = :tool WHERE tid = :id AND picfile = :expected_picfile";
     $statement = $this->db->prepare($sql);
     $statement->execute([
       'host' => $values['host'], 'picfile' => $values['picfile'], 'pchfile' => $values['pchfile'],
@@ -351,6 +351,7 @@ final class BoardRepository {
       'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'], 'id' => $id,
       'expected_picfile' => $values['expected_picfile'],
       'img_w' => $values['img_w'], 'img_h' => $values['img_h'],
+      'tool' => $values['tool'],
     ]);
     if ($statement->rowCount() !== 1) {
       throw new RuntimeException('The posted image changed before replacement completed.');

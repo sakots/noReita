@@ -1480,6 +1480,7 @@ PHP;
   $continued_from_thumbnail = (string)$db->query('SELECT thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
 
   $replacement_base = 'replacement-' . bin2hex(random_bytes(6));
+  $db->exec("UPDATE board_log SET tool = 'Klecks' WHERE tid = " . $image_post_id);
   $replacement_code = 'replace-code-' . bin2hex(random_bytes(4));
   $resized_replacement = imagecreatetruecolor(17, 11);
   imagepng($resized_replacement, $webroot . '/tmp/' . $replacement_base . '.png');
@@ -1506,7 +1507,16 @@ PHP;
     $cookie_jar,
     ['nsfw' => '0']
   );
-  $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail, img_w, img_h FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail, img_w, img_h, tool FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  [$replacement_page_status, $replacement_page_body] = http_request($base_url . '?resno=' . $image_post_id, $cookie_jar);
+  integration_test('image replacement updates tool from saved metadata and restores animation link', static function () use (
+    $replacement_status, $replaced_image_row, $replacement_page_status, $replacement_page_body, $replacement_base
+  ): bool {
+    return $replacement_status === 200 && is_array($replaced_image_row)
+      && $replaced_image_row['tool'] === 'PaintBBS NEO' && $replacement_page_status === 200
+      && str_contains($replacement_page_body, 'PaintBBS NEO')
+      && str_contains($replacement_page_body, '?mode=anime&amp;pch=' . $replacement_base . '.pch');
+  });
   integration_test('image replacement updates stored dimensions after canvas resize', static function () use (
     $replacement_status, $replaced_image_row
   ): bool {

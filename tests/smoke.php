@@ -2565,6 +2565,16 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
   }
 });
 
+smoke_test('saved drawing tools share display names for new posts and replacements', static function (): bool {
+  foreach ([
+    'neo' => 'PaintBBS NEO', 'shi' => 'Shi Painter', 'chicken' => 'litaChix', 'chi' => 'litaChix',
+    'klecks' => 'Klecks', 'tegaki' => 'Tegaki.js', 'axnos' => 'AxnosPaint', '' => '???', 'unknown' => '???',
+  ] as $tool => $expected) {
+    if (ImageService::toolDisplayName($tool) !== $expected) return false;
+  }
+  return true;
+});
+
 smoke_test('new post image and animation are finalized', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_finalize_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
