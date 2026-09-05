@@ -1824,6 +1824,37 @@ PHP;
       && !str_contains($pending_form_body, 'name="replace_pending_image"');
   });
 
+  $drawing_failure_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $drawing_failure_db->exec("CREATE TRIGGER fail_drawing_insert BEFORE INSERT ON board_log
+    BEGIN SELECT RAISE(ABORT, 'forced drawing insert failure'); END");
+  $drawing_originals = [];
+  foreach (glob($webroot . '/tmp/' . $pending_drawing_base . '.*') ?: [] as $path) {
+    $drawing_originals[$path] = hash_file('sha256', $path);
+  }
+  $drawing_count_before = (int)$drawing_failure_db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+  try {
+    [$drawing_failure_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+      'mode' => 'regist', 'send' => '1', 'name' => 'drawing-rollback', 'mail' => '', 'url' => '',
+      'sub' => 'Drawing rollback', 'com' => "描画保存失敗 {$marker}", 'pwd' => 'drawing-pass',
+      'picfile' => $pending_drawing_image, 'ctype' => 'new', 'nsfw' => '1', 'token' => $token,
+    ]);
+  } finally {
+    $drawing_failure_db->exec('DROP TRIGGER fail_drawing_insert');
+  }
+  integration_test('database failure preserves pending drawing and removes published files', static function () use (
+    $drawing_failure_status, $drawing_originals, $webroot, $pending_drawing_base,
+    $drawing_failure_db, $drawing_count_before
+  ): bool {
+    clearstatcache();
+    if ($drawing_failure_status !== 500 || count($drawing_originals) < 3
+      || (int)$drawing_failure_db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== $drawing_count_before
+      || (glob($webroot . '/img/' . $pending_drawing_base . '*') ?: []) !== []) return false;
+    foreach ($drawing_originals as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+    }
+    return true;
+  });
+
   $pending_replacement_marker = 'pending-replacement-' . bin2hex(random_bytes(6));
   [$pending_replacement_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'pending-replacement', 'mail' => '', 'url' => '',

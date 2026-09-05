@@ -2540,6 +2540,71 @@ smoke_test('new post image and animation are finalized', static function (): boo
   }
 });
 
+smoke_test('failed drawing finalization preserves temporary files and supports retry', static function (): bool {
+  $root = sys_get_temp_dir() . '/noreita_finalize_retry_' . bin2hex(random_bytes(8));
+  $temp = $root . '/tmp';
+  $images = $root . '/img';
+  mkdir($temp, 0700, true);
+  mkdir($images, 0700, true);
+  try {
+    $source = imagecreatetruecolor(4, 3);
+    imagepng($source, $temp . '/post.png');
+    file_put_contents($temp . '/post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
+    file_put_contents($temp . '/post.pch', 'NEO');
+    file_put_contents($temp . '/post.psd', 'PSD');
+    $originals = [];
+    foreach (glob($temp . '/*') as $path) $originals[$path] = hash_file('sha256', $path);
+
+    // A failure after image/thumbnail/animation publication must leave every source intact.
+    try {
+      ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600,
+        static function (array $result) use ($images): void {
+          if (!is_file($images . '/' . $result['thumbnail']) || !is_file($images . '/post.psd')) {
+            throw new RuntimeException('Files were not published before database save.');
+          }
+          throw new PDOException('Simulated database failure');
+        }
+      );
+      return false;
+    } catch (PDOException $e) {
+      if ($e->getMessage() !== 'Simulated database failure') return false;
+    }
+    if ((glob($images . '/*') ?: []) !== []) return false;
+    foreach ($originals as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+    }
+
+    // A later working-file collision also rolls back, without deleting an existing file.
+    file_put_contents($images . '/post.psd', 'existing PSD');
+    try {
+      ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600);
+      return false;
+    } catch (RuntimeException $e) {
+      if (file_get_contents($images . '/post.psd') !== 'existing PSD'
+        || count(glob($images . '/*') ?: []) !== 1) return false;
+    }
+    foreach ($originals as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+    }
+    unlink($images . '/post.psd');
+    $saved = 0;
+    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600,
+      static function (array $result) use (&$saved): void { ++$saved; }
+    );
+    return $saved === 1 && (glob($temp . '/*') ?: []) === []
+      && hash_file('sha256', $images . '/post.png') === $originals[$temp . '/post.png']
+      && file_get_contents($images . '/post.pch') === 'NEO'
+      && file_get_contents($images . '/post.psd') === 'PSD'
+      && is_file($images . '/' . $result['thumbnail']);
+  } finally {
+    foreach ([$temp, $images] as $directory) {
+      foreach (glob($directory . '/*') ?: [] as $file) if (is_file($file)) unlink($file);
+      rmdir($directory);
+    }
+    rmdir($root);
+  }
+});
+
 smoke_test('image consistency repair backs up data and fixes recoverable issues', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_consistency_' . bin2hex(random_bytes(8));
   $images = $root . DIRECTORY_SEPARATOR . 'img';

@@ -1373,7 +1373,10 @@ final class ImageService {
     return $result ? $name : '';
   }
 
-  /** @return array<string,mixed> */
+  /**
+   * @param callable(array<string,mixed>):void|null $save_post Save the database row before removing temporary files.
+   * @return array<string,mixed>
+   */
   public static function finalizeNewPost(
     string $temp_dir,
     string $image_dir,
@@ -1382,7 +1385,40 @@ final class ImageService {
     bool $show_paint_time,
     int $thumbnail_width,
     bool $nsfw,
-    int $permission
+    int $permission,
+    ?callable $save_post = null
+  ): array {
+    $published = [];
+    $temporary = [];
+    try {
+      $result = self::publishNewPostFiles(
+        $temp_dir, $image_dir, $image_name, $ctype, $show_paint_time,
+        $thumbnail_width, $nsfw, $permission, $published, $temporary
+      );
+      if ($save_post !== null) {
+        $save_post($result);
+      }
+    } catch (Throwable $e) {
+      foreach (array_reverse($published) as $path) {
+        safe_unlink($path);
+      }
+      throw $e;
+    }
+    foreach ($temporary as $path) {
+      safe_unlink($path);
+    }
+    return $result;
+  }
+
+  /**
+   * @param list<string> $published Files created by this attempt, for rollback.
+   * @param list<string> $temporary Files to remove only after the database commit.
+   * @return array<string,mixed>
+   */
+  private static function publishNewPostFiles(
+    string $temp_dir, string $image_dir, string $image_name, string $ctype,
+    bool $show_paint_time, int $thumbnail_width, bool $nsfw, int $permission,
+    array &$published, array &$temporary
   ): array {
     $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
@@ -1403,10 +1439,7 @@ final class ImageService {
     $tool = (string)($fields[9] ?? '');
 
     $destination = $image_dir . $image_name;
-    if (!rename($source, $destination)) {
-      throw new RuntimeException('Failed to save image file.');
-    }
-    chmod($destination, $permission);
+    self::copyNewPostFile($source, $destination, $permission, $published, $temporary);
 
     $size = getimagesize($destination);
     if ($size === false) {
@@ -1426,6 +1459,9 @@ final class ImageService {
       $thumbnail = self::refreshNsfwThumbnail(
         $image_dir, $image_name, '', $nsfw, $thumbnail_width, $permission
       );
+      if ($thumbnail !== '') {
+        $published[] = $image_dir . $thumbnail;
+      }
     }
 
     $animation = '';
@@ -1433,28 +1469,58 @@ final class ImageService {
       foreach (['pch', 'spch', 'chi', 'tgkr'] as $extension) {
         $candidate = $base_name . '.' . $extension;
         if (is_file($temp_dir . $candidate)) {
-          if (rename($temp_dir . $candidate, $image_dir . $candidate)) {
-            chmod($image_dir . $candidate, $permission);
-            $animation = $candidate;
-          }
+          self::copyNewPostFile($temp_dir . $candidate, $image_dir . $candidate, $permission, $published, $temporary);
+          $animation = $candidate;
           break;
         }
       }
     }
     $psd = $base_name . '.psd';
     if (is_file($temp_dir . $psd)) {
-      if (!rename($temp_dir . $psd, $image_dir . $psd)) {
-        throw new RuntimeException('Failed to save PSD working file.');
-      }
-      chmod($image_dir . $psd, $permission);
+      self::copyNewPostFile($temp_dir . $psd, $image_dir . $psd, $permission, $published, $temporary);
     }
-    safe_unlink($metadata_file);
+    $temporary[] = $metadata_file;
 
     return [
       'img_w' => (int)$size[0], 'img_h' => (int)$size[1], 'pchfile' => $animation,
       'psec' => $paint_seconds, 'utime' => $paint_time, 'tool' => $tool_names[$tool] ?? '???',
       'thumbnail' => $thumbnail, 'nsfw' => $nsfw,
     ];
+  }
+
+  /**
+   * @param list<string> $published
+   * @param list<string> $temporary
+   */
+  private static function copyNewPostFile(
+    string $source, string $destination, int $permission,
+    array &$published, array &$temporary
+  ): void {
+    // Exclusive creation avoids overwriting files from another post or concurrent attempt.
+    $output = @fopen($destination, 'xb');
+    if ($output === false) {
+      throw new RuntimeException('Failed to create posted file.');
+    }
+    $published[] = $destination;
+    $input = null;
+    try {
+      $input = @fopen($source, 'rb');
+      if ($input === false) {
+        throw new RuntimeException('Failed to read temporary file.');
+      }
+      $size = fstat($input);
+      $copied = stream_copy_to_stream($input, $output);
+      if ($size === false || $copied === false || $copied !== $size['size'] || !fflush($output)) {
+        throw new RuntimeException('Failed to copy posted file.');
+      }
+      if (!chmod($destination, $permission)) {
+        throw new RuntimeException('Failed to set posted file permissions.');
+      }
+      $temporary[] = $source;
+    } finally {
+      if (is_resource($input)) fclose($input);
+      fclose($output);
+    }
   }
 
   /** @return array<string,mixed> */

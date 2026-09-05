@@ -768,11 +768,16 @@ function regist(ApplicationContext $context): void {
         $ctype = PostInput::ctypeFromHttp();
         $image_result = ImageService::finalizeNewPost(
           Config::string('paths.temporary'), Config::string('paths.images'), (string)$picfile, $ctype, (bool)Config::bool('features.display_paint_time'), Config::int('limits.paint_default_width'),
-          Config::bool('features.nsfw') && $nsfw_flag === '1', Config::int('permissions.public_file')
+          Config::bool('features.nsfw') && $nsfw_flag === '1', Config::int('permissions.public_file'),
+          static function (array $image_data) use ($service, $prepared_post, $ctype): void {
+            $image_data['ctype'] = $ctype;
+            $service->createPreparedPost($prepared_post, $image_data);
+          }
         );
-        $image_result['ctype'] = $ctype;
       }
-      $service->createPreparedPost($prepared_post, $image_result);
+      if (is_array($uploaded_image) || !$picfile) {
+        $service->createPreparedPost($prepared_post, $image_result);
+      }
       unset($_SESSION['pending_picfile']);
       if ($replaced_pending_picfile !== '') {
         ImageService::deleteTemporaryImages(Config::string('paths.temporary'), [$replaced_pending_picfile]);
