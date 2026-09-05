@@ -260,7 +260,9 @@ final class PostService implements AdminPostManagementService {
 
     if ($parent !== null) {
       $parent_post = $this->repository->findPost($parent);
-      if (empty($parent_post)) throw new PostNotFoundException('Parent post was not found.');
+      if (empty($parent_post) || (int)($parent_post['thread'] ?? 0) !== 1) {
+        throw new PostNotFoundException('Parent post was not found.');
+      }
       $tree = $now - $parent - (int)$parent_post['tid'];
       $comid = $tree + $now;
       $age = (int)$parent_post['age'];

@@ -1311,6 +1311,31 @@ smoke_test('version 2 database is not modified automatically', static function (
   }
 });
 
+smoke_test('reply targets must be parent threads', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'invz' => 0]);
+  $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+  $post += ['resto' => (string)$parent, 'sodane' => 0, 'invz' => 0, 'admins' => 0];
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  $service = new PostService($repository, sys_get_temp_dir());
+  $reply = $service->createPreparedPost($post, $image);
+  $before = $repository->findPost($reply);
+  $post['resto'] = (string)$reply;
+  try {
+    $service->createPreparedPost($post, $image);
+    return false;
+  } catch (PostNotFoundException $e) {
+  }
+  if ($repository->findPost($reply) !== $before || $db->inTransaction()
+    || count($repository->findReplies($parent)) !== 1
+    || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 2) return false;
+  $repository->deletePost($parent, true);
+  return (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === 0;
+});
+
 smoke_test('failed reply insertion restores parent ordering', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
