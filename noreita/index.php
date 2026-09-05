@@ -828,13 +828,12 @@ function regist(ApplicationContext $context): void {
 
   //そろそろ消えるスレッドのフラグを設定
   $th_id = (int)round(Config::int('board.max_threads') * Config::int('board.log_warning_percent') / 100); //閾値 … 新しい方からこの件数以降がもうすぐ消える
-  if ($th_cnt > $th_id) {
-    // そろそろ消えるスレッドにshdフラグを設定
-    try {
-      (new BoardRepository())->markOldThreads($th_cnt - $th_id);
-    } catch (PDOException $e) {
-      render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
-    }
+  try {
+    // 自動削除後の件数で再計算し、警告対象が0件の場合も古いフラグを解除する。
+    $th_cnt = $repository->countThreads();
+    $repository->markOldThreads(max(0, $th_cnt - $th_id));
+  } catch (PDOException $e) {
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
   // そろそろ消えるスレッドの情報をテンプレートに渡す

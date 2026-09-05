@@ -1633,6 +1633,19 @@ smoke_test('content updates fail when the target was deleted before saving', sta
   }
 });
 
+smoke_test('old thread warnings are recalculated instead of accumulating', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  $db->exec('CREATE TABLE board_log (tid INTEGER PRIMARY KEY, thread INTEGER, shd TEXT)');
+  $db->exec("INSERT INTO board_log VALUES (1,1,'0'),(2,0,'0'),(3,1,'0'),(4,1,'0')");
+  $repository = new BoardRepository($db);
+  foreach ([[1, [1]], [1, [1]], [2, [1, 3]], [1, [1]], [0, []], [9, [1, 3, 4]], [-1, []]] as [$count, $expected]) {
+    $repository->markOldThreads($count);
+    $actual = array_map('intval', $db->query("SELECT tid FROM board_log WHERE shd='1' ORDER BY tid")->fetchAll(PDO::FETCH_COLUMN));
+    if ($actual !== $expected) return false;
+  }
+  return true;
+});
+
 smoke_test('post service centralizes edit and delete authorization', static function (): bool {
   $image_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_post_service_' . bin2hex(random_bytes(8));
   if (!mkdir($image_dir, 0700)) return false;

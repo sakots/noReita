@@ -387,9 +387,10 @@ final class BoardRepository {
   }
 
   public function markOldThreads(int $count): void {
-    if ($count <= 0) return;
-    $statement = $this->db->prepare("UPDATE board_log SET shd='1' WHERE thread=1 AND shd='0' ORDER BY tid ASC LIMIT ?");
-    $statement->bindValue(1, $count, PDO::PARAM_INT);
+    $statement = $this->db->prepare("UPDATE board_log SET shd = CASE
+      WHEN tid IN (SELECT tid FROM board_log WHERE thread=1 ORDER BY tid ASC LIMIT ?) THEN '1'
+      ELSE '0' END WHERE thread=1");
+    $statement->bindValue(1, max(0, $count), PDO::PARAM_INT);
     $statement->execute();
   }
 
