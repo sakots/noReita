@@ -414,6 +414,14 @@ final class PostValidator {
     $url = (string)($input['url'] ?? '');
     $sub = (string)($input['sub'] ?? '');
     $resto = (string)($input['resto'] ?? '');
+    // UTF-8正規表現のエラーを「一致なし」と扱ってスパム判定を回避させない。
+    foreach ([$com, $name, $mail, $url, $sub] as $text) {
+      if (preg_match('//u', $text) !== 1) {
+        throw new PostValidationException(self::message(
+          $en, 'Input contains invalid character encoding.', '入力に不正な文字コードが含まれています。'
+        ));
+      }
+    }
     $values = [
       preg_replace('/\s/u', '', $com) ?? '', preg_replace('/\s/u', '', $sub) ?? '',
       preg_replace('/\s/u', '', $name) ?? '', preg_replace('/\s/u', '', $mail) ?? '',

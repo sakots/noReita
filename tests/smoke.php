@@ -1452,6 +1452,25 @@ smoke_test('post validation is independent from HTTP rendering', static function
   return true;
 });
 
+smoke_test('post validation rejects invalid UTF-8 before spam matching', static function (): bool {
+  $input = ['com' => '日本語と絵文字🎨', 'name' => '名前', 'sub' => '題名', 'mail' => '', 'url' => ''];
+  $rules = ['request_method' => 'POST', 'japanese_filter' => false,
+    'bad_strings' => ['禁止語'], 'bad_names' => ['禁止語'],
+    'comment_score_rules' => [['禁止語', 3]], 'comment_score_threshold' => 3];
+  PostValidator::validate($input, $rules);
+  foreach (['com', 'name', 'sub', 'mail', 'url'] as $field) {
+    foreach (["\xFF", "\xE3\x81", "\xC0\xAF"] as $invalid_bytes) {
+      try {
+        PostValidator::validate(array_replace($input, [$field => '禁止語' . $invalid_bytes]), $rules);
+        return false;
+      } catch (PostValidationException $e) {
+        if ($e->getMessage() !== '入力に不正な文字コードが含まれています。') return false;
+      }
+    }
+  }
+  return true;
+});
+
 smoke_test('ctype input sources are resolved in priority order', static function (): bool {
   return PostInput::resolveCtype([
       'direct' => 'img', 'usercode' => 'ctype=pch', 'http_usercode' => 'ctype=spch',
