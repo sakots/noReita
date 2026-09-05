@@ -338,6 +338,9 @@ final class BoardRepository {
       'url' => $values['url'], 'host' => $values['host'],
       'pwdh' => $values['pwdh'], 'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'], 'id' => $id,
     ]);
+    if ($statement->rowCount() !== 1) {
+      throw new RuntimeException('The post could not be updated.');
+    }
   }
 
   public function updateImage(int $id, array $values): void {
