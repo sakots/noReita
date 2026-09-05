@@ -2504,7 +2504,8 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
       $temp, $images, 'new', '.png', 101, 'old.png', 'old.pch', 0600
     );
     ImageService::completePostedReplacement($replacement);
-    return !is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+    return $replacement['img_w'] === 4 && $replacement['img_h'] === 3
+      && !is_file($images . DIRECTORY_SEPARATOR . 'old.png')
       && !is_file($images . DIRECTORY_SEPARATOR . 'old.psd')
       && file_get_contents($images . DIRECTORY_SEPARATOR . 'new.psd') === 'new layers'
       && !is_file($temp . DIRECTORY_SEPARATOR . 'new.psd')

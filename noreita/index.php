@@ -2108,6 +2108,7 @@ function picreplace(ApplicationContext $context): void {
 
       $repository->updateImage((int)$no, [
         'host' => $host, 'picfile' => $new_picfile, 'pchfile' => $new_pchfile, 'author_id' => $id,
+        'img_w' => $replacement['img_w'], 'img_h' => $replacement['img_h'],
         'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw, 'thumbnail' => $thumbnail,
         'expected_picfile' => (string)$msg_d['picfile'],
       ]);

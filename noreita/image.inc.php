@@ -1549,6 +1549,11 @@ final class ImageService {
     }
     chmod($work_file, $permission);
 
+    $size = getimagesize($work_file);
+    if ($size === false) {
+      safe_unlink($work_file);
+      throw new RuntimeException('Failed to read replacement image dimensions.');
+    }
     $extension = get_image_type((string)mime_content_type($work_file));
     $new_image = $filename . $extension;
     $new_image_path = $image_dir . $new_image;
@@ -1622,6 +1627,8 @@ final class ImageService {
     return [
       'picfile' => $new_image,
       'pchfile' => $new_animation,
+      'img_w' => (int)$size[0],
+      'img_h' => (int)$size[1],
       'created_files' => $created_files,
       'old_files' => $old_files,
       'temporary_files' => $temporary_files,

@@ -1481,7 +1481,9 @@ PHP;
 
   $replacement_base = 'replacement-' . bin2hex(random_bytes(6));
   $replacement_code = 'replace-code-' . bin2hex(random_bytes(4));
-  file_put_contents($webroot . '/tmp/' . $replacement_base . '.png', $png);
+  $resized_replacement = imagecreatetruecolor(17, 11);
+  imagepng($resized_replacement, $webroot . '/tmp/' . $replacement_base . '.png');
+  unset($resized_replacement);
   file_put_contents(
     $webroot . '/tmp/' . $replacement_base . '.dat',
     "127.0.0.1\tlocalhost\tagent\t.png\tcode\t{$replacement_code}\t200\t260\t0\tneo"
@@ -1504,7 +1506,13 @@ PHP;
     $cookie_jar,
     ['nsfw' => '0']
   );
-  $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail, img_w, img_h FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  integration_test('image replacement updates stored dimensions after canvas resize', static function () use (
+    $replacement_status, $replaced_image_row
+  ): bool {
+    return $replacement_status === 200 && is_array($replaced_image_row)
+      && (int)$replaced_image_row['img_w'] === 17 && (int)$replaced_image_row['img_h'] === 11;
+  });
   $replacement_thumbnail = (string)($replaced_image_row['thumbnail'] ?? '');
   clearstatcache(true, $webroot . '/img/' . $continued_from_thumbnail);
   integration_test('continued NSFW drawing can become safe with a fresh thumbnail', static function () use (
