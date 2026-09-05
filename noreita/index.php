@@ -1955,13 +1955,10 @@ function in_continue(ApplicationContext $context): void {
     }
     // useshi, useneoは互換のためにいちおう残してある
 
-    // データベースのctypeを優先する
+    // imgは動画選択を抑止するが、古いctypeだけで存在しない動画を有効にしない。
     if ($db_ctype === 'img') {
       $dat['ctype_img'] = true;
       $dat['ctype_pch'] = false;
-    } elseif ($db_ctype === 'pch' || $db_ctype === 'spch') {
-      $dat['ctype_img'] = false;
-      $dat['ctype_pch'] = true;
     }
 
   } catch (Throwable $e) {

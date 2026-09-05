@@ -2009,6 +2009,39 @@ PHP;
     return $unsupported_avif_rejected;
   });
 
+  $check_continuation = static function (string $theme, string $continue_url, string $continue_cookies) use ($webroot, $upload_row): void {
+    $continue_db = new PDO('sqlite:' . $webroot . '/reita.db');
+    $continue_fixture = $continue_db->query('SELECT tid, picfile, pchfile, ctype FROM board_log WHERE picfile = '
+      . $continue_db->quote((string)$upload_row['picfile']))->fetch(PDO::FETCH_ASSOC);
+    $continue_animation = pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.pch';
+    $continue_animation_path = $webroot . '/img/' . $continue_animation;
+    if (file_exists($continue_animation_path)) throw new RuntimeException('Continuation fixture already has animation.');
+    try {
+      foreach ([['pch', false, false], ['spch', false, false], ['pch', true, true], ['img', true, false]] as [$stored_ctype, $has_animation, $expected_animation]) {
+        if ($has_animation) file_put_contents($continue_animation_path, 'NEO test replay');
+        elseif (is_file($continue_animation_path)) unlink($continue_animation_path);
+        $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ? WHERE tid = ?');
+        $statement->execute([$stored_ctype, $has_animation ? $continue_animation : '', $continue_fixture['tid']]);
+        [$continue_status, $continue_body] = http_request(
+          $continue_url . '?mode=continue&no=' . rawurlencode($continue_fixture['picfile']), $continue_cookies
+        );
+        integration_test('continuation requires an existing replay: ' . $theme . '/' . $stored_ctype . '/' . (int)$has_animation,
+          static function () use ($continue_status, $continue_body, $expected_animation): bool {
+            return $continue_status === 200
+              && str_contains($continue_body, '<option value="pch"') === $expected_animation
+              && str_contains($continue_body, 'name="pch"') === $expected_animation
+              && str_contains($continue_body, '<option value="img"');
+          }
+        );
+      }
+    } finally {
+      if (is_file($continue_animation_path)) unlink($continue_animation_path);
+      $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ? WHERE tid = ?');
+      $statement->execute([$continue_fixture['ctype'], $continue_fixture['pchfile'], $continue_fixture['tid']]);
+    }
+  };
+  $check_continuation('eda', $base_url, $cookie_jar);
+
   $monoreita_config_local = str_replace(
     "'paths' => ['theme' => 'starter'],",
     "'paths' => ['theme' => 'monoreita'],",
@@ -2103,6 +2136,7 @@ PHP;
       && str_contains($monoreita_temporary_body, '一時画像の管理')
       && str_contains($monoreita_temporary_body, 'mode=admin_temporary_images_manage');
   });
+  $check_continuation('monoreita', $monoreita_base_url, $monoreita_cookie_jar);
   $base_url = $monoreita_base_url;
 
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
