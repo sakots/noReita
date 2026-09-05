@@ -1480,6 +1480,7 @@ PHP;
   $continued_from_thumbnail = (string)$db->query('SELECT thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
 
   $replacement_base = 'replacement-' . bin2hex(random_bytes(6));
+  $paint_seconds_before = (int)$db->query('SELECT psec FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
   $db->exec("UPDATE board_log SET tool = 'Klecks' WHERE tid = " . $image_post_id);
   $replacement_code = 'replace-code-' . bin2hex(random_bytes(4));
   $resized_replacement = imagecreatetruecolor(17, 11);
@@ -1588,13 +1589,17 @@ PHP;
   preg_match('/formData\\.append\\("no",\\s*"([0-9]+)"\\)/', $tegaki_continue_form_body, $tegaki_post_id_match);
   $tegaki_replacement_code = (string)($tegaki_repcode_match[1] ?? '');
   $tegaki_replacement_post_id = (string)($tegaki_post_id_match[1] ?? '');
+  $paint_seconds_after = (int)$db->query('SELECT psec FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  integration_test('image replacement adds elapsed drawing time', static function () use ($paint_seconds_before, $paint_seconds_after): bool {
+    return $paint_seconds_after === $paint_seconds_before + 60;
+  });
   [$tegaki_save_status, $tegaki_save_body] = http_request(
     $base_url . '?mode=saveimage&tool=tegaki',
     $cookie_jar,
     [
       'picture' => new CURLFile($animation_png, 'image/png', 'continued-drawing.png'),
       'tool' => 'tegaki', 'repcode' => $tegaki_replacement_code,
-      'stime' => (string)time(), 'resto' => '0',
+      'stime' => (string)(time() + 3600), 'resto' => '0',
     ]
   );
   [$tegaki_replace_status, $tegaki_replace_body] = http_request($base_url, $cookie_jar, [
@@ -1604,6 +1609,13 @@ PHP;
   $tegaki_replaced_row = $db->query(
     'SELECT picfile, pchfile FROM board_log WHERE tid = ' . $image_post_id
   )->fetch(PDO::FETCH_ASSOC);
+  $paint_seconds_after_future_start = (int)$db->query('SELECT psec FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  integration_test('future drawing start does not subtract accumulated painting time', static function () use (
+    $tegaki_save_status, $tegaki_replace_status, $paint_seconds_after, $paint_seconds_after_future_start
+  ): bool {
+    return $tegaki_save_status === 200 && $tegaki_replace_status === 200
+      && $paint_seconds_after_future_start === $paint_seconds_after;
+  });
   integration_test('Tegaki continuation saves its PNG and opens the replacement edit form', static function () use (
     $tegaki_continue_form_status, $tegaki_continue_form_body, $tegaki_replacement_code, $tegaki_replacement_post_id,
     $tegaki_save_status, $tegaki_save_body, $tegaki_replace_status, $tegaki_replace_body,

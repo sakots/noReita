@@ -2057,8 +2057,6 @@ function picreplace(ApplicationContext $context): void {
   }
   $filename = $temporary_image['base_name'];
   $imgext = $temporary_image['image_extension'];
-  $starttime = $temporary_image['start_time'];
-  $postedtime = $temporary_image['posted_time'];
 
   $replacement = null;
   // ログ読み込み
@@ -2075,8 +2073,8 @@ function picreplace(ApplicationContext $context): void {
       $new_picfile = $replacement['picfile'];
       $new_pchfile = $replacement['pchfile'];
 
-      //描画時間を$userdataをもとに計算
-      $psec = (int)$msg_d['psec'] + ((int)$postedtime - (int)$starttime);
+      // Use the nonnegative elapsed time normalized by the metadata reader.
+      $psec = (int)$msg_d['psec'] + (int)$temporary_image['paint_seconds'];
       $utime = calcPtime($psec);
 
       //ホスト名取得
