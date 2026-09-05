@@ -1359,7 +1359,8 @@ function res(ApplicationContext $context): void {
       $bbsline['encoded_u'] = urlencode(Config::string('site.base_url').'?resno='.$bbsline['tid']);
 
       // SNSクローラー向けのOGP。NSFW投稿はぼかし済みサムネイルだけを公開する。
-      $og_image_name = (bool)$bbsline['nsfw'] && $bbsline['thumb'] !== ''
+      // サムネイル未登録時は画像メタタグを省略し、原寸画像へフォールバックしない。
+      $og_image_name = (bool)$bbsline['nsfw']
         ? (string)$bbsline['thumb']
         : (string)$bbsline['picfile'];
       if ($og_image_name !== '') {

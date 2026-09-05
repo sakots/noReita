@@ -1398,6 +1398,37 @@ PHP;
       && $nsfw_thumbnail !== '' && is_file($webroot . '/img/' . $nsfw_thumbnail);
   });
 
+  // 一時テストDBだけを更新し、旧データなどでサムネイルが未登録の場合も検証する。
+  $ogp_update = $db->prepare('UPDATE board_log SET nsfw = ?, thumbnail = ? WHERE tid = ?');
+  try {
+    foreach ([
+      'NSFW with empty thumbnail' => [1, '', ''],
+      'NSFW with null thumbnail' => [1, null, ''],
+      'NSFW with blurred thumbnail' => [1, $nsfw_thumbnail, $nsfw_thumbnail],
+      'safe original image' => [0, '', $image_name],
+    ] as $case => [$nsfw_state, $thumbnail_name, $expected_image]) {
+      $ogp_update->execute([$nsfw_state, $thumbnail_name, $image_post_id]);
+      [$ogp_status, $ogp_body] = http_request(
+        $base_url . '?resno=' . $image_post_id, $root . '/ogp-anonymous-cookies.txt'
+      );
+      integration_test('SNS image metadata: ' . $case, static function () use (
+        $ogp_status, $ogp_body, $expected_image
+      ): bool {
+        if ($ogp_status !== 200) return false;
+        $tags = [];
+        preg_match_all('/<meta\s+(?:property|name)="(?:og:image|twitter:image)"\s+content="([^"]*)"/', $ogp_body, $tags);
+        if ($expected_image === '') {
+          return $tags[1] === [] && str_contains($ogp_body, 'name="twitter:card" content="summary"');
+        }
+        return count($tags[1]) === 2 && $tags[1][0] === $tags[1][1]
+          && str_ends_with($tags[1][0], '/img/' . rawurlencode($expected_image))
+          && str_contains($ogp_body, 'name="twitter:card" content="summary_large_image"');
+      });
+    }
+  } finally {
+    $ogp_update->execute([$nsfw_image_row['nsfw'], $nsfw_image_row['thumbnail'], $image_post_id]);
+  }
+
   [, $checked_edit_form_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);

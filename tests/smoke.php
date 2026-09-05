@@ -2060,6 +2060,32 @@ smoke_test('GD thumbnail generation', static function (): bool {
   }
 });
 
+foreach ([
+  'wide image' => [1000, 1, 300, false, 1],
+  'NSFW wide image' => [1000, 10, 300, true, 3],
+  'NSFW small width' => [4, 4, 5, true, 5],
+] as $case => [$source_width, $source_height, $width, $nsfw, $expected_height]) {
+  smoke_test('GD thumbnails support positive dimensions: ' . $case, static function () use (
+    $source_width, $source_height, $width, $nsfw, $expected_height
+  ): bool {
+    $directory = sys_get_temp_dir() . '/noreita_thin_thumbnail_' . bin2hex(random_bytes(8));
+    if (!mkdir($directory, 0700)) return false;
+    try {
+      $image = imagecreatetruecolor($source_width, $source_height);
+      imagefill($image, 0, 0, imagecolorallocate($image, 20, 120, 220));
+      if (!imagepng($image, $directory . '/input.png')) return false;
+      $thumbnail = new Thumbnail($directory . '/input.png', $directory, $width, $nsfw, 'output');
+      if (!$thumbnail->createThumbnail()) return false;
+      $output = $thumbnail->getOutputPath();
+      $size = $output !== null ? getimagesize($output) : false;
+      return $size !== false && $size[0] === $width && $size[1] === $expected_height;
+    } finally {
+      foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
+      rmdir($directory);
+    }
+  });
+}
+
 smoke_test('GD thumbnails preserve transparent pixels for supported input formats', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_transparent_thumbnail_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
