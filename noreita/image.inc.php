@@ -798,8 +798,7 @@ final class ImageService {
     );
 
     $image_info = @getimagesize($picture['path']);
-    if (!is_array($image_info) || ($image_info['mime'] ?? '') !== 'image/png'
-      || !self::isDecodableImage($picture['path'], 'image/png')) {
+    if (!is_array($image_info) || ($image_info['mime'] ?? '') !== 'image/png') {
       throw new ImageUploadException('The generated animation image is invalid.', 422);
     }
     $width = (int)$image_info[0];
@@ -811,6 +810,10 @@ final class ImageService {
     if ($animation_info['extension'] === 'pch'
       && ($width !== $animation_info['width'] || $height !== $animation_info['height'])) {
       throw new ImageUploadException('The generated image does not match the PCH file.', 422);
+    }
+    // Reject excessive dimensions before GD allocates a decoded image buffer.
+    if (!self::isDecodableImage($picture['path'], 'image/png')) {
+      throw new ImageUploadException('The generated animation image is invalid.', 422);
     }
 
     $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;

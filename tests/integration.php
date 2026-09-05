@@ -640,6 +640,28 @@ PHP;
       'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'valid.pch'),
     ]
   );
+  // Header-only PNGs test validation order without allocating oversized image buffers.
+  $animation_defaults = require $webroot . '/config.php';
+  foreach ([
+    'width' => [$animation_defaults['limits']['paint_max_width'] + 1, 1, 413],
+    'height' => [1, $animation_defaults['limits']['paint_max_height'] + 1, 413],
+    'invalid pixels' => [1, 1, 422],
+  ] as $case => [$header_width, $header_height, $expected_status]) {
+    $header = 'IHDR' . pack('NNCCCCC', $header_width, $header_height, 8, 2, 0, 0, 0);
+    $header_file = $root . '/animation-header-only.png';
+    file_put_contents($header_file, "\x89PNG\r\n\x1a\n" . pack('N', 13) . $header . pack('N', crc32($header)));
+    $pending_before = glob($webroot . '/tmp/*');
+    [$header_status] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
+      'token' => $token,
+      'picture' => new CURLFile($header_file, 'image/png', 'header.png'),
+      'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'valid.pch'),
+    ]);
+    integration_test('animation upload checks dimensions before decoding: ' . $case, static function () use (
+      $header_status, $expected_status, $pending_before, $webroot
+    ): bool {
+      return $header_status === $expected_status && glob($webroot . '/tmp/*') === $pending_before;
+    });
+  }
   $animation_upload_lines = preg_split('/\r?\n/', trim($animation_upload_body)) ?: [];
   $uploaded_animation_image = (string)($animation_upload_lines[1] ?? '');
   $uploaded_animation_base = pathinfo($uploaded_animation_image, PATHINFO_FILENAME);
