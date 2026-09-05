@@ -1596,6 +1596,25 @@ smoke_test('ctype input sources are resolved in priority order', static function
     && PostInput::resolveCtype(['direct' => '../invalid', 'usercode' => 'ctype=invalid']) === 'new';
 });
 
+smoke_test('content editing preserves sodane increments after the post was read', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $id = $repository->insertPost([
+    'thread' => 1, 'sub' => 'Before', 'com' => 'Comment', 'a_name' => 'Author',
+    'pwd' => password_hash('owner', PASSWORD_DEFAULT), 'picfile' => '', 'invz' => 0,
+    'sodane' => 7, 'nsfw' => 0, 'thumbnail' => '',
+  ]);
+  $snapshot = $repository->findPost($id);
+  $repository->incrementSodane($id);
+  $repository->updateContent($id, [
+    'name' => 'Author', 'mail' => '', 'sub' => 'After', 'com' => 'Edited', 'url' => '', 'host' => 'localhost',
+    'sodane' => $snapshot['sodane'], 'pwdh' => $snapshot['pwd'], 'nsfw' => 0, 'thumbnail' => '',
+  ]);
+  $updated = $repository->findPost($id);
+  return (int)$updated['sodane'] === 8 && $updated['sub'] === 'After' && $updated['com'] === 'Edited';
+});
+
 smoke_test('post service centralizes edit and delete authorization', static function (): bool {
   $image_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_post_service_' . bin2hex(random_bytes(8));
   if (!mkdir($image_dir, 0700)) return false;
