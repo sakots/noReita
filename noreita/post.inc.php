@@ -240,6 +240,16 @@ final class PostService implements AdminPostManagementService {
    * @param array<string,mixed> $image
    */
   public function createPreparedPost(array $post, array $image): int {
+    return $this->repository->transaction(function () use ($post, $image): int {
+      return $this->insertPreparedPost($post, $image);
+    });
+  }
+
+  /**
+   * @param array<string,mixed> $post
+   * @param array<string,mixed> $image
+   */
+  private function insertPreparedPost(array $post, array $image): int {
     $now = time();
     $resto = (string)($post['resto'] ?? '');
     $thread = $resto === '' ? 1 : 0;

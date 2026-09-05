@@ -1311,6 +1311,33 @@ smoke_test('version 2 database is not modified automatically', static function (
   }
 });
 
+smoke_test('failed reply insertion restores parent ordering', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'sub' => 'parent']);
+  $before = $repository->findPost($parent);
+  $db->exec("CREATE TRIGGER reject_reply BEFORE INSERT ON board_log BEGIN SELECT RAISE(ABORT, 'simulated reply failure'); END");
+  $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+  $post += ['resto' => (string)$parent, 'sodane' => 0, 'invz' => 0, 'admins' => 0];
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  $service = new PostService($repository, sys_get_temp_dir());
+  try {
+    $service->createPreparedPost($post, $image);
+    return false;
+  } catch (PDOException $e) {
+    if (!str_contains($e->getMessage(), 'simulated reply failure')) throw $e;
+  }
+  if ($repository->findPost($parent) !== $before || $db->inTransaction()
+    || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 1) return false;
+  $db->exec('DROP TRIGGER reject_reply');
+  $reply = $service->createPreparedPost($post, $image);
+  return $reply > $parent && !$db->inTransaction()
+    && (int)$repository->findPost($parent)['age'] === 1
+    && (int)$repository->findPost($reply)['parent'] === $parent;
+});
+
 smoke_test('failed database operation is rolled back', static function (): bool {
   $db = new PDO('sqlite::memory:');
   $migrator = new DatabaseMigrator($db, ':memory:', sys_get_temp_dir());
