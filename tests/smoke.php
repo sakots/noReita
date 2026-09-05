@@ -2606,6 +2606,43 @@ smoke_test('drawing validation honors configured file size including the exact l
   }
 });
 
+smoke_test('NSFW thumbnail rollback preserves old and pre-existing thumbnails', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_nsfw_rollback_' . bin2hex(random_bytes(8));
+  mkdir($directory, 0700);
+  try {
+    $image = imagecreatetruecolor(8, 4);
+    imagepng($image, $directory . '/post.png');
+    unset($image);
+    $old = ImageService::refreshNsfwThumbnail($directory, 'post.png', '', false, 2, 0600);
+    $hash = hash_file('sha256', $directory . '/' . $old);
+    $existing = ImageService::refreshNsfwThumbnail($directory, 'post.png', $old, true, 2, 0600, false, false);
+    foreach ([true, false] as $pre_existing) {
+      if (!$pre_existing) unlink($directory . '/' . $existing);
+      try {
+        ImageService::updateNsfwThumbnail($directory, 'post.png', $old, true, 2, 0600,
+          static function (string $thumbnail) use ($directory, $old): void {
+            if (!is_file($directory . '/' . $old) || !is_file($directory . '/' . $thumbnail)) {
+              throw new RuntimeException('Missing thumbnail before database commit');
+            }
+            throw new PDOException('forced thumbnail rollback');
+          }
+        );
+        return false;
+      } catch (PDOException $e) {
+        if (hash_file('sha256', $directory . '/' . $old) !== $hash
+          || is_file($directory . '/' . $existing) !== $pre_existing) return false;
+      }
+    }
+    ImageService::updateNsfwThumbnail($directory, 'post.png', $old, true, 2, 0600,
+      static function (string $thumbnail): void {}
+    );
+    return !is_file($directory . '/' . $old) && is_file($directory . '/' . $existing);
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $file) if (is_file($file)) unlink($file);
+    rmdir($directory);
+  }
+});
+
 smoke_test('new post image and animation are finalized', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_finalize_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';

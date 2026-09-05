@@ -1431,6 +1431,32 @@ PHP;
       && !str_contains($image_edit_form_body, 'checked="checked"');
   });
 
+  $check_failed_nsfw_edit = static function (string $nsfw) use ($webroot, $base_url, $cookie_jar, $token, $image_post_id): void {
+    $failure_db = new PDO('sqlite:' . $webroot . '/reita.db');
+    $before = $failure_db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+    $files_before = [];
+    foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $files_before[$path] = hash_file('sha256', $path);
+    $failure_db->exec("CREATE TRIGGER fail_nsfw_edit BEFORE UPDATE ON board_log BEGIN SELECT RAISE(ABORT, 'forced edit failure'); END");
+    try {
+      [$status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+        'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+        'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
+        'sodane' => '0', 'nsfw' => $nsfw, 'token' => $token,
+      ]);
+    } finally {
+      $failure_db->exec('DROP TRIGGER fail_nsfw_edit');
+    }
+    integration_test('failed NSFW edit preserves database and thumbnail files: ' . $nsfw,
+      static function () use ($status, $before, $files_before, $failure_db, $image_post_id, $webroot): bool {
+        clearstatcache();
+        $files_after = [];
+        foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $files_after[$path] = hash_file('sha256', $path);
+        return $status === 500 && $files_before === $files_after
+          && $failure_db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC) === $before;
+      }
+    );
+  };
+  $check_failed_nsfw_edit('1');
   [$image_nsfw_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
     'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
@@ -1481,6 +1507,7 @@ PHP;
     return preg_match('/id="edit_nsfw"[^>]*checked="checked"/', $checked_edit_form_body) === 1;
   });
 
+  $check_failed_nsfw_edit('0');
   [$image_safe_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
     'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',

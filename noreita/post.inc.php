@@ -81,10 +81,16 @@ final class PostService implements AdminPostManagementService {
     if (array_key_exists('edit_nsfw', $values) && (string)$post['picfile'] !== '') {
       $nsfw = (bool)$values['edit_nsfw'];
       if ($nsfw !== (bool)$post['nsfw']) {
-        $values['thumbnail'] = ImageService::refreshNsfwThumbnail(
+        $values['nsfw'] = (int)$nsfw;
+        ImageService::updateNsfwThumbnail(
           $this->image_dir, (string)$post['picfile'], $values['thumbnail'], $nsfw,
-          $this->thumbnail_width, $this->file_permission
+          $this->thumbnail_width, $this->file_permission,
+          function (string $thumbnail) use ($post_id, $values): void {
+            $values['thumbnail'] = $thumbnail;
+            $this->repository->updateContent($post_id, $values);
+          }
         );
+        return $authorization['role'];
       }
       $values['nsfw'] = (int)$nsfw;
     }

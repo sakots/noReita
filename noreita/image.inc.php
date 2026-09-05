@@ -1253,6 +1253,31 @@ final class ImageService {
     return $thumbnail->createThumbnail() ? (string)$thumbnail->getOutputName() : '';
   }
 
+  /** @param callable(string):void $save_post Persist the new thumbnail before deleting the old one. */
+  public static function updateNsfwThumbnail(
+    string $image_dir, string $image_name, string $current_thumbnail,
+    bool $nsfw, int $thumbnail_width, int $permission, callable $save_post
+  ): void {
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $existing_files = self::relatedFilePaths($image_dir, [$image_name, $current_thumbnail]);
+    $new_thumbnail = self::refreshNsfwThumbnail(
+      $image_dir, $image_name, $current_thumbnail, $nsfw, $thumbnail_width, $permission, false, false
+    );
+    try {
+      $save_post($new_thumbnail);
+    } catch (Throwable $e) {
+      if ($new_thumbnail !== '' && $new_thumbnail !== basename($current_thumbnail)
+        && !in_array($image_dir . $new_thumbnail, $existing_files, true)) {
+        safe_unlink($image_dir . $new_thumbnail);
+      }
+      throw $e;
+    }
+    $current_thumbnail = basename($current_thumbnail);
+    if ($current_thumbnail !== '' && $current_thumbnail !== basename($image_name) && $current_thumbnail !== $new_thumbnail) {
+      safe_unlink($image_dir . $current_thumbnail);
+    }
+  }
+
   public static function refreshNsfwThumbnail(
     string $image_dir,
     string $image_name,
