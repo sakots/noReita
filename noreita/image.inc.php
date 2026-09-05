@@ -1584,6 +1584,8 @@ final class ImageService {
     }
 
     $created_files = [];
+    $temporary_files = [$source, $temp_dir . $filename . '.dat'];
+    if ($animation_source !== '') $temporary_files[] = $animation_source;
     try {
       if (!rename($work_file, $new_image_path)) {
         throw new RuntimeException('Failed to publish replacement image.');
@@ -1597,6 +1599,12 @@ final class ImageService {
         $created_files[] = $new_animation_path;
         chmod($new_animation_path, $permission);
       }
+      $psd_source = $temp_dir . $filename . '.psd';
+      if (is_file($psd_source)) {
+        self::copyNewPostFile(
+          $psd_source, $image_dir . $filename . '.psd', $permission, $created_files, $temporary_files
+        );
+      }
     } catch (Throwable $e) {
       safe_unlink($work_file);
       if ($animation_work_file !== '') safe_unlink($animation_work_file);
@@ -1608,8 +1616,8 @@ final class ImageService {
     if ($old_image !== '' && is_file($old_image_path)) $old_files[] = $old_image_path;
     $old_animation_path = $image_dir . basename($old_animation);
     if ($old_animation !== '' && is_file($old_animation_path)) $old_files[] = $old_animation_path;
-    $temporary_files = [$source, $temp_dir . $filename . '.dat'];
-    if ($animation_source !== '') $temporary_files[] = $animation_source;
+    $old_psd_path = $image_dir . pathinfo(basename($old_image), PATHINFO_FILENAME) . '.psd';
+    if ($old_image !== '' && is_file($old_psd_path)) $old_files[] = $old_psd_path;
 
     return [
       'picfile' => $new_image,

@@ -1487,6 +1487,9 @@ PHP;
     "127.0.0.1\tlocalhost\tagent\t.png\tcode\t{$replacement_code}\t200\t260\t0\tneo"
   );
   file_put_contents($webroot . '/tmp/' . $replacement_base . '.pch', 'replacement animation');
+  file_put_contents($webroot . '/tmp/' . $replacement_base . '.psd', 'replacement layers');
+  $replacement_old_psd = pathinfo((string)$image_row['picfile'], PATHINFO_FILENAME) . '.psd';
+  file_put_contents($webroot . '/img/' . $replacement_old_psd, 'old layers');
   [$replacement_authorization_status, $replacement_authorization_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
     'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
@@ -1507,7 +1510,7 @@ PHP;
   integration_test('continued NSFW drawing can become safe with a fresh thumbnail', static function () use (
     $replacement_authorization_status, $replacement_authorization_body, $replacement_status,
     $replacement_body, $replaced_image_row, $replacement_base,
-    $replacement_thumbnail, $continued_from_thumbnail, $webroot
+    $replacement_thumbnail, $continued_from_thumbnail, $webroot, $replacement_old_psd
   ): bool {
     return $replacement_authorization_status === 200
       && !str_contains($replacement_authorization_body, '&amp;pwd=')
@@ -1515,6 +1518,10 @@ PHP;
       && $replacement_status === 200 && is_array($replaced_image_row)
       && $replaced_image_row['picfile'] === $replacement_base . '.png'
       && $replaced_image_row['pchfile'] === $replacement_base . '.pch'
+      && is_file($webroot . '/img/' . $replacement_base . '.psd')
+      && file_get_contents($webroot . '/img/' . $replacement_base . '.psd') === 'replacement layers'
+      && !is_file($webroot . '/tmp/' . $replacement_base . '.psd')
+      && !is_file($webroot . '/img/' . $replacement_old_psd)
       && (int)$replaced_image_row['nsfw'] === 0
       && $replacement_thumbnail !== ''
       && str_starts_with($replacement_thumbnail, $replacement_base . '_thumb_safe_')

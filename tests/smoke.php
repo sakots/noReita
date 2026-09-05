@@ -2458,6 +2458,7 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
     imagepng($image, $temp . DIRECTORY_SEPARATOR . 'new.png');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'new.dat', 'metadata');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'new.pch', 'new animation');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'new.psd', 'new layers');
   };
 
   try {
@@ -2465,7 +2466,21 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
     imagefill($old_image, 0, 0, imagecolorallocate($old_image, 220, 20, 20));
     imagepng($old_image, $images . DIRECTORY_SEPARATOR . 'old.png');
     file_put_contents($images . DIRECTORY_SEPARATOR . 'old.pch', 'old animation');
+    file_put_contents($images . DIRECTORY_SEPARATOR . 'old.psd', 'old layers');
     $write_source();
+
+    // An existing PSD must not be overwritten, nor may a partial replacement survive.
+    file_put_contents($images . DIRECTORY_SEPARATOR . 'new.psd', 'unrelated layers');
+    try {
+      ImageService::replacePostedFiles($temp, $images, 'new', '.png', 99, 'old.png', 'old.pch', 0600);
+      return false;
+    } catch (RuntimeException $e) {
+      if (file_get_contents($images . DIRECTORY_SEPARATOR . 'new.psd') !== 'unrelated layers'
+        || is_file($images . DIRECTORY_SEPARATOR . 'new.png')
+        || is_file($images . DIRECTORY_SEPARATOR . 'new.pch')
+        || file_get_contents($temp . DIRECTORY_SEPARATOR . 'new.psd') !== 'new layers') return false;
+    }
+    unlink($images . DIRECTORY_SEPARATOR . 'new.psd');
 
     $replacement = ImageService::replacePostedFiles(
       $temp, $images, 'new', '.png', 100, 'old.png', 'old.pch', 0600
@@ -2477,6 +2492,9 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
 
     ImageService::rollbackPostedReplacement($replacement);
     if (!is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+      || file_get_contents($images . DIRECTORY_SEPARATOR . 'old.psd') !== 'old layers'
+      || file_get_contents($temp . DIRECTORY_SEPARATOR . 'new.psd') !== 'new layers'
+      || is_file($images . DIRECTORY_SEPARATOR . 'new.psd')
       || !is_file($images . DIRECTORY_SEPARATOR . 'old.pch')
       || is_file($images . DIRECTORY_SEPARATOR . 'new.png')
       || is_file($images . DIRECTORY_SEPARATOR . 'new.pch')
@@ -2487,6 +2505,9 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
     );
     ImageService::completePostedReplacement($replacement);
     return !is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+      && !is_file($images . DIRECTORY_SEPARATOR . 'old.psd')
+      && file_get_contents($images . DIRECTORY_SEPARATOR . 'new.psd') === 'new layers'
+      && !is_file($temp . DIRECTORY_SEPARATOR . 'new.psd')
       && !is_file($images . DIRECTORY_SEPARATOR . 'old.pch')
       && is_file($images . DIRECTORY_SEPARATOR . 'new.png')
       && is_file($images . DIRECTORY_SEPARATOR . 'new.pch')
