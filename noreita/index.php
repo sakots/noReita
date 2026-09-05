@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.7.0 lot.260904.2';
+const REITA_VER = 'v4.7.1 lot.260905.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -242,6 +242,8 @@ $dat['share_button'] = Config::bool('features.share_button');
 $dat['use_hashtag'] = Config::bool('features.hashtag');
 
 $dat['sodane'] = SODANE;
+// 「そうだね」は設定にかかわらずCSRFトークン付きPOSTで更新する。
+$dat['sodane_token'] = RequestSecurity::csrfToken();
 
 $dat['use_oekaki_reply'] = Config::bool('features.oekaki_reply');
 $dat['use_image_upload'] = Config::bool('features.image_upload');
@@ -766,11 +768,16 @@ function regist(ApplicationContext $context): void {
         $ctype = PostInput::ctypeFromHttp();
         $image_result = ImageService::finalizeNewPost(
           Config::string('paths.temporary'), Config::string('paths.images'), (string)$picfile, $ctype, (bool)Config::bool('features.display_paint_time'), Config::int('limits.paint_default_width'),
-          Config::bool('features.nsfw') && $nsfw_flag === '1', Config::int('permissions.public_file')
+          Config::bool('features.nsfw') && $nsfw_flag === '1', Config::int('permissions.public_file'),
+          static function (array $image_data) use ($service, $prepared_post, $ctype): void {
+            $image_data['ctype'] = $ctype;
+            $service->createPreparedPost($prepared_post, $image_data);
+          }
         );
-        $image_result['ctype'] = $ctype;
       }
-      $service->createPreparedPost($prepared_post, $image_result);
+      if (is_array($uploaded_image) || !$picfile) {
+        $service->createPreparedPost($prepared_post, $image_result);
+      }
       unset($_SESSION['pending_picfile']);
       if ($replaced_pending_picfile !== '') {
         ImageService::deleteTemporaryImages(Config::string('paths.temporary'), [$replaced_pending_picfile]);
@@ -821,13 +828,12 @@ function regist(ApplicationContext $context): void {
 
   //そろそろ消えるスレッドのフラグを設定
   $th_id = (int)round(Config::int('board.max_threads') * Config::int('board.log_warning_percent') / 100); //閾値 … 新しい方からこの件数以降がもうすぐ消える
-  if ($th_cnt > $th_id) {
-    // そろそろ消えるスレッドにshdフラグを設定
-    try {
-      (new BoardRepository())->markOldThreads($th_cnt - $th_id);
-    } catch (PDOException $e) {
-      render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
-    }
+  try {
+    // 自動削除後の件数で再計算し、警告対象が0件の場合も古いフラグを解除する。
+    $th_cnt = $repository->countThreads();
+    $repository->markOldThreads(max(0, $th_cnt - $th_id));
+  } catch (PDOException $e) {
+    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
 
   // そろそろ消えるスレッドの情報をテンプレートに渡す
@@ -1185,12 +1191,20 @@ function search(ApplicationContext $context): void {
 
 //そうだね
 function sodane(ApplicationContext $context): void {
-  $resto = filter_input(INPUT_GET, 'resto', FILTER_VALIDATE_INT);
+  $resto = filter_input(INPUT_POST, 'resto', FILTER_VALIDATE_INT);
 
   // Ajaxリクエストかどうかをチェック
   $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
   try {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+      header('Allow: POST');
+      throw new RequestSecurityException('Only POST is supported.', 405);
+    }
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $context->english);
+    if (!is_int($resto) || $resto < 1) {
+      throw new RequestSecurityException('Invalid post number.', 400);
+    }
     $new_sodane = (new BoardRepository())->incrementSodane((int)$resto);
 
     if ($is_ajax) {
@@ -1204,6 +1218,14 @@ function sodane(ApplicationContext $context): void {
       return;
     }
 
+  } catch (RequestSecurityException $e) {
+    if ($is_ajax) {
+      http_response_code($e->getCode() ?: 403);
+      header('Content-Type: application/json; charset=UTF-8');
+      echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+      return;
+    }
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
   } catch (PDOException $e) {
     if ($is_ajax) {
       $error_id = ApplicationErrorHandler::reportThrowable($e);
@@ -1265,6 +1287,10 @@ function res(ApplicationContext $context): void {
     $dat['resno'] = $resno;
 
     $thread = $repository->findPost((int)$resno);
+    // 公開画面では、非表示の記事を本文・OGPへ渡さない。
+    if ($thread === false || (int)($thread['invz'] ?? 0) !== 0) {
+      render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
+    }
     $posts = $thread ? [$thread] : [];
 
     $oya = array();
@@ -1355,7 +1381,8 @@ function res(ApplicationContext $context): void {
       $bbsline['encoded_u'] = urlencode(Config::string('site.base_url').'?resno='.$bbsline['tid']);
 
       // SNSクローラー向けのOGP。NSFW投稿はぼかし済みサムネイルだけを公開する。
-      $og_image_name = (bool)$bbsline['nsfw'] && $bbsline['thumb'] !== ''
+      // サムネイル未登録時は画像メタタグを省略し、原寸画像へフォールバックしない。
+      $og_image_name = (bool)$bbsline['nsfw']
         ? (string)$bbsline['thumb']
         : (string)$bbsline['picfile'];
       if ($og_image_name !== '') {
@@ -1927,13 +1954,10 @@ function in_continue(ApplicationContext $context): void {
     }
     // useshi, useneoは互換のためにいちおう残してある
 
-    // データベースのctypeを優先する
+    // imgは動画選択を抑止するが、古いctypeだけで存在しない動画を有効にしない。
     if ($db_ctype === 'img') {
       $dat['ctype_img'] = true;
       $dat['ctype_pch'] = false;
-    } elseif ($db_ctype === 'pch' || $db_ctype === 'spch') {
-      $dat['ctype_img'] = false;
-      $dat['ctype_pch'] = true;
     }
 
   } catch (Throwable $e) {
@@ -2029,8 +2053,6 @@ function picreplace(ApplicationContext $context): void {
   }
   $filename = $temporary_image['base_name'];
   $imgext = $temporary_image['image_extension'];
-  $starttime = $temporary_image['start_time'];
-  $postedtime = $temporary_image['posted_time'];
 
   $replacement = null;
   // ログ読み込み
@@ -2047,8 +2069,8 @@ function picreplace(ApplicationContext $context): void {
       $new_picfile = $replacement['picfile'];
       $new_pchfile = $replacement['pchfile'];
 
-      //描画時間を$userdataをもとに計算
-      $psec = (int)$msg_d['psec'] + ((int)$postedtime - (int)$starttime);
+      // Use the nonnegative elapsed time normalized by the metadata reader.
+      $psec = (int)$msg_d['psec'] + (int)$temporary_image['paint_seconds'];
       $utime = calcPtime($psec);
 
       //ホスト名取得
@@ -2080,6 +2102,8 @@ function picreplace(ApplicationContext $context): void {
 
       $repository->updateImage((int)$no, [
         'host' => $host, 'picfile' => $new_picfile, 'pchfile' => $new_pchfile, 'author_id' => $id,
+        'img_w' => $replacement['img_w'], 'img_h' => $replacement['img_h'],
+        'tool' => ImageService::toolDisplayName((string)$temporary_image['tool']),
         'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw, 'thumbnail' => $thumbnail,
         'expected_picfile' => (string)$msg_d['picfile'],
       ]);

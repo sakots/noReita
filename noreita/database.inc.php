@@ -330,26 +330,31 @@ final class BoardRepository {
 
   public function updateContent(int $id, array $values): void {
     $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), a_name = :name, mail = :mail,
-      sub = :sub, com = :com, a_url = :url, host = :host, sodane = :sodane, pwd = :pwdh,
+      sub = :sub, com = :com, a_url = :url, host = :host, pwd = :pwdh,
       nsfw = :nsfw, thumbnail = :thumbnail WHERE tid = :id";
     $statement = $this->db->prepare($sql);
     $statement->execute([
       'name' => $values['name'], 'mail' => $values['mail'], 'sub' => $values['sub'], 'com' => $values['com'],
-      'url' => $values['url'], 'host' => $values['host'], 'sodane' => $values['sodane'],
+      'url' => $values['url'], 'host' => $values['host'],
       'pwdh' => $values['pwdh'], 'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'], 'id' => $id,
     ]);
+    if ($statement->rowCount() !== 1) {
+      throw new RuntimeException('The post could not be updated.');
+    }
   }
 
   public function updateImage(int $id, array $values): void {
     $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), host = :host, picfile = :picfile,
       pchfile = :pchfile, id = :author_id, psec = :psec, utime = :utime, nsfw = :nsfw,
-      thumbnail = :thumbnail WHERE tid = :id AND picfile = :expected_picfile";
+      thumbnail = :thumbnail, img_w = :img_w, img_h = :img_h, tool = :tool WHERE tid = :id AND picfile = :expected_picfile";
     $statement = $this->db->prepare($sql);
     $statement->execute([
       'host' => $values['host'], 'picfile' => $values['picfile'], 'pchfile' => $values['pchfile'],
       'author_id' => $values['author_id'], 'psec' => $values['psec'], 'utime' => $values['utime'],
       'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'], 'id' => $id,
       'expected_picfile' => $values['expected_picfile'],
+      'img_w' => $values['img_w'], 'img_h' => $values['img_h'],
+      'tool' => $values['tool'],
     ]);
     if ($statement->rowCount() !== 1) {
       throw new RuntimeException('The posted image changed before replacement completed.');
@@ -382,9 +387,10 @@ final class BoardRepository {
   }
 
   public function markOldThreads(int $count): void {
-    if ($count <= 0) return;
-    $statement = $this->db->prepare("UPDATE board_log SET shd='1' WHERE thread=1 AND shd='0' ORDER BY tid ASC LIMIT ?");
-    $statement->bindValue(1, $count, PDO::PARAM_INT);
+    $statement = $this->db->prepare("UPDATE board_log SET shd = CASE
+      WHEN tid IN (SELECT tid FROM board_log WHERE thread=1 ORDER BY tid ASC LIMIT ?) THEN '1'
+      ELSE '0' END WHERE thread=1");
+    $statement->bindValue(1, max(0, $count), PDO::PARAM_INT);
     $statement->execute();
   }
 

@@ -20,7 +20,7 @@
     <span class="id">ID：{{ res['id'] }}</span>
   {% endif %}
     <span class="sodane">
-    <a href="{{ self }}?mode=sodane&amp;resto={{ res['tid'] }}">{{ sodane }}
+    <a href="{{ self }}?mode=sodane&amp;resto={{ res['tid'] }}" data-sodane-token="{{ sodane_token }}">{{ sodane }}
       {% if res['sodane'] != 0 %}
         x{{ res['sodane'] }}
       {% else %}

@@ -8,14 +8,22 @@ document.addEventListener('DOMContentLoaded', function() {
       e.preventDefault(); // デフォルトのリンク動作を無効化
 
       const href = this.getAttribute('href');
+      const endpoint = new URL(href, window.location.href);
+      const body = new URLSearchParams({
+        mode: 'sodane',
+        resto: endpoint.searchParams.get('resto') || '',
+        token: this.dataset.sodaneToken || ''
+      });
+      endpoint.search = '';
 
       // ボタンを一時的に無効化
       this.style.pointerEvents = 'none';
       this.style.opacity = '0.5';
 
       // Ajaxリクエストを送信
-      fetch(href, {
-        method: 'GET',
+      fetch(endpoint, {
+        method: 'POST',
+        body,
         headers: {
           'X-Requested-With': 'XMLHttpRequest'
         }

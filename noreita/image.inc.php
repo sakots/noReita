@@ -607,7 +607,7 @@ final class ImageService {
   public static function validateUpload(string $file_path, array $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
     if (!is_file($file_path) || !is_readable($file_path)) return false;
     $file_size = filesize($file_path);
-    if ($file_size === false || $file_size === 0 || $file_size > 10 * 1024 * 1024) return false;
+    if ($file_size === false || $file_size === 0 || $file_size > Config::int('limits.paint_image_kb') * 1024) return false;
 
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $mime_type = $finfo->file($file_path);
@@ -673,8 +673,7 @@ final class ImageService {
       throw new ImageUploadException('The detected image format is not supported by this server.', 415);
     }
     $image = @getimagesize($temporary_file);
-    if ($image === false || ($image['mime'] ?? null) !== $mime
-      || !self::isDecodableImage($temporary_file, $mime)) {
+    if ($image === false || ($image['mime'] ?? null) !== $mime) {
       throw new ImageUploadException('Unsupported image format.', 400);
     }
     $width = (int)$image[0];
@@ -682,6 +681,10 @@ final class ImageService {
     if ($max_width < 1 || $max_height < 1 || $width < 1 || $height < 1
       || $width > $max_width || $height > $max_height) {
       throw new ImageUploadException('The uploaded image dimensions exceed the limit.', 400);
+    }
+    // GDが画素データを展開する前に、ヘッダーの寸法を制限する。
+    if (!self::isDecodableImage($temporary_file, $mime)) {
+      throw new ImageUploadException('Unsupported image format.', 400);
     }
 
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
@@ -795,8 +798,7 @@ final class ImageService {
     );
 
     $image_info = @getimagesize($picture['path']);
-    if (!is_array($image_info) || ($image_info['mime'] ?? '') !== 'image/png'
-      || !self::isDecodableImage($picture['path'], 'image/png')) {
+    if (!is_array($image_info) || ($image_info['mime'] ?? '') !== 'image/png') {
       throw new ImageUploadException('The generated animation image is invalid.', 422);
     }
     $width = (int)$image_info[0];
@@ -808,6 +810,10 @@ final class ImageService {
     if ($animation_info['extension'] === 'pch'
       && ($width !== $animation_info['width'] || $height !== $animation_info['height'])) {
       throw new ImageUploadException('The generated image does not match the PCH file.', 422);
+    }
+    // Reject excessive dimensions before GD allocates a decoded image buffer.
+    if (!self::isDecodableImage($picture['path'], 'image/png')) {
+      throw new ImageUploadException('The generated animation image is invalid.', 422);
     }
 
     $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
@@ -1247,6 +1253,31 @@ final class ImageService {
     return $thumbnail->createThumbnail() ? (string)$thumbnail->getOutputName() : '';
   }
 
+  /** @param callable(string):void $save_post Persist the new thumbnail before deleting the old one. */
+  public static function updateNsfwThumbnail(
+    string $image_dir, string $image_name, string $current_thumbnail,
+    bool $nsfw, int $thumbnail_width, int $permission, callable $save_post
+  ): void {
+    $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
+    $existing_files = self::relatedFilePaths($image_dir, [$image_name, $current_thumbnail]);
+    $new_thumbnail = self::refreshNsfwThumbnail(
+      $image_dir, $image_name, $current_thumbnail, $nsfw, $thumbnail_width, $permission, false, false
+    );
+    try {
+      $save_post($new_thumbnail);
+    } catch (Throwable $e) {
+      if ($new_thumbnail !== '' && $new_thumbnail !== basename($current_thumbnail)
+        && !in_array($image_dir . $new_thumbnail, $existing_files, true)) {
+        safe_unlink($image_dir . $new_thumbnail);
+      }
+      throw $e;
+    }
+    $current_thumbnail = basename($current_thumbnail);
+    if ($current_thumbnail !== '' && $current_thumbnail !== basename($image_name) && $current_thumbnail !== $new_thumbnail) {
+      safe_unlink($image_dir . $current_thumbnail);
+    }
+  }
+
   public static function refreshNsfwThumbnail(
     string $image_dir,
     string $image_name,
@@ -1370,7 +1401,18 @@ final class ImageService {
     return $result ? $name : '';
   }
 
-  /** @return array<string,mixed> */
+  public static function toolDisplayName(string $tool): string {
+    $tool_names = [
+      'neo' => 'PaintBBS NEO', 'shi' => 'Shi Painter', 'chicken' => 'litaChix', 'chi' => 'litaChix',
+      'klecks' => 'Klecks', 'tegaki' => 'Tegaki.js', 'axnos' => 'AxnosPaint',
+    ];
+    return $tool_names[$tool] ?? '???';
+  }
+
+  /**
+   * @param callable(array<string,mixed>):void|null $save_post Save the database row before removing temporary files.
+   * @return array<string,mixed>
+   */
   public static function finalizeNewPost(
     string $temp_dir,
     string $image_dir,
@@ -1379,7 +1421,40 @@ final class ImageService {
     bool $show_paint_time,
     int $thumbnail_width,
     bool $nsfw,
-    int $permission
+    int $permission,
+    ?callable $save_post = null
+  ): array {
+    $published = [];
+    $temporary = [];
+    try {
+      $result = self::publishNewPostFiles(
+        $temp_dir, $image_dir, $image_name, $ctype, $show_paint_time,
+        $thumbnail_width, $nsfw, $permission, $published, $temporary
+      );
+      if ($save_post !== null) {
+        $save_post($result);
+      }
+    } catch (Throwable $e) {
+      foreach (array_reverse($published) as $path) {
+        safe_unlink($path);
+      }
+      throw $e;
+    }
+    foreach ($temporary as $path) {
+      safe_unlink($path);
+    }
+    return $result;
+  }
+
+  /**
+   * @param list<string> $published Files created by this attempt, for rollback.
+   * @param list<string> $temporary Files to remove only after the database commit.
+   * @return array<string,mixed>
+   */
+  private static function publishNewPostFiles(
+    string $temp_dir, string $image_dir, string $image_name, string $ctype,
+    bool $show_paint_time, int $thumbnail_width, bool $nsfw, int $permission,
+    array &$published, array &$temporary
   ): array {
     $temp_dir = rtrim($temp_dir, '/\\') . DIRECTORY_SEPARATOR;
     $image_dir = rtrim($image_dir, '/\\') . DIRECTORY_SEPARATOR;
@@ -1400,10 +1475,7 @@ final class ImageService {
     $tool = (string)($fields[9] ?? '');
 
     $destination = $image_dir . $image_name;
-    if (!rename($source, $destination)) {
-      throw new RuntimeException('Failed to save image file.');
-    }
-    chmod($destination, $permission);
+    self::copyNewPostFile($source, $destination, $permission, $published, $temporary);
 
     $size = getimagesize($destination);
     if ($size === false) {
@@ -1411,11 +1483,6 @@ final class ImageService {
     }
     $paint_seconds = ($show_paint_time && $start_time > 0) ? max(0, $posted_time - $start_time) : 0;
     $paint_time = $paint_seconds > 0 ? calcPtime($paint_seconds) : '';
-    $tool_names = [
-      'neo' => 'PaintBBS NEO', 'shi' => 'Shi Painter', 'chicken' => 'litaChix', 'chi' => 'litaChix',
-      'klecks' => 'Klecks', 'tegaki' => 'Tegaki.js', 'axnos' => 'AxnosPaint',
-    ];
-
     $thumbnail = '';
     if ((int)$size[0] > $thumbnail_width || $nsfw) {
       // Keep thumbnails separate from their source. Using the source basename directly can
@@ -1423,6 +1490,9 @@ final class ImageService {
       $thumbnail = self::refreshNsfwThumbnail(
         $image_dir, $image_name, '', $nsfw, $thumbnail_width, $permission
       );
+      if ($thumbnail !== '') {
+        $published[] = $image_dir . $thumbnail;
+      }
     }
 
     $animation = '';
@@ -1430,28 +1500,58 @@ final class ImageService {
       foreach (['pch', 'spch', 'chi', 'tgkr'] as $extension) {
         $candidate = $base_name . '.' . $extension;
         if (is_file($temp_dir . $candidate)) {
-          if (rename($temp_dir . $candidate, $image_dir . $candidate)) {
-            chmod($image_dir . $candidate, $permission);
-            $animation = $candidate;
-          }
+          self::copyNewPostFile($temp_dir . $candidate, $image_dir . $candidate, $permission, $published, $temporary);
+          $animation = $candidate;
           break;
         }
       }
     }
     $psd = $base_name . '.psd';
     if (is_file($temp_dir . $psd)) {
-      if (!rename($temp_dir . $psd, $image_dir . $psd)) {
-        throw new RuntimeException('Failed to save PSD working file.');
-      }
-      chmod($image_dir . $psd, $permission);
+      self::copyNewPostFile($temp_dir . $psd, $image_dir . $psd, $permission, $published, $temporary);
     }
-    safe_unlink($metadata_file);
+    $temporary[] = $metadata_file;
 
     return [
       'img_w' => (int)$size[0], 'img_h' => (int)$size[1], 'pchfile' => $animation,
-      'psec' => $paint_seconds, 'utime' => $paint_time, 'tool' => $tool_names[$tool] ?? '???',
+      'psec' => $paint_seconds, 'utime' => $paint_time, 'tool' => self::toolDisplayName($tool),
       'thumbnail' => $thumbnail, 'nsfw' => $nsfw,
     ];
+  }
+
+  /**
+   * @param list<string> $published
+   * @param list<string> $temporary
+   */
+  private static function copyNewPostFile(
+    string $source, string $destination, int $permission,
+    array &$published, array &$temporary
+  ): void {
+    // Exclusive creation avoids overwriting files from another post or concurrent attempt.
+    $output = @fopen($destination, 'xb');
+    if ($output === false) {
+      throw new RuntimeException('Failed to create posted file.');
+    }
+    $published[] = $destination;
+    $input = null;
+    try {
+      $input = @fopen($source, 'rb');
+      if ($input === false) {
+        throw new RuntimeException('Failed to read temporary file.');
+      }
+      $size = fstat($input);
+      $copied = stream_copy_to_stream($input, $output);
+      if ($size === false || $copied === false || $copied !== $size['size'] || !fflush($output)) {
+        throw new RuntimeException('Failed to copy posted file.');
+      }
+      if (!chmod($destination, $permission)) {
+        throw new RuntimeException('Failed to set posted file permissions.');
+      }
+      $temporary[] = $source;
+    } finally {
+      if (is_resource($input)) fclose($input);
+      fclose($output);
+    }
   }
 
   /** @return array<string,mixed> */
@@ -1480,6 +1580,11 @@ final class ImageService {
     }
     chmod($work_file, $permission);
 
+    $size = getimagesize($work_file);
+    if ($size === false) {
+      safe_unlink($work_file);
+      throw new RuntimeException('Failed to read replacement image dimensions.');
+    }
     $extension = get_image_type((string)mime_content_type($work_file));
     $new_image = $filename . $extension;
     $new_image_path = $image_dir . $new_image;
@@ -1515,6 +1620,8 @@ final class ImageService {
     }
 
     $created_files = [];
+    $temporary_files = [$source, $temp_dir . $filename . '.dat'];
+    if ($animation_source !== '') $temporary_files[] = $animation_source;
     try {
       if (!rename($work_file, $new_image_path)) {
         throw new RuntimeException('Failed to publish replacement image.');
@@ -1528,6 +1635,12 @@ final class ImageService {
         $created_files[] = $new_animation_path;
         chmod($new_animation_path, $permission);
       }
+      $psd_source = $temp_dir . $filename . '.psd';
+      if (is_file($psd_source)) {
+        self::copyNewPostFile(
+          $psd_source, $image_dir . $filename . '.psd', $permission, $created_files, $temporary_files
+        );
+      }
     } catch (Throwable $e) {
       safe_unlink($work_file);
       if ($animation_work_file !== '') safe_unlink($animation_work_file);
@@ -1539,12 +1652,14 @@ final class ImageService {
     if ($old_image !== '' && is_file($old_image_path)) $old_files[] = $old_image_path;
     $old_animation_path = $image_dir . basename($old_animation);
     if ($old_animation !== '' && is_file($old_animation_path)) $old_files[] = $old_animation_path;
-    $temporary_files = [$source, $temp_dir . $filename . '.dat'];
-    if ($animation_source !== '') $temporary_files[] = $animation_source;
+    $old_psd_path = $image_dir . pathinfo(basename($old_image), PATHINFO_FILENAME) . '.psd';
+    if ($old_image !== '' && is_file($old_psd_path)) $old_files[] = $old_psd_path;
 
     return [
       'picfile' => $new_image,
       'pchfile' => $new_animation,
+      'img_w' => (int)$size[0],
+      'img_h' => (int)$size[1],
       'created_files' => $created_files,
       'old_files' => $old_files,
       'temporary_files' => $temporary_files,

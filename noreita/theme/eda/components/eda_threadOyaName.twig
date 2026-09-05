@@ -18,7 +18,7 @@
   {% if display_id %}
     <span class="id">ID：{{ bbsline['id'] }}</span>
   {% endif %}
-  <span class="sodane"><a href="{{ self }}?mode=sodane&amp;resto={{ bbsline['tid'] }}">
+  <span class="sodane"><a href="{{ self }}?mode=sodane&amp;resto={{ bbsline['tid'] }}" data-sodane-token="{{ sodane_token }}">
   {{ sodane }}
   {% if bbsline['sodane'] != 0 %}
     x{{ bbsline['sodane'] }}

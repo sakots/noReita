@@ -125,6 +125,45 @@ smoke_test('BladeOne and Twig render through the template engine abstraction', s
   }
 });
 
+smoke_test('both themes limit animation links to supported tool names', static function (): bool {
+  $cache = sys_get_temp_dir() . '/noreita_animation_links_' . bin2hex(random_bytes(8));
+  mkdir($cache, 0700, true);
+  try {
+    foreach (['eda' => 'twig', 'monoreita' => 'blade'] as $theme => $type) {
+      mkdir($cache . '/' . $theme, 0700);
+      $engine = TemplateEngineFactory::create($type, dirname(__DIR__) . '/noreita/theme/' . $theme . '/components', $cache . '/' . $theme);
+      foreach (['Oya' => 'bbsline', 'Rep' => 'res'] as $component => $key) {
+        foreach (['neo', 'PaintBBS NEO', 'Tegaki', 'Tegaki.js', 'litaChix', 'Klecks', 'Upload', ''] as $tool) {
+          foreach (['new', 'img'] as $ctype) {
+            foreach (['record.pch', ''] as $animation) {
+              $post = ['tool' => $tool, 'img_w' => 4, 'img_h' => 3, 'psec' => 0, 'utime' => '',
+                'nsfw' => 0, 'picfile' => 'record.png', 'thumb' => '', 'pchfile' => $animation, 'ctype' => $ctype];
+              $html = $engine->render($theme . '_thread' . $component . 'Picfile', [
+                $key => $post, 'display_painttime' => false, 'path' => 'img/', 'self' => 'index.php', 'use_continue' => false,
+                'use_misskey_note' => false,
+              ]);
+              $expected = in_array($tool, ['neo', 'PaintBBS NEO', 'Tegaki', 'Tegaki.js'], true)
+                && $ctype !== 'img' && $animation !== '';
+              if (str_contains($html, '?mode=anime') !== $expected) {
+                throw new RuntimeException($theme . '/' . $component . ': unexpected animation link for ' . $tool);
+              }
+            }
+          }
+        }
+      }
+    }
+    return true;
+  } finally {
+    $iterator = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($cache, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $item) {
+      $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+    }
+    rmdir($cache);
+  }
+});
+
 smoke_test('eda Twig theme templates compile', static function (): bool {
   $views = dirname(__DIR__) . '/noreita/theme/eda';
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_eda_twig_' . bin2hex(random_bytes(8));
@@ -1311,6 +1350,58 @@ smoke_test('version 2 database is not modified automatically', static function (
   }
 });
 
+smoke_test('reply targets must be parent threads', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'invz' => 0]);
+  $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+  $post += ['resto' => (string)$parent, 'sodane' => 0, 'invz' => 0, 'admins' => 0];
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  $service = new PostService($repository, sys_get_temp_dir());
+  $reply = $service->createPreparedPost($post, $image);
+  $before = $repository->findPost($reply);
+  $post['resto'] = (string)$reply;
+  try {
+    $service->createPreparedPost($post, $image);
+    return false;
+  } catch (PostNotFoundException $e) {
+  }
+  if ($repository->findPost($reply) !== $before || $db->inTransaction()
+    || count($repository->findReplies($parent)) !== 1
+    || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 2) return false;
+  $repository->deletePost($parent, true);
+  return (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === 0;
+});
+
+smoke_test('failed reply insertion restores parent ordering', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'sub' => 'parent']);
+  $before = $repository->findPost($parent);
+  $db->exec("CREATE TRIGGER reject_reply BEFORE INSERT ON board_log BEGIN SELECT RAISE(ABORT, 'simulated reply failure'); END");
+  $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+  $post += ['resto' => (string)$parent, 'sodane' => 0, 'invz' => 0, 'admins' => 0];
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  $service = new PostService($repository, sys_get_temp_dir());
+  try {
+    $service->createPreparedPost($post, $image);
+    return false;
+  } catch (PDOException $e) {
+    if (!str_contains($e->getMessage(), 'simulated reply failure')) throw $e;
+  }
+  if ($repository->findPost($parent) !== $before || $db->inTransaction()
+    || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 1) return false;
+  $db->exec('DROP TRIGGER reject_reply');
+  $reply = $service->createPreparedPost($post, $image);
+  return $reply > $parent && !$db->inTransaction()
+    && (int)$repository->findPost($parent)['age'] === 1
+    && (int)$repository->findPost($reply)['parent'] === $parent;
+});
+
 smoke_test('failed database operation is rolled back', static function (): bool {
   $db = new PDO('sqlite::memory:');
   $migrator = new DatabaseMigrator($db, ':memory:', sys_get_temp_dir());
@@ -1452,6 +1543,48 @@ smoke_test('post validation is independent from HTTP rendering', static function
   return true;
 });
 
+smoke_test('spam scoring skips disabled rules and avoids integer overflow', static function (): bool {
+  $rules = ['request_method' => 'POST', 'comment_score_threshold' => 0,
+    'comment_score_rules' => [['test', PHP_INT_MAX], ['test', 1]]];
+  PostValidator::validate(['com' => 'test'], $rules);
+  $rules['comment_score_threshold'] = 3;
+  foreach ([
+    [[['test', PHP_INT_MAX], ['test', 1]], true],
+    [[['test', 1], ['test', PHP_INT_MAX]], true],
+    [[['test', 1], ['test', 2]], true],
+    [[['test', 1], ['test', 1]], false],
+    [[['unmatched', PHP_INT_MAX]], false],
+  ] as [$patterns, $should_reject]) {
+    $rules['comment_score_rules'] = $patterns;
+    try {
+      PostValidator::validate(['com' => 'test'], $rules);
+      if ($should_reject) return false;
+    } catch (PostValidationException $e) {
+      if (!$should_reject || $e->getMessage() !== 'コメントはスパムとして拒否されました。') return false;
+    }
+  }
+  return true;
+});
+
+smoke_test('post validation rejects invalid UTF-8 before spam matching', static function (): bool {
+  $input = ['com' => '日本語と絵文字🎨', 'name' => '名前', 'sub' => '題名', 'mail' => '', 'url' => ''];
+  $rules = ['request_method' => 'POST', 'japanese_filter' => false,
+    'bad_strings' => ['禁止語'], 'bad_names' => ['禁止語'],
+    'comment_score_rules' => [['禁止語', 3]], 'comment_score_threshold' => 3];
+  PostValidator::validate($input, $rules);
+  foreach (['com', 'name', 'sub', 'mail', 'url'] as $field) {
+    foreach (["\xFF", "\xE3\x81", "\xC0\xAF"] as $invalid_bytes) {
+      try {
+        PostValidator::validate(array_replace($input, [$field => '禁止語' . $invalid_bytes]), $rules);
+        return false;
+      } catch (PostValidationException $e) {
+        if ($e->getMessage() !== '入力に不正な文字コードが含まれています。') return false;
+      }
+    }
+  }
+  return true;
+});
+
 smoke_test('ctype input sources are resolved in priority order', static function (): bool {
   return PostInput::resolveCtype([
       'direct' => 'img', 'usercode' => 'ctype=pch', 'http_usercode' => 'ctype=spch',
@@ -1461,6 +1594,56 @@ smoke_test('ctype input sources are resolved in priority order', static function
     && PostInput::resolveCtype(['http_usercode' => 'ctype=img']) === 'img'
     && PostInput::resolveCtype(['session_usercode' => 'ctype=pch']) === 'pch'
     && PostInput::resolveCtype(['direct' => '../invalid', 'usercode' => 'ctype=invalid']) === 'new';
+});
+
+smoke_test('content editing preserves sodane increments after the post was read', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $id = $repository->insertPost([
+    'thread' => 1, 'sub' => 'Before', 'com' => 'Comment', 'a_name' => 'Author',
+    'pwd' => password_hash('owner', PASSWORD_DEFAULT), 'picfile' => '', 'invz' => 0,
+    'sodane' => 7, 'nsfw' => 0, 'thumbnail' => '',
+  ]);
+  $snapshot = $repository->findPost($id);
+  $repository->incrementSodane($id);
+  $repository->updateContent($id, [
+    'name' => 'Author', 'mail' => '', 'sub' => 'After', 'com' => 'Edited', 'url' => '', 'host' => 'localhost',
+    'sodane' => $snapshot['sodane'], 'pwdh' => $snapshot['pwd'], 'nsfw' => 0, 'thumbnail' => '',
+  ]);
+  $updated = $repository->findPost($id);
+  return (int)$updated['sodane'] === 8 && $updated['sub'] === 'After' && $updated['com'] === 'Edited';
+});
+
+smoke_test('content updates fail when the target was deleted before saving', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $id = $repository->insertPost(['thread' => 1, 'sub' => 'Before', 'com' => 'Comment', 'a_name' => 'Author']);
+  $snapshot = $repository->findPost($id);
+  $db->exec('DELETE FROM board_log WHERE tid = ' . $id);
+  try {
+    $repository->updateContent($id, [
+      'name' => $snapshot['a_name'], 'mail' => '', 'sub' => 'After', 'com' => 'Edited',
+      'url' => '', 'host' => 'localhost', 'pwdh' => '', 'nsfw' => 0, 'thumbnail' => '',
+    ]);
+    return false;
+  } catch (RuntimeException $e) {
+    return $repository->findPost($id) === false;
+  }
+});
+
+smoke_test('old thread warnings are recalculated instead of accumulating', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  $db->exec('CREATE TABLE board_log (tid INTEGER PRIMARY KEY, thread INTEGER, shd TEXT)');
+  $db->exec("INSERT INTO board_log VALUES (1,1,'0'),(2,0,'0'),(3,1,'0'),(4,1,'0')");
+  $repository = new BoardRepository($db);
+  foreach ([[1, [1]], [1, [1]], [2, [1, 3]], [1, [1]], [0, []], [9, [1, 3, 4]], [-1, []]] as [$count, $expected]) {
+    $repository->markOldThreads($count);
+    $actual = array_map('intval', $db->query("SELECT tid FROM board_log WHERE shd='1' ORDER BY tid")->fetchAll(PDO::FETCH_COLUMN));
+    if ($actual !== $expected) return false;
+  }
+  return true;
 });
 
 smoke_test('post service centralizes edit and delete authorization', static function (): bool {
@@ -2060,6 +2243,35 @@ smoke_test('GD thumbnail generation', static function (): bool {
   }
 });
 
+foreach ([
+  'wide image' => [1000, 1, 300, false, 1],
+  'NSFW wide image' => [1000, 10, 300, true, 3],
+  'NSFW small width' => [4, 4, 5, true, 5],
+] as $case => [$source_width, $source_height, $width, $nsfw, $expected_height]) {
+  smoke_test('GD thumbnails support positive dimensions: ' . $case, static function () use (
+    $source_width, $source_height, $width, $nsfw, $expected_height
+  ): bool {
+    $directory = sys_get_temp_dir() . '/noreita_thin_thumbnail_' . bin2hex(random_bytes(8));
+    if (!mkdir($directory, 0700)) return false;
+    try {
+      $image = imagecreatetruecolor($source_width, $source_height);
+      imagefill($image, 0, 0, imagecolorallocate($image, 20, 120, 220));
+      if (!imagepng($image, $directory . '/input.png')) return false;
+      $thumbnail = new Thumbnail($directory . '/input.png', $directory, $width, $nsfw, 'output');
+      if (!$thumbnail->createThumbnail()) return false;
+      $output = $thumbnail->getOutputPath();
+      // PHP 8.1のgetimagesize()はAVIFの寸法を0として返すため、
+      // 生成した画像を実際にデコードして寸法を検証する。
+      $bytes = $output !== null ? file_get_contents($output) : false;
+      $decoded = is_string($bytes) ? imagecreatefromstring($bytes) : false;
+      return $decoded !== false && imagesx($decoded) === $width && imagesy($decoded) === $expected_height;
+    } finally {
+      foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
+      rmdir($directory);
+    }
+  });
+}
+
 smoke_test('GD thumbnails preserve transparent pixels for supported input formats', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_transparent_thumbnail_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
@@ -2338,6 +2550,7 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
     imagepng($image, $temp . DIRECTORY_SEPARATOR . 'new.png');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'new.dat', 'metadata');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'new.pch', 'new animation');
+    file_put_contents($temp . DIRECTORY_SEPARATOR . 'new.psd', 'new layers');
   };
 
   try {
@@ -2345,7 +2558,21 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
     imagefill($old_image, 0, 0, imagecolorallocate($old_image, 220, 20, 20));
     imagepng($old_image, $images . DIRECTORY_SEPARATOR . 'old.png');
     file_put_contents($images . DIRECTORY_SEPARATOR . 'old.pch', 'old animation');
+    file_put_contents($images . DIRECTORY_SEPARATOR . 'old.psd', 'old layers');
     $write_source();
+
+    // An existing PSD must not be overwritten, nor may a partial replacement survive.
+    file_put_contents($images . DIRECTORY_SEPARATOR . 'new.psd', 'unrelated layers');
+    try {
+      ImageService::replacePostedFiles($temp, $images, 'new', '.png', 99, 'old.png', 'old.pch', 0600);
+      return false;
+    } catch (RuntimeException $e) {
+      if (file_get_contents($images . DIRECTORY_SEPARATOR . 'new.psd') !== 'unrelated layers'
+        || is_file($images . DIRECTORY_SEPARATOR . 'new.png')
+        || is_file($images . DIRECTORY_SEPARATOR . 'new.pch')
+        || file_get_contents($temp . DIRECTORY_SEPARATOR . 'new.psd') !== 'new layers') return false;
+    }
+    unlink($images . DIRECTORY_SEPARATOR . 'new.psd');
 
     $replacement = ImageService::replacePostedFiles(
       $temp, $images, 'new', '.png', 100, 'old.png', 'old.pch', 0600
@@ -2357,6 +2584,9 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
 
     ImageService::rollbackPostedReplacement($replacement);
     if (!is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+      || file_get_contents($images . DIRECTORY_SEPARATOR . 'old.psd') !== 'old layers'
+      || file_get_contents($temp . DIRECTORY_SEPARATOR . 'new.psd') !== 'new layers'
+      || is_file($images . DIRECTORY_SEPARATOR . 'new.psd')
       || !is_file($images . DIRECTORY_SEPARATOR . 'old.pch')
       || is_file($images . DIRECTORY_SEPARATOR . 'new.png')
       || is_file($images . DIRECTORY_SEPARATOR . 'new.pch')
@@ -2366,7 +2596,11 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
       $temp, $images, 'new', '.png', 101, 'old.png', 'old.pch', 0600
     );
     ImageService::completePostedReplacement($replacement);
-    return !is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+    return $replacement['img_w'] === 4 && $replacement['img_h'] === 3
+      && !is_file($images . DIRECTORY_SEPARATOR . 'old.png')
+      && !is_file($images . DIRECTORY_SEPARATOR . 'old.psd')
+      && file_get_contents($images . DIRECTORY_SEPARATOR . 'new.psd') === 'new layers'
+      && !is_file($temp . DIRECTORY_SEPARATOR . 'new.psd')
       && !is_file($images . DIRECTORY_SEPARATOR . 'old.pch')
       && is_file($images . DIRECTORY_SEPARATOR . 'new.png')
       && is_file($images . DIRECTORY_SEPARATOR . 'new.pch')
@@ -2381,6 +2615,84 @@ smoke_test('posted image replacement can roll back or complete atomically', stat
       if (is_dir($directory)) rmdir($directory);
     }
     if (is_dir($root)) rmdir($root);
+  }
+});
+
+smoke_test('saved drawing tools share display names for new posts and replacements', static function (): bool {
+  foreach ([
+    'neo' => 'PaintBBS NEO', 'shi' => 'Shi Painter', 'chicken' => 'litaChix', 'chi' => 'litaChix',
+    'klecks' => 'Klecks', 'tegaki' => 'Tegaki.js', 'axnos' => 'AxnosPaint', '' => '???', 'unknown' => '???',
+  ] as $tool => $expected) {
+    if (ImageService::toolDisplayName($tool) !== $expected) return false;
+  }
+  return true;
+});
+
+smoke_test('drawing validation honors configured file size including the exact limit', static function (): bool {
+  $configuration = Config::all();
+  $directory = sys_get_temp_dir() . '/noreita_image_limit_' . bin2hex(random_bytes(8));
+  mkdir($directory, 0700);
+  $path = $directory . '/drawing.png';
+  try {
+    $image = imagecreatetruecolor(1, 1);
+    imagepng($image, $path);
+    unset($image);
+    $png = file_get_contents($path);
+    // A large ancillary chunk keeps decoded image memory small while testing >10 MiB files.
+    $limit_kb = 11264;
+    $chunk_size = $limit_kb * 1024 - strlen($png) - 12;
+    $chunk = 'tEXt' . "Comment\0" . str_repeat('x', $chunk_size - 8);
+    file_put_contents($path, substr($png, 0, -12) . pack('N', $chunk_size) . $chunk
+      . pack('N', crc32($chunk)) . substr($png, -12));
+    unset($chunk);
+    clearstatcache(true, $path);
+    if (filesize($path) !== $limit_kb * 1024) return false;
+    foreach ([$limit_kb => true, $limit_kb - 1 => false, 10240 => false] as $limit => $expected) {
+      Config::initializeForTesting($configuration, ['limits' => ['paint_image_kb' => $limit]]);
+      if (ImageService::validateUpload($path, ['image/png']) !== $expected) return false;
+    }
+    return true;
+  } finally {
+    Config::initializeForTesting($configuration);
+    if (is_file($path)) unlink($path);
+    rmdir($directory);
+  }
+});
+
+smoke_test('NSFW thumbnail rollback preserves old and pre-existing thumbnails', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_nsfw_rollback_' . bin2hex(random_bytes(8));
+  mkdir($directory, 0700);
+  try {
+    $image = imagecreatetruecolor(8, 4);
+    imagepng($image, $directory . '/post.png');
+    unset($image);
+    $old = ImageService::refreshNsfwThumbnail($directory, 'post.png', '', false, 2, 0600);
+    $hash = hash_file('sha256', $directory . '/' . $old);
+    $existing = ImageService::refreshNsfwThumbnail($directory, 'post.png', $old, true, 2, 0600, false, false);
+    foreach ([true, false] as $pre_existing) {
+      if (!$pre_existing) unlink($directory . '/' . $existing);
+      try {
+        ImageService::updateNsfwThumbnail($directory, 'post.png', $old, true, 2, 0600,
+          static function (string $thumbnail) use ($directory, $old): void {
+            if (!is_file($directory . '/' . $old) || !is_file($directory . '/' . $thumbnail)) {
+              throw new RuntimeException('Missing thumbnail before database commit');
+            }
+            throw new PDOException('forced thumbnail rollback');
+          }
+        );
+        return false;
+      } catch (PDOException $e) {
+        if (hash_file('sha256', $directory . '/' . $old) !== $hash
+          || is_file($directory . '/' . $existing) !== $pre_existing) return false;
+      }
+    }
+    ImageService::updateNsfwThumbnail($directory, 'post.png', $old, true, 2, 0600,
+      static function (string $thumbnail): void {}
+    );
+    return !is_file($directory . '/' . $old) && is_file($directory . '/' . $existing);
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $file) if (is_file($file)) unlink($file);
+    rmdir($directory);
   }
 });
 
@@ -2417,6 +2729,71 @@ smoke_test('new post image and animation are finalized', static function (): boo
       if (is_dir($directory)) rmdir($directory);
     }
     if (is_dir($root)) rmdir($root);
+  }
+});
+
+smoke_test('failed drawing finalization preserves temporary files and supports retry', static function (): bool {
+  $root = sys_get_temp_dir() . '/noreita_finalize_retry_' . bin2hex(random_bytes(8));
+  $temp = $root . '/tmp';
+  $images = $root . '/img';
+  mkdir($temp, 0700, true);
+  mkdir($images, 0700, true);
+  try {
+    $source = imagecreatetruecolor(4, 3);
+    imagepng($source, $temp . '/post.png');
+    file_put_contents($temp . '/post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
+    file_put_contents($temp . '/post.pch', 'NEO');
+    file_put_contents($temp . '/post.psd', 'PSD');
+    $originals = [];
+    foreach (glob($temp . '/*') as $path) $originals[$path] = hash_file('sha256', $path);
+
+    // A failure after image/thumbnail/animation publication must leave every source intact.
+    try {
+      ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600,
+        static function (array $result) use ($images): void {
+          if (!is_file($images . '/' . $result['thumbnail']) || !is_file($images . '/post.psd')) {
+            throw new RuntimeException('Files were not published before database save.');
+          }
+          throw new PDOException('Simulated database failure');
+        }
+      );
+      return false;
+    } catch (PDOException $e) {
+      if ($e->getMessage() !== 'Simulated database failure') return false;
+    }
+    if ((glob($images . '/*') ?: []) !== []) return false;
+    foreach ($originals as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+    }
+
+    // A later working-file collision also rolls back, without deleting an existing file.
+    file_put_contents($images . '/post.psd', 'existing PSD');
+    try {
+      ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600);
+      return false;
+    } catch (RuntimeException $e) {
+      if (file_get_contents($images . '/post.psd') !== 'existing PSD'
+        || count(glob($images . '/*') ?: []) !== 1) return false;
+    }
+    foreach ($originals as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+    }
+    unlink($images . '/post.psd');
+    $saved = 0;
+    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600,
+      static function (array $result) use (&$saved): void { ++$saved; }
+    );
+    return $saved === 1 && (glob($temp . '/*') ?: []) === []
+      && hash_file('sha256', $images . '/post.png') === $originals[$temp . '/post.png']
+      && file_get_contents($images . '/post.pch') === 'NEO'
+      && file_get_contents($images . '/post.psd') === 'PSD'
+      && is_file($images . '/' . $result['thumbnail']);
+  } finally {
+    foreach ([$temp, $images] as $directory) {
+      foreach (glob($directory . '/*') ?: [] as $file) if (is_file($file)) unlink($file);
+      rmdir($directory);
+    }
+    rmdir($root);
   }
 });
 

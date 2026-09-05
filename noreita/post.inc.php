@@ -74,17 +74,22 @@ final class PostService implements AdminPostManagementService {
       ? $submitted_name
       : generate_trip($submitted_name);
     $values['pwdh'] = (string)$post['pwd'];
-    // 「そうだね」は閲覧者の評価であり、投稿編集・画像差し替えでは変更しない。
-    $values['sodane'] = (int)$post['sodane'];
+    // 「そうだね」は更新SQLの対象外とし、読み取り後の加算を上書きしない。
     $values['nsfw'] = (int)$post['nsfw'];
     $values['thumbnail'] = (string)($post['thumbnail'] ?? '');
     if (array_key_exists('edit_nsfw', $values) && (string)$post['picfile'] !== '') {
       $nsfw = (bool)$values['edit_nsfw'];
       if ($nsfw !== (bool)$post['nsfw']) {
-        $values['thumbnail'] = ImageService::refreshNsfwThumbnail(
+        $values['nsfw'] = (int)$nsfw;
+        ImageService::updateNsfwThumbnail(
           $this->image_dir, (string)$post['picfile'], $values['thumbnail'], $nsfw,
-          $this->thumbnail_width, $this->file_permission
+          $this->thumbnail_width, $this->file_permission,
+          function (string $thumbnail) use ($post_id, $values): void {
+            $values['thumbnail'] = $thumbnail;
+            $this->repository->updateContent($post_id, $values);
+          }
         );
+        return $authorization['role'];
       }
       $values['nsfw'] = (int)$nsfw;
     }
@@ -240,6 +245,16 @@ final class PostService implements AdminPostManagementService {
    * @param array<string,mixed> $image
    */
   public function createPreparedPost(array $post, array $image): int {
+    return $this->repository->transaction(function () use ($post, $image): int {
+      return $this->insertPreparedPost($post, $image);
+    });
+  }
+
+  /**
+   * @param array<string,mixed> $post
+   * @param array<string,mixed> $image
+   */
+  private function insertPreparedPost(array $post, array $image): int {
     $now = time();
     $resto = (string)($post['resto'] ?? '');
     $thread = $resto === '' ? 1 : 0;
@@ -250,7 +265,9 @@ final class PostService implements AdminPostManagementService {
 
     if ($parent !== null) {
       $parent_post = $this->repository->findPost($parent);
-      if (empty($parent_post)) throw new PostNotFoundException('Parent post was not found.');
+      if (empty($parent_post) || (int)($parent_post['thread'] ?? 0) !== 1) {
+        throw new PostNotFoundException('Parent post was not found.');
+      }
       $tree = $now - $parent - (int)$parent_post['tid'];
       $comid = $tree + $now;
       $age = (int)$parent_post['age'];
@@ -414,6 +431,14 @@ final class PostValidator {
     $url = (string)($input['url'] ?? '');
     $sub = (string)($input['sub'] ?? '');
     $resto = (string)($input['resto'] ?? '');
+    // UTF-8正規表現のエラーを「一致なし」と扱ってスパム判定を回避させない。
+    foreach ([$com, $name, $mail, $url, $sub] as $text) {
+      if (preg_match('//u', $text) !== 1) {
+        throw new PostValidationException(self::message(
+          $en, 'Input contains invalid character encoding.', '入力に不正な文字コードが含まれています。'
+        ));
+      }
+    }
     $values = [
       preg_replace('/\s/u', '', $com) ?? '', preg_replace('/\s/u', '', $sub) ?? '',
       preg_replace('/\s/u', '', $name) ?? '', preg_replace('/\s/u', '', $mail) ?? '',
@@ -435,9 +460,9 @@ final class PostValidator {
     if (is_ngword($rules['bad_strings_a'] ?? [], $values) && is_ngword($rules['bad_strings_b'] ?? [], $values)) {
       throw new PostValidationException(self::message($en, 'Invalid combination of characters found in comment.', 'コメントに無効な文字の組み合わせが含まれています。'));
     }
-    if (self::commentRejectionScore($com, $rules['comment_score_rules'] ?? [])
-      >= (int)($rules['comment_score_threshold'] ?? 0)
-      && (int)($rules['comment_score_threshold'] ?? 0) > 0) {
+    $score_threshold = (int)($rules['comment_score_threshold'] ?? 0);
+    if ($score_threshold > 0
+      && self::commentRejectionScore($com, $rules['comment_score_rules'] ?? [], $score_threshold) >= $score_threshold) {
       throw new PostValidationException(self::message($en, 'Your comment was rejected as spam.', 'コメントはスパムとして拒否されました。'));
     }
 
@@ -476,10 +501,14 @@ final class PostValidator {
   }
 
   /** @param array<int, array{0:string, 1:int}> $rules */
-  private static function commentRejectionScore(string $comment, array $rules): int {
+  private static function commentRejectionScore(string $comment, array $rules, int $threshold): int {
     $score = 0;
     foreach ($rules as $rule) {
-      if (preg_match('/' . $rule[0] . '/ui', $comment) === 1) $score += $rule[1];
+      if (preg_match('/' . $rule[0] . '/ui', $comment) === 1) {
+        // 加算前に残り点数と比較し、整数オーバーフローを防ぐ。
+        if ($rule[1] >= $threshold - $score) return $threshold;
+        $score += $rule[1];
+      }
     }
     return $score;
   }

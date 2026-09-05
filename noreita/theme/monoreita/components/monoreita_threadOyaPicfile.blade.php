@@ -10,7 +10,7 @@
 <h5>
   <a target="_blank" href="{{$path}}{{$bbsline['picfile']}}">{{$bbsline['picfile']}}</a>
   <a class="copy-image" href="{{$path}}{{$bbsline['picfile']}}" data-image-url="{{$path}}{{$bbsline['picfile']}}"><span class="carbon--copy-to-clipboard" aria-hidden="true"></span> <span class="copy-image-label">画像をコピー</span></a>
-  @if ($bbsline['pchfile'] && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img') && ($bbsline['tool'] == ("neo" || "PaintBBS NEO" || "Tegaki" || "Tegaki.js")))
+  @if ($bbsline['pchfile'] && (!isset($bbsline['ctype']) || $bbsline['ctype'] !== 'img') && in_array($bbsline['tool'], ['neo', 'PaintBBS NEO', 'Tegaki', 'Tegaki.js'], true))
     <a href="{{$self}}?mode=anime&amp;pch={{$bbsline['pchfile']}}" target="_blank"><span class="mdi--animation-play"></span>動画</a>
   @endif
   @if ($use_continue)

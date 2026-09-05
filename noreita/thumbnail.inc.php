@@ -85,7 +85,7 @@ class Thumbnail {
     }
 
     // 縦横比を維持してサムネイルの高さを計算
-    $thumb_height = (int)($this->thumb_width * $src_height / $src_width);
+    $thumb_height = max(1, (int)($this->thumb_width * $src_height / $src_width));
 
     // 入力画像を読み込む
     switch ($mime) {
@@ -131,8 +131,8 @@ class Thumbnail {
     if ($this->nsfw) {
       // ぼかしの強さを調整するために、サムネイルをさらに縮小してから拡大する方法を取ります。
       $blur_strength = 10; // ぼかしの強さ（数値が大きいほどぼかしが強くなります）
-      $small_width = (int)($this->thumb_width / $blur_strength);
-      $small_height = (int)($thumb_height / $blur_strength);
+      $small_width = max(1, (int)($this->thumb_width / $blur_strength));
+      $small_height = max(1, (int)($thumb_height / $blur_strength));
 
       // 小さい画像を作成
       $small_image = self::createTransparentCanvas($small_width, $small_height);

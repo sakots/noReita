@@ -640,6 +640,28 @@ PHP;
       'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'valid.pch'),
     ]
   );
+  // Header-only PNGs test validation order without allocating oversized image buffers.
+  $animation_defaults = require $webroot . '/config.php';
+  foreach ([
+    'width' => [$animation_defaults['limits']['paint_max_width'] + 1, 1, 413],
+    'height' => [1, $animation_defaults['limits']['paint_max_height'] + 1, 413],
+    'invalid pixels' => [1, 1, 422],
+  ] as $case => [$header_width, $header_height, $expected_status]) {
+    $header = 'IHDR' . pack('NNCCCCC', $header_width, $header_height, 8, 2, 0, 0, 0);
+    $header_file = $root . '/animation-header-only.png';
+    file_put_contents($header_file, "\x89PNG\r\n\x1a\n" . pack('N', 13) . $header . pack('N', crc32($header)));
+    $pending_before = glob($webroot . '/tmp/*');
+    [$header_status] = http_request($base_url . '?mode=animation_upload', $cookie_jar, [
+      'token' => $token,
+      'picture' => new CURLFile($header_file, 'image/png', 'header.png'),
+      'animation' => new CURLFile($valid_pch, 'application/octet-stream', 'valid.pch'),
+    ]);
+    integration_test('animation upload checks dimensions before decoding: ' . $case, static function () use (
+      $header_status, $expected_status, $pending_before, $webroot
+    ): bool {
+      return $header_status === $expected_status && glob($webroot . '/tmp/*') === $pending_before;
+    });
+  }
   $animation_upload_lines = preg_split('/\r?\n/', trim($animation_upload_body)) ?: [];
   $uploaded_animation_image = (string)($animation_upload_lines[1] ?? '');
   $uploaded_animation_base = pathinfo($uploaded_animation_image, PATHINFO_FILENAME);
@@ -963,6 +985,29 @@ PHP;
   });
 
   $shared_thread_id = (int)($row['tid'] ?? 0);
+  $sodane_count = static fn(): int => (int)$db->query('SELECT sodane FROM board_log WHERE tid = ' . $shared_thread_id)->fetchColumn();
+  foreach ([
+    'GET' => [null, 405],
+    'missing token' => [['resto' => (string)$shared_thread_id], 403],
+    'wrong token' => [['resto' => (string)$shared_thread_id, 'token' => 'invalid'], 403],
+  ] as $case => [$payload, $expected_status]) {
+    $before_count = $sodane_count();
+    [$reaction_status] = http_request($base_url . '?mode=sodane&resto=' . $shared_thread_id, $cookie_jar, $payload);
+    integration_test('sodane rejects ' . $case . ' without incrementing', static function () use (
+      $reaction_status, $expected_status, $before_count, $sodane_count
+    ): bool {
+      return $reaction_status === $expected_status && $sodane_count() === $before_count;
+    });
+  }
+  $before_count = $sodane_count();
+  [$reaction_status] = http_request($base_url . '?mode=sodane', $cookie_jar, [
+    'resto' => (string)$shared_thread_id, 'token' => $token,
+  ]);
+  integration_test('sodane accepts a POST with a valid CSRF token', static function () use (
+    $reaction_status, $before_count, $sodane_count
+  ): bool {
+    return $reaction_status === 302 && $sodane_count() === $before_count + 1;
+  });
   [$shared_thread_status, $shared_thread_body] = http_request(
     $base_url . '?resno=' . $shared_thread_id, $cookie_jar
   );
@@ -1386,6 +1431,35 @@ PHP;
       && !str_contains($image_edit_form_body, 'checked="checked"');
   });
 
+  $check_failed_nsfw_edit = static function (string $nsfw, bool $ignore_update = false) use ($webroot, $base_url, $cookie_jar, $token, $image_post_id): void {
+    $failure_db = new PDO('sqlite:' . $webroot . '/reita.db');
+    $before = $failure_db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+    $files_before = [];
+    foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $files_before[$path] = hash_file('sha256', $path);
+    $failure_db->exec($ignore_update
+      ? 'CREATE TRIGGER fail_nsfw_edit BEFORE UPDATE ON board_log BEGIN SELECT RAISE(IGNORE); END'
+      : "CREATE TRIGGER fail_nsfw_edit BEFORE UPDATE ON board_log BEGIN SELECT RAISE(ABORT, 'forced edit failure'); END");
+    try {
+      [$status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+        'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+        'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
+        'sodane' => '0', 'nsfw' => $nsfw, 'token' => $token,
+      ]);
+    } finally {
+      $failure_db->exec('DROP TRIGGER fail_nsfw_edit');
+    }
+    integration_test('failed NSFW edit preserves database and thumbnail files: ' . $nsfw . ($ignore_update ? ' / zero rows' : ''),
+      static function () use ($status, $before, $files_before, $failure_db, $image_post_id, $webroot): bool {
+        clearstatcache();
+        $files_after = [];
+        foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $files_after[$path] = hash_file('sha256', $path);
+        return $status === 500 && $files_before === $files_after
+          && $failure_db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC) === $before;
+      }
+    );
+  };
+  $check_failed_nsfw_edit('1');
+  $check_failed_nsfw_edit('1', true);
   [$image_nsfw_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
     'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
@@ -1398,6 +1472,37 @@ PHP;
       && $nsfw_thumbnail !== '' && is_file($webroot . '/img/' . $nsfw_thumbnail);
   });
 
+  // 一時テストDBだけを更新し、旧データなどでサムネイルが未登録の場合も検証する。
+  $ogp_update = $db->prepare('UPDATE board_log SET nsfw = ?, thumbnail = ? WHERE tid = ?');
+  try {
+    foreach ([
+      'NSFW with empty thumbnail' => [1, '', ''],
+      'NSFW with null thumbnail' => [1, null, ''],
+      'NSFW with blurred thumbnail' => [1, $nsfw_thumbnail, $nsfw_thumbnail],
+      'safe original image' => [0, '', $image_name],
+    ] as $case => [$nsfw_state, $thumbnail_name, $expected_image]) {
+      $ogp_update->execute([$nsfw_state, $thumbnail_name, $image_post_id]);
+      [$ogp_status, $ogp_body] = http_request(
+        $base_url . '?resno=' . $image_post_id, $root . '/ogp-anonymous-cookies.txt'
+      );
+      integration_test('SNS image metadata: ' . $case, static function () use (
+        $ogp_status, $ogp_body, $expected_image
+      ): bool {
+        if ($ogp_status !== 200) return false;
+        $tags = [];
+        preg_match_all('/<meta\s+(?:property|name)="(?:og:image|twitter:image)"\s+content="([^"]*)"/', $ogp_body, $tags);
+        if ($expected_image === '') {
+          return $tags[1] === [] && str_contains($ogp_body, 'name="twitter:card" content="summary"');
+        }
+        return count($tags[1]) === 2 && $tags[1][0] === $tags[1][1]
+          && str_ends_with($tags[1][0], '/img/' . rawurlencode($expected_image))
+          && str_contains($ogp_body, 'name="twitter:card" content="summary_large_image"');
+      });
+    }
+  } finally {
+    $ogp_update->execute([$nsfw_image_row['nsfw'], $nsfw_image_row['thumbnail'], $image_post_id]);
+  }
+
   [, $checked_edit_form_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);
@@ -1405,6 +1510,8 @@ PHP;
     return preg_match('/id="edit_nsfw"[^>]*checked="checked"/', $checked_edit_form_body) === 1;
   });
 
+  $check_failed_nsfw_edit('0');
+  $check_failed_nsfw_edit('0', true);
   [$image_safe_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
     'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
@@ -1426,13 +1533,20 @@ PHP;
   $continued_from_thumbnail = (string)$db->query('SELECT thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
 
   $replacement_base = 'replacement-' . bin2hex(random_bytes(6));
+  $paint_seconds_before = (int)$db->query('SELECT psec FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  $db->exec("UPDATE board_log SET tool = 'Klecks' WHERE tid = " . $image_post_id);
   $replacement_code = 'replace-code-' . bin2hex(random_bytes(4));
-  file_put_contents($webroot . '/tmp/' . $replacement_base . '.png', $png);
+  $resized_replacement = imagecreatetruecolor(17, 11);
+  imagepng($resized_replacement, $webroot . '/tmp/' . $replacement_base . '.png');
+  unset($resized_replacement);
   file_put_contents(
     $webroot . '/tmp/' . $replacement_base . '.dat',
     "127.0.0.1\tlocalhost\tagent\t.png\tcode\t{$replacement_code}\t200\t260\t0\tneo"
   );
   file_put_contents($webroot . '/tmp/' . $replacement_base . '.pch', 'replacement animation');
+  file_put_contents($webroot . '/tmp/' . $replacement_base . '.psd', 'replacement layers');
+  $replacement_old_psd = pathinfo((string)$image_row['picfile'], PATHINFO_FILENAME) . '.psd';
+  file_put_contents($webroot . '/img/' . $replacement_old_psd, 'old layers');
   [$replacement_authorization_status, $replacement_authorization_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
     'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
@@ -1447,13 +1561,28 @@ PHP;
     $cookie_jar,
     ['nsfw' => '0']
   );
-  $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail, img_w, img_h, tool FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  [$replacement_page_status, $replacement_page_body] = http_request($base_url . '?resno=' . $image_post_id, $cookie_jar);
+  integration_test('image replacement updates tool from saved metadata and restores animation link', static function () use (
+    $replacement_status, $replaced_image_row, $replacement_page_status, $replacement_page_body, $replacement_base
+  ): bool {
+    return $replacement_status === 200 && is_array($replaced_image_row)
+      && $replaced_image_row['tool'] === 'PaintBBS NEO' && $replacement_page_status === 200
+      && str_contains($replacement_page_body, 'PaintBBS NEO')
+      && str_contains($replacement_page_body, '?mode=anime&amp;pch=' . $replacement_base . '.pch');
+  });
+  integration_test('image replacement updates stored dimensions after canvas resize', static function () use (
+    $replacement_status, $replaced_image_row
+  ): bool {
+    return $replacement_status === 200 && is_array($replaced_image_row)
+      && (int)$replaced_image_row['img_w'] === 17 && (int)$replaced_image_row['img_h'] === 11;
+  });
   $replacement_thumbnail = (string)($replaced_image_row['thumbnail'] ?? '');
   clearstatcache(true, $webroot . '/img/' . $continued_from_thumbnail);
   integration_test('continued NSFW drawing can become safe with a fresh thumbnail', static function () use (
     $replacement_authorization_status, $replacement_authorization_body, $replacement_status,
     $replacement_body, $replaced_image_row, $replacement_base,
-    $replacement_thumbnail, $continued_from_thumbnail, $webroot
+    $replacement_thumbnail, $continued_from_thumbnail, $webroot, $replacement_old_psd
   ): bool {
     return $replacement_authorization_status === 200
       && !str_contains($replacement_authorization_body, '&amp;pwd=')
@@ -1461,6 +1590,10 @@ PHP;
       && $replacement_status === 200 && is_array($replaced_image_row)
       && $replaced_image_row['picfile'] === $replacement_base . '.png'
       && $replaced_image_row['pchfile'] === $replacement_base . '.pch'
+      && is_file($webroot . '/img/' . $replacement_base . '.psd')
+      && file_get_contents($webroot . '/img/' . $replacement_base . '.psd') === 'replacement layers'
+      && !is_file($webroot . '/tmp/' . $replacement_base . '.psd')
+      && !is_file($webroot . '/img/' . $replacement_old_psd)
       && (int)$replaced_image_row['nsfw'] === 0
       && $replacement_thumbnail !== ''
       && str_starts_with($replacement_thumbnail, $replacement_base . '_thumb_safe_')
@@ -1509,13 +1642,17 @@ PHP;
   preg_match('/formData\\.append\\("no",\\s*"([0-9]+)"\\)/', $tegaki_continue_form_body, $tegaki_post_id_match);
   $tegaki_replacement_code = (string)($tegaki_repcode_match[1] ?? '');
   $tegaki_replacement_post_id = (string)($tegaki_post_id_match[1] ?? '');
+  $paint_seconds_after = (int)$db->query('SELECT psec FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  integration_test('image replacement adds elapsed drawing time', static function () use ($paint_seconds_before, $paint_seconds_after): bool {
+    return $paint_seconds_after === $paint_seconds_before + 60;
+  });
   [$tegaki_save_status, $tegaki_save_body] = http_request(
     $base_url . '?mode=saveimage&tool=tegaki',
     $cookie_jar,
     [
       'picture' => new CURLFile($animation_png, 'image/png', 'continued-drawing.png'),
       'tool' => 'tegaki', 'repcode' => $tegaki_replacement_code,
-      'stime' => (string)time(), 'resto' => '0',
+      'stime' => (string)(time() + 3600), 'resto' => '0',
     ]
   );
   [$tegaki_replace_status, $tegaki_replace_body] = http_request($base_url, $cookie_jar, [
@@ -1525,6 +1662,13 @@ PHP;
   $tegaki_replaced_row = $db->query(
     'SELECT picfile, pchfile FROM board_log WHERE tid = ' . $image_post_id
   )->fetch(PDO::FETCH_ASSOC);
+  $paint_seconds_after_future_start = (int)$db->query('SELECT psec FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  integration_test('future drawing start does not subtract accumulated painting time', static function () use (
+    $tegaki_save_status, $tegaki_replace_status, $paint_seconds_after, $paint_seconds_after_future_start
+  ): bool {
+    return $tegaki_save_status === 200 && $tegaki_replace_status === 200
+      && $paint_seconds_after_future_start === $paint_seconds_after;
+  });
   integration_test('Tegaki continuation saves its PNG and opens the replacement edit form', static function () use (
     $tegaki_continue_form_status, $tegaki_continue_form_body, $tegaki_replacement_code, $tegaki_replacement_post_id,
     $tegaki_save_status, $tegaki_save_body, $tegaki_replace_status, $tegaki_replace_body,
@@ -1622,6 +1766,19 @@ PHP;
       && $hidden_search_status === 200 && str_contains($hidden_search_body, '0件');
   });
 
+  $hidden_uuid = (string)$db->query('SELECT uuid FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  foreach (['?resno=' . $post_id, '?mode=res&res=' . $post_id,
+    '?mode=res&uuid=' . rawurlencode($hidden_uuid), '?resno=2147483647'] as $query) {
+    [$private_status, $private_body] = http_request($base_url . $query, $root . '/anonymous-cookies.txt');
+    integration_test('public response rejects hidden or missing posts: ' . $query, static function () use (
+      $private_status, $private_body, $marker
+    ): bool {
+      return $private_status === 404 && !str_contains($private_body, $marker)
+        && !str_contains($private_body, 'property="og:description"')
+        && !str_contains($private_body, 'property="og:image"');
+    });
+  }
+
   [$show_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'show', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
@@ -1658,6 +1815,31 @@ PHP;
     throw new RuntimeException('Could not create direct upload image.');
   }
   $upload_marker = 'direct-upload-' . bin2hex(random_bytes(6));
+  // IHDRだけのPNGで検証順序を確認する。巨大な画像データは生成・展開しない。
+  $upload_defaults = require $webroot . '/config.php';
+  foreach ([
+    'width' => [$upload_defaults['limits']['image_width'] + 1, 1, 'dimensions exceed the limit'],
+    'height' => [1, $upload_defaults['limits']['image_height'] + 1, 'dimensions exceed the limit'],
+    'invalid pixels' => [1, 1, 'Unsupported image format'],
+  ] as $case => [$header_width, $header_height, $expected_error]) {
+    $header = 'IHDR' . pack('NNCCCCC', $header_width, $header_height, 8, 2, 0, 0, 0);
+    $header_file = $root . '/header-only.png';
+    file_put_contents($header_file, "\x89PNG\r\n\x1a\n" . pack('N', 13) . $header . pack('N', crc32($header)));
+    $before_rows = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+    $before_files = glob($webroot . '/img/*');
+    [$dimension_status, $dimension_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
+      'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'sub' => 'Invalid image',
+      'com' => '画像の寸法検証 ' . $case, 'pwd' => 'upload-delete-pass', 'token' => $token,
+      'image_upload' => new CURLFile($header_file, 'image/png', 'header-only.png'),
+    ]);
+    integration_test('upload validates dimensions before decoding: ' . $case, static function () use (
+      $dimension_status, $dimension_body, $expected_error, $before_rows, $before_files, $db, $webroot
+    ): bool {
+      return $dimension_status === 400 && str_contains($dimension_body, $expected_error)
+        && (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === $before_rows
+        && glob($webroot . '/img/*') === $before_files;
+    });
+  }
   [$direct_upload_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
     'sub' => 'Direct image upload', 'com' => "画像アップロード {$upload_marker}", 'pwd' => 'upload-delete-pass',
@@ -1732,6 +1914,37 @@ PHP;
       && !str_contains($pending_form_body, 'name="replace_pending_image"');
   });
 
+  $drawing_failure_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $drawing_failure_db->exec("CREATE TRIGGER fail_drawing_insert BEFORE INSERT ON board_log
+    BEGIN SELECT RAISE(ABORT, 'forced drawing insert failure'); END");
+  $drawing_originals = [];
+  foreach (glob($webroot . '/tmp/' . $pending_drawing_base . '.*') ?: [] as $path) {
+    $drawing_originals[$path] = hash_file('sha256', $path);
+  }
+  $drawing_count_before = (int)$drawing_failure_db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+  try {
+    [$drawing_failure_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+      'mode' => 'regist', 'send' => '1', 'name' => 'drawing-rollback', 'mail' => '', 'url' => '',
+      'sub' => 'Drawing rollback', 'com' => "描画保存失敗 {$marker}", 'pwd' => 'drawing-pass',
+      'picfile' => $pending_drawing_image, 'ctype' => 'new', 'nsfw' => '1', 'token' => $token,
+    ]);
+  } finally {
+    $drawing_failure_db->exec('DROP TRIGGER fail_drawing_insert');
+  }
+  integration_test('database failure preserves pending drawing and removes published files', static function () use (
+    $drawing_failure_status, $drawing_originals, $webroot, $pending_drawing_base,
+    $drawing_failure_db, $drawing_count_before
+  ): bool {
+    clearstatcache();
+    if ($drawing_failure_status !== 500 || count($drawing_originals) < 3
+      || (int)$drawing_failure_db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== $drawing_count_before
+      || (glob($webroot . '/img/' . $pending_drawing_base . '*') ?: []) !== []) return false;
+    foreach ($drawing_originals as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+    }
+    return true;
+  });
+
   $pending_replacement_marker = 'pending-replacement-' . bin2hex(random_bytes(6));
   [$pending_replacement_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'pending-replacement', 'mail' => '', 'url' => '',
@@ -1750,6 +1963,9 @@ PHP;
     $pending_replacement_status, $pending_replacement_row, $pending_drawing_image,
     $pending_drawing_base, $webroot
   ): bool {
+    // HTTPサーバー側で削除されたファイルを、直前のロールバック検証で
+    // このテストプロセスに残ったstatキャッシュで判定しない。
+    clearstatcache();
     return $pending_replacement_status === 200 && is_array($pending_replacement_row)
       && $pending_replacement_row['picfile'] !== $pending_drawing_image
       && $pending_replacement_row['tool'] === 'Upload'
@@ -1826,6 +2042,39 @@ PHP;
   ): bool {
     return $unsupported_avif_rejected;
   });
+
+  $check_continuation = static function (string $theme, string $continue_url, string $continue_cookies) use ($webroot, $upload_row): void {
+    $continue_db = new PDO('sqlite:' . $webroot . '/reita.db');
+    $continue_fixture = $continue_db->query('SELECT tid, picfile, pchfile, ctype FROM board_log WHERE picfile = '
+      . $continue_db->quote((string)$upload_row['picfile']))->fetch(PDO::FETCH_ASSOC);
+    $continue_animation = pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.pch';
+    $continue_animation_path = $webroot . '/img/' . $continue_animation;
+    if (file_exists($continue_animation_path)) throw new RuntimeException('Continuation fixture already has animation.');
+    try {
+      foreach ([['pch', false, false], ['spch', false, false], ['pch', true, true], ['img', true, false]] as [$stored_ctype, $has_animation, $expected_animation]) {
+        if ($has_animation) file_put_contents($continue_animation_path, 'NEO test replay');
+        elseif (is_file($continue_animation_path)) unlink($continue_animation_path);
+        $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ? WHERE tid = ?');
+        $statement->execute([$stored_ctype, $has_animation ? $continue_animation : '', $continue_fixture['tid']]);
+        [$continue_status, $continue_body] = http_request(
+          $continue_url . '?mode=continue&no=' . rawurlencode($continue_fixture['picfile']), $continue_cookies
+        );
+        integration_test('continuation requires an existing replay: ' . $theme . '/' . $stored_ctype . '/' . (int)$has_animation,
+          static function () use ($continue_status, $continue_body, $expected_animation): bool {
+            return $continue_status === 200
+              && str_contains($continue_body, '<option value="pch"') === $expected_animation
+              && str_contains($continue_body, 'name="pch"') === $expected_animation
+              && str_contains($continue_body, '<option value="img"');
+          }
+        );
+      }
+    } finally {
+      if (is_file($continue_animation_path)) unlink($continue_animation_path);
+      $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ? WHERE tid = ?');
+      $statement->execute([$continue_fixture['ctype'], $continue_fixture['pchfile'], $continue_fixture['tid']]);
+    }
+  };
+  $check_continuation('eda', $base_url, $cookie_jar);
 
   $monoreita_config_local = str_replace(
     "'paths' => ['theme' => 'starter'],",
@@ -1921,6 +2170,7 @@ PHP;
       && str_contains($monoreita_temporary_body, '一時画像の管理')
       && str_contains($monoreita_temporary_body, 'mode=admin_temporary_images_manage');
   });
+  $check_continuation('monoreita', $monoreita_base_url, $monoreita_cookie_jar);
   $base_url = $monoreita_base_url;
 
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
