@@ -607,7 +607,7 @@ final class ImageService {
   public static function validateUpload(string $file_path, array $allowed_types = ['image/jpeg', 'image/png', 'image/gif']): bool {
     if (!is_file($file_path) || !is_readable($file_path)) return false;
     $file_size = filesize($file_path);
-    if ($file_size === false || $file_size === 0 || $file_size > 10 * 1024 * 1024) return false;
+    if ($file_size === false || $file_size === 0 || $file_size > Config::int('limits.paint_image_kb') * 1024) return false;
 
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $mime_type = $finfo->file($file_path);

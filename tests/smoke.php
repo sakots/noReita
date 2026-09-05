@@ -2575,6 +2575,37 @@ smoke_test('saved drawing tools share display names for new posts and replacemen
   return true;
 });
 
+smoke_test('drawing validation honors configured file size including the exact limit', static function (): bool {
+  $configuration = Config::all();
+  $directory = sys_get_temp_dir() . '/noreita_image_limit_' . bin2hex(random_bytes(8));
+  mkdir($directory, 0700);
+  $path = $directory . '/drawing.png';
+  try {
+    $image = imagecreatetruecolor(1, 1);
+    imagepng($image, $path);
+    unset($image);
+    $png = file_get_contents($path);
+    // A large ancillary chunk keeps decoded image memory small while testing >10 MiB files.
+    $limit_kb = 11264;
+    $chunk_size = $limit_kb * 1024 - strlen($png) - 12;
+    $chunk = 'tEXt' . "Comment\0" . str_repeat('x', $chunk_size - 8);
+    file_put_contents($path, substr($png, 0, -12) . pack('N', $chunk_size) . $chunk
+      . pack('N', crc32($chunk)) . substr($png, -12));
+    unset($chunk);
+    clearstatcache(true, $path);
+    if (filesize($path) !== $limit_kb * 1024) return false;
+    foreach ([$limit_kb => true, $limit_kb - 1 => false, 10240 => false] as $limit => $expected) {
+      Config::initializeForTesting($configuration, ['limits' => ['paint_image_kb' => $limit]]);
+      if (ImageService::validateUpload($path, ['image/png']) !== $expected) return false;
+    }
+    return true;
+  } finally {
+    Config::initializeForTesting($configuration);
+    if (is_file($path)) unlink($path);
+    rmdir($directory);
+  }
+});
+
 smoke_test('new post image and animation are finalized', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_finalize_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
