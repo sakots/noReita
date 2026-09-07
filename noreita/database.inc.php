@@ -314,6 +314,21 @@ final class BoardRepository {
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
+  /**
+   * @param array<int,int> $parents
+   * @return array<int,array<string,mixed>>
+   */
+  public function findRepliesForThreads(array $parents): array {
+    $parents = array_values(array_unique(array_filter($parents, static fn(int $id): bool => $id > 0)));
+    if ($parents === []) return [];
+    $placeholders = implode(',', array_fill(0, count($parents), '?'));
+    $statement = $this->db->prepare(
+      "SELECT * FROM board_log WHERE parent IN ({$placeholders}) AND invz = 0 ORDER BY parent ASC, comid ASC"
+    );
+    $statement->execute($parents);
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+  }
+
   public function findRepliesForAdmin(int $parent): array {
     $statement = $this->db->prepare('SELECT * FROM board_log WHERE parent = ? ORDER BY comid ASC');
     $statement->execute([$parent]);

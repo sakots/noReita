@@ -1099,6 +1099,11 @@ smoke_test('public API exposes only visible React-safe post data', static functi
     'a_name' => 'API reply', 'sub' => '', 'com' => 'API reply comment',
     'pwd' => 'private-reply-password', 'host' => 'private-reply.example', 'invz' => 0, 'nsfw' => 0,
   ]);
+  $repository->insertPost([
+    'thread' => 0, 'parent' => $thread_id, 'comid' => 2, 'tree' => 1,
+    'a_name' => 'Hidden API reply', 'sub' => '', 'com' => 'This must stay private.',
+    'pwd' => 'private-hidden-reply-password', 'host' => 'private-hidden-reply.example', 'invz' => 1, 'nsfw' => 0,
+  ]);
   $threads = PublicApi::dispatch($repository, ['mode' => 'threads', 'per_page' => '1']);
   $thread = PublicApi::dispatch($repository, ['mode' => 'thread', 'id' => (string)$thread_id]);
   $catalog = PublicApi::dispatch($repository, ['mode' => 'catalog']);
@@ -1107,6 +1112,8 @@ smoke_test('public API exposes only visible React-safe post data', static functi
   return $threads['api_version'] === 'v1' && $threads['pagination']['total'] === 1
     && ($item['id'] ?? 0) === $thread_id && !array_key_exists('pwd', $item) && !array_key_exists('host', $item)
     && ($item['image']['url'] ?? '') === 'https://smoke.example/img/api-image.png'
+    && ($item['replies'][0]['id'] ?? 0) === $reply_id && count($item['replies'] ?? []) === 1
+    && !array_key_exists('pwd', $item['replies'][0] ?? []) && !array_key_exists('host', $item['replies'][0] ?? [])
     && ($thread['thread']['id'] ?? 0) === $thread_id && ($thread['replies'][0]['id'] ?? 0) === $reply_id
     && count($catalog['items']) === 1 && count($search['items']) === 1;
 });
