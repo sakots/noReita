@@ -1229,7 +1229,6 @@ smoke_test('legacy SQLite database backup', static function (): bool {
     $db->exec("INSERT INTO backup_test VALUES ('preserved')");
     $migrator = new DatabaseMigrator($db, $database_file, $directory);
     $method = new ReflectionMethod($migrator, 'createLegacyBackup');
-    $method->setAccessible(true);
     $method->invoke($migrator, $backup_file);
 
     $backup = new PDO('sqlite:' . $backup_file);
@@ -1406,7 +1405,6 @@ smoke_test('failed database operation is rolled back', static function (): bool 
   $db = new PDO('sqlite::memory:');
   $migrator = new DatabaseMigrator($db, ':memory:', sys_get_temp_dir());
   $transaction = new ReflectionMethod($migrator, 'transaction');
-  $transaction->setAccessible(true);
 
   try {
     $transaction->invoke($migrator, static function () use ($db): void {
