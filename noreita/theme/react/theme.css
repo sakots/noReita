@@ -14,6 +14,7 @@ body { margin: 0; background: Canvas; color: CanvasText; }
 .react-thumbnail { width: min(180px, 35vw); height: auto; max-height: 180px; object-fit: contain; }
 .react-replies { grid-column: 1 / -1; border-top: 1px solid color-mix(in srgb, CanvasText 18%, transparent); padding-top: .5rem; }
 .react-reply { padding: .5rem 0; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+.react-reply .react-thumbnail { display: block; margin-top: .5rem; }
 .react-pagination { display: flex; justify-content: center; gap: .75rem; margin: 1rem 0; }
 .react-pagination button { padding: .4rem .8rem; }
 .react-error { color: #b00020; }
