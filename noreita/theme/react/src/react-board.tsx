@@ -35,6 +35,10 @@ function localImageUrl(url: string): string {
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
+function localThreadUrl(id: number): string {
+  return `?resno=${encodeURIComponent(String(id))}`;
+}
+
 function isThreadsResponse(value: unknown): value is ThreadsResponse {
   if (typeof value !== 'object' || value === null) return false;
   const response = value as Partial<ThreadsResponse>;
@@ -46,7 +50,7 @@ function Reply({reply}: {reply: Post}) {
   return <article className="react-reply">
     <div className="react-reply-meta">#{reply.id} {reply.author} · {reply.created_at}</div>
     <div className="react-comment">{reply.comment}</div>
-    {reply.image !== null && <a href={reply.url}><img className="react-thumbnail" src={localImageUrl(reply.image.thumbnail_url)} alt="" loading="lazy" /></a>}
+    {reply.image !== null && <a href={localThreadUrl(reply.id)}><img className="react-thumbnail" src={localImageUrl(reply.image.thumbnail_url)} alt="" loading="lazy" /></a>}
   </article>;
 }
 
@@ -54,11 +58,11 @@ function Thread({thread}: {thread: Post}) {
   const title = thread.subject || `No.${thread.id}`;
   return <article className="react-thread">
     <div>
-      <h2><a href={thread.url}>{title}</a></h2>
+      <h2><a href={localThreadUrl(thread.id)}>{title}</a></h2>
       <div className="react-thread-meta">#{thread.id} {thread.author} · {thread.created_at}</div>
       <div className="react-comment">{thread.comment}</div>
     </div>
-    {thread.image !== null && <a href={thread.url}><img className="react-thumbnail" src={localImageUrl(thread.image.thumbnail_url)} alt="" loading="lazy" /></a>}
+    {thread.image !== null && <a href={localThreadUrl(thread.id)}><img className="react-thumbnail" src={localImageUrl(thread.image.thumbnail_url)} alt="" loading="lazy" /></a>}
     {thread.replies.length > 0 && <section className="react-replies" aria-label="返信">
       {thread.replies.map((reply) => <Reply key={reply.id} reply={reply} />)}
     </section>}
