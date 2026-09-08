@@ -175,7 +175,7 @@ return [
 
 [すべての履歴はこちら](changelog.md)
 
-### [2026/09/08] v4.8.0
+### [2026/09/08] v4.7.2
 
 - `autocomplete="off"`にしcookieを使用するように
 
