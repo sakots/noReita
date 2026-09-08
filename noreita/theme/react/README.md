@@ -18,5 +18,6 @@ npm run react:build
 npm run react:check
 ```
 
-公開一覧は同一オリジンの `api.php?mode=threads` のみを読みます。投稿などの
-状態変更 API は使用しません。
+公開一覧は、現在の設置先から解決する同一オリジンの `api.php?mode=threads` のみを
+読みます。`site.base_url` のホスト名やプロキシ設定に影響されず、投稿などの状態変更
+API は使用しません。

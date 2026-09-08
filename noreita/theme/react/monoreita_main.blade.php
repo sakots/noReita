@@ -17,7 +17,7 @@
         <a href="{{$self}}?mode=pictmp">投稿途中の絵</a>
       </nav>
     </header>
-    <div id="react-board" data-api-url="{{$base}}api.php">
+    <div id="react-board" data-api-url="api.php">
       <p>読み込み中…</p>
     </div>
     <noscript>
