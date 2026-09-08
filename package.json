@@ -1,10 +1,18 @@
 {
   "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
     "chokidar": "^5.0.0",
-    "sass": "^1.102.0"
+    "esbuild": "^0.28.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sass": "^1.102.0",
+    "typescript": "^7.0.2"
   },
   "scripts": {
     "sass": "node scripts/watch-sass.mjs",
-    "sass:build": "node scripts/watch-sass.mjs --once"
+    "sass:build": "node scripts/watch-sass.mjs --once",
+    "react:build": "esbuild noreita/theme/react/src/react-board.tsx --bundle --minify --format=iife --target=es2018 --outfile=noreita/theme/react/assets/react-board.js",
+    "react:check": "tsc --project noreita/theme/react/tsconfig.json"
   }
 }
