@@ -177,7 +177,8 @@ return [
 
 ### [2026/09/08] v4.7.2
 
-- `autocomplete="off"`にしcookieを使用するように
+- `autocomplete="off"`にしcookieを使用するようにした
+- `api.php`でスレッドにリプライを読み込むようにした
 
 ### [2026/09/05] v4.7.1
 
