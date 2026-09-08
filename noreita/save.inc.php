@@ -285,7 +285,7 @@ class image_save{
     if(!isset($_SERVER['HTTP_ORIGIN']) || !isset($_SERVER['HTTP_HOST'])){
       $this->error_msg($this->en ? "Your browser is not supported." : "お使いのブラウザはサポートされていません。", 400);
     }
-    if(!$same_origin && (parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST) !== $_SERVER['HTTP_HOST'])){
+    if(!$same_origin && !RequestSecurity::isSameOrigin((string)$_SERVER['HTTP_ORIGIN'], (string)$_SERVER['HTTP_HOST'])){
       $this->error_msg($this->en ? "The post has been rejected." : "拒絶されました。", 403);
     }
 

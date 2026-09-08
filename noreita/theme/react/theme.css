@@ -1,0 +1,21 @@
+/* React public-board theme. Parent templates are used outside the top page. */
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; background: Canvas; color: CanvasText; }
+.react-board-shell { max-width: 960px; margin: auto; padding: 1rem; }
+.react-board-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid color-mix(in srgb, CanvasText 25%, transparent); }
+.react-board-header h1 { font-size: 1.4rem; }
+.react-board-header a { color: LinkText; }
+.react-board-header nav { display: flex; flex-wrap: wrap; gap: .8rem; }
+.react-board-list { display: grid; gap: 1rem; margin-top: 1rem; }
+.react-thread { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .75rem; padding: 1rem; border: 1px solid color-mix(in srgb, CanvasText 25%, transparent); border-radius: .5rem; }
+.react-thread h2 { margin: 0; font-size: 1.1rem; }
+.react-thread-meta, .react-reply-meta { color: color-mix(in srgb, CanvasText 70%, transparent); font-size: .85rem; }
+.react-comment { white-space: pre-wrap; overflow-wrap: anywhere; }
+.react-thumbnail { width: min(180px, 35vw); height: auto; max-height: 180px; object-fit: contain; }
+.react-replies { grid-column: 1 / -1; border-top: 1px solid color-mix(in srgb, CanvasText 18%, transparent); padding-top: .5rem; }
+.react-reply { padding: .5rem 0; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+.react-reply .react-thumbnail { display: block; margin-top: .5rem; }
+.react-pagination { display: flex; justify-content: center; gap: .75rem; margin: 1rem 0; }
+.react-pagination button { padding: .4rem .8rem; }
+.react-error { color: #b00020; }
+@media (max-width: 560px) { .react-board-header { align-items: flex-start; flex-direction: column; } .react-thread { grid-template-columns: 1fr; } }

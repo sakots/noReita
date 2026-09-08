@@ -37,7 +37,14 @@ final class PublicApi {
     $page_size = self::pageSize($query, Config::int('board.page_size'));
     $pagination = self::pagination($repository->countThreads(true), $query, $page_size);
     $posts = $repository->listThreads($pagination['offset'], $page_size);
-    return self::collection('threads', array_map([self::class, 'post'], $posts), $pagination);
+    $thread_ids = array_map(static fn(array $post): int => (int)($post['tid'] ?? 0), $posts);
+    $replies_by_thread = self::repliesByThread($repository->findRepliesForThreads($thread_ids));
+    $items = array_map(static function (array $post) use ($replies_by_thread): array {
+      $thread = self::post($post);
+      $thread['replies'] = $replies_by_thread[$thread['id']] ?? [];
+      return $thread;
+    }, $posts);
+    return self::collection('threads', $items, $pagination);
   }
 
   /** @param array<string,mixed> $query
@@ -119,6 +126,19 @@ final class PublicApi {
         'nsfw' => (bool)($post['nsfw'] ?? false),
       ],
     ];
+  }
+
+  /**
+   * @param array<int,array<string,mixed>> $replies
+   * @return array<int,array<int,array<string,mixed>>>
+   */
+  private static function repliesByThread(array $replies): array {
+    $grouped = [];
+    foreach ($replies as $reply) {
+      $parent = (int)($reply['parent'] ?? 0);
+      if ($parent > 0) $grouped[$parent][] = self::post($reply);
+    }
+    return $grouped;
   }
 
   /** @param array<string,mixed> $query

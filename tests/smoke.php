@@ -929,6 +929,22 @@ smoke_test('request client IP only trusts forwarding headers from configured pro
     ], ['0.0.0.0/0']) === '';
 });
 
+smoke_test('same-origin requests compare scheme, host, and port', static function (): bool {
+  $server = $_SERVER;
+  try {
+    unset($_SERVER['HTTPS']);
+    $http = RequestSecurity::isSameOrigin('http://127.0.0.1:8080', '127.0.0.1:8080')
+      && !RequestSecurity::isSameOrigin('http://127.0.0.1:8081', '127.0.0.1:8080')
+      && !RequestSecurity::isSameOrigin('https://127.0.0.1:8080', '127.0.0.1:8080');
+    $_SERVER['HTTPS'] = 'on';
+    $https = RequestSecurity::isSameOrigin('https://example.test', 'example.test')
+      && !RequestSecurity::isSameOrigin('http://example.test', 'example.test');
+    return $http && $https;
+  } finally {
+    $_SERVER = $server;
+  }
+});
+
 smoke_test('administrator session validates password changes and idle timeout', static function (): bool {
   $now = 1_700_000_000;
   $session = [
@@ -1099,6 +1115,11 @@ smoke_test('public API exposes only visible React-safe post data', static functi
     'a_name' => 'API reply', 'sub' => '', 'com' => 'API reply comment',
     'pwd' => 'private-reply-password', 'host' => 'private-reply.example', 'invz' => 0, 'nsfw' => 0,
   ]);
+  $repository->insertPost([
+    'thread' => 0, 'parent' => $thread_id, 'comid' => 2, 'tree' => 1,
+    'a_name' => 'Hidden API reply', 'sub' => '', 'com' => 'This must stay private.',
+    'pwd' => 'private-hidden-reply-password', 'host' => 'private-hidden-reply.example', 'invz' => 1, 'nsfw' => 0,
+  ]);
   $threads = PublicApi::dispatch($repository, ['mode' => 'threads', 'per_page' => '1']);
   $thread = PublicApi::dispatch($repository, ['mode' => 'thread', 'id' => (string)$thread_id]);
   $catalog = PublicApi::dispatch($repository, ['mode' => 'catalog']);
@@ -1107,6 +1128,8 @@ smoke_test('public API exposes only visible React-safe post data', static functi
   return $threads['api_version'] === 'v1' && $threads['pagination']['total'] === 1
     && ($item['id'] ?? 0) === $thread_id && !array_key_exists('pwd', $item) && !array_key_exists('host', $item)
     && ($item['image']['url'] ?? '') === 'https://smoke.example/img/api-image.png'
+    && ($item['replies'][0]['id'] ?? 0) === $reply_id && count($item['replies'] ?? []) === 1
+    && !array_key_exists('pwd', $item['replies'][0] ?? []) && !array_key_exists('host', $item['replies'][0] ?? [])
     && ($thread['thread']['id'] ?? 0) === $thread_id && ($thread['replies'][0]['id'] ?? 0) === $reply_id
     && count($catalog['items']) === 1 && count($search['items']) === 1;
 });
@@ -2866,6 +2889,29 @@ smoke_test('image consistency repair backs up data and fixes recoverable issues'
     }
     if (is_dir($root)) rmdir($root);
   }
+});
+
+smoke_test('post autocomplete avoids browser-wide profile suggestions', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita';
+  $templates = [
+    '/theme/eda/eda_picpost.twig',
+    '/theme/eda/components/eda_resForm.twig',
+    '/theme/eda/components/eda_editMode.twig',
+    '/theme/monoreita/monoreita_picpost.blade.php',
+    '/theme/monoreita/components/monoreita_resForm.blade.php',
+    '/theme/monoreita/components/monoreita_editMode.blade.php',
+  ];
+  foreach ($templates as $template) {
+    $contents = file_get_contents($root . $template);
+    if ($contents === false
+      || str_contains($contents, 'username')
+      || str_contains($contents, 'autocomplete="email"')
+      || str_contains($contents, 'autocomplete="url"')
+      || str_contains($contents, 'current-password')) {
+      return false;
+    }
+  }
+  return true;
 });
 
 echo "\nSmoke tests: {$passed} passed, {$failed} failed.\n";

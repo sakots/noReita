@@ -77,10 +77,32 @@ final class RequestSecurity {
     if (!is_string($origin) || !is_string($host)) {
       throw new RequestSecurityException($english ? 'Your browser is not supported.' : 'お使いのブラウザはサポートされていません。', 403);
     }
-    if (parse_url($origin, PHP_URL_HOST) !== $host) {
+    if (!self::isSameOrigin($origin, $host)) {
       throw new RequestSecurityException($english ? 'The post has been rejected.' : '拒絶されました。', 403);
     }
 
+  }
+
+  /**
+   * Compare a browser Origin header with the current request authority.
+   * HTTP_HOST includes a non-default port, while parse_url() returns it separately.
+   */
+  public static function isSameOrigin(string $origin, string $host): bool {
+    $request_scheme = self::isHttps() ? 'https' : 'http';
+    $origin_parts = parse_url($origin);
+    $request_parts = parse_url($request_scheme . '://' . $host);
+    if (!is_array($origin_parts) || !is_array($request_parts)) return false;
+
+    $origin_scheme = strtolower((string)($origin_parts['scheme'] ?? ''));
+    $origin_host = strtolower((string)($origin_parts['host'] ?? ''));
+    $request_host = strtolower((string)($request_parts['host'] ?? ''));
+    if (!in_array($origin_scheme, ['http', 'https'], true)
+      || $origin_scheme !== $request_scheme || $origin_host === '' || $request_host === '') {
+      return false;
+    }
+    $origin_port = (int)($origin_parts['port'] ?? self::defaultPort($origin_scheme));
+    $request_port = (int)($request_parts['port'] ?? self::defaultPort($request_scheme));
+    return $origin_host === $request_host && $origin_port === $request_port;
   }
 
   public static function assertCurrentCsrfRequest(string $usercode, bool $english): void {
@@ -99,6 +121,10 @@ final class RequestSecurity {
 
   private static function isHttps(): bool {
     return isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && strtolower((string)$_SERVER['HTTPS']) !== 'off';
+  }
+
+  private static function defaultPort(string $scheme): int {
+    return $scheme === 'https' ? 443 : 80;
   }
 
   private static function sessionFileLifetime(): int {
