@@ -208,7 +208,7 @@
             <input type="hidden" name="id_and_no" value="{{$post['id']}},{{$post['tid']}}">
             <input type="hidden" name="created" value="{{$post['created']}}">
             <input type="hidden" name="modified" value="{{$post['modified']}}">
-            <input type="password" name="pwd" value="{{$pwd_cookie}}" autocomplete="current-password">
+            <input type="password" name="pwd" value="{{$pwd_cookie}}" autocomplete="off">
             <input type="hidden" name="mode" value="misskey_note_edit_form">
             <button type="submit">
               <span class="simple-icons--misskey"></span> ノート

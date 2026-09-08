@@ -55,25 +55,25 @@
           <table>
             <tr>
               <td>name {% if use_name %} * {% endif %}</td>
-              <td><input type="text" name="name" size="28" value="{{ name_cookie }}" autocomplete="section-post username" {% if use_name %} required {% endif %} maxlength="{{ max_name }}" data-trip-preview-input><output data-trip-preview hidden aria-live="polite"></output></td>
+              <td><input type="text" name="name" size="28" value="{{ name_cookie }}" autocomplete="off" {% if use_name %} required {% endif %} maxlength="{{ max_name }}" data-trip-preview-input><output data-trip-preview hidden aria-live="polite"></output></td>
             </tr>
             <tr>
               <td>mail</td>
-              <td><input type="text" name="mail" size="28" value="{{ email_cookie }}" autocomplete="email" maxlength="{{ max_email }}"></td>
+              <td><input type="text" name="mail" size="28" value="{{ email_cookie }}" autocomplete="off" maxlength="{{ max_email }}"></td>
             </tr>
             <tr>
               <td>URL</td>
-              <td><input type="text" name="url" size="28" value="{{ url_cookie }}" autocomplete="url" maxlength="{{ max_url }}"></td>
+              <td><input type="text" name="url" size="28" value="{{ url_cookie }}" autocomplete="off" maxlength="{{ max_url }}"></td>
             </tr>
             <tr>
               <td>subject {% if use_sub %} * {% endif %}</td>
               <td>
-                <input type="text" name="sub" size="35" autocomplete="section-sub" {% if use_sub %} required {% endif %} maxlength="{{ max_sub }}">
+                <input type="text" name="sub" size="35" autocomplete="off" {% if use_sub %} required {% endif %} maxlength="{{ max_sub }}">
               </td>
             </tr>
             <tr>
               <td>comment {% if use_com %} * {% endif %} </td>
-              <td><textarea name="com" cols="48" rows="5" wrap="soft" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};" {% if use_com %} required {% endif %} maxlength="{{ max_com }}"></textarea></td>
+              <td><textarea name="com" cols="48" rows="5" wrap="soft" autocomplete="off" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};" {% if use_com %} required {% endif %} maxlength="{{ max_com }}"></textarea></td>
             </tr>
             {% if temp is defined and (selected_picfile is not defined or temp|length > 1) %}
             <tr>
@@ -114,7 +114,7 @@
             <tr>
               <td>pass</td>
               <td>
-                <input type="password" name="pwd" size="8" value="{{ pwd_cookie }}" autocomplete="section-post current-password" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
+                <input type="password" name="pwd" size="8" value="{{ pwd_cookie }}" autocomplete="off" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};">
                 (記事の編集削除用。英数字で)
               </td>
             </tr>

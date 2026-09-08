@@ -2891,5 +2891,28 @@ smoke_test('image consistency repair backs up data and fixes recoverable issues'
   }
 });
 
+smoke_test('post autocomplete avoids browser-wide profile suggestions', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita';
+  $templates = [
+    '/theme/eda/eda_picpost.twig',
+    '/theme/eda/components/eda_resForm.twig',
+    '/theme/eda/components/eda_editMode.twig',
+    '/theme/monoreita/monoreita_picpost.blade.php',
+    '/theme/monoreita/components/monoreita_resForm.blade.php',
+    '/theme/monoreita/components/monoreita_editMode.blade.php',
+  ];
+  foreach ($templates as $template) {
+    $contents = file_get_contents($root . $template);
+    if ($contents === false
+      || str_contains($contents, 'username')
+      || str_contains($contents, 'autocomplete="email"')
+      || str_contains($contents, 'autocomplete="url"')
+      || str_contains($contents, 'current-password')) {
+      return false;
+    }
+  }
+  return true;
+});
+
 echo "\nSmoke tests: {$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);
