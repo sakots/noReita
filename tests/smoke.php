@@ -929,6 +929,22 @@ smoke_test('request client IP only trusts forwarding headers from configured pro
     ], ['0.0.0.0/0']) === '';
 });
 
+smoke_test('same-origin requests compare scheme, host, and port', static function (): bool {
+  $server = $_SERVER;
+  try {
+    unset($_SERVER['HTTPS']);
+    $http = RequestSecurity::isSameOrigin('http://127.0.0.1:8080', '127.0.0.1:8080')
+      && !RequestSecurity::isSameOrigin('http://127.0.0.1:8081', '127.0.0.1:8080')
+      && !RequestSecurity::isSameOrigin('https://127.0.0.1:8080', '127.0.0.1:8080');
+    $_SERVER['HTTPS'] = 'on';
+    $https = RequestSecurity::isSameOrigin('https://example.test', 'example.test')
+      && !RequestSecurity::isSameOrigin('http://example.test', 'example.test');
+    return $http && $https;
+  } finally {
+    $_SERVER = $server;
+  }
+});
+
 smoke_test('administrator session validates password changes and idle timeout', static function (): bool {
   $now = 1_700_000_000;
   $session = [
