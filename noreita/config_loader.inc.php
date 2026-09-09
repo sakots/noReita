@@ -285,7 +285,7 @@ final class Config {
     self::validatePairs(self::valueAt($values, 'drawing.palettes'), 'drawing.palettes', false);
     self::validateTrustedProxies(self::valueAt($values, 'security.trusted_proxies'));
     foreach (['spam.bad_strings', 'spam.bad_names', 'spam.bad_strings_a', 'spam.bad_strings_b',
-      'spam.bad_files', 'spam.bad_hosts', 'board.additional_info'] as $key) {
+      'spam.bad_files', 'spam.bad_hosts', 'board.additional_info', 'site.head_scripts'] as $key) {
       foreach (self::valueAt($values, $key) as $value) {
         if (!is_string($value)) throw new ConfigException("Configuration list must contain strings: {$key}");
       }

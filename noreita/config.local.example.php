@@ -27,6 +27,14 @@ return [
 
     // 投稿日時の基準となるタイムゾーンです。
     'timezone' => 'Asia/Tokyo',
+
+    // トップページの<head>内へそのまま出力する設置者管理のHTMLです。
+    // Google Analyticsを使う場合は、G-XXXXXXXXXXを実際の測定IDへ変更してください。
+    // 利用者が入力できる値をここへ入れてはいけません。
+    'head_scripts' => [
+      // '<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>',
+      // '<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-XXXXXXXXXX");</script>',
+    ],
   ],
 
   'database' => [

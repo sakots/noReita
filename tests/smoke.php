@@ -234,6 +234,17 @@ smoke_test('response templates provide image OGP metadata for SNS sharing', stat
     && str_contains($index, "['og_image']");
 });
 
+smoke_test('main templates render trusted configured head scripts', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $templates = ['eda/eda_main.twig', 'monoreita/monoreita_main.blade.php'];
+  foreach ($templates as $template) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
+    if (!is_string($source) || !str_contains($source, 'head_scripts')) return false;
+  }
+  $config = require dirname(__DIR__) . '/noreita/config.php';
+  return $config['site']['head_scripts'] === [];
+});
+
 smoke_test('post image templates provide a clipboard copy link', static function (): bool {
   $root = dirname(__DIR__) . '/noreita/theme';
   $templates = [
@@ -479,7 +490,10 @@ smoke_test('configuration overrides defaults and replaces list values', static f
   $defaults = require dirname(__DIR__) . '/noreita/config.php';
   $resolved = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin', 'login' => ['max_failures' => 9]],
-    'site' => ['base_url' => 'https://configured.example/'],
+    'site' => [
+      'base_url' => 'https://configured.example/',
+      'head_scripts' => ['<script src="https://analytics.example/script.js"></script>'],
+    ],
     'features' => [
       'nsfw' => false,
       'image_upload' => false,
@@ -496,6 +510,7 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['features']['diary_mode'] === true
     && $resolved['features']['diary_allow_public_replies'] === false
     && $resolved['security']['trusted_proxies'] === ['192.0.2.10', '2001:db8:1234::/48']
+    && $resolved['site']['head_scripts'] === ['<script src="https://analytics.example/script.js"></script>']
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
 });
 
@@ -567,6 +582,7 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_threshold' => -1]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_rules' => [['valid', 0]]]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_rules' => [['[', 1]]]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/', 'head_scripts' => [false]]],
   ];
   foreach ($invalid as $override) {
     try {

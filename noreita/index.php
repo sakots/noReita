@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.8.0 lot.260908.0';
+const REITA_VER = 'v4.8.0 lot.260909.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -183,6 +183,7 @@ $dat['base'] = Config::string('site.base_url');
 $dat['board_title'] = Config::string('site.title');
 $dat['home'] = Config::string('site.home_url');
 $dat['self'] = Config::string('site.script_name');
+$dat['head_scripts'] = Config::array('site.head_scripts');
 $dat['message'] = '';
 $dat['pdef_w'] = Config::int('limits.paint_default_width');
 $dat['pdef_h'] = Config::int('limits.paint_default_height');

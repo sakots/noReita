@@ -45,6 +45,9 @@ return [
     'timezone' => 'Asia/Tokyo',
     // 掲示板本体のエントリーポイント名です。通常は変更しません。
     'script_name' => 'index.php',
+    // トップページのhead末尾へ出力する、設置者管理のHTML（script等）の一覧です。
+    // config.local.phpで設定します。利用者が入力できる値を入れてはいけません。
+    'head_scripts' => [],
   ],
 
   // SQLiteデータベースに関する設定です。

@@ -8,6 +8,9 @@
   @include('components.monoreita_headCss')
   <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/noreita-luminous.css">
   @include('components.monoreita_customCss')
+  @foreach ($head_scripts as $head_script)
+  {!! $head_script !!}
+  @endforeach
 </head>
 <body>
   <header id="header">
