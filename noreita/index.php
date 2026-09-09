@@ -131,8 +131,8 @@ $theme_directory = $theme_runtime['active_directory'];
 date_default_timezone_set(Config::string('site.timezone'));
 
 
-// 管理パスが初期値(admin_pass)の場合は動作させない
-if (Config::string("admin.password") === 'admin_pass') {
+// 管理パスが初期値(replace-with-a-long-random-admin-password)の場合は動作させない
+if (Config::string("admin.password") === 'replace-with-a-long-random-admin-password') {
   die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
 }
 
