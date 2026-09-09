@@ -8,6 +8,9 @@
   {% include 'components/eda_headCss.twig' %}
   <link rel="stylesheet" href="theme/{{ theme_dir }}/luminous/noreita-luminous.css">
   {% include 'components/eda_customCss.twig' %}
+  {% for head_script in head_scripts %}
+  {{ head_script|raw }}
+  {% endfor %}
 </head>
 <body>
   <header id="header">

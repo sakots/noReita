@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.8.0 lot.260908.0';
+const REITA_VER = 'v4.8.0 lot.260909.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -131,8 +131,8 @@ $theme_directory = $theme_runtime['active_directory'];
 date_default_timezone_set(Config::string('site.timezone'));
 
 
-// 管理パスが初期値(admin_pass)の場合は動作させない
-if (Config::string("admin.password") === 'admin_pass') {
+// 管理パスが初期値(replace-with-a-long-random-admin-password)の場合は動作させない
+if (Config::string("admin.password") === 'replace-with-a-long-random-admin-password') {
   die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
 }
 
@@ -183,6 +183,7 @@ $dat['base'] = Config::string('site.base_url');
 $dat['board_title'] = Config::string('site.title');
 $dat['home'] = Config::string('site.home_url');
 $dat['self'] = Config::string('site.script_name');
+$dat['head_scripts'] = Config::array('site.head_scripts');
 $dat['message'] = '';
 $dat['pdef_w'] = Config::int('limits.paint_default_width');
 $dat['pdef_h'] = Config::int('limits.paint_default_height');
@@ -428,6 +429,10 @@ switch ($mode) {
     AdminController::manage($application_context); return;
   case 'admin_theme_settings':
     AdminController::themeSettings($application_context); return;
+  case 'admin_config':
+    AdminController::configuration($application_context); return;
+  case 'admin_config_save':
+    AdminController::saveConfiguration($application_context); return;
   case 'admin_errorlog':
     AdminController::errorLog($application_context); return;
   case 'admin_auditlog':
@@ -2409,6 +2414,53 @@ function theme_settings_provider(string $theme_directory): ?object {
     }
   }
   return $provider;
+}
+
+function admin_config(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
+
+  require_admin_session($context);
+  try {
+    $dat['config_php'] = ConfigEditor::editablePhp();
+  } catch (Throwable $e) {
+    render_error($context, $en ? 'Configuration is unavailable.' : '設定を読み込めませんでした。', 500, $e);
+    return;
+  }
+  $dat['othermode'] = 'admin_config';
+  $dat['token'] = RequestSecurity::csrfToken();
+  $dat['config_message'] = (string)($_SESSION['config_message'] ?? '');
+  unset($_SESSION['config_message']);
+  echo $template_engine->render(OTHERFILE, $dat);
+}
+
+function admin_config_save(ApplicationContext $context): void {
+  $en = $context->english;
+
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
+  } catch (RequestSecurityException $e) {
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
+  }
+  require_admin_session($context);
+  $source = $_POST['configuration'] ?? null;
+  if (!is_string($source)) {
+    render_error($context, $en ? 'Configuration is required.' : '設定を入力してください。', 400);
+  }
+  try {
+    ConfigEditor::save(__DIR__, $source);
+    ApplicationErrorHandler::reportAdminAudit('configuration-save');
+    $_SESSION['config_message'] = $en
+      ? 'Configuration was saved. It will take effect on the next request.'
+      : '設定を保存しました。次のリクエストから反映されます。';
+  } catch (InvalidArgumentException|ConfigException $e) {
+    render_error($context, ($en ? 'Invalid configuration: ' : '設定が不正です: ') . $e->getMessage(), 400);
+  } catch (Throwable $e) {
+    render_error($context, $en ? 'Failed to save configuration.' : '設定を保存できませんでした。', 500, $e);
+  }
+  redirect(Config::string('site.script_name') . '?mode=admin_config');
 }
 
 function admin_theme_settings(ApplicationContext $context): void {

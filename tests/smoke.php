@@ -234,6 +234,17 @@ smoke_test('response templates provide image OGP metadata for SNS sharing', stat
     && str_contains($index, "['og_image']");
 });
 
+smoke_test('main templates render trusted configured head scripts', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $templates = ['eda/eda_main.twig', 'monoreita/monoreita_main.blade.php'];
+  foreach ($templates as $template) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
+    if (!is_string($source) || !str_contains($source, 'head_scripts')) return false;
+  }
+  $config = require dirname(__DIR__) . '/noreita/config.php';
+  return $config['site']['head_scripts'] === [];
+});
+
 smoke_test('post image templates provide a clipboard copy link', static function (): bool {
   $root = dirname(__DIR__) . '/noreita/theme';
   $templates = [
@@ -479,7 +490,10 @@ smoke_test('configuration overrides defaults and replaces list values', static f
   $defaults = require dirname(__DIR__) . '/noreita/config.php';
   $resolved = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin', 'login' => ['max_failures' => 9]],
-    'site' => ['base_url' => 'https://configured.example/'],
+    'site' => [
+      'base_url' => 'https://configured.example/',
+      'head_scripts' => ['<script src="https://analytics.example/script.js"></script>'],
+    ],
     'features' => [
       'nsfw' => false,
       'image_upload' => false,
@@ -496,7 +510,48 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['features']['diary_mode'] === true
     && $resolved['features']['diary_allow_public_replies'] === false
     && $resolved['security']['trusted_proxies'] === ['192.0.2.10', '2001:db8:1234::/48']
+    && $resolved['site']['head_scripts'] === ['<script src="https://analytics.example/script.js"></script>']
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
+});
+
+smoke_test('administrator configuration editor writes validated local overrides only', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_config_editor_' . bin2hex(random_bytes(8));
+  if (!mkdir($root, 0700)) return false;
+  try {
+    $source = dirname(__DIR__) . '/noreita/config.php';
+    if (!copy($source, $root . DIRECTORY_SEPARATOR . 'config.php')) return false;
+    $defaults = ConfigEditor::defaults($root);
+    $source = <<<'PHP'
+<?php
+
+return [
+  'admin' => ['password' => 'configured-admin'],
+  'site' => ['base_url' => 'https://configured.example/', 'title' => '設定済み掲示板'],
+];
+PHP;
+    ConfigEditor::save($root, $source);
+    $local_file = $root . DIRECTORY_SEPARATOR . 'config.local.php';
+    if (!is_file($local_file) || (fileperms($local_file) & 0777) !== 0600) return false;
+    $overrides = require $local_file;
+    $resolved = Config::resolve($defaults, $overrides);
+    $invalid_rejected = false;
+    try {
+      ConfigEditor::save($root, "<?php return ['unknown' => true];");
+    } catch (ConfigException $e) {
+      $invalid_rejected = true;
+    }
+    $editable = ConfigEditor::editablePhp();
+    return str_starts_with($editable, "<?php\n\nreturn [") && $overrides === [
+      'admin' => ['password' => 'configured-admin'],
+      'site' => ['base_url' => 'https://configured.example/', 'title' => '設定済み掲示板'],
+    ] && $resolved['site']['title'] === '設定済み掲示板' && $invalid_rejected;
+  } finally {
+    foreach (['config.local.php', 'config.php'] as $file) {
+      $path = $root . DIRECTORY_SEPARATOR . $file;
+      if (is_file($path)) unlink($path);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
 });
 
 smoke_test('diary posting policy restricts new posts and can allow public replies', static function (): bool {
@@ -567,6 +622,7 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_threshold' => -1]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_rules' => [['valid', 0]]]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_rules' => [['[', 1]]]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/', 'head_scripts' => [false]]],
   ];
   foreach ($invalid as $override) {
     try {

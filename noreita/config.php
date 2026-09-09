@@ -9,7 +9,7 @@ return [
   // 管理画面と管理者表示に関する設定です。
   'admin' => [
     // 管理画面へログインするときのパスワードです。config.local.phpで必ず変更してください。
-    'password' => 'admin_pass',
+    'password' => 'replace-with-a-long-random-admin-password',
     // 管理者が投稿したときに表示する名前です。
     'name' => '管理人',
     // 管理者名の後ろに付け、一般投稿者による管理者名の使用と区別する文字列です。
@@ -45,6 +45,9 @@ return [
     'timezone' => 'Asia/Tokyo',
     // 掲示板本体のエントリーポイント名です。通常は変更しません。
     'script_name' => 'index.php',
+    // トップページのhead末尾へ出力する、設置者管理のHTML（script等）の一覧です。
+    // config.local.phpで設定します。利用者が入力できる値を入れてはいけません。
+    'head_scripts' => [],
   ],
 
   // SQLiteデータベースに関する設定です。
