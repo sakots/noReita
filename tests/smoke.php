@@ -514,6 +514,46 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
 });
 
+smoke_test('administrator configuration editor writes validated local overrides only', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_config_editor_' . bin2hex(random_bytes(8));
+  if (!mkdir($root, 0700)) return false;
+  try {
+    $source = dirname(__DIR__) . '/noreita/config.php';
+    if (!copy($source, $root . DIRECTORY_SEPARATOR . 'config.php')) return false;
+    $defaults = ConfigEditor::defaults($root);
+    $source = <<<'PHP'
+<?php
+
+return [
+  'admin' => ['password' => 'configured-admin'],
+  'site' => ['base_url' => 'https://configured.example/', 'title' => '設定済み掲示板'],
+];
+PHP;
+    ConfigEditor::save($root, $source);
+    $local_file = $root . DIRECTORY_SEPARATOR . 'config.local.php';
+    if (!is_file($local_file) || (fileperms($local_file) & 0777) !== 0600) return false;
+    $overrides = require $local_file;
+    $resolved = Config::resolve($defaults, $overrides);
+    $invalid_rejected = false;
+    try {
+      ConfigEditor::save($root, "<?php return ['unknown' => true];");
+    } catch (ConfigException $e) {
+      $invalid_rejected = true;
+    }
+    $editable = ConfigEditor::editablePhp();
+    return str_starts_with($editable, "<?php\n\nreturn [") && $overrides === [
+      'admin' => ['password' => 'configured-admin'],
+      'site' => ['base_url' => 'https://configured.example/', 'title' => '設定済み掲示板'],
+    ] && $resolved['site']['title'] === '設定済み掲示板' && $invalid_rejected;
+  } finally {
+    foreach (['config.local.php', 'config.php'] as $file) {
+      $path = $root . DIRECTORY_SEPARATOR . $file;
+      if (is_file($path)) unlink($path);
+    }
+    if (is_dir($root)) rmdir($root);
+  }
+});
+
 smoke_test('diary posting policy restricts new posts and can allow public replies', static function (): bool {
   return DiaryPostPolicy::allows(false, false, false, false)
     && !DiaryPostPolicy::allows(true, true, false, false)

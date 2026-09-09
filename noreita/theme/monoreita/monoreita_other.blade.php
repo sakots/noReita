@@ -47,6 +47,9 @@
       @include('components.monoreita_adminInMode')
     @endif
     {{-- 管理モードin おわり --}}
+    @if ($othermode == 'admin_config')
+      @include('components.monoreita_adminConfig')
+    @endif
     {{-- ok画面 --}}
     @if ($othermode == 'ok')
       @include('components.monoreita_ok')

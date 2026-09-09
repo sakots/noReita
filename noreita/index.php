@@ -429,6 +429,10 @@ switch ($mode) {
     AdminController::manage($application_context); return;
   case 'admin_theme_settings':
     AdminController::themeSettings($application_context); return;
+  case 'admin_config':
+    AdminController::configuration($application_context); return;
+  case 'admin_config_save':
+    AdminController::saveConfiguration($application_context); return;
   case 'admin_errorlog':
     AdminController::errorLog($application_context); return;
   case 'admin_auditlog':
@@ -2410,6 +2414,53 @@ function theme_settings_provider(string $theme_directory): ?object {
     }
   }
   return $provider;
+}
+
+function admin_config(ApplicationContext $context): void {
+  $template_engine = $context->templates;
+  $dat =& $context->data;
+  $en = $context->english;
+
+  require_admin_session($context);
+  try {
+    $dat['config_php'] = ConfigEditor::editablePhp();
+  } catch (Throwable $e) {
+    render_error($context, $en ? 'Configuration is unavailable.' : '設定を読み込めませんでした。', 500, $e);
+    return;
+  }
+  $dat['othermode'] = 'admin_config';
+  $dat['token'] = RequestSecurity::csrfToken();
+  $dat['config_message'] = (string)($_SESSION['config_message'] ?? '');
+  unset($_SESSION['config_message']);
+  echo $template_engine->render(OTHERFILE, $dat);
+}
+
+function admin_config_save(ApplicationContext $context): void {
+  $en = $context->english;
+
+  admin_no_store();
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
+  } catch (RequestSecurityException $e) {
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
+  }
+  require_admin_session($context);
+  $source = $_POST['configuration'] ?? null;
+  if (!is_string($source)) {
+    render_error($context, $en ? 'Configuration is required.' : '設定を入力してください。', 400);
+  }
+  try {
+    ConfigEditor::save(__DIR__, $source);
+    ApplicationErrorHandler::reportAdminAudit('configuration-save');
+    $_SESSION['config_message'] = $en
+      ? 'Configuration was saved. It will take effect on the next request.'
+      : '設定を保存しました。次のリクエストから反映されます。';
+  } catch (InvalidArgumentException|ConfigException $e) {
+    render_error($context, ($en ? 'Invalid configuration: ' : '設定が不正です: ') . $e->getMessage(), 400);
+  } catch (Throwable $e) {
+    render_error($context, $en ? 'Failed to save configuration.' : '設定を保存できませんでした。', 500, $e);
+  }
+  redirect(Config::string('site.script_name') . '?mode=admin_config');
 }
 
 function admin_theme_settings(ApplicationContext $context): void {

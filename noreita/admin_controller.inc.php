@@ -8,6 +8,8 @@ final class AdminController {
   public static function post(ApplicationContext $context): void { admin_post($context); }
   public static function edit(ApplicationContext $context): void { admin_edit($context); }
   public static function themeSettings(ApplicationContext $context): void { admin_theme_settings($context); }
+  public static function configuration(ApplicationContext $context): void { admin_config($context); }
+  public static function saveConfiguration(ApplicationContext $context): void { admin_config_save($context); }
   public static function errorLog(ApplicationContext $context): void { admin_errorlog($context); }
   public static function auditLog(ApplicationContext $context): void { admin_auditlog($context); }
   public static function temporaryImages(ApplicationContext $context): void { admin_temporary_images($context); }
