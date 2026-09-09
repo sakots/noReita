@@ -175,6 +175,10 @@ return [
 
 [すべての履歴はこちら](changelog.md)
 
+### [2029/09/09] v4.8.0
+
+- configで`<head>`内にgoogleアナリティクスなどのスクリプトを読み込めるようにした
+
 ### [2026/09/08] v4.7.2
 
 - `autocomplete="off"`にしcookieを使用するようにした
