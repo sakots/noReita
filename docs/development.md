@@ -30,3 +30,42 @@ Integration tests: 44 passed, 0 failed.
 ```
 
 レンタルサーバーではなく、PHPと必要な拡張機能をインストールしたローカル開発環境またはCIで実行する想定です。
+
+## Sassのコンパイル
+
+配布テーマのスタイルはSassで管理しています。`noreita/theme/eda/css/` と
+`noreita/theme/monoreita/css/` 以下の `.scss` を変更した場合は、生成されるCSSも更新してください。
+
+初回のみ、プロジェクトルートでNode.jsの開発依存をインストールします。
+
+```bash
+npm ci
+```
+
+一度だけ全Sassをコンパイルする場合は、次を実行します。
+
+```bash
+npm run sass:build
+```
+
+開発中に監視して自動コンパイルする場合は、次を実行したままにします。
+
+```bash
+npm run sass
+```
+
+ビルドスクリプトは、リポジトリ配下にある先頭が`_`ではないすべての`.scss`を対象にします。各入力ファイルと同じディレクトリへ、以下を出力します。
+
+- 展開済みCSS: `ファイル名.css`
+- 圧縮版CSS: `ファイル名.min.css`
+- それぞれのsource map: `.css.map` と `.min.css.map`
+
+`_color.scss`や`_eda_conf.scss`のように先頭が`_`のファイルはpartialです。単体のCSSは生成されませんが、それらを`@use`するエントリーポイントを再コンパイルしてください。生成済みの`.css`、`.min.css`、source mapは直接編集せず、Sassを修正してからビルド結果をコミットします。
+
+テーマを変更した後は、Sassビルドに加えて両テーマの診断と差分確認を実行してください。
+
+```bash
+php plugins/check-theme.php --root=noreita --theme=eda
+php plugins/check-theme.php --root=noreita --theme=monoreita
+git diff --check
+```
