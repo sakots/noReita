@@ -46,7 +46,7 @@
                 <span {% if bbsline['nsfw'] == 1 %} class="nsfw" {% endif %}>
                   <img
                     src="{{ path }}{{ bbsline['thumbnail'] != '' ? bbsline['thumbnail'] : bbsline['picfile'] }}"
-                    alt="{{ bbsline['picfile'] }}"
+                    alt="投稿画像（{{ bbsline['a_name'] }}）: {{ bbsline['sub'] }}"
                     loading="lazy"
                     class="image">
                 </span>

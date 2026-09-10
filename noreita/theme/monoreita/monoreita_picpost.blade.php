@@ -38,7 +38,7 @@
             <div class="imgs">
               @if (isset($tmp['src']) && isset($tmp['src_name']))
               <figure>
-                <img src="{{$tmp['src']}}">
+                <img src="{{$tmp['src']}}" alt="投稿途中の画像: {{$tmp['src_name']}}">
                 <figcaption>{{$tmp['src_name']}}[{{$tmp['date']}}] 描画時間{{$tmp['utime']}}</figcaption>
               </figure>
               @endif

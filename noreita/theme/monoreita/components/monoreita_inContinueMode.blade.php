@@ -3,7 +3,7 @@
     <h1 class="oekaki">続きから描く</h1>
     @foreach ($oya as $bbsline)
       <figure>
-        <img src="{{$path}}{{$bbsline['picfile']}}">
+        <img src="{{$path}}{{$bbsline['picfile']}}" alt="投稿画像（{{$bbsline['a_name']}}）: {{$bbsline['sub']}}">
         <figcaption>
           {{$bbsline['picfile']}}
           @if ($display_painttime && ($bbsline['psec'] != null))

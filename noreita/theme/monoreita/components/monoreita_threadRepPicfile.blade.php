@@ -24,20 +24,20 @@
   <a class="luminous" href="{{$path}}{{$res['picfile']}}">
     <span class="nsfw@if (str_ends_with($res['picfile'], '.avif')) nsfw-browser-blur@endif">
       @if (str_ends_with($res['picfile'], '.avif'))
-        <img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$res['picfile']}}" alt="投稿画像（{{$res['a_name']}}）: {{$res['sub']}}" loading="lazy" class="image">
       @elseif ($res['thumb'])
-        <img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$res['thumb']}}" alt="投稿画像（{{$res['a_name']}}）: {{$res['sub']}}" loading="lazy" class="image">
       @else
-        <img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$res['picfile']}}" alt="投稿画像（{{$res['a_name']}}）: {{$res['sub']}}" loading="lazy" class="image">
       @endif
     </span>
   </a>
 @else
   <a class="luminous" href="{{$path}}{{$res['picfile']}}">
   @if ($res['thumb'])
-    <img src="{{$path}}{{$res['thumb']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+    <img src="{{$path}}{{$res['thumb']}}" alt="投稿画像（{{$res['a_name']}}）: {{$res['sub']}}" loading="lazy" class="image">
   @else
-    <img src="{{$path}}{{$res['picfile']}}" alt="{{$res['picfile']}}" loading="lazy" class="image">
+    <img src="{{$path}}{{$res['picfile']}}" alt="投稿画像（{{$res['a_name']}}）: {{$res['sub']}}" loading="lazy" class="image">
   @endif
   </a>
 @endif
