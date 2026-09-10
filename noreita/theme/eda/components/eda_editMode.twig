@@ -38,6 +38,10 @@
             <td>comment</td>
             <td><textarea name="com" cols="48" rows="4" wrap="soft" autocomplete="off" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('send').click();return false};" maxlength="{{ max_com }}" required>{{ bbsline['com'] }}</textarea></td>
           </tr>
+          <tr>
+            <td><label for="image_alt">画像の説明</label></td>
+            <td><input type="text" name="image_alt" id="image_alt" size="48" maxlength="500" value="{{ bbsline['image_alt'] ?? '' }}" aria-describedby="image_alt_help"> <small id="image_alt_help">画像の内容を説明できます。</small></td>
+          </tr>
           {% if bbsline['picfile'] != '' %}
           <tr>
             <td>image</td>
@@ -46,7 +50,7 @@
                 <span {% if bbsline['nsfw'] == 1 %} class="nsfw" {% endif %}>
                   <img
                     src="{{ path }}{{ bbsline['thumbnail'] != '' ? bbsline['thumbnail'] : bbsline['picfile'] }}"
-                    alt="投稿画像（{{ bbsline['a_name'] }}）: {{ bbsline['sub'] }}"
+                    alt="{{ bbsline['image_alt']|default('投稿画像（' ~ bbsline['a_name'] ~ '）: ' ~ bbsline['sub']) }}"
                     loading="lazy"
                     class="image">
                 </span>

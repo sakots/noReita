@@ -346,12 +346,13 @@ final class BoardRepository {
   public function updateContent(int $id, array $values): void {
     $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), a_name = :name, mail = :mail,
       sub = :sub, com = :com, a_url = :url, host = :host, pwd = :pwdh,
-      nsfw = :nsfw, thumbnail = :thumbnail WHERE tid = :id";
+      nsfw = :nsfw, thumbnail = :thumbnail, image_alt = :image_alt WHERE tid = :id";
     $statement = $this->db->prepare($sql);
     $statement->execute([
       'name' => $values['name'], 'mail' => $values['mail'], 'sub' => $values['sub'], 'com' => $values['com'],
       'url' => $values['url'], 'host' => $values['host'],
-      'pwdh' => $values['pwdh'], 'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'], 'id' => $id,
+      'pwdh' => $values['pwdh'], 'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'],
+      'image_alt' => $values['image_alt'] ?? '', 'id' => $id,
     ]);
     if ($statement->rowCount() !== 1) {
       throw new RuntimeException('The post could not be updated.');
@@ -382,11 +383,13 @@ final class BoardRepository {
   }
 
   public function insertPost(array $post): int {
-    $columns = ['thread','parent','comid','tree','a_name','sub','com','mail','a_url','picfile','pchfile','img_w','img_h','psec','utime','pwd','id','sodane','age','invz','host','tool','admins','shd','nsfw','ctype','uuid','thumbnail'];
+    $columns = ['thread','parent','comid','tree','a_name','sub','com','mail','a_url','picfile','pchfile','img_w','img_h','psec','utime','pwd','id','sodane','age','invz','host','tool','admins','shd','nsfw','ctype','uuid','thumbnail','image_alt'];
     $sql = "INSERT INTO board_log (created, modified, " . implode(',', $columns) . ") VALUES (datetime('now','localtime'), datetime('now','localtime'), :" . implode(',:', $columns) . ')';
     $statement = $this->db->prepare($sql);
     $values = [];
-    foreach ($columns as $column) $values[$column] = $post[$column] ?? null;
+    foreach ($columns as $column) {
+      $values[$column] = $post[$column] ?? ($column === 'image_alt' ? '' : null);
+    }
     $statement->execute($values);
     return (int)$this->db->lastInsertId();
   }
@@ -561,7 +564,7 @@ final class BoardRepository {
 }
 
 final class DatabaseMigrator {
-  public const SCHEMA_VERSION = 1;
+  public const SCHEMA_VERSION = 2;
 
   private PDO $db;
   private string $database_file;
@@ -601,7 +604,7 @@ final class DatabaseMigrator {
       if (!in_array('board_log', $tables, true)) {
         throw new RuntimeException('The board_log table was not found. The database was not modified.');
       }
-      $this->assertCurrentColumns();
+      $this->assertVersionOneColumns();
     }
 
     if ($current_version === self::SCHEMA_VERSION) {
@@ -627,7 +630,13 @@ final class DatabaseMigrator {
     switch ($version) {
       case 1:
         // v3.0～v3.4のboard_logは現行スキーマなので、user_versionの登録だけを行う。
-        $this->assertCurrentColumns();
+        $this->assertVersionOneColumns();
+        return;
+      case 2:
+        $columns = $this->db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1);
+        if (!in_array('image_alt', $columns, true)) {
+          $this->db->exec("ALTER TABLE board_log ADD COLUMN image_alt TEXT NOT NULL DEFAULT ''");
+        }
         return;
       default:
         throw new RuntimeException("No migration is defined for schema version {$version}.");
@@ -666,7 +675,8 @@ final class DatabaseMigrator {
       nsfw TEXT,
       ctype TEXT,
       uuid TEXT,
-      thumbnail TEXT
+      thumbnail TEXT,
+      image_alt TEXT NOT NULL DEFAULT ''
     )");
   }
 
@@ -674,8 +684,22 @@ final class DatabaseMigrator {
     $required = [
       'tid', 'created', 'modified', 'thread', 'parent', 'comid', 'tree', 'a_name', 'mail', 'sub',
       'com', 'a_url', 'host', 'sodane', 'id', 'pwd', 'psec', 'utime', 'picfile', 'pchfile',
+      'img_w', 'img_h', 'age', 'invz', 'tool', 'admins', 'shd', 'nsfw', 'ctype', 'uuid', 'thumbnail', 'image_alt',
+    ];
+    $this->assertColumns($required);
+  }
+
+  private function assertVersionOneColumns(): void {
+    $required = [
+      'tid', 'created', 'modified', 'thread', 'parent', 'comid', 'tree', 'a_name', 'mail', 'sub',
+      'com', 'a_url', 'host', 'sodane', 'id', 'pwd', 'psec', 'utime', 'picfile', 'pchfile',
       'img_w', 'img_h', 'age', 'invz', 'tool', 'admins', 'shd', 'nsfw', 'ctype', 'uuid', 'thumbnail',
     ];
+    $this->assertColumns($required);
+  }
+
+  /** @param array<int,string> $required */
+  private function assertColumns(array $required): void {
     $columns = $this->db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1);
     $missing = array_values(array_diff($required, $columns));
     if ($missing) {
