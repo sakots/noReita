@@ -311,7 +311,7 @@ PHP;
 
   integration_test('new board creates versioned database', static function () use ($webroot): bool {
     $db = new PDO('sqlite:' . $webroot . '/reita.db');
-    return (int)$db->query('PRAGMA user_version')->fetchColumn() === 1
+    return (int)$db->query('PRAGMA user_version')->fetchColumn() === 2
       && (int)$db->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='board_log'")->fetchColumn() === 1;
   });
 

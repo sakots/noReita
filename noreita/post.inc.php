@@ -77,6 +77,7 @@ final class PostService implements AdminPostManagementService {
     // 「そうだね」は更新SQLの対象外とし、読み取り後の加算を上書きしない。
     $values['nsfw'] = (int)$post['nsfw'];
     $values['thumbnail'] = (string)($post['thumbnail'] ?? '');
+    $values['image_alt'] = (string)($values['image_alt'] ?? $post['image_alt'] ?? '');
     if (array_key_exists('edit_nsfw', $values) && (string)$post['picfile'] !== '') {
       $nsfw = (bool)$values['edit_nsfw'];
       if ($nsfw !== (bool)$post['nsfw']) {
@@ -282,6 +283,7 @@ final class PostService implements AdminPostManagementService {
       'a_name' => $post['name'], 'sub' => $post['sub'],
       'com' => preg_replace('/(\n|\r|\r\n){3,}/us', "\n\n", (string)$post['com']),
       'mail' => $post['mail'], 'a_url' => $post['url'], 'picfile' => $post['picfile'],
+      'image_alt' => (string)($post['image_alt'] ?? ''),
       'pchfile' => $image['pchfile'], 'img_w' => $image['img_w'], 'img_h' => $image['img_h'],
       'psec' => $image['psec'], 'utime' => $image['utime'], 'pwd' => $post['pwdh'],
       'id' => gen_id((string)$post['host'], (string)$now), 'sodane' => $post['sodane'],
@@ -351,6 +353,7 @@ final class PostInput {
 }
 
 final class PostValidator {
+  public const MAX_IMAGE_ALT_LENGTH = 500;
   /**
    * @param array<int,string> $blocked_hosts
    * @return array<string,mixed>
@@ -396,6 +399,7 @@ final class PostValidator {
       'mail' => (string)filter_input(INPUT_POST, 'mail'),
       'url' => (string)filter_input(INPUT_POST, 'url'),
       'com' => (string)filter_input(INPUT_POST, 'com'),
+      'image_alt' => trim((string)filter_input(INPUT_POST, 'image_alt')),
       'picfile' => filter_input(INPUT_POST, 'picfile') ?: null,
       'invz' => trim((string)filter_input(INPUT_POST, 'invz')),
       'img_w' => (int)filter_input(INPUT_POST, 'img_w', FILTER_VALIDATE_INT),
@@ -430,14 +434,20 @@ final class PostValidator {
     $mail = (string)($input['mail'] ?? '');
     $url = (string)($input['url'] ?? '');
     $sub = (string)($input['sub'] ?? '');
+    $image_alt = (string)($input['image_alt'] ?? '');
     $resto = (string)($input['resto'] ?? '');
     // UTF-8正規表現のエラーを「一致なし」と扱ってスパム判定を回避させない。
-    foreach ([$com, $name, $mail, $url, $sub] as $text) {
+    foreach ([$com, $name, $mail, $url, $sub, $image_alt] as $text) {
       if (preg_match('//u', $text) !== 1) {
         throw new PostValidationException(self::message(
           $en, 'Input contains invalid character encoding.', '入力に不正な文字コードが含まれています。'
         ));
       }
+    }
+    if (mb_strlen($image_alt, 'UTF-8') > self::MAX_IMAGE_ALT_LENGTH) {
+      throw new PostValidationException(self::message(
+        $en, 'Image description is too long.', '画像の説明が長すぎます。'
+      ));
     }
     $values = [
       preg_replace('/\s/u', '', $com) ?? '', preg_replace('/\s/u', '', $sub) ?? '',

@@ -121,11 +121,19 @@ final class PublicApi {
       'image' => $image_url === null ? null : [
         'url' => $image_url,
         'thumbnail_url' => $thumbnail_url,
+        'alt' => self::imageAlt($post),
         'width' => (int)($post['img_w'] ?? 0),
         'height' => (int)($post['img_h'] ?? 0),
         'nsfw' => (bool)($post['nsfw'] ?? false),
       ],
     ];
+  }
+
+  /** @param array<string,mixed> $post */
+  private static function imageAlt(array $post): string {
+    $image_alt = trim((string)($post['image_alt'] ?? ''));
+    if ($image_alt !== '') return $image_alt;
+    return '投稿画像（' . (string)($post['a_name'] ?? '') . '）: ' . (string)($post['sub'] ?? '');
   }
 
   /**

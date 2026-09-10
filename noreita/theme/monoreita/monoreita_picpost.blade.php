@@ -75,6 +75,10 @@
               <td>comment @if ($use_com) * @endif </td>
               <td><textarea name="com" cols="48" rows="5" wrap="soft" autocomplete="off" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};" @if ($use_com) required @endif maxlength="{{$max_com}}"></textarea></td>
             </tr>
+            <tr>
+              <td><label for="image_alt">画像の説明</label></td>
+              <td><input type="text" name="image_alt" id="image_alt" size="48" maxlength="500" aria-describedby="image_alt_help"> <small id="image_alt_help">画像の内容を、見えない人にも伝わるように入力できます。</small></td>
+            </tr>
             @if (isset($temp) && (!isset($selected_picfile) || count($temp) > 1))
             <tr>
               <td>imgs</td>

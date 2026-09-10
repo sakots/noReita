@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.8.0 lot.260909.0';
+const REITA_VER = 'v4.9.0 lot.260910.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -615,6 +615,7 @@ function regist(ApplicationContext $context): void {
   $mail = $input['mail'];
   $url = $input['url'];
   $com = $input['com'];
+  $image_alt = $input['image_alt'];
   $picfile = $input['picfile'];
   $pwd = $input['pwd'];
   $pal = $input['pal'];
@@ -815,7 +816,7 @@ function regist(ApplicationContext $context): void {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     render_error($context, $en ? 'Posting failed.' : '投稿処理に失敗しました。', 500, $e);
   }
-  unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
+  unset($name, $mail, $sub, $com, $image_alt, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
   //ログ行数オーバー処理
   //スレ数カウント
@@ -1393,7 +1394,7 @@ function res(ApplicationContext $context): void {
       if ($og_image_name !== '') {
         $dat['og_image'] = Config::string('site.base_url') . Config::string('paths.images')
           . rawurlencode(basename($og_image_name));
-        $dat['og_image_alt'] = (string)$bbsline['sub'];
+        $dat['og_image_alt'] = (string)($bbsline['image_alt'] ?: $bbsline['sub']);
         $dat['og_twitter_card'] = 'summary_large_image';
       }
       $dat['og_title'] = '[' . $bbsline['tid'] . '] ' . $bbsline['sub']
@@ -2209,6 +2210,7 @@ function editexec(ApplicationContext $context): void {
   $mail = $input['mail'];
   $url = $input['url'];
   $com = $input['com'];
+  $image_alt = $input['image_alt'];
   $picfile = (string)$input['picfile'];
   $pwd = $input['pwd'];
   $sodane = $input['sodane'];
@@ -2235,7 +2237,7 @@ function editexec(ApplicationContext $context): void {
   try {
     $service = new PostService(new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
     $edit_role = $service->edit((int)$e_no, $pwd, [
-      'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'url' => $url,
+      'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'image_alt' => $image_alt, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
     ], $edit_as_admin);
     if ($edit_role === 'admin') {
@@ -2259,7 +2261,7 @@ function editexec(ApplicationContext $context): void {
     render_error($context, $en ? 'Editing failed.' : '編集に失敗しました。', 500, $e);
     return;
   }
-  unset($name, $mail, $sub, $com, $url, $pwd, $picfile);
+  unset($name, $mail, $sub, $com, $image_alt, $url, $pwd, $picfile);
   //header('Location:'.Config::string('site.script_name'));
   ok($context, $en ? 'Successfully edited. Switching screen.' : '編集に成功しました。画面を切り替えます。');
 }

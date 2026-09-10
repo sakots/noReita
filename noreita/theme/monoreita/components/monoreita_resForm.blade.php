@@ -43,6 +43,10 @@
         <textarea name="com" rows="5" cols="48" id="p_input_com" autocomplete="off" onkeydown="if(event.ctrlKey&&event.keyCode==13){document.getElementById('submit').click();return false};"></textarea required maxlength="{{$max_com}}">
       </td>
     </tr>
+    <tr>
+      <td><label for="image_alt_reply_{{$resno}}">画像の説明</label></td>
+      <td><input type="text" name="image_alt" id="image_alt_reply_{{$resno}}" size="48" maxlength="500" aria-describedby="image_alt_reply_help_{{$resno}}"> <small id="image_alt_reply_help_{{$resno}}">画像の内容を説明できます。</small></td>
+    </tr>
     @if ($use_image_upload)
     <tr>
       <td>画像</td>
