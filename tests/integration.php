@@ -179,6 +179,27 @@ PHP;
   if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
     throw new RuntimeException('Could not create test config.local.php');
   }
+  // HTTPサーバー起動時に、実際のv1→v2移行を通す。新規作成した現行スキーマから
+  // image_altだけを取り除くことで、過去のboard_log定義を維持したフィクスチャにする。
+  require_once $webroot . '/database.inc.php';
+  $legacy_database_file = $webroot . '/reita.db';
+  $legacy_db = new PDO('sqlite:' . $legacy_database_file);
+  $legacy_migrator = new DatabaseMigrator($legacy_db, $legacy_database_file, $webroot . '/backup');
+  $legacy_migrator->migrate();
+  $current_schema = $legacy_db->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'board_log'")->fetchColumn();
+  if (!is_string($current_schema)) throw new RuntimeException('Could not read the board_log schema');
+  $version_one_schema = str_replace(",\n      image_alt TEXT NOT NULL DEFAULT ''", '', $current_schema);
+  if ($version_one_schema === $current_schema) throw new RuntimeException('Could not create a version 1 database fixture');
+  $legacy_db->exec(str_replace('CREATE TABLE board_log', 'CREATE TABLE board_log_v1', $version_one_schema));
+  $columns = $legacy_db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1);
+  $version_one_columns = array_values(array_filter($columns, static fn (string $column): bool => $column !== 'image_alt'));
+  $legacy_db->exec('INSERT INTO board_log_v1 (' . implode(', ', $version_one_columns) . ') SELECT '
+    . implode(', ', $version_one_columns) . ' FROM board_log');
+  $legacy_db->exec('DROP TABLE board_log');
+  $legacy_db->exec('ALTER TABLE board_log_v1 RENAME TO board_log');
+  $legacy_db->exec('PRAGMA user_version = 1');
+  $legacy_db = null;
+
   $theme_config_file = $webroot . '/theme/eda/theme_conf.php';
   $theme_config = file_get_contents($theme_config_file);
   if (!is_string($theme_config) || !str_contains($theme_config, "const THEME_TEMPLATE_ENGINE = 'twig';")) {
@@ -309,10 +330,12 @@ PHP;
     return count($protected_results) === 25 && !in_array(false, $protected_results, true);
   });
 
-  integration_test('new board creates versioned database', static function () use ($webroot): bool {
+  integration_test('version 1 board database is migrated before HTTP requests', static function () use ($webroot): bool {
     $db = new PDO('sqlite:' . $webroot . '/reita.db');
+    $columns = $db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1);
     return (int)$db->query('PRAGMA user_version')->fetchColumn() === 2
-      && (int)$db->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='board_log'")->fetchColumn() === 1;
+      && (int)$db->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='board_log'")->fetchColumn() === 1
+      && in_array('image_alt', $columns, true);
   });
 
   integration_test('application startup does not redefine database constants', static function () use ($startup_body): bool {
@@ -1281,6 +1304,7 @@ PHP;
 
   $image_base = 'image-' . bin2hex(random_bytes(6));
   $image_name = $image_base . '.png';
+  $image_alt = '投稿時の画像説明';
   $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
   if ($png === false) throw new RuntimeException('Could not decode integration PNG');
   file_put_contents($webroot . '/tmp/' . $image_name, $png);
@@ -1288,19 +1312,44 @@ PHP;
   file_put_contents($webroot . '/tmp/' . $image_base . '.pch', 'NEO animation');
   [$image_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'Image test', 'mail' => '', 'url' => '',
-    'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
+    'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'image_alt' => $image_alt, 'pwd' => 'image-pass',
     'picfile' => $image_name, 'ctype' => 'new', 'invz' => '0', 'sodane' => '0', 'nsfw' => '0',
     'token' => $token,
   ]);
-  $image_row = $db->query("SELECT tid, picfile, pchfile, img_w, img_h, psec, tool, nsfw, thumbnail FROM board_log WHERE sub = 'Image subject' ORDER BY tid DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-  integration_test('image and animation post is stored through HTTP', static function () use ($image_status, $image_row, $webroot, $image_name, $image_base): bool {
+  $image_row = $db->query("SELECT tid, picfile, image_alt, pchfile, img_w, img_h, psec, tool, nsfw, thumbnail FROM board_log WHERE sub = 'Image subject' ORDER BY tid DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+  integration_test('image and animation post is stored through HTTP', static function () use ($image_status, $image_row, $webroot, $image_name, $image_base, $image_alt): bool {
     return $image_status === 200 && is_array($image_row)
       && $image_row['picfile'] === $image_name && $image_row['pchfile'] === $image_base . '.pch'
+      && $image_row['image_alt'] === $image_alt
       && (int)$image_row['img_w'] === 1 && (int)$image_row['img_h'] === 1
       && (int)$image_row['psec'] === 60 && $image_row['tool'] === 'PaintBBS NEO'
       && is_file($webroot . '/img/' . $image_name)
       && is_file($webroot . '/img/' . $image_base . '.pch')
       && !is_file($webroot . '/tmp/' . $image_base . '.dat');
+  });
+
+  $image_post_id = (int)($image_row['tid'] ?? 0);
+  $edited_image_alt = '編集後の説明 & <安全な文字列>';
+  [$image_alt_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'image_alt' => $edited_image_alt,
+    'pwd' => 'image-pass', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  $stored_image_alt = $db->query('SELECT image_alt FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  [$image_alt_page_status, $image_alt_page_body] = http_request($base_url . '?resno=' . $image_post_id, $cookie_jar);
+  [$image_alt_api_status, $image_alt_api_body] = http_request(
+    substr($base_url, 0, -strlen('index.php')) . 'api.php?mode=thread&id=' . $image_post_id, $cookie_jar
+  );
+  integration_test('image alt text is edited and exposed through HTML and API', static function () use (
+    $image_alt_edit_status, $stored_image_alt, $edited_image_alt, $image_alt_page_status, $image_alt_page_body,
+    $image_alt_api_status, $image_alt_api_body
+  ): bool {
+    $api = json_decode($image_alt_api_body, true);
+    return $image_alt_edit_status === 200 && $stored_image_alt === $edited_image_alt
+      && $image_alt_page_status === 200
+      && str_contains($image_alt_page_body, 'alt="' . htmlspecialchars($edited_image_alt, ENT_QUOTES, 'UTF-8') . '"')
+      && $image_alt_api_status === 200
+      && is_array($api) && ($api['thread']['image']['alt'] ?? '') === $edited_image_alt;
   });
 
   $admin_temporary_base = 'admin-temp-' . bin2hex(random_bytes(6));

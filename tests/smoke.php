@@ -1163,7 +1163,7 @@ smoke_test('public API exposes only visible React-safe post data', static functi
   $thread_id = $repository->insertPost([
     'thread' => 1, 'parent' => null, 'comid' => null, 'tree' => 2,
     'a_name' => 'API author', 'sub' => 'API subject', 'com' => 'API searchable comment',
-    'picfile' => 'api-image.png', 'img_w' => 640, 'img_h' => 480,
+    'picfile' => 'api-image.png', 'image_alt' => 'API image description', 'img_w' => 640, 'img_h' => 480,
     'pwd' => 'private-password-hash', 'host' => 'private.example', 'invz' => 0, 'nsfw' => 0,
   ]);
   $reply_id = $repository->insertPost([
@@ -1184,6 +1184,7 @@ smoke_test('public API exposes only visible React-safe post data', static functi
   return $threads['api_version'] === 'v1' && $threads['pagination']['total'] === 1
     && ($item['id'] ?? 0) === $thread_id && !array_key_exists('pwd', $item) && !array_key_exists('host', $item)
     && ($item['image']['url'] ?? '') === 'https://smoke.example/img/api-image.png'
+    && ($item['image']['alt'] ?? '') === 'API image description'
     && ($item['replies'][0]['id'] ?? 0) === $reply_id && count($item['replies'] ?? []) === 1
     && !array_key_exists('pwd', $item['replies'][0] ?? []) && !array_key_exists('host', $item['replies'][0] ?? [])
     && ($thread['thread']['id'] ?? 0) === $thread_id && ($thread['replies'][0]['id'] ?? 0) === $reply_id
@@ -1289,6 +1290,43 @@ smoke_test('database migration and backup', static function (): bool {
       if (is_file($file)) unlink($file);
     }
     if (is_file($database_file)) unlink($database_file);
+    if (is_dir($backup_dir)) rmdir($backup_dir);
+    if (is_dir($directory)) rmdir($directory);
+  }
+});
+
+smoke_test('database migration adds image alt to version 1 databases', static function (): bool {
+  $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_image_alt_db_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  $database_file = $directory . DIRECTORY_SEPARATOR . 'version-1.db';
+  $backup_dir = $directory . DIRECTORY_SEPARATOR . 'backup';
+
+  try {
+    $db = new PDO('sqlite:' . $database_file);
+    $migrator = new DatabaseMigrator($db, $database_file, $backup_dir);
+    $migrator->migrate();
+    $db->exec("INSERT INTO board_log (com) VALUES ('legacy image post')");
+
+    $columns = $db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1);
+    $version_one_columns = array_values(array_filter($columns, static fn (string $column): bool => $column !== 'image_alt'));
+    $db->exec('CREATE TABLE board_log_v1 AS SELECT ' . implode(', ', $version_one_columns) . ' FROM board_log');
+    $db->exec('DROP TABLE board_log');
+    $db->exec('ALTER TABLE board_log_v1 RENAME TO board_log');
+    $db->exec('PRAGMA user_version = 1');
+
+    $backup = $migrator->migrate();
+    $migrated_columns = $db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1);
+    return $backup !== null && is_file($backup)
+      && $migrator->schemaVersion() === DatabaseMigrator::SCHEMA_VERSION
+      && in_array('image_alt', $migrated_columns, true)
+      && $db->query("SELECT image_alt FROM board_log WHERE com = 'legacy image post'")->fetchColumn() === '';
+  } finally {
+    foreach (glob($backup_dir . DIRECTORY_SEPARATOR . '*.db') ?: [] as $file) {
+      if (is_file($file)) unlink($file);
+    }
+    foreach ([$database_file, $database_file . '-wal', $database_file . '-shm'] as $file) {
+      if (is_file($file)) unlink($file);
+    }
     if (is_dir($backup_dir)) rmdir($backup_dir);
     if (is_dir($directory)) rmdir($directory);
   }
