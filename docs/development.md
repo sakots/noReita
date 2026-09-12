@@ -26,7 +26,7 @@ PHP_BIN=php81 ./scripts/integration-test.sh
 
 ```txt
 Smoke tests: 99 passed, 0 failed.
-Integration tests: 116 passed, 0 failed.
+Integration tests: 117 passed, 0 failed.
 ```
 
 レンタルサーバーではなく、PHPと必要な拡張機能をインストールしたローカル開発環境またはCIで実行する想定です。
