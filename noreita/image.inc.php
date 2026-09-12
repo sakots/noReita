@@ -1,7 +1,7 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260818;
+const IMAGE_INC_VER = 20260913;
 
 final class ImageUploadException extends RuntimeException {
 }
@@ -60,16 +60,23 @@ final class ImageService {
   }
 
   /**
-   * Decode and re-encode a direct upload before it reaches the public image directory.
+   * Decode, resize and re-encode a direct upload before it reaches the public image directory.
    * GD output does not retain EXIF or other container metadata from the original file.
    * Animated raster uploads are stored as their first frame because GD has no animation encoder.
    *
    * @param string $source
    * @param string $destination
    * @param string $mime_type
-   * @return void
+   * @return array{width:int,height:int}
    */
-  private static function reencodeUploadedImage(string $source, string $destination, string $mime_type): void {
+  private static function reencodeUploadedImage(
+    string $source,
+    string $destination,
+    string $mime_type,
+    string $output_mime = '',
+    int $max_width = 0,
+    int $max_height = 0
+  ): array {
     $format = self::UPLOAD_IMAGE_TYPES[$mime_type] ?? null;
     if ($format === null || !function_exists($format['decoder']) || !function_exists($format['encoder'])) {
       throw new ImageUploadException('The detected image format is not supported by this server.', 415);
@@ -89,11 +96,36 @@ final class ImageService {
     }
 
     try {
-      if ($mime_type === 'image/png' || $mime_type === 'image/webp' || $mime_type === 'image/avif') {
+      $source_width = imagesx($image);
+      $source_height = imagesy($image);
+      if ($source_width < 1 || $source_height < 1) {
+        throw new ImageUploadException('The uploaded image could not be processed.', 422);
+      }
+      $scale = 1.0;
+      if ($max_width > 0 && $source_width > $max_width) $scale = min($scale, $max_width / $source_width);
+      if ($max_height > 0 && $source_height > $max_height) $scale = min($scale, $max_height / $source_height);
+      $width = max(1, (int)floor($source_width * $scale));
+      $height = max(1, (int)floor($source_height * $scale));
+      if ($width !== $source_width || $height !== $source_height) {
+        $resized = imagecreatetruecolor($width, $height);
+        if ($resized === false) throw new ImageUploadException('The uploaded image could not be processed.', 422);
+        imagealphablending($resized, false);
+        imagesavealpha($resized, true);
+        $transparent = imagecolorallocatealpha($resized, 0, 0, 0, 127);
+        imagefilledrectangle($resized, 0, 0, $width, $height, $transparent);
+        if (!imagecopyresampled($resized, $image, 0, 0, 0, 0, $width, $height, $source_width, $source_height)) {
+          unset($resized);
+          throw new ImageUploadException('The uploaded image could not be processed.', 422);
+        }
+        unset($image);
+        $image = $resized;
+      }
+      $output_mime = $output_mime !== '' ? $output_mime : $mime_type;
+      if ($output_mime === 'image/png' || $output_mime === 'image/webp' || $output_mime === 'image/avif') {
         imagealphablending($image, false);
         imagesavealpha($image, true);
       }
-      $saved = match ($mime_type) {
+      $saved = match ($output_mime) {
         'image/png' => @imagepng($image, $destination, 6),
         'image/jpeg' => @imagejpeg($image, $destination, 90),
         'image/gif' => @imagegif($image, $destination),
@@ -104,6 +136,7 @@ final class ImageService {
       if (!$saved || !is_file($destination) || (filesize($destination) ?: 0) < 1) {
         throw new ImageUploadException('The uploaded image could not be processed.', 422);
       }
+      return ['width' => $width, 'height' => $height];
     } finally {
       if ($frame !== '') safe_unlink($frame);
       unset($image);
@@ -633,6 +666,9 @@ final class ImageService {
     int $max_kilobytes,
     int $max_width,
     int $max_height,
+    int $resize_width,
+    int $resize_height,
+    bool $convert_to_webp,
     int $thumbnail_width,
     bool $nsfw,
     int $permission
@@ -691,7 +727,8 @@ final class ImageService {
     if (!is_dir($image_dir) || !is_writable($image_dir)) {
       throw new RuntimeException('Image directory is not writable.');
     }
-    $extension = $types[$mime]['extension'];
+    $output_mime = $convert_to_webp && function_exists('imagewebp') ? 'image/webp' : $mime;
+    $extension = self::UPLOAD_IMAGE_TYPES[$output_mime]['extension'];
     $filename = self::newOekakiImageFilename($image_dir, $extension);
     $destination = $image_dir . $filename;
     $staged_source = tempnam($image_dir, '.noreita_upload_source_');
@@ -706,7 +743,9 @@ final class ImageService {
       if (!move_uploaded_file($temporary_file, $staged_source)) {
         throw new RuntimeException('Failed to store uploaded image.');
       }
-      self::reencodeUploadedImage($staged_source, $staged_image, $mime);
+      $saved_image = self::reencodeUploadedImage(
+        $staged_source, $staged_image, $mime, $output_mime, $resize_width, $resize_height
+      );
       safe_unlink($staged_source);
       if (is_file($destination) || !rename($staged_image, $destination)) {
         throw new RuntimeException('Failed to finalize uploaded image.');
@@ -714,7 +753,7 @@ final class ImageService {
       @chmod($destination, $permission);
       $thumbnail = self::refreshNsfwThumbnail($image_dir, $filename, '', $nsfw, $thumbnail_width, $permission);
       return [
-        'picfile' => $filename, 'img_w' => $width, 'img_h' => $height,
+        'picfile' => $filename, 'img_w' => $saved_image['width'], 'img_h' => $saved_image['height'],
         'pchfile' => '', 'psec' => 0, 'utime' => '', 'tool' => 'Upload',
         'thumbnail' => $thumbnail, 'nsfw' => $nsfw, 'ctype' => 'img',
       ];

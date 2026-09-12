@@ -173,6 +173,8 @@ return [
     'paint_image_kb' => 1,
     'paint_work_kb' => 1,
     'paint_request_kb' => 2,
+    'upload_resize_width' => 2,
+    'upload_resize_height' => 2,
   ],
 ];
 PHP;
@@ -1901,11 +1903,41 @@ PHP;
   integration_test('direct image upload uses an oekaki-style generated filename', static function () use (
     $direct_upload_status, $upload_row, $webroot
   ): bool {
+    $extension = function_exists('imagewebp') ? 'webp' : 'png';
     return $direct_upload_status === 200 && is_array($upload_row)
-      && preg_match('/^\\d{16}\\.png$/D', (string)$upload_row['picfile']) === 1
+      && preg_match('/^\\d{16}\\.' . $extension . '$/D', (string)$upload_row['picfile']) === 1
       && (int)$upload_row['img_w'] === 1 && (int)$upload_row['img_h'] === 1
       && $upload_row['tool'] === 'Upload' && $upload_row['thumbnail'] === ''
       && is_file($webroot . '/img/' . $upload_row['picfile']);
+  });
+
+  $resize_upload_source = $root . '/direct-upload-resize.png';
+  $resize_canvas = imagecreatetruecolor(4, 2);
+  if ($resize_canvas === false || !imagepng($resize_canvas, $resize_upload_source)) {
+    throw new RuntimeException('Could not create resizable direct upload image.');
+  }
+  unset($resize_canvas);
+  $resize_upload_comment = 'direct-upload-resize-' . bin2hex(random_bytes(6));
+  [$resize_upload_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
+    'sub' => 'Resized direct image upload', 'com' => $resize_upload_comment, 'pwd' => 'upload-delete-pass',
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+    'image_upload' => new CURLFile($resize_upload_source, 'image/png', 'large-source.png'),
+  ]);
+  $resize_upload_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $resize_upload_statement = $resize_upload_db->prepare('SELECT picfile, img_w, img_h FROM board_log WHERE com = :comment LIMIT 1');
+  $resize_upload_statement->execute([':comment' => $resize_upload_comment]);
+  $resize_upload_row = $resize_upload_statement->fetch(PDO::FETCH_ASSOC);
+  integration_test('direct image upload is resized and converted to WebP when available', static function () use (
+    $resize_upload_status, $resize_upload_row, $webroot
+  ): bool {
+    if ($resize_upload_status !== 200 || !is_array($resize_upload_row)) return false;
+    $path = $webroot . '/img/' . $resize_upload_row['picfile'];
+    $image = @getimagesize($path);
+    $extension = function_exists('imagewebp') ? 'webp' : 'png';
+    return preg_match('/^\\d{16}\\.' . $extension . '$/D', (string)$resize_upload_row['picfile']) === 1
+      && (int)$resize_upload_row['img_w'] === 2 && (int)$resize_upload_row['img_h'] === 1
+      && is_array($image) && (int)$image[0] === 2 && (int)$image[1] === 1;
   });
 
   $jpeg_upload_source = $root . '/direct-upload-exif.jpg';
@@ -1923,20 +1955,21 @@ PHP;
     throw new RuntimeException('Could not add EXIF metadata to direct JPEG upload image.');
   }
   $jpeg_upload_comment = 'direct-upload-exif-' . bin2hex(random_bytes(6));
-  $jpeg_files_before_upload = glob($webroot . '/img/*.jpg') ?: [];
   [$jpeg_upload_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
     'sub' => 'Direct JPEG upload', 'com' => "JPEGアップロード {$jpeg_upload_comment}", 'pwd' => 'upload-delete-pass',
     'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
     'image_upload' => new CURLFile($jpeg_upload_source, 'image/jpeg', 'metadata.jpg'),
   ]);
-  $jpeg_files_after_upload = glob($webroot . '/img/*.jpg') ?: [];
-  $jpeg_uploaded_files = array_values(array_diff($jpeg_files_after_upload, $jpeg_files_before_upload));
+  $jpeg_upload_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $jpeg_upload_statement = $jpeg_upload_db->prepare('SELECT picfile FROM board_log WHERE com = :comment LIMIT 1');
+  $jpeg_upload_statement->execute([':comment' => "JPEGアップロード {$jpeg_upload_comment}"]);
+  $jpeg_uploaded_file = $webroot . '/img/' . (string)$jpeg_upload_statement->fetchColumn();
   integration_test('direct JPEG upload removes embedded EXIF metadata', static function () use (
-    $jpeg_upload_status, $jpeg_uploaded_files, $jpeg_marker
+    $jpeg_upload_status, $jpeg_uploaded_file, $jpeg_marker
   ): bool {
-    if ($jpeg_upload_status !== 200 || count($jpeg_uploaded_files) !== 1) return false;
-    $contents = file_get_contents($jpeg_uploaded_files[0]);
+    if ($jpeg_upload_status !== 200 || !is_file($jpeg_uploaded_file)) return false;
+    $contents = file_get_contents($jpeg_uploaded_file);
     return is_string($contents) && !str_contains($contents, $jpeg_marker);
   });
 

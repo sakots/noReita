@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.9.0 lot.260910.0';
+const REITA_VER = 'v4.10.0 lot.260913.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -56,7 +56,7 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260817) {
 // image.inc
 check_file(__DIR__.'/image.inc.php', $en);
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260818) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260913) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
@@ -746,6 +746,8 @@ function regist(ApplicationContext $context): void {
         $uploaded_image = ImageService::storeUploadedImage(
           $uploaded_file, Config::string('paths.images'), Config::int('limits.upload_kb'),
           Config::int('limits.image_width'), Config::int('limits.image_height'),
+          Config::int('limits.upload_resize_width'), Config::int('limits.upload_resize_height'),
+          Config::bool('features.upload_webp'),
           Config::int('limits.paint_default_width'), Config::bool('features.nsfw') && $nsfw_flag === '1',
           Config::int('permissions.public_file')
         );
