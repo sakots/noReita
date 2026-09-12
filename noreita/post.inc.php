@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260807;
+const POST_INC_VER = 20260910;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}

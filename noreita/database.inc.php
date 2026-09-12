@@ -3,7 +3,7 @@
 
 require_once __DIR__ . '/filesystem_permissions.inc.php';
 
-const DATABASE_INC_VER = 20260817;
+const DATABASE_INC_VER = 20260910;
 
 final class AdminPostFilter {
   private const ENUMS = [

@@ -25,8 +25,8 @@ PHP_BIN=php81 ./scripts/integration-test.sh
 成功すると最後に概ね以下のように表示されます。
 
 ```txt
-Smoke tests: 41 passed, 0 failed.
-Integration tests: 44 passed, 0 failed.
+Smoke tests: 99 passed, 0 failed.
+Integration tests: 117 passed, 0 failed.
 ```
 
 レンタルサーバーではなく、PHPと必要な拡張機能をインストールしたローカル開発環境またはCIで実行する想定です。
