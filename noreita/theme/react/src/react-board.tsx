@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 
 type ImageData = {
   thumbnail_url: string;
+  alt: string;
 };
 
 type Post = {
@@ -50,7 +51,7 @@ function Reply({reply}: {reply: Post}) {
   return <article className="react-reply">
     <div className="react-reply-meta">#{reply.id} {reply.author} · {reply.created_at}</div>
     <div className="react-comment">{reply.comment}</div>
-    {reply.image !== null && <a href={localThreadUrl(reply.id)}><img className="react-thumbnail" src={localImageUrl(reply.image.thumbnail_url)} alt="" loading="lazy" /></a>}
+    {reply.image !== null && <a href={localThreadUrl(reply.id)}><img className="react-thumbnail" src={localImageUrl(reply.image.thumbnail_url)} alt={reply.image.alt} loading="lazy" /></a>}
   </article>;
 }
 
@@ -62,7 +63,7 @@ function Thread({thread}: {thread: Post}) {
       <div className="react-thread-meta">#{thread.id} {thread.author} · {thread.created_at}</div>
       <div className="react-comment">{thread.comment}</div>
     </div>
-    {thread.image !== null && <a href={localThreadUrl(thread.id)}><img className="react-thumbnail" src={localImageUrl(thread.image.thumbnail_url)} alt="" loading="lazy" /></a>}
+    {thread.image !== null && <a href={localThreadUrl(thread.id)}><img className="react-thumbnail" src={localImageUrl(thread.image.thumbnail_url)} alt={thread.image.alt} loading="lazy" /></a>}
     {thread.replies.length > 0 && <section className="react-replies" aria-label="返信">
       {thread.replies.map((reply) => <Reply key={reply.id} reply={reply} />)}
     </section>}
