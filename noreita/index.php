@@ -42,7 +42,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260817) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260910) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -63,7 +63,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260818) {
 // post.inc
 check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260807) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260910) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
