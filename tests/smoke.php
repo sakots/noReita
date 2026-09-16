@@ -281,7 +281,10 @@ smoke_test('PaintBBS NEO loads from GitHub API with a configurable mirror fallba
       || !str_contains($source, "?ref=master")
       || !str_contains($source, "fetchSource('neo.css')")
       || !str_contains($source, "fetchSource('neo.js')")
+      || !str_contains($source, 'Promise.all')
+      || str_contains($source, 'request.open')
       || !str_contains($source, 'useGithubApi !== false')
+      || !str_contains($source, 'finishLoad(onReady)')
       || !str_contains($source, 'loadFallback')) {
       return false;
     }
@@ -293,7 +296,8 @@ smoke_test('PaintBBS NEO loads from GitHub API with a configurable mirror fallba
   ];
   foreach ($templates as $template) {
     $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
-    if (!is_string($source) || !str_contains($source, 'loadPaintBbsNeo(') || !str_contains($source, 'neo_github_api')) return false;
+    if (!is_string($source) || !str_contains($source, 'loadPaintBbsNeo(')
+      || !str_contains($source, 'neo_github_api') || !str_contains($source, 'configurePaintBbsNeo')) return false;
   }
   $config = require dirname(__DIR__) . '/noreita/config.php';
   return ($config['features']['neo_github_api'] ?? null) === true;

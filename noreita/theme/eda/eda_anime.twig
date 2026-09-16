@@ -17,7 +17,6 @@
     }
 	</script>
   <script src="theme/eda/js/neoLoader.js?{{ a_stime }}" charset="utf-8"></script>
-  <script>loadPaintBbsNeo({{ neo_dir|json_encode|raw }}, {{ neo_github_api|json_encode|raw }});</script>
   {% include 'components/eda_customCss.twig' %}
 </head>
 
@@ -43,6 +42,7 @@
       <div class="app">
         <div class="neo-applet-pch" data-width="{{ w }}" data-height="{{ h }}"></div>
         <script>
+          window.configurePaintBbsNeo = function () {
           Neo.param = {
             pch:{
               image_width: "{{ picw }}",
@@ -54,7 +54,9 @@
               neo_enable_zoom_out:true,
               neo_viewer_buttonswrapper_top:true,
             }
-          }
+          };
+          };
+          loadPaintBbsNeo({{ neo_dir|json_encode|raw }}, {{ neo_github_api|json_encode|raw }}, window.configurePaintBbsNeo);
         </script>
       </div>
     </section>
