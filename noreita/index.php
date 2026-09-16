@@ -269,6 +269,7 @@ $dat['upload_max_width'] = Config::int('limits.image_width');
 $dat['upload_max_height'] = Config::int('limits.image_height');
 $dat['upload_accept'] = ImageService::uploadAccept();
 $dat['upload_format_label'] = ImageService::uploadFormatLabel();
+$dat['neo_github_api'] = Config::bool('features.neo_github_api');
 
 $dat['theme_name'] = $theme_runtime['name'];
 

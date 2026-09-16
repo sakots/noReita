@@ -268,7 +268,7 @@ smoke_test('post image templates provide a clipboard copy link', static function
   return true;
 });
 
-smoke_test('PaintBBS NEO loads from GitHub with the configured mirror as fallback', static function (): bool {
+smoke_test('PaintBBS NEO loads from GitHub API with a configurable mirror fallback', static function (): bool {
   $root = dirname(__DIR__) . '/noreita/theme';
   $loaders = [
     'eda/js/neoLoader.js',
@@ -281,6 +281,7 @@ smoke_test('PaintBBS NEO loads from GitHub with the configured mirror as fallbac
       || !str_contains($source, "?ref=master")
       || !str_contains($source, "fetchSource('neo.css')")
       || !str_contains($source, "fetchSource('neo.js')")
+      || !str_contains($source, 'useGithubApi !== false')
       || !str_contains($source, 'loadFallback')) {
       return false;
     }
@@ -292,9 +293,10 @@ smoke_test('PaintBBS NEO loads from GitHub with the configured mirror as fallbac
   ];
   foreach ($templates as $template) {
     $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
-    if (!is_string($source) || !str_contains($source, 'loadPaintBbsNeo(')) return false;
+    if (!is_string($source) || !str_contains($source, 'loadPaintBbsNeo(') || !str_contains($source, 'neo_github_api')) return false;
   }
-  return true;
+  $config = require dirname(__DIR__) . '/noreita/config.php';
+  return ($config['features']['neo_github_api'] ?? null) === true;
 });
 
 smoke_test('simple theme stylesheets load after page-specific styles', static function (): bool {

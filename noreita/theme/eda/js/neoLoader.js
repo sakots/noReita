@@ -57,14 +57,18 @@
     appendScript(baseUrl + 'neo.js', startNeoIfDocumentIsReady);
   }
 
-  window.loadPaintBbsNeo = function (fallbackBaseUrl) {
-    try {
-      const css = fetchSource('neo.css');
-      const javascript = fetchSource('neo.js');
-      appendStyle(css);
-      appendScript(javascript);
-    } catch (error) {
-      loadFallback(fallbackBaseUrl);
+  window.loadPaintBbsNeo = function (fallbackBaseUrl, useGithubApi) {
+    if (useGithubApi !== false) {
+      try {
+        const css = fetchSource('neo.css');
+        const javascript = fetchSource('neo.js');
+        appendStyle(css);
+        appendScript(javascript);
+        return;
+      } catch (error) {
+        // APIの障害、CORS制限、レート制限時は従来の読み込み先へ戻す。
+      }
     }
+    loadFallback(fallbackBaseUrl);
   };
 }());
