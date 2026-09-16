@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {% include 'components/eda_headCss.twig' %}
     <script src="theme/eda/js/neoLoader.js?{{ stime }}" charset="utf-8"></script>
-    <script>loadPaintBbsNeo({{ neo_dir|json_encode|raw }});</script>
     <!-- アプレットフィット -->
     <script>
       const originalWidth = {{ w }};
@@ -63,6 +62,7 @@
         <div class="app" id="apps">
           <div class="neo-applet-paintbbs" data-width="{{ w }}" data-height="{{ h }}"></div>
           <script>
+            window.configurePaintBbsNeo = function () {
             Neo.params = {
               paintbbs: {
                 image_width:{{ picw }},
@@ -103,7 +103,9 @@
                   security_post:false
                 {% endif %}
               }
-            }
+            };
+            };
+            loadPaintBbsNeo({{ neo_dir|json_encode|raw }}, {{ neo_github_api|json_encode|raw }}, window.configurePaintBbsNeo);
           </script>
         </div>
         <div class="palette" id="dyntools">

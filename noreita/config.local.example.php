@@ -45,6 +45,8 @@ return [
   'features' => [
     // ブラウザからの画像アップロードを無効にする場合はfalseにします。
     'image_upload' => false,
+    // PaintBBS NEOをGitHub API経由でmasterの最新版から読み込みます。falseで同梱・ミラーURLを使います。
+    'neo_github_api' => true,
     // 直接アップロード画像をWebPへ変換します。GDがWebP非対応の場合は元形式で保存されます。
     'upload_webp' => true,
     // 日記モードでは新規投稿を管理者ログイン中の利用者だけに限定します。

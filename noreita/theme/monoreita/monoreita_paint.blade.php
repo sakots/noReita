@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('components.monoreita_headCss')
     <script src="theme/monoreita/js/neoLoader.js?{{$stime}}" charset="utf-8"></script>
-    <script>loadPaintBbsNeo({!! json_encode($neo_dir, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!});</script>
     <!-- アプレットフィット -->
     <script>
       const originalWidth = {{$w}};
@@ -63,6 +62,7 @@
         <div class="app" id="apps">
           <div class="neo-applet-paintbbs" data-width="{{$w}}" data-height="{{$h}}"></div>
           <script>
+            window.configurePaintBbsNeo = function () {
             Neo.params = {
               paintbbs: {
                 image_width:{{$picw}},
@@ -103,7 +103,9 @@
                   security_post:false
                 @endif
               }
-            }
+            };
+            };
+            loadPaintBbsNeo({!! json_encode($neo_dir, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}, {!! json_encode($neo_github_api, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}, window.configurePaintBbsNeo);
           </script>
         </div>
         <div class="palette" id="dyntools">

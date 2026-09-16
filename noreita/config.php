@@ -107,6 +107,8 @@ return [
     'oekaki_reply' => true,
     // ブラウザから画像ファイルを直接アップロードして投稿できるようにします。
     'image_upload' => false,
+    // PaintBBS NEOをGitHub API経由でmasterの最新版から読み込みます。falseで同梱・ミラーURLを使います。
+    'neo_github_api' => true,
     // 直接アップロード画像をWebPへ変換します。GDがWebPを扱えない環境では元形式で保存します。
     'upload_webp' => true,
     // 日記モードでは新規投稿を、管理者ログイン中の利用者だけに限定します。

@@ -5,20 +5,20 @@
   const apiBase = 'https://api.github.com/repos/funige/neo/contents/dist/';
 
   function fetchSource(filename) {
-    const request = new XMLHttpRequest();
-    request.open('GET', apiBase + filename + '?ref=master', false);
-    request.setRequestHeader('Accept', 'application/vnd.github+json');
-    request.send();
-    if (request.status !== 200) throw new Error('GitHub API request failed');
-
-    const response = JSON.parse(request.responseText);
-    if (response.encoding !== 'base64' || typeof response.content !== 'string') {
-      throw new Error('GitHub API response is not base64 content');
-    }
-    const bytes = Uint8Array.from(atob(response.content.replace(/\s/g, '')), function (character) {
-      return character.charCodeAt(0);
+    return fetch(apiBase + filename + '?ref=master', {
+      headers: { Accept: 'application/vnd.github+json' },
+    }).then(function (response) {
+      if (!response.ok) throw new Error('GitHub API request failed');
+      return response.json();
+    }).then(function (response) {
+      if (response.encoding !== 'base64' || typeof response.content !== 'string') {
+        throw new Error('GitHub API response is not base64 content');
+      }
+      const bytes = Uint8Array.from(atob(response.content.replace(/\s/g, '')), function (character) {
+        return character.charCodeAt(0);
+      });
+      return new TextDecoder('utf-8').decode(bytes);
     });
-    return new TextDecoder('utf-8').decode(bytes);
   }
 
   function appendStyle(css) {
@@ -52,19 +52,30 @@
     document.head.appendChild(script);
   }
 
-  function loadFallback(baseUrl) {
-    appendStylesheet(baseUrl + 'neo.css');
-    appendScript(baseUrl + 'neo.js', startNeoIfDocumentIsReady);
+  function finishLoad(onReady) {
+    if (typeof onReady === 'function') onReady();
+    startNeoIfDocumentIsReady();
   }
 
-  window.loadPaintBbsNeo = function (fallbackBaseUrl) {
-    try {
-      const css = fetchSource('neo.css');
-      const javascript = fetchSource('neo.js');
-      appendStyle(css);
-      appendScript(javascript);
-    } catch (error) {
-      loadFallback(fallbackBaseUrl);
+  function loadFallback(baseUrl, onReady) {
+    appendStylesheet(baseUrl + 'neo.css');
+    appendScript(baseUrl + 'neo.js', function () { finishLoad(onReady); });
+  }
+
+  window.loadPaintBbsNeo = function (fallbackBaseUrl, useGithubApi, onReady) {
+    if (useGithubApi !== false && window.fetch && window.Promise && window.TextDecoder) {
+      return Promise.all([fetchSource('neo.css'), fetchSource('neo.js')]).then(function (sources) {
+        const css = sources[0];
+        const javascript = sources[1];
+        appendStyle(css);
+        appendScript(javascript);
+        finishLoad(onReady);
+      }).catch(function () {
+        // APIの障害、CORS制限、レート制限時は従来の読み込み先へ戻す。
+        loadFallback(fallbackBaseUrl, onReady);
+      });
     }
+    loadFallback(fallbackBaseUrl, onReady);
+    return null;
   };
 }());

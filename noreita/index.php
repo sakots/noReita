@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.10.0 lot.260913.0';
+const REITA_VER = 'v4.11.0 lot.260916.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -269,6 +269,7 @@ $dat['upload_max_width'] = Config::int('limits.image_width');
 $dat['upload_max_height'] = Config::int('limits.image_height');
 $dat['upload_accept'] = ImageService::uploadAccept();
 $dat['upload_format_label'] = ImageService::uploadFormatLabel();
+$dat['neo_github_api'] = Config::bool('features.neo_github_api');
 
 $dat['theme_name'] = $theme_runtime['name'];
 
