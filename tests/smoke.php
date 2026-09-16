@@ -303,6 +303,18 @@ smoke_test('PaintBBS NEO loads from GitHub API with a configurable mirror fallba
   return ($config['features']['neo_github_api'] ?? null) === true;
 });
 
+smoke_test('applet fit waits for the asynchronously created NEO container', static function (): bool {
+  foreach (['eda', 'monoreita'] as $theme) {
+    $source = file_get_contents(dirname(__DIR__) . '/noreita/theme/' . $theme . '/js/appFit.js');
+    if (!is_string($source) || !str_contains($source, 'refreshElements()')
+      || !str_contains($source, 'this.isExpanded || !this.refreshElements()')
+      || !str_contains($source, '!this.isExpanded || !this.refreshElements()')) {
+      return false;
+    }
+  }
+  return true;
+});
+
 smoke_test('simple theme stylesheets load after page-specific styles', static function (): bool {
   $themes = [
     [

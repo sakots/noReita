@@ -9,10 +9,15 @@ class AppFitManager {
 
   init() {
     this.document = document;
+    this.refreshElements();
+  }
+
+  refreshElements() {
     this.appstage = this.document.getElementById("appstage");
     this.target = this.document.getElementById("neo-pageView");
     this.fitExp = this.document.getElementById("fit_exp");
     this.fitComp = this.document.getElementById("fit_comp");
+    return this.appstage !== null && this.target !== null && this.fitExp !== null && this.fitComp !== null;
   }
 
   getClientHeight() {
@@ -23,7 +28,7 @@ class AppFitManager {
   }
 
   expand() {
-    if (this.isExpanded) return;
+    if (this.isExpanded || !this.refreshElements()) return;
     
     const clientHeight = this.getClientHeight();
     const contentWidth = this.appstage.scrollWidth - 360;
@@ -46,7 +51,7 @@ class AppFitManager {
   }
 
   compress() {
-    if (!this.isExpanded) return;
+    if (!this.isExpanded || !this.refreshElements()) return;
     
     // 元のサイズに戻す
     this.target.style.width = `${this.originalWidth}px`;
