@@ -3,11 +3,31 @@
   'use strict';
 
   const apiBase = 'https://api.github.com/repos/funige/neo/contents/dist/';
+  const requestTimeoutMs = 5000;
+
+  function fetchWithTimeout(url) {
+    const controller = window.AbortController ? new AbortController() : null;
+    const options = { headers: { Accept: 'application/vnd.github+json' } };
+    if (controller) options.signal = controller.signal;
+    let timeoutId;
+    const request = new Promise(function (resolve, reject) {
+      timeoutId = window.setTimeout(function () {
+        if (controller) controller.abort();
+        reject(new Error('GitHub API request timed out'));
+      }, requestTimeoutMs);
+      fetch(url, options).then(resolve, reject);
+    });
+    return request.then(function (response) {
+      window.clearTimeout(timeoutId);
+      return response;
+    }, function (error) {
+      window.clearTimeout(timeoutId);
+      throw error;
+    });
+  }
 
   function fetchSource(filename) {
-    return fetch(apiBase + filename + '?ref=master', {
-      headers: { Accept: 'application/vnd.github+json' },
-    }).then(function (response) {
+    return fetchWithTimeout(apiBase + filename + '?ref=master').then(function (response) {
       if (!response.ok) throw new Error('GitHub API request failed');
       return response.json();
     }).then(function (response) {
