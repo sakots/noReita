@@ -77,7 +77,9 @@ final class PostService implements AdminPostManagementService {
     // 「そうだね」は更新SQLの対象外とし、読み取り後の加算を上書きしない。
     $values['nsfw'] = (int)$post['nsfw'];
     $values['thumbnail'] = (string)($post['thumbnail'] ?? '');
-    $values['image_alt'] = (string)($values['image_alt'] ?? $post['image_alt'] ?? '');
+    $values['image_alt'] = (string)$post['picfile'] !== ''
+      ? (string)($values['image_alt'] ?? $post['image_alt'] ?? '')
+      : '';
     if (array_key_exists('edit_nsfw', $values) && (string)$post['picfile'] !== '') {
       $nsfw = (bool)$values['edit_nsfw'];
       if ($nsfw !== (bool)$post['nsfw']) {
@@ -283,7 +285,7 @@ final class PostService implements AdminPostManagementService {
       'a_name' => $post['name'], 'sub' => $post['sub'],
       'com' => preg_replace('/(\n|\r|\r\n){3,}/us', "\n\n", (string)$post['com']),
       'mail' => $post['mail'], 'a_url' => $post['url'], 'picfile' => $post['picfile'],
-      'image_alt' => (string)($post['image_alt'] ?? ''),
+      'image_alt' => (string)$post['picfile'] !== '' ? (string)($post['image_alt'] ?? '') : '',
       'pchfile' => $image['pchfile'], 'img_w' => $image['img_w'], 'img_h' => $image['img_h'],
       'psec' => $image['psec'], 'utime' => $image['utime'], 'pwd' => $post['pwdh'],
       'id' => gen_id((string)$post['host'], (string)$now), 'sodane' => $post['sodane'],

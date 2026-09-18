@@ -1539,6 +1539,26 @@ smoke_test('failed reply insertion restores parent ordering', static function ()
     && (int)$repository->findPost($reply)['parent'] === $parent;
 });
 
+smoke_test('image descriptions are saved only with an image', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $service = new PostService($repository, sys_get_temp_dir());
+  $post = [
+    'name' => 'name', 'sub' => 'subject', 'com' => 'comment', 'mail' => '', 'url' => '',
+    'picfile' => '', 'image_alt' => '画像のない投稿の説明', 'pwdh' => '', 'host' => 'localhost',
+    'resto' => '', 'sodane' => 0, 'invz' => 0, 'admins' => 0,
+  ];
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  $without_image = $service->createPreparedPost($post, $image);
+  $post['picfile'] = 'image.png';
+  $post['image_alt'] = '画像の説明';
+  $with_image = $service->createPreparedPost($post, $image);
+  return ($repository->findPost($without_image)['image_alt'] ?? null) === ''
+    && ($repository->findPost($with_image)['image_alt'] ?? null) === '画像の説明';
+});
+
 smoke_test('failed database operation is rolled back', static function (): bool {
   $db = new PDO('sqlite::memory:');
   $migrator = new DatabaseMigrator($db, ':memory:', sys_get_temp_dir());
