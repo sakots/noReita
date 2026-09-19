@@ -17,13 +17,15 @@ AVIF非対応のサーバーではフォームの候補から除外され、送�
 
 ## Composer依存ライブラリ
 
-BladeOne v4.19.1をComposerで管理しています。ソースコードから設置・開発する場合は、事前に次を実行してください。
+Twig v3.28以降とBladeOne v4.19.1をComposerで管理しています。既定の`eda`テーマはTwigを使用するため、Twigを含む`vendor/`が必要です。`monoreita`テーマはBladeOneを使用します。ソースコードから設置・開発する場合は、事前に次を実行してください。
 
 ```bash
 composer install --working-dir=noreita --no-dev --prefer-dist
 ```
 
 `vendor/`を含む配布用パッケージを利用する場合、レンタルサーバー上でComposerを実行する必要はありません。
+
+Twigテンプレート（`*.twig`）はPHPとして直接実行せず、noReitaからTwig経由でだけ読み込みます。Webサーバーからテンプレートソースを直接取得できないよう、Apacheでは同梱の`.htaccess`を有効にし、nginxではこの文書のアクセス拒否設定を適用してください。
 
 ## Apacheで必要な設定
 
