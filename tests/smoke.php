@@ -530,6 +530,7 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['features']['image_upload'] === false
     && $resolved['features']['diary_mode'] === true
     && $resolved['features']['diary_allow_public_replies'] === false
+    && $resolved['debug']['enabled'] === false
     && $resolved['security']['trusted_proxies'] === ['192.0.2.10', '2001:db8:1234::/48']
     && $resolved['site']['head_scripts'] === ['<script src="https://analytics.example/script.js"></script>']
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];

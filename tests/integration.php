@@ -218,6 +218,16 @@ PHP;
   if (file_put_contents($webroot . '/error-probe.php', $error_probe) === false) {
     throw new RuntimeException('Could not create error handling probe.');
   }
+  $debug_error_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/error_handler.inc.php';
+ApplicationErrorHandler::install(__DIR__ . '/errorlog');
+ApplicationErrorHandler::setDebug(true);
+throw new RuntimeException('debug-detail-must-appear');
+PHP;
+  if (file_put_contents($webroot . '/debug-error-probe.php', $debug_error_probe) === false) {
+    throw new RuntimeException('Could not create debug error handling probe.');
+  }
   $plain_error_probe = <<<'PHP'
 <?php
 require_once __DIR__ . '/bootstrap.php';
@@ -368,6 +378,17 @@ PHP;
       && str_contains($error_log_contents, 'RuntimeException')
       && str_contains($error_log_contents, 'error-probe.php')
       && !str_contains($error_log_contents, 'error-probe-secret');
+  });
+
+  [$debug_error_status, $debug_error_body] = http_request($origin_url . '/debug-error-probe.php', $cookie_jar);
+  integration_test('debug mode exposes exception details on the error page', static function () use (
+    $debug_error_status, $debug_error_body, $webroot
+  ): bool {
+    return $debug_error_status === 500
+      && str_contains($debug_error_body, 'Debug error')
+      && str_contains($debug_error_body, 'debug-detail-must-appear')
+      && str_contains($debug_error_body, 'RuntimeException')
+      && str_contains($debug_error_body, $webroot . '/debug-error-probe.php');
   });
 
   [$plain_error_status, $plain_error_body] = http_request($origin_url . '/plain-error-probe.php', $cookie_jar);

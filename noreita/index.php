@@ -3020,7 +3020,9 @@ function render_error(ApplicationContext $context, string $mes, int $status = 40
   // 4xxも含め、利用者へエラー画面を返すすべての異常を記録する。
   $error_id = ApplicationErrorHandler::reportHttpError($status, strip_tags($mes), $cause);
   if ($status >= 500) {
-    $mes = h(ApplicationErrorHandler::publicMessage($error_id, $en));
+    $mes = ApplicationErrorHandler::debugEnabled()
+      ? ApplicationErrorHandler::debugHtml($error_id, $mes, $cause)
+      : h(ApplicationErrorHandler::publicMessage($error_id, $en));
   }
   http_response_code($status);
   $dat['errmes'] = $mes;
@@ -3039,7 +3041,9 @@ function render_bootstrap_error(string $mes, int $status = 400, ?Throwable $caus
   if ($status < 400 || $status > 599) $status = 500;
   $error_id = ApplicationErrorHandler::reportHttpError($status, strip_tags($mes), $cause);
   if ($status >= 500) {
-    $mes = h(ApplicationErrorHandler::publicMessage($error_id, ApplicationBootstrap::english()));
+    $mes = ApplicationErrorHandler::debugEnabled()
+      ? ApplicationErrorHandler::debugMessage($error_id, $mes, $cause)
+      : h(ApplicationErrorHandler::publicMessage($error_id, ApplicationBootstrap::english()));
   }
   http_response_code($status);
   header('Content-Type: text/plain; charset=UTF-8');

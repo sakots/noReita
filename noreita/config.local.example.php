@@ -57,6 +57,11 @@ return [
     'external_link_preview' => true,
   ],
 
+  'debug' => [
+    // 開発・障害調査時だけtrueにします。エラー詳細が一般公開されるため、本番ではfalseにしてください。
+    'enabled' => false,
+  ],
+
   'spam' => [
     // 本文で一致した規則の点数を合計し、threshold以上なら投稿を拒否します。0なら無効です。
     'comment_score_rules' => [

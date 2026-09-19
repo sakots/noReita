@@ -36,6 +36,7 @@ final class ApplicationBootstrap {
     ApplicationErrorHandler::install($root . '/errorlog', $root . '/auditlog');
 
     Config::load($root);
+    ApplicationErrorHandler::setDebug(Config::bool('debug.enabled'));
     ApplicationErrorHandler::configure(
       Config::int('error_log.retention_days'),
       Config::int('error_log.max_bytes'),

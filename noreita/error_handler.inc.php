@@ -236,6 +236,7 @@ final class ApplicationErrorHandler {
   private static string $audit_directory = '';
   private static bool $installed = false;
   private static bool $rendering = false;
+  private static bool $debug = false;
   private static int $retention_days = self::DEFAULT_RETENTION_DAYS;
   private static int $max_bytes = self::DEFAULT_MAX_BYTES;
   private static int $max_files_per_day = self::DEFAULT_MAX_FILES_PER_DAY;
@@ -286,6 +287,16 @@ final class ApplicationErrorHandler {
     }
   }
 
+  public static function setDebug(bool $enabled): void {
+    self::$debug = $enabled;
+    ini_set('display_errors', $enabled ? '1' : '0');
+    ini_set('display_startup_errors', $enabled ? '1' : '0');
+  }
+
+  public static function debugEnabled(): bool {
+    return self::$debug;
+  }
+
   public static function cleanupLogs(?int $now = null, int $limit = 20): int {
     return ErrorLogStorage::cleanup(self::$log_directory, self::$retention_days, $limit, $now);
   }
@@ -310,6 +321,10 @@ final class ApplicationErrorHandler {
       'file' => $file,
       'line' => $line,
     ]);
+    if (self::$debug) {
+      echo '<pre>PHP error: ' . htmlspecialchars(self::redact($message), ENT_QUOTES, 'UTF-8')
+        . ' in ' . htmlspecialchars($file, ENT_QUOTES, 'UTF-8') . ' on line ' . $line . '</pre>';
+    }
     if (in_array($severity, [E_USER_ERROR, E_RECOVERABLE_ERROR], true)) {
       throw new ErrorException($message, 0, $severity, $file, $line);
     }
@@ -320,7 +335,7 @@ final class ApplicationErrorHandler {
     if (self::$rendering) return;
     self::$rendering = true;
     $error_id = self::reportThrowable($exception, 'uncaught-exception');
-    self::renderPublicError($error_id);
+    self::renderPublicError($error_id, $exception->getMessage(), $exception);
   }
 
   public static function handleShutdown(): void {
@@ -338,7 +353,7 @@ final class ApplicationErrorHandler {
       'file' => (string)$last_error['file'],
       'line' => (int)$last_error['line'],
     ]);
-    self::renderPublicError($error_id);
+    self::renderPublicError($error_id, (string)$last_error['message']);
   }
 
   public static function reportThrowable(Throwable $exception, string $type = 'application-error'): string {
@@ -419,7 +434,11 @@ final class ApplicationErrorHandler {
     $log_message = trim(strip_tags($diagnostic ?? $public_message));
     $log_message = mb_substr($log_message !== '' ? $log_message : 'API request failed.', 0, 4000);
     $error_id = self::reportHttpError($status, $log_message, $cause);
-    $response_message = $status >= 500 ? self::publicMessage($error_id, $english) : $public_message;
+    $response_message = $status >= 500
+      ? (self::$debug
+        ? self::debugMessage($error_id, $diagnostic ?? $public_message, $cause)
+        : self::publicMessage($error_id, $english))
+      : $public_message;
     if ($status < 500 && $include_error_id_for_client_error) {
       $response_message .= "\n" . self::publicErrorReference($error_id, $english);
     }
@@ -436,6 +455,24 @@ final class ApplicationErrorHandler {
     return $english
       ? 'An internal error occurred. ' . self::publicErrorReference($error_id, true)
       : '内部エラーが発生しました。' . self::publicErrorReference($error_id, false);
+  }
+
+  public static function debugMessage(string $error_id, string $message, ?Throwable $cause = null): string {
+    $details = [
+      'Debug mode is enabled.',
+      'Error ID: ' . $error_id,
+      self::redact($message),
+    ];
+    if ($cause !== null) {
+      $details[] = get_class($cause) . ': ' . self::redact($cause->getMessage());
+      $details[] = $cause->getFile() . ':' . $cause->getLine();
+      $details[] = self::redact($cause->getTraceAsString());
+    }
+    return implode("\n", $details);
+  }
+
+  public static function debugHtml(string $error_id, string $message, ?Throwable $cause = null): string {
+    return nl2br(htmlspecialchars(self::debugMessage($error_id, $message, $cause), ENT_QUOTES, 'UTF-8'));
   }
 
   private static function publicErrorReference(string $error_id, bool $english): string {
@@ -522,19 +559,21 @@ final class ApplicationErrorHandler {
     if (is_dir($directory)) @chmod($directory, 0700);
   }
 
-  private static function renderPublicError(string $error_id): void {
+  private static function renderPublicError(string $error_id, string $message = '', ?Throwable $cause = null): void {
     if (!headers_sent()) {
       http_response_code(500);
       header('Content-Type: text/html; charset=UTF-8');
       header('Cache-Control: no-store, private');
     }
     $english = stripos((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''), 'ja') !== 0;
-    $title = $english ? 'Internal Server Error' : '内部エラー';
-    $message = self::publicMessage($error_id, $english);
+    $title = self::$debug ? 'Debug error' : ($english ? 'Internal Server Error' : '内部エラー');
+    $body = self::$debug
+      ? self::debugMessage($error_id, $message, $cause)
+      : self::publicMessage($error_id, $english);
     echo '<!doctype html><html lang="' . ($english ? 'en' : 'ja') . '"><meta charset="UTF-8">'
       . '<meta name="robots" content="noindex"><title>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</title>'
-      . '<body><h1>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1><p>'
-      . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p></body></html>';
+      . '<body><h1>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1><pre>'
+      . htmlspecialchars($body, ENT_QUOTES, 'UTF-8') . '</pre></body></html>';
   }
 
   private static function requestPath(): string {
