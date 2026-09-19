@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.11.2 lot.260917.0';
+const REITA_VER = 'v4.12.0 lot.260919.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
