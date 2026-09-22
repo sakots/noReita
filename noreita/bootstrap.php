@@ -6,7 +6,7 @@ require_once __DIR__ . '/request_info.inc.php';
 
 const NOREITA_MIN_PHP_VERSION = '8.1.0';
 const NOREITA_MIN_PHP_VERSION_ID = 80100;
-const NOREITA_VERSION = '4.12.0';
+const NOREITA_VERSION = '4.12.1';
 
 if (PHP_VERSION_ID < NOREITA_MIN_PHP_VERSION_ID) {
   if (!headers_sent()) {
