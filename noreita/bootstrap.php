@@ -2,6 +2,7 @@
 // Shared bootstrap for every noReita entry point.
 
 require_once __DIR__ . '/config_loader.inc.php';
+require_once __DIR__ . '/request_info.inc.php';
 
 const NOREITA_MIN_PHP_VERSION = '8.1.0';
 const NOREITA_MIN_PHP_VERSION_ID = 80100;
@@ -36,7 +37,10 @@ final class ApplicationBootstrap {
     ApplicationErrorHandler::install($root . '/errorlog', $root . '/auditlog');
 
     Config::load($root);
-    ApplicationErrorHandler::setDebug(Config::bool('debug.enabled'));
+    $debug_ip = RequestInfo::clientIp();
+    $debug_enabled = Config::bool('debug.enabled') && $debug_ip !== ''
+      && in_array($debug_ip, Config::array('debug.allowed_ips'), true);
+    ApplicationErrorHandler::setDebug($debug_enabled);
     ApplicationErrorHandler::configure(
       Config::int('error_log.retention_days'),
       Config::int('error_log.max_bytes'),

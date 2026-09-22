@@ -46,7 +46,7 @@ return [
     // ブラウザからの画像アップロードを無効にする場合はfalseにします。
     'image_upload' => false,
     // PaintBBS NEOをGitHub API経由でmasterの最新版から読み込みます。falseで同梱・ミラーURLを使います。
-    'neo_github_api' => true,
+    'neo_github_api' => false,
     // 直接アップロード画像をWebPへ変換します。GDがWebP非対応の場合は元形式で保存されます。
     'upload_webp' => true,
     // 日記モードでは新規投稿を管理者ログイン中の利用者だけに限定します。
@@ -58,8 +58,10 @@ return [
   ],
 
   'debug' => [
-    // 開発・障害調査時だけtrueにします。エラー詳細が一般公開されるため、本番ではfalseにしてください。
+    // 開発・障害調査時だけtrueにします。詳細はallowed_ipsの接続元だけに表示されます。
     'enabled' => false,
+    // デバッグ表示を許可する接続元IPアドレスです。リバースプロキシ配下ではtrusted_proxiesも設定します。
+    'allowed_ips' => ['127.0.0.1'],
   ],
 
   'spam' => [

@@ -167,6 +167,10 @@ return [
     'external_image_thumbnail' => false,
     'misskey_note' => false,
   ],
+  'debug' => [
+    'enabled' => true,
+    'allowed_ips' => ['198.51.100.99'],
+  ],
   // The local HTTP server is the explicitly trusted reverse proxy for forwarded-IP tests.
   'security' => ['trusted_proxies' => ['127.0.0.1']],
   'limits' => [
@@ -218,11 +222,10 @@ PHP;
   if (file_put_contents($webroot . '/error-probe.php', $error_probe) === false) {
     throw new RuntimeException('Could not create error handling probe.');
   }
-  $debug_error_probe = <<<'PHP'
+$debug_error_probe = <<<'PHP'
 <?php
-require_once __DIR__ . '/error_handler.inc.php';
-ApplicationErrorHandler::install(__DIR__ . '/errorlog');
-ApplicationErrorHandler::setDebug(true);
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
 throw new RuntimeException('debug-detail-must-appear');
 PHP;
   if (file_put_contents($webroot . '/debug-error-probe.php', $debug_error_probe) === false) {
@@ -380,7 +383,9 @@ PHP;
       && !str_contains($error_log_contents, 'error-probe-secret');
   });
 
-  [$debug_error_status, $debug_error_body] = http_request($origin_url . '/debug-error-probe.php', $cookie_jar);
+  [$debug_error_status, $debug_error_body] = http_request(
+    $origin_url . '/debug-error-probe.php', $cookie_jar, null, '198.51.100.99'
+  );
   integration_test('debug mode exposes exception details on the error page', static function () use (
     $debug_error_status, $debug_error_body, $webroot
   ): bool {

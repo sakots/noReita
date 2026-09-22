@@ -290,6 +290,7 @@ final class Config {
     }
     self::validatePairs(self::valueAt($values, 'drawing.palettes'), 'drawing.palettes', false);
     self::validateTrustedProxies(self::valueAt($values, 'security.trusted_proxies'));
+    self::validateDebugAllowedIps(self::valueAt($values, 'debug.allowed_ips'));
     foreach (['spam.bad_strings', 'spam.bad_names', 'spam.bad_strings_a', 'spam.bad_strings_b',
       'spam.bad_files', 'spam.bad_hosts', 'board.additional_info', 'site.head_scripts'] as $key) {
       foreach (self::valueAt($values, $key) as $value) {
@@ -359,6 +360,21 @@ final class Config {
       $bits = strlen($packed) * 8;
       if ($prefix < 1 || $prefix > $bits) {
         throw new ConfigException('security.trusted_proxies contains an unsafe CIDR range.');
+      }
+    }
+  }
+
+  /** @param array<int,mixed> $ips */
+  private static function validateDebugAllowedIps(array $ips): void {
+    if (!self::isList($ips)) {
+      throw new ConfigException('debug.allowed_ips must be a list.');
+    }
+    if (count($ips) > 64) {
+      throw new ConfigException('debug.allowed_ips contains too many entries.');
+    }
+    foreach ($ips as $ip) {
+      if (!is_string($ip) || $ip === '' || trim($ip) !== $ip || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+        throw new ConfigException('debug.allowed_ips must contain IP addresses.');
       }
     }
   }

@@ -303,7 +303,7 @@ smoke_test('PaintBBS NEO loads from GitHub API with a configurable mirror fallba
       || !str_contains($source, 'neo_github_api') || !str_contains($source, 'configurePaintBbsNeo')) return false;
   }
   $config = require dirname(__DIR__) . '/noreita/config.php';
-  return ($config['features']['neo_github_api'] ?? null) === true;
+  return ($config['features']['neo_github_api'] ?? null) === false;
 });
 
 smoke_test('applet fit waits for the asynchronously created NEO container', static function (): bool {
@@ -530,7 +530,7 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['features']['image_upload'] === false
     && $resolved['features']['diary_mode'] === true
     && $resolved['features']['diary_allow_public_replies'] === false
-    && $resolved['debug']['enabled'] === false
+    && $resolved['debug']['enabled'] === false && $resolved['debug']['allowed_ips'] === []
     && $resolved['security']['trusted_proxies'] === ['192.0.2.10', '2001:db8:1234::/48']
     && $resolved['site']['head_scripts'] === ['<script src="https://analytics.example/script.js"></script>']
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
@@ -639,6 +639,7 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['not-an-ip']]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['0.0.0.0/0']]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['2001:db8::/129']]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'debug' => ['allowed_ips' => ['not-an-ip']]],
     ['admin' => ['password' => 'admin_pass'], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://example.com/noreita/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'spam' => ['comment_score_threshold' => -1]],
