@@ -185,6 +185,17 @@ PHP;
   if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
     throw new RuntimeException('Could not create test config.local.php');
   }
+  $diagnostic_config = <<<'PHP'
+<?php
+return [
+  'enabled' => true,
+  'allowed_ips' => ['198.51.100.99'],
+  'trusted_proxies' => ['127.0.0.1'],
+];
+PHP;
+  if (file_put_contents($webroot . '/debug.local.php', $diagnostic_config) === false) {
+    throw new RuntimeException('Could not create diagnostic config.');
+  }
   // HTTPサーバー起動時に、実際のv1→v2移行を通す。新規作成した現行スキーマから
   // image_altだけを取り除くことで、過去のboard_log定義を維持したフィクスチャにする。
   require_once $webroot . '/database.inc.php';
@@ -299,6 +310,7 @@ PHP;
   $protected_probes = [
     'config.php' => 'admin_pass',
     'config.local.php' => 'integration-admin-pass',
+    'debug.local.php' => '198.51.100.99',
     'config.local.php.bak' => 'config-backup-secret',
     'config.php.old' => 'old-config-secret',
     'config.local.php~' => 'editor-config-backup-secret',
@@ -342,7 +354,7 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 25 && !in_array(false, $protected_results, true);
+    return count($protected_results) === 26 && !in_array(false, $protected_results, true);
   });
 
   integration_test('version 1 board database is migrated before HTTP requests', static function () use ($webroot): bool {
@@ -394,6 +406,29 @@ PHP;
       && str_contains($debug_error_body, 'debug-detail-must-appear')
       && str_contains($debug_error_body, 'RuntimeException')
       && str_contains($debug_error_body, $webroot . '/debug-error-probe.php');
+  });
+
+  $broken_config = "<?php\nreturn ['limits' => ['upload_resize_width' => 'invalid']];\n";
+  if (file_put_contents($webroot . '/config.local.php', $broken_config) === false) {
+    throw new RuntimeException('Could not create invalid test configuration.');
+  }
+  [$configuration_debug_status, $configuration_debug_body] = http_request(
+    $base_url, $cookie_jar, null, '198.51.100.99'
+  );
+  [$configuration_public_status, $configuration_public_body] = http_request($base_url, $cookie_jar);
+  if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
+    throw new RuntimeException('Could not restore integration configuration.');
+  }
+  integration_test('broken configuration details are visible only to diagnostic IPs', static function () use (
+    $configuration_debug_status, $configuration_debug_body, $configuration_public_status, $configuration_public_body, $webroot
+  ): bool {
+    return $configuration_debug_status === 500 && $configuration_public_status === 500
+      && str_contains($configuration_debug_body, 'Configuration error')
+      && str_contains($configuration_debug_body, 'Invalid type for configuration key: limits.upload_resize_width')
+      && str_contains($configuration_debug_body, $webroot . '/config_loader.inc.php')
+      && !str_contains($configuration_public_body, 'Configuration error')
+      && !str_contains($configuration_public_body, 'limits.upload_resize_width')
+      && !str_contains($configuration_public_body, $webroot);
   });
 
   [$plain_error_status, $plain_error_body] = http_request($origin_url . '/plain-error-probe.php', $cookie_jar);

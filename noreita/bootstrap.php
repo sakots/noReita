@@ -36,7 +36,12 @@ final class ApplicationBootstrap {
     require_once $error_handler;
     ApplicationErrorHandler::install($root . '/errorlog', $root . '/auditlog');
 
-    Config::load($root);
+    try {
+      Config::load($root);
+    } catch (Throwable $e) {
+      if ($e instanceof ConfigException) throw $e;
+      throw new ConfigException('Configuration could not be loaded.', 0, $e);
+    }
     $debug_ip = RequestInfo::clientIp();
     $debug_enabled = Config::bool('debug.enabled') && $debug_ip !== ''
       && in_array($debug_ip, Config::array('debug.allowed_ips'), true);
@@ -51,6 +56,54 @@ final class ApplicationBootstrap {
     );
     date_default_timezone_set(Config::string('site.timezone'));
     self::$booted = true;
+  }
+
+  /** Render a safe configuration error page before configuration is available. */
+  public static function renderConfigurationError(string $root, ConfigException $error): void {
+    $debug = self::configurationDiagnosticsAllowed($root);
+    ApplicationErrorHandler::setDebug($debug);
+    $error_id = ApplicationErrorHandler::reportHttpError(500, 'Configuration loading failed.', $error);
+    $english = self::$english;
+    $title = $debug ? 'Configuration error' : ($english ? 'Internal Server Error' : '内部エラー');
+    $body = $debug
+      ? ApplicationErrorHandler::debugMessage($error_id, 'Configuration loading failed.', $error)
+      : ApplicationErrorHandler::publicMessage($error_id, $english);
+    if (!headers_sent()) {
+      http_response_code(500);
+      header('Content-Type: text/html; charset=UTF-8');
+      header('Cache-Control: no-store, private');
+    }
+    echo '<!doctype html><html lang="' . ($english ? 'en' : 'ja') . '"><meta charset="UTF-8">'
+      . '<meta name="robots" content="noindex"><title>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</title>'
+      . '<body><h1>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1><pre>'
+      . htmlspecialchars($body, ENT_QUOTES, 'UTF-8') . '</pre></body></html>';
+    exit;
+  }
+
+  private static function configurationDiagnosticsAllowed(string $root): bool {
+    $file = rtrim($root, '/\\') . DIRECTORY_SEPARATOR . 'debug.local.php';
+    if (!is_file($file) || !is_readable($file)) return false;
+    try {
+      $settings = require $file;
+    } catch (Throwable) {
+      return false;
+    }
+    if (!is_array($settings) || ($settings['enabled'] ?? false) !== true) return false;
+    $allowed_ips = $settings['allowed_ips'] ?? null;
+    $trusted_proxies = $settings['trusted_proxies'] ?? [];
+    if (!self::validDiagnosticIps($allowed_ips, 64) || !self::validDiagnosticIps($trusted_proxies, 256)) return false;
+    $ip = RequestInfo::clientIp(null, $trusted_proxies);
+    return $ip !== '' && in_array($ip, $allowed_ips, true);
+  }
+
+  /** @param mixed $ips */
+  private static function validDiagnosticIps($ips, int $maximum): bool {
+    if (!is_array($ips) || count($ips) > $maximum
+      || array_keys($ips) !== ($ips === [] ? [] : range(0, count($ips) - 1))) return false;
+    foreach ($ips as $ip) {
+      if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) return false;
+    }
+    return true;
   }
 
   public static function english(): bool {

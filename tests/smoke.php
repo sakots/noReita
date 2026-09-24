@@ -868,6 +868,7 @@ smoke_test('private files and directories ship Apache access denial rules', stat
   $private_file_regex = '#' . str_replace('#', '\\#', $private_file_pattern) . '#';
   foreach ([
     'config.local.php~',
+    'debug.local.php',
     'theme.php.bak',
     'theme_conf.php.old',
     'theme_manifest.php~',
@@ -882,7 +883,7 @@ smoke_test('private files and directories ship Apache access denial rules', stat
     if (preg_match($private_file_regex, $public_file) === 1) return false;
   }
   $ignore = file_get_contents(dirname(__DIR__) . '/.gitignore');
-  if (!is_string($ignore) || !str_contains($ignore, 'config.local.php')
+  if (!is_string($ignore) || !str_contains($ignore, 'config.local.php') || !str_contains($ignore, 'debug.local.php')
     || preg_match('/^config\.php$/m', $ignore) === 1) return false;
   foreach (['session', 'cache', 'backup', 'errorlog', 'auditlog', 'tmp'] as $directory) {
     $rule = file_get_contents(dirname(__DIR__) . "/noreita/{$directory}/.htaccess");

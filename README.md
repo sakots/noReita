@@ -46,6 +46,12 @@ return [
 `config.local.php`はGit管理とプログラム更新の上書き対象から除外されます。
 設定の型、必須値、範囲、URL、パス、権限は起動時に検証されます。
 
+### 壊れた設定の診断
+
+`config.local.php`が壊れて通常画面を開けない場合は、`debug.local.example.php`を
+`debug.local.php`としてコピーし、`enabled`と調査元IPを設定すると、そのIPからだけ設定エラーの詳細を確認できます。
+この診断用ファイルは`config.local.php`とは別に読み込まれ、HTTPアクセスも拒否されます。調査後は`enabled`をfalseへ戻すか、ファイルを削除してください。
+
 [リリース](https://github.com/sakots/noReita/releases/latest) からダウンロードして、
 FTPソフトをつかってサーバーにアップロードするだけです。簡単。
 

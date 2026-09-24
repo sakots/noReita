@@ -6,8 +6,7 @@ function app_bootstrap(string $root): bool {
   try {
     ApplicationBootstrap::boot($root);
   } catch (ConfigException $e) {
-    http_response_code(500);
-    die('Configuration error: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
+    ApplicationBootstrap::renderConfigurationError($root, $e);
   }
   return ApplicationBootstrap::english();
 }
