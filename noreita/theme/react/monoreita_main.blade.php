@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="theme/react/theme.css?v=1.0.0">
-  <script defer src="theme/react/assets/react-board.js?v=1.0.0"></script>
+  @include('components.monoreita_customCss')
+  <script defer src="theme/react/assets/react-board.js?v={{$theme_active_asset_version}}"></script>
 </head>
 <body>
   <main class="react-board-shell">

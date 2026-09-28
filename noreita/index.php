@@ -202,6 +202,10 @@ $dat['theme_name'] = $theme_runtime['name'];
 $dat['tver'] = $theme_runtime['simple']
   ? (string)$theme_runtime['base_metadata']['version'] . '-' . $theme_runtime['version']
   : $theme_runtime['version'];
+$active_theme_script = $theme_runtime['active_directory'] . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'react-board.js';
+$active_theme_script_digest = is_file($active_theme_script) ? @hash_file('sha256', $active_theme_script) : false;
+$dat['theme_active_asset_version'] = $theme_runtime['version']
+  . (is_string($active_theme_script_digest) ? '-' . substr($active_theme_script_digest, 0, 12) : '');
 $dat['theme_custom_stylesheets'] = array_map(
   static fn(array $theme): string => 'theme/' . rawurlencode($theme['id']) . '/theme.css?v=' . rawurlencode($theme['version']),
   $theme_runtime['stylesheet_themes']
