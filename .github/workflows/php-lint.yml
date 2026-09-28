@@ -29,13 +29,19 @@ jobs:
       - name: Compile Sass
         run: npm run sass:build
 
-      - name: Check generated CSS is up to date
+      - name: Type-check React theme
+        run: npm run react:check
+
+      - name: Build React theme
+        run: npm run react:build
+
+      - name: Check generated frontend assets are up to date
         shell: bash
         run: |
           changes="$(git status --porcelain --untracked-files=all -- noreita/theme)"
           if [[ -n "$changes" ]]; then
             echo "$changes"
-            echo "::error::Sass generated files are missing or out of date. Run npm run sass:build and commit the results."
+            echo "::error::Generated frontend assets are missing or out of date. Run npm run sass:build and npm run react:build, then commit the results."
             exit 1
           fi
 
