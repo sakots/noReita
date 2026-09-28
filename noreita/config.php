@@ -329,6 +329,7 @@ return [
       ['PCCS_HSL', 'p_PCCS.txt'],
       ['マンセルHV/C', 'p_munsellHVC.txt'],
       ['マンセル(V2)', 'p_munsell_V2.txt'],
+      ['やこうさん', 'p_yakoh.txt'],
     ],
     // アニメーションの再生速度です（-1:最速、0:標準、10/100/1000:遅延ミリ秒）。
     'animation_speed' => 0,

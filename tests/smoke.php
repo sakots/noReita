@@ -352,6 +352,17 @@ smoke_test('simple theme stylesheets load after page-specific styles', static fu
   return $checked === 28;
 });
 
+smoke_test('React theme assets use content-addressed cache versions', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita';
+  $index = file_get_contents($root . '/index.php');
+  $template = file_get_contents($root . '/theme/react/monoreita_main.blade.php');
+  if (!is_string($index) || !is_string($template)) return false;
+  return str_contains($index, "hash_file('sha256', \$active_theme_script)")
+    && str_contains($template, "@include('components.monoreita_customCss')")
+    && str_contains($template, 'react-board.js?v={{$theme_active_asset_version}}')
+    && !str_contains($template, '?v=1.0.0');
+});
+
 smoke_test('administration templates escape post subjects', static function (): bool {
   $eda = file_get_contents(dirname(__DIR__) . '/noreita/theme/eda/eda_admin.twig');
   $monoreita = file_get_contents(dirname(__DIR__) . '/noreita/theme/monoreita/monoreita_admin.blade.php');
