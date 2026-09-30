@@ -96,10 +96,10 @@ smoke_test('trip preview uses the server trip generator without sending secrets 
   $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
   return is_string($script) && is_string($index)
     && str_contains($script, "method: 'POST'")
-    && str_contains($script, 'URLSearchParams({ name })')
+    && str_contains($script, 'URLSearchParams({ value })')
     && !str_contains($script, 'endpoint +')
     && str_contains($index, "case 'trip_preview':")
-    && str_contains($index, 'generate_trip($name)');
+    && str_contains($index, 'generate_trip($value)');
 });
 
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
@@ -1915,7 +1915,7 @@ smoke_test('post service centralizes edit and delete authorization', static func
     }
 
     $new_input = [
-      'name' => '投稿者#trip-secret', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
+      'name' => '投稿者#trip-secret', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => 'mail@example.test#mail-trip-secret', 'url' => '',
       'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,
       'resto' => '', 'modid' => '',
     ];
@@ -1938,11 +1938,16 @@ smoke_test('post service centralizes edit and delete authorization', static func
     ]);
     $new_post = $repository->findPost($new_id);
     $trip_name = generate_trip('投稿者#trip-secret');
+    $trip_mail = generate_trip('mail@example.test#mail-trip-secret');
     if (($new_post['sub'] ?? '') !== '新規題名'
       || ($new_post['a_name'] ?? '') !== $trip_name
+      || ($new_post['mail'] ?? '') !== $trip_mail
       || PostService::nameForEdit($trip_name, '投稿者#trip-secret', true) !== '投稿者#trip-secret'
       || PostService::nameForEdit($trip_name, '別人#trip-secret', true) !== $trip_name
-      || PostService::nameForEdit($trip_name, '投稿者#trip-secret', false) !== $trip_name) {
+      || PostService::nameForEdit($trip_name, '投稿者#trip-secret', false) !== $trip_name
+      || PostService::mailForEdit($trip_mail, 'mail@example.test#mail-trip-secret', true) !== 'mail@example.test#mail-trip-secret'
+      || PostService::mailForEdit($trip_mail, 'other@example.test#mail-trip-secret', true) !== $trip_mail
+      || PostService::mailForEdit($trip_mail, 'mail@example.test#mail-trip-secret', false) !== $trip_mail) {
       return false;
     }
     try {

@@ -63,7 +63,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260913) {
 // post.inc
 check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260910) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20260930) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -489,7 +489,7 @@ switch ($mode) {
 
 /**
  * Generate a preview with the same PHP implementation used when posting.
- * The browser sends the name in a POST body, so a trip key is not placed in a URL.
+ * The browser sends the field value in a POST body, so a trip key is not placed in a URL.
  *
  * @param ApplicationContext $context
  */
@@ -504,15 +504,17 @@ function trip_preview(ApplicationContext $context): void {
     return;
   }
 
-  $name = filter_input_data('POST', 'name');
-  if (!is_string($name) || mb_strlen($name, 'UTF-8') > Config::int('limits.name_length')) {
+  $value = filter_input_data('POST', 'value');
+  if (!is_string($value) || mb_strlen($value, 'UTF-8') > max(
+    Config::int('limits.name_length'), Config::int('limits.email_length')
+  )) {
     http_response_code(422);
-    echo json_encode(['error' => 'Invalid name.']);
+    echo json_encode(['error' => 'Invalid input.']);
     return;
   }
 
   // Keep conversion in generate_trip(): it handles legacy crypt(), modern trips, and Shift_JIS.
-  echo json_encode(['preview' => generate_trip($name)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  echo json_encode(['preview' => generate_trip($value)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
 /*-----------Main-------------*/
@@ -2189,6 +2191,9 @@ function editform(ApplicationContext $context, ?int $authorized_post_id = null, 
     $msg['input_name'] = PostService::nameForEdit(
       (string)$msg['a_name'], (string)($dat['name_cookie'] ?? ''), $authorization['role'] === 'owner'
     );
+    $msg['input_mail'] = PostService::mailForEdit(
+      (string)$msg['mail'], (string)($dat['email_cookie'] ?? ''), $authorization['role'] === 'owner'
+    );
     // 続き描きや所有者編集で認証済みの投稿パスワードを使う。
     // 別投稿で保存されたCookieのパスワードでは、画像だけ更新され本文編集が失敗し得る。
     $msg['input_password'] = $authorization['role'] === 'owner'
@@ -2268,6 +2273,10 @@ function editexec(ApplicationContext $context): void {
       $https_only = (bool)($_SERVER['HTTPS'] ?? '');
       setcookie(
         'name_c', $name, time() + (Config::int('board.cookie_days') * 24 * 3600),
+        '', '', $https_only, true
+      );
+      setcookie(
+        'email_c', $mail, time() + (Config::int('board.cookie_days') * 24 * 3600),
         '', '', $https_only, true
       );
     }
