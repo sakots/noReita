@@ -531,6 +531,8 @@ PHP;
       && str_contains($pictmp_body, 'accept="' . implode(',', $upload_mimes) . '"')
       && str_contains($pictmp_body, implode(' / ', $upload_labels))
       && str_contains($pictmp_body, 'data-image-upload-file')
+      && str_contains($pictmp_body, 'data-image-upload-cancel')
+      && str_contains($pictmp_body, 'data-animation-upload-cancel')
       && str_contains($pictmp_body, '保存時: 最大2 × 2px')
       && str_contains($pictmp_body, 'data-upload-resize-width="2"')
       && str_contains($pictmp_body, 'data-upload-output-format=')

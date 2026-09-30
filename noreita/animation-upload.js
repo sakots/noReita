@@ -225,6 +225,8 @@
       directUpload.value = '';
       directUpload.disabled = true;
     }
+    const animationCancel = form.querySelector('[data-animation-upload-cancel]');
+    if (animationCancel) animationCancel.disabled = true;
     const preview = form.querySelector('[data-animation-upload-preview]');
     if (preview) {
       preview.replaceChildren();
@@ -270,6 +272,14 @@
 
   function clearImageUploadPreview(form) {
     const preview = form.querySelector('[data-image-upload-preview]');
+    if (!preview) return;
+    if (preview.dataset.objectUrl) URL.revokeObjectURL(preview.dataset.objectUrl);
+    delete preview.dataset.objectUrl;
+    preview.replaceChildren();
+  }
+
+  function clearAnimationUploadPreview(form) {
+    const preview = form.querySelector('[data-animation-upload-preview]');
     if (!preview) return;
     if (preview.dataset.objectUrl) URL.revokeObjectURL(preview.dataset.objectUrl);
     delete preview.dataset.objectUrl;
@@ -348,6 +358,8 @@
     const temporaryImage = form.querySelector('select[name="picfile"]');
     const directUpload = form.querySelector('[name="image_upload"]');
     const animationUpload = form.querySelector('[data-animation-upload-file]');
+    const directCancel = form.querySelector('[data-image-upload-cancel]');
+    const animationCancel = form.querySelector('[data-animation-upload-cancel]');
     const status = form.querySelector('[data-animation-upload-status]');
     updateImageAltField(form);
     if (directUpload) {
@@ -355,8 +367,15 @@
         const file = directUpload.files && directUpload.files[0];
         if (file) showImageUploadPreview(form, file);
         else clearImageUploadPreview(form);
+        if (directCancel) directCancel.disabled = !file;
         updateImageAltField(form);
       });
+      if (directCancel) {
+        directCancel.addEventListener('click', () => {
+          directUpload.value = '';
+          directUpload.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      }
     }
     if (!temporaryImage) return;
 
@@ -379,6 +398,9 @@
       const clearedImage = clearFileInput(directUpload);
       const clearedAnimation = clearFileInput(animationUpload);
       if (clearedImage) clearImageUploadPreview(form);
+      if (clearedAnimation) clearAnimationUploadPreview(form);
+      if (clearedImage && directCancel) directCancel.disabled = true;
+      if (clearedAnimation && animationCancel) animationCancel.disabled = true;
       if (status && (clearedImage || clearedAnimation)) {
         status.textContent = '投稿途中の画像を選択したため、画像・動画の選択を解除しました。';
       }
@@ -406,6 +428,7 @@
     const status = form && form.querySelector('[data-animation-upload-status]');
     if (!form || !status) return;
     const directUpload = form.querySelector('[name="image_upload"]');
+    const animationCancel = form.querySelector('[data-animation-upload-cancel]');
     let processing = false;
     let preparing = false;
     let preparedPicture = null;
@@ -418,6 +441,8 @@
           input.value = '';
           preparedPicture = null;
           preparation = null;
+          clearAnimationUploadPreview(form);
+          if (animationCancel) animationCancel.disabled = true;
           status.textContent = '画像を選択したため、動画の選択を解除しました。';
         }
       });
@@ -427,9 +452,12 @@
       if (!input.files || !input.files[0]) {
         preparedPicture = null;
         preparation = null;
+        clearAnimationUploadPreview(form);
+        if (animationCancel) animationCancel.disabled = true;
         status.textContent = '';
         return;
       }
+      if (animationCancel) animationCancel.disabled = false;
       if (preparing) {
         status.textContent = '動画を確認中です。完了してから選択を変更してください。';
         return;
@@ -437,6 +465,8 @@
       if (directUpload && directUpload.files && directUpload.files[0]) {
         directUpload.value = '';
         clearImageUploadPreview(form);
+        const directCancel = form.querySelector('[data-image-upload-cancel]');
+        if (directCancel) directCancel.disabled = true;
         status.textContent = '動画を選択したため、画像の選択を解除しました。';
         return;
       }
@@ -466,6 +496,17 @@
         .finally(() => { preparing = false; });
       preparation.catch(() => {});
     });
+
+    if (animationCancel) {
+      animationCancel.addEventListener('click', () => {
+        if (processing) return;
+        input.value = '';
+        preparedPicture = null;
+        preparation = null;
+        clearAnimationUploadPreview(form);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
 
     form.addEventListener('submit', async (event) => {
       const file = input.files && input.files[0];
