@@ -71,6 +71,9 @@ smoke_test('post image candidates replace each other in the post form', static f
     && str_contains($script, "select[name=\"picfile\"]")
     && str_contains($script, 'clearTemporaryImage')
     && str_contains($script, "directUpload.addEventListener('change'")
+    && str_contains($script, '[data-image-upload-cancel]')
+    && str_contains($script, '[data-animation-upload-cancel]')
+    && str_contains($script, 'clearAnimationUploadPreview')
     && str_contains($script, "input.value = '';")
     && str_contains($script, "directUpload.value = '';")
     && str_contains($script, 'showPreparedPreview')
@@ -78,15 +81,25 @@ smoke_test('post image candidates replace each other in the post form', static f
     && !str_contains($script, '別の動画へ変更する場合はページを再読み込みしてください。');
 });
 
+smoke_test('post preview renders text and links without fetching external pages', static function (): bool {
+  $script = file_get_contents(dirname(__DIR__) . '/noreita/post-preview.js');
+  return is_string($script)
+    && str_contains($script, 'textarea[name="com"]')
+    && str_contains($script, '外部リンク')
+    && str_contains($script, "link.rel = 'noopener noreferrer'")
+    && str_contains($script, 'body.textContent = text')
+    && !str_contains($script, 'fetch(');
+});
+
 smoke_test('trip preview uses the server trip generator without sending secrets in URLs', static function (): bool {
   $script = file_get_contents(dirname(__DIR__) . '/noreita/trip-preview.js');
   $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
   return is_string($script) && is_string($index)
     && str_contains($script, "method: 'POST'")
-    && str_contains($script, 'URLSearchParams({ name })')
+    && str_contains($script, 'URLSearchParams({ value })')
     && !str_contains($script, 'endpoint +')
     && str_contains($index, "case 'trip_preview':")
-    && str_contains($index, 'generate_trip($name)');
+    && str_contains($index, 'generate_trip($value)');
 });
 
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
@@ -1902,7 +1915,7 @@ smoke_test('post service centralizes edit and delete authorization', static func
     }
 
     $new_input = [
-      'name' => '投稿者#trip-secret', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => '', 'url' => '',
+      'name' => '投稿者#trip-secret', 'sub' => '新規題名', 'com' => '新規本文', 'mail' => 'mail@example.test#mail-trip-secret', 'url' => '',
       'picfile' => null, 'pwd' => 'new-pass', 'sodane' => 0, 'invz' => 0,
       'resto' => '', 'modid' => '',
     ];
@@ -1925,11 +1938,16 @@ smoke_test('post service centralizes edit and delete authorization', static func
     ]);
     $new_post = $repository->findPost($new_id);
     $trip_name = generate_trip('投稿者#trip-secret');
+    $trip_mail = generate_trip('mail@example.test#mail-trip-secret');
     if (($new_post['sub'] ?? '') !== '新規題名'
       || ($new_post['a_name'] ?? '') !== $trip_name
+      || ($new_post['mail'] ?? '') !== $trip_mail
       || PostService::nameForEdit($trip_name, '投稿者#trip-secret', true) !== '投稿者#trip-secret'
       || PostService::nameForEdit($trip_name, '別人#trip-secret', true) !== $trip_name
-      || PostService::nameForEdit($trip_name, '投稿者#trip-secret', false) !== $trip_name) {
+      || PostService::nameForEdit($trip_name, '投稿者#trip-secret', false) !== $trip_name
+      || PostService::mailForEdit($trip_mail, 'mail@example.test#mail-trip-secret', true) !== 'mail@example.test#mail-trip-secret'
+      || PostService::mailForEdit($trip_mail, 'other@example.test#mail-trip-secret', true) !== $trip_mail
+      || PostService::mailForEdit($trip_mail, 'mail@example.test#mail-trip-secret', false) !== $trip_mail) {
       return false;
     }
     try {

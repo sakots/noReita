@@ -27,8 +27,8 @@
       preview.hidden = true;
     };
     const update = async () => {
-      const name = input.value;
-      if (!name.includes('#')) {
+      const value = input.value;
+      if (!value.includes('#')) {
         clear();
         return;
       }
@@ -36,14 +36,14 @@
       request = new AbortController();
       const activeRequest = request;
       try {
-        // `name` は application/x-www-form-urlencoded の POST 本文にのみ入る。
-        const body = new URLSearchParams({ name });
+        // 入力値は application/x-www-form-urlencoded の POST 本文にのみ入る。
+        const body = new URLSearchParams({ value });
         const response = await fetch(endpoint, {
           method: 'POST', credentials: 'same-origin',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
           body, signal: activeRequest.signal,
         });
-        // サーバー側は generate_trip(name) を { preview: "..." } として返す。
+        // サーバー側は generate_trip(value) を { preview: "..." } として返す。
         const payload = await response.json();
         if (!response.ok || typeof payload.preview !== 'string' || request !== activeRequest) return;
         preview.textContent = `トリップ: ${payload.preview}`;

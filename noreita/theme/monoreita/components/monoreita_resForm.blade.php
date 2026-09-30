@@ -7,7 +7,7 @@
     </tr>
     <tr>
       <td>mail</td>
-      <td><input type="text" name="mail" size="18" value="{{$email_cookie}}" autocomplete="off" maxlength="{{$max_email}}"></td>
+      <td><input type="text" name="mail" size="18" value="{{$email_cookie}}" autocomplete="off" maxlength="{{$max_email}}" data-trip-preview-input><output data-trip-preview hidden aria-live="polite"></output></td>
     </tr>
     <tr>
       <td>URL</td>
@@ -50,7 +50,7 @@
     @if ($use_image_upload)
     <tr>
       <td>画像</td>
-      <td><input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）<div data-image-upload-preview></div></td>
+      <td><input type="file" name="image_upload" accept="{{$upload_accept}}" data-image-upload-file> <button class="button" type="button" data-image-upload-cancel disabled>選択を取り消す</button>（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）<small>保存時: {{$upload_resize_label}}、{{$upload_output_format}}形式</small></td>
     </tr>
     @endif
     @if ($use_animation_upload)
@@ -58,12 +58,16 @@
       <td>動画</td>
       <td>
         <input type="file" name="animation_upload" accept="{{$animation_upload_accept}}" data-animation-upload-file>
+        <button class="button" type="button" data-animation-upload-cancel disabled>選択を取り消す</button>
         （{{$animation_upload_format_label}}、{{$animation_upload_max_kb}}KBまで。選択するとプレビューを生成します）
         <span data-animation-upload-status aria-live="polite"></span>
-        <div data-animation-upload-preview></div>
       </td>
     </tr>
     @endif
+    <tr data-post-preview-row hidden>
+      <td>投稿プレビュー</td>
+      <td><section data-post-preview><div data-post-preview-content aria-live="polite"></div><div data-image-upload-preview aria-live="polite"></div><div data-animation-upload-preview aria-live="polite"></div></section></td>
+    </tr>
     @if ($use_nsfw)
     <tr>
       <td>NSFW</td>

@@ -13,6 +13,9 @@
     maxWorkBytes: Number(loader.dataset.maxWorkBytes || 0),
     maxWidth: Number(loader.dataset.maxWidth || 0),
     maxHeight: Number(loader.dataset.maxHeight || 0),
+    uploadResizeWidth: Number(loader.dataset.uploadResizeWidth || 0),
+    uploadResizeHeight: Number(loader.dataset.uploadResizeHeight || 0),
+    uploadOutputFormat: loader.dataset.uploadOutputFormat || '元の画像形式',
   };
   const assetUrl = (directory, filename) => `${directory.replace(/\/?$/, '/')}${filename}`;
   const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -222,6 +225,8 @@
       directUpload.value = '';
       directUpload.disabled = true;
     }
+    const animationCancel = form.querySelector('[data-animation-upload-cancel]');
+    if (animationCancel) animationCancel.disabled = true;
     const preview = form.querySelector('[data-animation-upload-preview]');
     if (preview) {
       preview.replaceChildren();
@@ -273,6 +278,14 @@
     preview.replaceChildren();
   }
 
+  function clearAnimationUploadPreview(form) {
+    const preview = form.querySelector('[data-animation-upload-preview]');
+    if (!preview) return;
+    if (preview.dataset.objectUrl) URL.revokeObjectURL(preview.dataset.objectUrl);
+    delete preview.dataset.objectUrl;
+    preview.replaceChildren();
+  }
+
   function showImageUploadPreview(form, file) {
     const preview = form.querySelector('[data-image-upload-preview]');
     if (!preview || !file) return;
@@ -284,7 +297,28 @@
     image.alt = 'アップロード画像の投稿プレビュー';
     image.style.maxWidth = '240px';
     image.style.maxHeight = '240px';
-    preview.appendChild(image);
+    const details = document.createElement('p');
+    details.dataset.imageUploadDetails = '1';
+    details.textContent = '画像の情報を確認しています…';
+    image.addEventListener('load', () => {
+      const sourceWidth = image.naturalWidth;
+      const sourceHeight = image.naturalHeight;
+      let scale = 1;
+      if (settings.uploadResizeWidth > 0 && sourceWidth > settings.uploadResizeWidth) {
+        scale = Math.min(scale, settings.uploadResizeWidth / sourceWidth);
+      }
+      if (settings.uploadResizeHeight > 0 && sourceHeight > settings.uploadResizeHeight) {
+        scale = Math.min(scale, settings.uploadResizeHeight / sourceHeight);
+      }
+      const savedWidth = Math.max(1, Math.floor(sourceWidth * scale));
+      const savedHeight = Math.max(1, Math.floor(sourceHeight * scale));
+      const sourceSize = Math.ceil(file.size / 1024);
+      details.textContent = `選択中: ${sourceWidth} × ${sourceHeight}px、${sourceSize}KB。保存時: ${savedWidth} × ${savedHeight}px、${settings.uploadOutputFormat}形式。`;
+    }, { once: true });
+    image.addEventListener('error', () => {
+      details.textContent = '画像をプレビューできません。投稿時にサーバーで検証されます。';
+    }, { once: true });
+    preview.append(image, details);
   }
 
   async function prepareAnimation(file, status) {
@@ -324,6 +358,8 @@
     const temporaryImage = form.querySelector('select[name="picfile"]');
     const directUpload = form.querySelector('[name="image_upload"]');
     const animationUpload = form.querySelector('[data-animation-upload-file]');
+    const directCancel = form.querySelector('[data-image-upload-cancel]');
+    const animationCancel = form.querySelector('[data-animation-upload-cancel]');
     const status = form.querySelector('[data-animation-upload-status]');
     updateImageAltField(form);
     if (directUpload) {
@@ -331,8 +367,15 @@
         const file = directUpload.files && directUpload.files[0];
         if (file) showImageUploadPreview(form, file);
         else clearImageUploadPreview(form);
+        if (directCancel) directCancel.disabled = !file;
         updateImageAltField(form);
       });
+      if (directCancel) {
+        directCancel.addEventListener('click', () => {
+          directUpload.value = '';
+          directUpload.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      }
     }
     if (!temporaryImage) return;
 
@@ -355,6 +398,9 @@
       const clearedImage = clearFileInput(directUpload);
       const clearedAnimation = clearFileInput(animationUpload);
       if (clearedImage) clearImageUploadPreview(form);
+      if (clearedAnimation) clearAnimationUploadPreview(form);
+      if (clearedImage && directCancel) directCancel.disabled = true;
+      if (clearedAnimation && animationCancel) animationCancel.disabled = true;
       if (status && (clearedImage || clearedAnimation)) {
         status.textContent = '投稿途中の画像を選択したため、画像・動画の選択を解除しました。';
       }
@@ -382,6 +428,7 @@
     const status = form && form.querySelector('[data-animation-upload-status]');
     if (!form || !status) return;
     const directUpload = form.querySelector('[name="image_upload"]');
+    const animationCancel = form.querySelector('[data-animation-upload-cancel]');
     let processing = false;
     let preparing = false;
     let preparedPicture = null;
@@ -394,6 +441,8 @@
           input.value = '';
           preparedPicture = null;
           preparation = null;
+          clearAnimationUploadPreview(form);
+          if (animationCancel) animationCancel.disabled = true;
           status.textContent = '画像を選択したため、動画の選択を解除しました。';
         }
       });
@@ -403,9 +452,12 @@
       if (!input.files || !input.files[0]) {
         preparedPicture = null;
         preparation = null;
+        clearAnimationUploadPreview(form);
+        if (animationCancel) animationCancel.disabled = true;
         status.textContent = '';
         return;
       }
+      if (animationCancel) animationCancel.disabled = false;
       if (preparing) {
         status.textContent = '動画を確認中です。完了してから選択を変更してください。';
         return;
@@ -413,6 +465,8 @@
       if (directUpload && directUpload.files && directUpload.files[0]) {
         directUpload.value = '';
         clearImageUploadPreview(form);
+        const directCancel = form.querySelector('[data-image-upload-cancel]');
+        if (directCancel) directCancel.disabled = true;
         status.textContent = '動画を選択したため、画像の選択を解除しました。';
         return;
       }
@@ -442,6 +496,17 @@
         .finally(() => { preparing = false; });
       preparation.catch(() => {});
     });
+
+    if (animationCancel) {
+      animationCancel.addEventListener('click', () => {
+        if (processing) return;
+        input.value = '';
+        preparedPicture = null;
+        preparation = null;
+        clearAnimationUploadPreview(form);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
 
     form.addEventListener('submit', async (event) => {
       const file = input.files && input.files[0];

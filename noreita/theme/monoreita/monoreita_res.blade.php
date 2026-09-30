@@ -138,12 +138,15 @@
     <!-- scripts -->
     <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
     <script src="trip-preview.js?v={{$trip_preview_version}}" data-endpoint="{{$self}}?mode=trip_preview"></script>
+    <script src="post-preview.js?v={{$post_preview_version}}"></script>
     @if ($use_image_upload)
     <script src="animation-upload.js?v={{$animation_upload_version}}" data-endpoint="{{$self}}?mode=animation_upload"
       data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"
-      data-tegaki-enabled="{{$use_tegaki ? '1' : '0'}}"
-      data-max-work-bytes="{{$animation_upload_max_bytes}}"
-      data-max-width="{{$pmax_w}}" data-max-height="{{$pmax_h}}"></script>
+    data-tegaki-enabled="{{$use_tegaki ? '1' : '0'}}"
+    data-max-work-bytes="{{$animation_upload_max_bytes}}"
+    data-max-width="{{$pmax_w}}" data-max-height="{{$pmax_h}}"
+    data-upload-resize-width="{{$upload_resize_width}}" data-upload-resize-height="{{$upload_resize_height}}"
+    data-upload-output-format="{{$upload_output_format}}"></script>
     @endif
     @include('components.monoreita_togglePaletteVisibility')
     @include('components.monoreita_luminous')

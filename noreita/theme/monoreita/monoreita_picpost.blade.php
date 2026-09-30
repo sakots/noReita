@@ -59,7 +59,7 @@
             </tr>
             <tr>
               <td>mail</td>
-              <td><input type="text" name="mail" size="28" value="{{$email_cookie}}" autocomplete="off" maxlength="{{$max_email}}"></td>
+              <td><input type="text" name="mail" size="28" value="{{$email_cookie}}" autocomplete="off" maxlength="{{$max_email}}" data-trip-preview-input><output data-trip-preview hidden aria-live="polite"></output></td>
             </tr>
             <tr>
               <td>URL</td>
@@ -106,8 +106,9 @@
             <tr>
               <td>画像</td>
               <td>
-                <input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
-                <div data-image-upload-preview></div>
+                <input type="file" name="image_upload" accept="{{$upload_accept}}" data-image-upload-file>
+                <button class="button" type="button" data-image-upload-cancel disabled>選択を取り消す</button>（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
+                <small>保存時: {{$upload_resize_label}}、{{$upload_output_format}}形式</small>
               </td>
             </tr>
             @endif
@@ -116,12 +117,16 @@
               <td>動画</td>
               <td>
                 <input type="file" name="animation_upload" accept="{{$animation_upload_accept}}" data-animation-upload-file>
+                <button class="button" type="button" data-animation-upload-cancel disabled>選択を取り消す</button>
                 （{{$animation_upload_format_label}}、{{$animation_upload_max_kb}}KBまで。選択するとプレビューを生成します）
                 <span data-animation-upload-status aria-live="polite"></span>
-                <div data-animation-upload-preview></div>
               </td>
             </tr>
             @endif
+            <tr data-post-preview-row hidden>
+              <td>投稿プレビュー</td>
+              <td><section data-post-preview><div data-post-preview-content aria-live="polite"></div><div data-image-upload-preview aria-live="polite"></div><div data-animation-upload-preview aria-live="polite"></div></section></td>
+            </tr>
             <tr>
               <td>pass</td>
               <td>
@@ -171,12 +176,15 @@
     @include('components.monoreita_footerCopy')
   </footer>
   <script src="trip-preview.js?v={{$trip_preview_version}}" data-endpoint="{{$self}}?mode=trip_preview"></script>
+  <script src="post-preview.js?v={{$post_preview_version}}"></script>
   @if ($use_image_upload)
   <script src="animation-upload.js?v={{$animation_upload_version}}" data-endpoint="{{$self}}?mode=animation_upload"
     data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"
     data-tegaki-enabled="{{$use_tegaki ? '1' : '0'}}"
     data-max-work-bytes="{{$animation_upload_max_bytes}}"
-    data-max-width="{{$pmax_w}}" data-max-height="{{$pmax_h}}"></script>
+    data-max-width="{{$pmax_w}}" data-max-height="{{$pmax_h}}"
+    data-upload-resize-width="{{$upload_resize_width}}" data-upload-resize-height="{{$upload_resize_height}}"
+    data-upload-output-format="{{$upload_output_format}}"></script>
   @endif
 </body>
 

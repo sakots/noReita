@@ -10,7 +10,7 @@
           </tr>
           <tr>
             <td>mail</td>
-            <td><input type="text" name="mail" size="28" autocomplete="off" value="{{$bbsline['mail']}}" maxlength="{{$max_email}}"></td>
+            <td><input type="text" name="mail" size="28" autocomplete="off" value="{{$bbsline['input_mail'] ?? $bbsline['mail']}}" maxlength="{{$max_email}}" data-trip-preview-input><output data-trip-preview hidden aria-live="polite"></output></td>
           </tr>
           <tr>
             <td>URL</td>

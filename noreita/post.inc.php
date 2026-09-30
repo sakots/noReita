@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260910;
+const POST_INC_VER = 20260930;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -73,6 +73,10 @@ final class PostService implements AdminPostManagementService {
     $values['name'] = hash_equals((string)$post['a_name'], $submitted_name)
       ? $submitted_name
       : generate_trip($submitted_name);
+    $submitted_mail = (string)($values['mail'] ?? '');
+    $values['mail'] = hash_equals((string)$post['mail'], $submitted_mail)
+      ? $submitted_mail
+      : generate_trip($submitted_mail);
     $values['pwdh'] = (string)$post['pwd'];
     // 「そうだね」は更新SQLの対象外とし、読み取り後の加算を上書きしない。
     $values['nsfw'] = (int)$post['nsfw'];
@@ -103,6 +107,11 @@ final class PostService implements AdminPostManagementService {
   public static function nameForEdit(string $stored_name, string $saved_name, bool $is_owner): string {
     if (!$is_owner || $saved_name === '') return $stored_name;
     return hash_equals($stored_name, generate_trip($saved_name)) ? $saved_name : $stored_name;
+  }
+
+  public static function mailForEdit(string $stored_mail, string $saved_mail, bool $is_owner): string {
+    if (!$is_owner || $saved_mail === '') return $stored_mail;
+    return hash_equals($stored_mail, generate_trip($saved_mail)) ? $saved_mail : $stored_mail;
   }
 
   public function delete(int $post_id, string $password, bool $delete_as_admin): string {
@@ -216,6 +225,7 @@ final class PostService implements AdminPostManagementService {
     $comment_was_present = (string)($input['com'] ?? '') !== '';
     $name = generate_trip((string)($input['name'] ?? ''));
     $name = $name !== '' ? $name : (string)$settings['default_name'];
+    $mail = generate_trip((string)($input['mail'] ?? ''));
     $comment = (string)($input['com'] ?? '');
     $comment = $comment !== '' ? $comment : (string)$settings['default_comment'];
     $subject = (string)($input['sub'] ?? '');
@@ -237,7 +247,7 @@ final class PostService implements AdminPostManagementService {
       $name .= (string)$settings['admin_cap'];
     }
     return array_merge($input, [
-      'name' => $name, 'com' => $comment, 'sub' => $subject, 'host' => $host,
+      'name' => $name, 'mail' => $mail, 'com' => $comment, 'sub' => $subject, 'host' => $host,
       'pwdh' => password_hash($password, PASSWORD_DEFAULT),
       'admins' => ($is_admin && $name === $admin_name) ? 1 : 0,
     ]);
