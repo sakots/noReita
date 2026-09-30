@@ -13,6 +13,9 @@
     maxWorkBytes: Number(loader.dataset.maxWorkBytes || 0),
     maxWidth: Number(loader.dataset.maxWidth || 0),
     maxHeight: Number(loader.dataset.maxHeight || 0),
+    uploadResizeWidth: Number(loader.dataset.uploadResizeWidth || 0),
+    uploadResizeHeight: Number(loader.dataset.uploadResizeHeight || 0),
+    uploadOutputFormat: loader.dataset.uploadOutputFormat || '元の画像形式',
   };
   const assetUrl = (directory, filename) => `${directory.replace(/\/?$/, '/')}${filename}`;
   const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -284,7 +287,28 @@
     image.alt = 'アップロード画像の投稿プレビュー';
     image.style.maxWidth = '240px';
     image.style.maxHeight = '240px';
-    preview.appendChild(image);
+    const details = document.createElement('p');
+    details.dataset.imageUploadDetails = '1';
+    details.textContent = '画像の情報を確認しています…';
+    image.addEventListener('load', () => {
+      const sourceWidth = image.naturalWidth;
+      const sourceHeight = image.naturalHeight;
+      let scale = 1;
+      if (settings.uploadResizeWidth > 0 && sourceWidth > settings.uploadResizeWidth) {
+        scale = Math.min(scale, settings.uploadResizeWidth / sourceWidth);
+      }
+      if (settings.uploadResizeHeight > 0 && sourceHeight > settings.uploadResizeHeight) {
+        scale = Math.min(scale, settings.uploadResizeHeight / sourceHeight);
+      }
+      const savedWidth = Math.max(1, Math.floor(sourceWidth * scale));
+      const savedHeight = Math.max(1, Math.floor(sourceHeight * scale));
+      const sourceSize = Math.ceil(file.size / 1024);
+      details.textContent = `選択中: ${sourceWidth} × ${sourceHeight}px、${sourceSize}KB。保存時: ${savedWidth} × ${savedHeight}px、${settings.uploadOutputFormat}形式。`;
+    }, { once: true });
+    image.addEventListener('error', () => {
+      details.textContent = '画像をプレビューできません。投稿時にサーバーで検証されます。';
+    }, { once: true });
+    preview.append(image, details);
   }
 
   async function prepareAnimation(file, status) {

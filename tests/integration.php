@@ -523,13 +523,17 @@ PHP;
     $upload_mimes[] = $mime;
     $upload_labels[] = $label;
   }
-  integration_test('image upload form lists only formats supported by GD', static function () use (
+  integration_test('image upload form lists supported formats and conversion guidance', static function () use (
     $status, $pictmp_body, $upload_mimes, $upload_labels
   ): bool {
     return $status === 200
       && str_contains($pictmp_body, 'name="image_upload"')
       && str_contains($pictmp_body, 'accept="' . implode(',', $upload_mimes) . '"')
-      && str_contains($pictmp_body, implode(' / ', $upload_labels));
+      && str_contains($pictmp_body, implode(' / ', $upload_labels))
+      && str_contains($pictmp_body, 'data-image-upload-file')
+      && str_contains($pictmp_body, '保存時: 最大2 × 2px')
+      && str_contains($pictmp_body, 'data-upload-resize-width="2"')
+      && str_contains($pictmp_body, 'data-upload-output-format=');
   });
 
   integration_test('animation upload uses the normal post submit action', static function () use (

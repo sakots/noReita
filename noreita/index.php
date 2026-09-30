@@ -271,6 +271,16 @@ $dat['can_post_reply'] = diary_post_allowed(true);
 $dat['upload_max_kb'] = Config::int('limits.upload_kb');
 $dat['upload_max_width'] = Config::int('limits.image_width');
 $dat['upload_max_height'] = Config::int('limits.image_height');
+$dat['upload_resize_width'] = Config::int('limits.upload_resize_width');
+$dat['upload_resize_height'] = Config::int('limits.upload_resize_height');
+$dat['upload_resize_label'] = $dat['upload_resize_width'] > 0 && $dat['upload_resize_height'] > 0
+  ? '最大' . $dat['upload_resize_width'] . ' × ' . $dat['upload_resize_height'] . 'px'
+  : ($dat['upload_resize_width'] > 0
+    ? '最大幅' . $dat['upload_resize_width'] . 'px'
+    : ($dat['upload_resize_height'] > 0 ? '最大高さ' . $dat['upload_resize_height'] . 'px' : '元の大きさ'));
+$dat['upload_output_format'] = Config::bool('features.upload_webp') && function_exists('imagewebp')
+  ? 'WebP'
+  : '元の画像形式';
 $dat['upload_accept'] = ImageService::uploadAccept();
 $dat['upload_format_label'] = ImageService::uploadFormatLabel();
 $dat['neo_github_api'] = Config::bool('features.neo_github_api');

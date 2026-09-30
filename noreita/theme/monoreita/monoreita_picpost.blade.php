@@ -106,8 +106,9 @@
             <tr>
               <td>画像</td>
               <td>
-                <input type="file" name="image_upload" accept="{{$upload_accept}}">（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
-                <div data-image-upload-preview></div>
+                <input type="file" name="image_upload" accept="{{$upload_accept}}" data-image-upload-file>（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
+                <small>保存時: {{$upload_resize_label}}、{{$upload_output_format}}形式</small>
+                <div data-image-upload-preview aria-live="polite"></div>
               </td>
             </tr>
             @endif
@@ -176,7 +177,9 @@
     data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"
     data-tegaki-enabled="{{$use_tegaki ? '1' : '0'}}"
     data-max-work-bytes="{{$animation_upload_max_bytes}}"
-    data-max-width="{{$pmax_w}}" data-max-height="{{$pmax_h}}"></script>
+    data-max-width="{{$pmax_w}}" data-max-height="{{$pmax_h}}"
+    data-upload-resize-width="{{$upload_resize_width}}" data-upload-resize-height="{{$upload_resize_height}}"
+    data-upload-output-format="{{$upload_output_format}}"></script>
   @endif
 </body>
 
