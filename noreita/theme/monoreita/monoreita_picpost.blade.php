@@ -108,7 +108,6 @@
               <td>
                 <input type="file" name="image_upload" accept="{{$upload_accept}}" data-image-upload-file>（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
                 <small>保存時: {{$upload_resize_label}}、{{$upload_output_format}}形式</small>
-                <div data-image-upload-preview aria-live="polite"></div>
               </td>
             </tr>
             @endif
@@ -121,6 +120,12 @@
                 <span data-animation-upload-status aria-live="polite"></span>
                 <div data-animation-upload-preview></div>
               </td>
+            </tr>
+            @endif
+            @if ($use_image_upload && !isset($selected_picfile))
+            <tr data-image-upload-preview-row>
+              <td></td>
+              <td><div data-image-upload-preview aria-live="polite"></div></td>
             </tr>
             @endif
             <tr>
