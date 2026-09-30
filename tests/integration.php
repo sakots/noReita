@@ -533,7 +533,10 @@ PHP;
       && str_contains($pictmp_body, 'data-image-upload-file')
       && str_contains($pictmp_body, '保存時: 最大2 × 2px')
       && str_contains($pictmp_body, 'data-upload-resize-width="2"')
-      && str_contains($pictmp_body, 'data-upload-output-format=');
+      && str_contains($pictmp_body, 'data-upload-output-format=')
+      && str_contains($pictmp_body, 'data-post-preview-row')
+      && str_contains($pictmp_body, 'data-post-preview-content')
+      && str_contains($pictmp_body, 'post-preview.js?');
   });
 
   integration_test('animation upload uses the normal post submit action', static function () use (

@@ -64,12 +64,10 @@
       </td>
     </tr>
     @endif
-    @if ($use_image_upload)
-    <tr data-image-upload-preview-row>
-      <td></td>
-      <td><div data-image-upload-preview aria-live="polite"></div></td>
+    <tr data-post-preview-row hidden>
+      <td>投稿プレビュー</td>
+      <td><section data-post-preview><div data-post-preview-content aria-live="polite"></div><div data-image-upload-preview aria-live="polite"></div></section></td>
     </tr>
-    @endif
     @if ($use_nsfw)
     <tr>
       <td>NSFW</td>

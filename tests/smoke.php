@@ -78,6 +78,16 @@ smoke_test('post image candidates replace each other in the post form', static f
     && !str_contains($script, '別の動画へ変更する場合はページを再読み込みしてください。');
 });
 
+smoke_test('post preview renders text and links without fetching external pages', static function (): bool {
+  $script = file_get_contents(dirname(__DIR__) . '/noreita/post-preview.js');
+  return is_string($script)
+    && str_contains($script, 'textarea[name="com"]')
+    && str_contains($script, '外部リンク')
+    && str_contains($script, "link.rel = 'noopener noreferrer'")
+    && str_contains($script, 'body.textContent = text')
+    && !str_contains($script, 'fetch(');
+});
+
 smoke_test('trip preview uses the server trip generator without sending secrets in URLs', static function (): bool {
   $script = file_get_contents(dirname(__DIR__) . '/noreita/trip-preview.js');
   $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');

@@ -122,12 +122,10 @@
               </td>
             </tr>
             @endif
-            @if ($use_image_upload && !isset($selected_picfile))
-            <tr data-image-upload-preview-row>
-              <td></td>
-              <td><div data-image-upload-preview aria-live="polite"></div></td>
+            <tr data-post-preview-row hidden>
+              <td>投稿プレビュー</td>
+              <td><section data-post-preview><div data-post-preview-content aria-live="polite"></div><div data-image-upload-preview aria-live="polite"></div></section></td>
             </tr>
-            @endif
             <tr>
               <td>pass</td>
               <td>
@@ -177,6 +175,7 @@
     @include('components.monoreita_footerCopy')
   </footer>
   <script src="trip-preview.js?v={{$trip_preview_version}}" data-endpoint="{{$self}}?mode=trip_preview"></script>
+  <script src="post-preview.js?v={{$post_preview_version}}"></script>
   @if ($use_image_upload)
   <script src="animation-upload.js?v={{$animation_upload_version}}" data-endpoint="{{$self}}?mode=animation_upload"
     data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"

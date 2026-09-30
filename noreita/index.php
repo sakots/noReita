@@ -265,6 +265,10 @@ $trip_preview_modified = @filemtime(__DIR__ . '/trip-preview.js');
 $dat['trip_preview_version'] = $trip_preview_modified === false
   ? REITA_VER
   : (string)$trip_preview_modified;
+$post_preview_modified = @filemtime(__DIR__ . '/post-preview.js');
+$dat['post_preview_version'] = $post_preview_modified === false
+  ? REITA_VER
+  : (string)$post_preview_modified;
 $dat['diary_mode'] = Config::bool('features.diary_mode');
 $dat['can_create_thread'] = diary_post_allowed(false);
 $dat['can_post_reply'] = diary_post_allowed(true);

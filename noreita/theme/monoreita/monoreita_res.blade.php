@@ -138,6 +138,7 @@
     <!-- scripts -->
     <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
     <script src="trip-preview.js?v={{$trip_preview_version}}" data-endpoint="{{$self}}?mode=trip_preview"></script>
+    <script src="post-preview.js?v={{$post_preview_version}}"></script>
     @if ($use_image_upload)
     <script src="animation-upload.js?v={{$animation_upload_version}}" data-endpoint="{{$self}}?mode=animation_upload"
       data-neo-dir="{{$neo_dir}}" data-tegaki-dir="{{$tegaki_dir}}"
