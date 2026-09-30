@@ -111,13 +111,12 @@
                 <input type="file" name="animation_upload" accept="{{ animation_upload_accept }}" data-animation-upload-file>
                 （{{ animation_upload_format_label }}、{{ animation_upload_max_kb }}KBまで。選択するとプレビューを生成します）
                 <span data-animation-upload-status aria-live="polite"></span>
-                <div data-animation-upload-preview></div>
               </td>
             </tr>
             {% endif %}
             <tr data-post-preview-row hidden>
               <td>投稿プレビュー</td>
-              <td><section data-post-preview><div data-post-preview-content aria-live="polite"></div><div data-image-upload-preview aria-live="polite"></div></section></td>
+              <td><section data-post-preview><div data-post-preview-content aria-live="polite"></div><div data-image-upload-preview aria-live="polite"></div><div data-animation-upload-preview aria-live="polite"></div></section></td>
             </tr>
             <tr>
               <td>pass</td>

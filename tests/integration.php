@@ -536,6 +536,7 @@ PHP;
       && str_contains($pictmp_body, 'data-upload-output-format=')
       && str_contains($pictmp_body, 'data-post-preview-row')
       && str_contains($pictmp_body, 'data-post-preview-content')
+      && str_contains($pictmp_body, 'data-animation-upload-preview')
       && str_contains($pictmp_body, 'post-preview.js?');
   });
 
