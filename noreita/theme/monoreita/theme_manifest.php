@@ -8,7 +8,7 @@ return [
   'engine' => 'blade',
   'requires' => [
     'php' => '8.1.0',
-    'noreita' => '4.5.0',
+    'noreita' => '4.13.0',
   ],
   'templates' => [
     'main' => 'monoreita_main', 'response' => 'monoreita_res', 'paint' => 'monoreita_paint',
