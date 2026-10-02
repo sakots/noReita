@@ -3,6 +3,9 @@
 
 const MISSKEY_SECURITY_VER = 20260816;
 
+/**
+ * Misskey連携先のURLを正規化・検証し、SSRFにつながる接続先を拒否する。
+ */
 final class MisskeyServerSecurity {
   public static function normalizeBaseUrl(string $url): string|false {
     $url = trim($url);

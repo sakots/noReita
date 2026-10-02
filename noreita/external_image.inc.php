@@ -3,6 +3,10 @@
 
 const EXTERNAL_IMAGE_INC_VER = 20260820;
 
+/**
+ * 本文中の外部画像を取得してサムネイル化する。
+ * URLと接続先を検証し、内部ネットワークへのアクセスを防止する。
+ */
 final class ExternalImageService {
   public const MAX_BYTES = 1024 * 1024;
   public const MAX_URLS_PER_POST = 2;
@@ -337,6 +341,10 @@ final class ExternalImageService {
   }
 }
 
+/**
+ * 外部ページのOGP情報をキャッシュし、本文へリンクカードを追加する。
+ * ブラウザーではなくサーバー側で取得して、表示時の外部通信を行わない。
+ */
 final class ExternalLinkPreviewService {
   private const MAX_BYTES = 524288;
   private const MAX_URLS_PER_POST = 2;

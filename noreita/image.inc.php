@@ -6,6 +6,11 @@ const IMAGE_INC_VER = 20260913;
 final class ImageUploadException extends RuntimeException {
 }
 
+/**
+ * 画像と再生ファイルの検証、安全な公開、サムネイル、差し替え、削除復旧を担う。
+ * 関連ファイルをここで一元的に扱い、投稿の変更時にPCH・PSD・サムネイルを
+ * 取り残さないようにする。
+ */
 final class ImageService {
   private const RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'psd', 'tgkr'];
   private const TEMPORARY_RELATED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pch', 'spch', 'dat', 'chi', 'psd', 'tgkr'];
@@ -700,6 +705,7 @@ final class ImageService {
       throw new ImageUploadException('The uploaded image exceeds the size limit.', 400);
     }
 
+    // ブラウザーが送るファイル名やContent-Typeは信頼せず、アップロード済みの実データを調べる。
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($temporary_file);
     $types = self::supportedUploadFormats();
     if (!is_string($mime) || !isset(self::UPLOAD_IMAGE_TYPES[$mime])) {
@@ -731,6 +737,7 @@ final class ImageService {
     $extension = self::UPLOAD_IMAGE_TYPES[$output_mime]['extension'];
     $filename = self::newOekakiImageFilename($image_dir, $extension);
     $destination = $image_dir . $filename;
+    // 同一ファイルシステム内でrename()を原子的に行えるよう、公開先と同じディレクトリで準備する。
     $staged_source = tempnam($image_dir, '.noreita_upload_source_');
     $staged_image = tempnam($image_dir, '.noreita_upload_image_');
     if ($staged_source === false || $staged_image === false) {
@@ -1474,6 +1481,7 @@ final class ImageService {
         $save_post($result);
       }
     } catch (Throwable $e) {
+      // DB保存または後続のファイル処理に失敗した場合は、今回作成したファイルだけを削除する。
       foreach (array_reverse($published) as $path) {
         safe_unlink($path);
       }
@@ -1612,6 +1620,7 @@ final class ImageService {
       throw new RuntimeException('Invalid replacement image.');
     }
 
+    // 公開中のファイル名と入れ替える前に、差し替え用ファイルを完全な状態まで作成する。
     $work_file = tempnam($image_dir, '.noreita_replace_');
     if ($work_file === false || !copy($source, $work_file) || !is_file($work_file)) {
       if (is_string($work_file)) safe_unlink($work_file);

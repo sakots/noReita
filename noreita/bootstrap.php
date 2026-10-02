@@ -16,6 +16,10 @@ if (PHP_VERSION_ID < NOREITA_MIN_PHP_VERSION_ID) {
   exit('PHP ' . NOREITA_MIN_PHP_VERSION . ' or higher is required. Current PHP version: ' . PHP_VERSION);
 }
 
+/**
+ * 設定、エラー処理、テンプレートに必要な基盤を起動する。
+ * HTTPハンドラーへ渡す前に、実行環境の不備を検出する。
+ */
 final class ApplicationBootstrap {
   private static bool $booted = false;
   private static bool $english = false;
@@ -37,7 +41,8 @@ final class ApplicationBootstrap {
     ApplicationErrorHandler::install($root . '/errorlog', $root . '/auditlog');
 
     try {
-      Config::load($root);
+    // config.local.phpは既定設定へ検証付きで重ね、運用環境ごとの差分だけを許可する。
+    Config::load($root);
     } catch (Throwable $e) {
       if ($e instanceof ConfigException) throw $e;
       throw new ConfigException('Configuration could not be loaded.', 0, $e);

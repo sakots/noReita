@@ -6,6 +6,10 @@ const SAVE_INC_VER = 20260820; //save.inc.phpのバージョン
 
 final class PaintSaveCapacityException extends RuntimeException {}
 
+/**
+ * 描画アプリからの保存リクエストを受け取る前に、データ量と画像寸法を制限する。
+ * 大きすぎるデータを展開・保存して容量を使い切ることを防ぐ。
+ */
 final class PaintSaveRequestGuard {
   private const FILE_FIELDS = [
     'neo' => ['picture', 'pch'],
@@ -138,6 +142,10 @@ final class PaintSaveRequestGuard {
   }
 }
 
+/**
+ * 各描画アプリの保存形式を一時ディレクトリへ受け取る互換レイヤー。
+ * 公開ディレクトリへの移動と投稿行の保存は、後段のImageServiceが担当する。
+ */
 class image_save{
 
   /** @var int|string */

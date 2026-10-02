@@ -3,6 +3,10 @@
 
 const SHARE_INC_VER = 20260725;
 
+/**
+ * 設定済み共有先だけに投稿URLを渡す。
+ * リダイレクト先を検証して、任意URLへの転送を許可しない。
+ */
 final class ShareService {
   private const DEFAULT_SERVERS = [
     ['X', 'https://x.com'],

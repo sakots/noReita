@@ -6,6 +6,10 @@ const REQUEST_SECURITY_INC_VER = 20260726;
 final class RequestSecurityException extends RuntimeException {
 }
 
+/**
+ * セッション、同一オリジン検証、CSRF対策のHTTPリクエスト境界。
+ * 投稿、設定、アップロード済みファイルを変更する前にこれらを確認する。
+ */
 final class RequestSecurity {
   public static function startSession(): void {
     if (session_status() !== PHP_SESSION_NONE) return;
@@ -16,6 +20,7 @@ final class RequestSecurity {
     session_save_path($session_directory);
     ini_set('session.use_strict_mode', '1');
     ini_set('session.gc_maxlifetime', (string)$session_file_lifetime);
+    // セッションIDをJavaScriptから参照できないようにし、HTTPSでは暗号化通信でのみ送信する。
     session_set_cookie_params([
       'lifetime' => 0,
       'path' => '',
@@ -41,6 +46,7 @@ final class RequestSecurity {
     self::startSession();
     self::disableCacheHeaders();
     if (!isset($_SESSION['token']) || !is_string($_SESSION['token']) || $_SESSION['token'] === '') {
+      // トークンはセッションに結び付け、検証時はhash_equals()で比較する。
       $_SESSION['token'] = hash('sha256', session_id(), false);
     }
     return $_SESSION['token'];
@@ -51,6 +57,7 @@ final class RequestSecurity {
       throw new RequestSecurityException($english ? 'This operation has failed.' : 'この操作は失敗しました。', 400);
     }
 
+    // トークン比較の前にOriginとusercode Cookieを確認し、別サイトからのフォーム送信を拒否する。
     self::assertSameOriginRequest($usercode, $english);
     $token = (string)filter_input_data('POST', 'token');
     $session_token = isset($_SESSION['token']) ? (string)$_SESSION['token'] : '';
@@ -183,6 +190,9 @@ final class SessionFileCleaner {
   }
 }
 
+/**
+ * セッションにはパスワードから導いた指紋だけを保存し、管理者パスワード自体は保存しない。
+ */
 final class AdminAuth {
   private const SESSION_FINGERPRINT = 'admin_auth_fingerprint';
   private const SESSION_LAST_ACTIVITY = 'admin_auth_last_activity';
@@ -245,6 +255,10 @@ final class AdminAuth {
   }
 }
 
+/**
+ * 管理者ログイン試行をファイルで制限する。PHPセッションの外に記録することで、
+ * 新しいセッションを作ってロックアウトを回避できないようにする。
+ */
 final class AdminLoginRateLimiter {
   private string $directory;
   private string $secret;

@@ -386,6 +386,8 @@ $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTT
 
 // モード
 
+// 正規化済みのmodeをコントローラーへ振り分ける。
+// 状態を変更する各処理でCSRF・認可を確認するため、この分岐には共通の検査を置かない。
 switch ($mode) {
   case 'regist': // スレ立て
     PostController::register($application_context); return;
@@ -626,6 +628,7 @@ function regist(ApplicationContext $context): void {
     }
   }
 
+  // 入力は一度だけ取り出し、一時画像やDBに触れる前に検証する。
   $input = PostValidator::inputFromHttp();
   if (!diary_post_allowed($input['resto'] !== '')) {
     render_error($context, $en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
@@ -2219,7 +2222,7 @@ function editexec(ApplicationContext $context): void {
   $dat =& $context->data;
   $en = $context->english;
 
-  //CSRFトークンをチェック
+  // 編集は公開内容を変更するため、投稿時と同じリクエスト保護を必須にする。
   if (Config::bool('features.csrf')) {
     try {
       RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);

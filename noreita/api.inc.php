@@ -14,6 +14,10 @@ final class PublicApiException extends RuntimeException {
   }
 }
 
+/**
+ * 公開済み投稿だけを、テーマに依存しないJSON形式で返すAPI。
+ * DB行をそのまま返さず、パスワードやホストなどの非公開項目を除外する。
+ */
 final class PublicApi {
   private const VERSION = 'v1';
   private const MAX_PAGE_SIZE = 100;

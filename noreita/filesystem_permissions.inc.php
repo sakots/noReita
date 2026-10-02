@@ -3,6 +3,7 @@
 
 const FILESYSTEM_PERMISSIONS_INC_VER = 20260817;
 
+/** OSごとの差異を吸収して、生成ファイルへ安全な権限を設定する。 */
 final class FilesystemPermissions {
   /**
    * Windowsのchmod()とfileperms()はPOSIXの所有者・グループ・その他の

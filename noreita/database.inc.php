@@ -155,6 +155,11 @@ final class AdminPostFilter {
   }
 }
 
+/**
+ * Webリクエストと保守ツールで共通のSQLite設定を持つPDO接続を作成する。
+ * WALと待機時間の設定により、短時間の同時書き込みでは即座に
+ * 「database is locked」を返さず再試行できるようにする。
+ */
 final class Database {
   private const DEFAULT_BUSY_TIMEOUT_MS = 5000;
   private const MAX_BUSY_TIMEOUT_MS = 60000;
@@ -217,6 +222,10 @@ final class PublicPostSearch {
   }
 }
 
+/**
+ * board_logの永続化を担う境界。リクエスト処理側でSQLを組み立てず、
+ * ドメイン値をここへ渡す。
+ */
 final class BoardRepository {
   private PDO $db;
 
@@ -288,6 +297,7 @@ final class BoardRepository {
 
   /** @return mixed */
   public function transaction(callable $operation) {
+    // ネストしたサービス呼び出しは外側のトランザクションを共有し、その所有者だけが確定・取消を行う。
     if ($this->db->inTransaction()) return $operation();
     $this->db->beginTransaction();
     try {
@@ -368,6 +378,7 @@ final class BoardRepository {
       'host' => $values['host'], 'picfile' => $values['picfile'], 'pchfile' => $values['pchfile'],
       'author_id' => $values['author_id'], 'psec' => $values['psec'], 'utime' => $values['utime'],
       'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'], 'id' => $id,
+      // 古いファイル名も照合し、同時に行われた別の差し替えで新しい画像を上書きしない。
       'expected_picfile' => $values['expected_picfile'],
       'img_w' => $values['img_w'], 'img_h' => $values['img_h'],
       'tool' => $values['tool'],
@@ -563,6 +574,10 @@ final class BoardRepository {
   }
 }
 
+/**
+ * 対応する掲示板DBを番号付きの小さな手順で更新する。
+ * 既存DBを変更する前にバックアップを作成し、管理者が復旧できるようにする。
+ */
 final class DatabaseMigrator {
   public const SCHEMA_VERSION = 2;
 
@@ -612,6 +627,7 @@ final class DatabaseMigrator {
       return null;
     }
 
+    // スキーマとuser_versionは同時に確定する。移行に失敗しても元のDBを利用できるようにする。
     $backup_path = $this->createBackup($current_version);
     $this->transaction(function () use ($current_version): void {
       for ($version = $current_version + 1; $version <= self::SCHEMA_VERSION; $version++) {

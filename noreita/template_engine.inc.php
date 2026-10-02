@@ -6,6 +6,7 @@ interface TemplateEngine {
   public function render(string $template, array $data = []): string;
 }
 
+/** BladeOneテンプレートをキャッシュ付きで描画する実装。 */
 final class BladeTemplateEngine implements TemplateEngine {
   private \eftec\bladeone\BladeOne $blade;
 
@@ -21,6 +22,7 @@ final class BladeTemplateEngine implements TemplateEngine {
   }
 }
 
+/** Twigテンプレートを自動エスケープ付きで描画・検証する実装。 */
 final class TwigTemplateEngine implements TemplateEngine {
   private \Twig\Environment $twig;
   private BladeTemplateEngine $blade_fallback;
@@ -68,6 +70,7 @@ final class TwigTemplateEngine implements TemplateEngine {
   }
 }
 
+/** テーママニフェストで選ばれたテンプレートエンジンを安全に生成する。 */
 final class TemplateEngineFactory {
   /** @param string|array<int,string> $views */
   public static function create(string $engine, string|array $views, string $cache): TemplateEngine {

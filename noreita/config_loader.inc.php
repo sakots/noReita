@@ -4,6 +4,10 @@
 final class ConfigException extends RuntimeException {
 }
 
+/**
+ * 配布時の既定設定と設置者用の上書きを読み込み、型・値・パスの安全性を検証する。
+ * 値は読み込み後に固定し、リクエスト中の設定差し替えを防ぐ。
+ */
 final class Config {
   public const FORMAT_VERSION = 4;
 
@@ -405,6 +409,7 @@ final class Config {
 }
 
 /** Admin-only editor for the trusted local configuration override. */
+/** 管理画面から許可された設定差分だけをconfig.local.phpへ保存する。 */
 final class ConfigEditor {
   /** @return array<string,mixed> */
   public static function defaults(string $root): array {
@@ -504,6 +509,7 @@ final class ConfigEditor {
 }
 
 /** Restricted parser for a PHP configuration array. It never evaluates submitted code. */
+/** PHPコードを実行せず、設定編集画面の配列リテラルだけを解析する小さなパーサー。 */
 final class ConfigArrayParser {
   /** @var array<int,array{0:int,1:string,2:int}|string> */
   private array $tokens;

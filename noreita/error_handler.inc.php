@@ -3,6 +3,7 @@
 
 const ERROR_HANDLER_INC_VER = 20260820;
 
+/** エラー記録を日付ごとのJSON Linesファイルへ追記し、サイズと保存期間を管理する。 */
 final class ErrorLogStorage {
   public static function append(
     string $directory,
@@ -78,6 +79,7 @@ final class ErrorLogStorage {
 }
 
 /** Read the application's JSON Lines logs without exposing their filesystem paths. */
+/** 管理画面で表示してよい形式に限定して、非公開エラーログを読み出す。 */
 final class ErrorLogReader {
   private const MAX_RECORDS = 100;
   private const MAX_FIELD_LENGTH = 4000;
@@ -228,6 +230,10 @@ final class AuditLogReader {
   }
 }
 
+/**
+ * PHPエラーと例外を一意な参照ID付きで非公開ログへ記録する。
+ * 公開レスポンスには内部パスや例外詳細を渡さない。
+ */
 final class ApplicationErrorHandler {
   private const DEFAULT_RETENTION_DAYS = 30;
   private const DEFAULT_MAX_BYTES = 5242880;
@@ -594,6 +600,7 @@ final class ApplicationErrorHandler {
    * @param array<string,mixed> $record
    * @return array<string,mixed>
    */
+  /** ログを保存する前に、URL・パス・認証情報に含まれ得る値を伏せる。 */
   private static function redactRecord(array $record): array {
     foreach ($record as $key => $value) {
       if (is_string($value)) $record[$key] = self::redact($value);

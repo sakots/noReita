@@ -8,6 +8,7 @@ final class PostNotFoundException extends RuntimeException {}
 final class PostAuthorizationException extends RuntimeException {}
 final class DuplicatePostException extends RuntimeException {}
 
+/** コントローラーごとに規則を重複させず、日記モードの投稿可否を判断する。 */
 final class DiaryPostPolicy {
   public static function allows(bool $diary_mode, bool $allow_public_replies, bool $is_admin, bool $is_reply): bool {
     return !$diary_mode || $is_admin || ($is_reply && $allow_public_replies);
@@ -21,6 +22,10 @@ interface AdminPostManagementService {
   public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int;
 }
 
+/**
+ * 認可、投稿行、関連画像ファイルをまとめて扱う。
+ * コントローラーはHTTP入力を検証してから、状態変更をこのサービスへ委譲する。
+ */
 final class PostService implements AdminPostManagementService {
   private BoardRepository $repository;
   private string $image_dir;
@@ -56,6 +61,7 @@ final class PostService implements AdminPostManagementService {
   public function authorize(int $post_id, string $password, bool $authorize_as_admin = false): array {
     $post = $this->repository->findPost($post_id);
     if (empty($post)) throw new PostNotFoundException('Post was not found.');
+    // 管理者としての認可は、呼び出し元で確認済みのセッションに対してのみ与える。
     if ($authorize_as_admin) {
       return ['post' => $post, 'role' => 'admin'];
     }
@@ -70,6 +76,7 @@ final class PostService implements AdminPostManagementService {
     $authorization = $this->authorize($post_id, $password, $edit_as_admin);
     $post = $authorization['post'];
     $submitted_name = (string)($values['name'] ?? '');
+    // 表示済みトリップを再変換すると◆が◇になるため、未変更ならそのまま保存する。
     $values['name'] = hash_equals((string)$post['a_name'], $submitted_name)
       ? $submitted_name
       : generate_trip($submitted_name);
@@ -156,6 +163,7 @@ final class PostService implements AdminPostManagementService {
    * @param callable():void $delete_database_rows
    */
   private function deletePostsAtomically(array $posts, callable $delete_database_rows): void {
+    // 先にファイルを退避してからDB削除を確定する。失敗時は退避したファイルを復元する。
     $image_names = array_map(static fn(array $post): string => (string)($post['picfile'] ?? ''), $posts);
     $staged = ImageService::stageRelatedFilesForDeletion(
       $this->image_dir, $this->deletion_staging_dir, $image_names, $posts
@@ -223,6 +231,7 @@ final class PostService implements AdminPostManagementService {
    */
   public function prepareNewPost(array $input, string $host, array $settings): array {
     $comment_was_present = (string)($input['com'] ?? '') !== '';
+    // #以降のキーが公開投稿行に残らないよう、保存前にトリップへ変換する。
     $name = generate_trip((string)($input['name'] ?? ''));
     $name = $name !== '' ? $name : (string)$settings['default_name'];
     $mail = generate_trip((string)($input['mail'] ?? ''));
@@ -277,6 +286,7 @@ final class PostService implements AdminPostManagementService {
     $age = 0;
 
     if ($parent !== null) {
+      // 返信は親スレッドの並び順データを引き継ぐ。sage返信では意図的に並び順を更新しない。
       $parent_post = $this->repository->findPost($parent);
       if (empty($parent_post) || (int)($parent_post['thread'] ?? 0) !== 1) {
         throw new PostNotFoundException('Parent post was not found.');
@@ -364,6 +374,10 @@ final class PostInput {
   }
 }
 
+/**
+ * 信頼できないリクエスト値をサービスで使う限定された投稿データへ変換し、
+ * 掲示板固有の長さ・スパム・日記モードの規則を適用する。
+ */
 final class PostValidator {
   public const MAX_IMAGE_ALT_LENGTH = 500;
   /**
