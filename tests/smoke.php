@@ -1220,6 +1220,18 @@ smoke_test('superseded internal helpers are removed', static function (): bool {
     && !function_exists('user_del_valid');
 });
 
+smoke_test('themes do not retain the removed err2 mode', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $eda = file_get_contents($root . '/eda/eda_other.twig');
+  $monoreita = file_get_contents($root . '/monoreita/monoreita_other.blade.php');
+  return is_string($eda)
+    && is_string($monoreita)
+    && !str_contains($eda, "othermode == 'err2'")
+    && !str_contains($eda, 'eda_err2.twig')
+    && !str_contains($monoreita, "othermode == 'err2'")
+    && !str_contains($monoreita, 'monoreita_err2');
+});
+
 smoke_test('public API exposes only visible React-safe post data', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
