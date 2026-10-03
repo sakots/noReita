@@ -541,11 +541,6 @@ final class BoardRepository {
   }
 
   /** @return array|false */
-  public function oldestPost() {
-    return $this->db->query('SELECT * FROM board_log ORDER BY tid LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-  }
-
-  /** @return array|false */
   public function oldestThread() {
     return $this->db->query('SELECT * FROM board_log WHERE thread=1 ORDER BY tid LIMIT 1')->fetch(PDO::FETCH_ASSOC);
   }

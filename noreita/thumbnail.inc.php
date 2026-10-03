@@ -42,10 +42,6 @@ class Thumbnail {
     return $this->last_output_path;
   }
 
-  public function getOutputUrl(): ?string {
-    return $this->last_output_path;
-  }
-
   public function getOutputName(): ?string {
     return $this->last_output_path ? basename($this->last_output_path) : null;
   }

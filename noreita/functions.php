@@ -1,24 +1,6 @@
 <?php
 const FUNCTIONS_VER = 20260807;
 
-//ページのコンテキストをセッションに保存
-function set_page_context_to_session(): void {
-  RequestSecurity::startSession();
-  // セッションに保存
-  $_SESSION['current_page_context'] = [
-    'page' => (int)filter_input_data('GET', 'page', FILTER_VALIDATE_INT),
-    'resno' => filter_input_data('GET', 'resno', FILTER_VALIDATE_INT),//未設定時はnull。intでキャストしない事。
-    'catalog' => (bool)(filter_input_data('GET', 'mode') === 'catalog'),
-    'res_catalog' => (bool)filter_input_data('GET', 'res_catalog', FILTER_VALIDATE_BOOLEAN),
-    'misskey_note' => (bool)filter_input_data('GET', 'misskey_note', FILTER_VALIDATE_BOOLEAN),
-    'search' => (bool)(filter_input_data('GET', 'mode') === 'search'),
-    'radio' => (int)filter_input_data('GET', 'radio', FILTER_VALIDATE_INT),
-    'imgsearch' => (bool)filter_input_data('GET', 'imgsearch', FILTER_VALIDATE_BOOLEAN),
-    'q' => (string)filter_input_data('GET', 'q'),
-  ];
-  $_SESSION['current_id'] = null;
-}
-
 // 文字コード変換
 function charconvert(string $str): string {
   mb_language(Config::string('site.language'));
@@ -257,42 +239,6 @@ function check_file(string $path, bool $english): void {
   }
 }
 
-//PaintBBS NEOのpchかどうか調べる
-function is_neo(string $src): bool {
-  $fp = fopen("$src", "rb");
-  $is_neo=(fread($fp,3) === "NEO");
-  fclose($fp);
-  return $is_neo;
-}
-//pchデータから幅と高さを取得
-function get_pch_size(string $src): ?array {
-  if(!$src){
-    return null;
-  }
-  $fp = fopen("$src", "rb");
-  $is_neo=(fread($fp,3) === "NEO");//ファイルポインタが3byte移動
-  $pch_data=(string)bin2hex(fread($fp,5));
-  fclose($fp);
-  if(!$is_neo || !$pch_data){
-    return null;
-  }
-  $width = null;
-  $height = null;
-  $w0 = hexdec(substr($pch_data,2,2));
-  $w1 = hexdec(substr($pch_data,4,2));
-  $h0 = hexdec(substr($pch_data,6,2));
-  $h1 = hexdec(substr($pch_data,8,2));
-  if( !is_numeric($w0) || !is_numeric($w1) || !is_numeric($h0) || !is_numeric($h1)){
-    return null;
-  }
-  $width = (int)$w0 + ((int)$w1 * 256);
-  $height = (int)$h0 + ((int)$h1 * 256);
-  if( !$width || !$height) {
-    return null;
-  }
-  return[(int)$width,(int)$height];
-}
-
 function initial_error_message(bool $english): array {
   return [
     '001' => $english ? ' does not exist.' : 'がありません。',
@@ -333,11 +279,6 @@ function admin_del_valid(?string $second_pass): bool {
   return isset($_SESSION['admin_del'])
     && AdminAuth::secondaryPasswordMatches($_SESSION['admin_del'], $second_pass ?? null);
 }
-function user_del_valid(): bool {
-  RequestSecurity::startSession();
-  return isset($_SESSION['user_del']) && ($_SESSION['user_del'] === 'user_del_mode');
-}
-
 // トリップ生成
 function generate_trip(string $name): string {
   if ( ( $index = strpos($name, '#') ) === false)

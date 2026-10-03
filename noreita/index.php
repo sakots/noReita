@@ -3079,21 +3079,3 @@ function render_bootstrap_error(string $mes, int $status = 400, ?Throwable $caus
   header('Content-Type: text/plain; charset=UTF-8');
   exit($mes);
 }
-
-//画像差し替え失敗
-function error2(ApplicationContext $context): void {
-  $template_engine = $context->templates;
-  $dat =& $context->data;
-  $en = $context->english;
-  http_response_code(500);
-
-  $self = Config::string('site.script_name');
-  $dat['othermode'] = 'err2';
-  $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
-  $http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
-  if($http_x_requested_with || $async_flag){
-    die($en ? "error?\nImage not found. There might be a failure in the posting.<a href=\"{{$self}}?mode=piccom\">Uploaded images</a> might still be available." : "error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
-  }
-  echo $template_engine->render(OTHERFILE, $dat);
-  exit;
-}

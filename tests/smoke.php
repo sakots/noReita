@@ -1209,7 +1209,15 @@ smoke_test('superseded internal helpers are removed', static function (): bool {
   return !$repository->hasMethod('searchComments')
     && !$repository->hasMethod('searchAuthors')
     && !$repository->hasMethod('hidePost')
-    && !(new ReflectionClass(RequestSecurity::class))->hasMethod('sessionValue');
+    && !$repository->hasMethod('oldestPost')
+    && !(new ReflectionClass(RequestSecurity::class))->hasMethod('sessionValue')
+    && !(new ReflectionClass(Config::class))->hasMethod('resetForTesting')
+    && !(new ReflectionClass(Thumbnail::class))->hasMethod('getOutputUrl')
+    && !function_exists('error2')
+    && !function_exists('set_page_context_to_session')
+    && !function_exists('is_neo')
+    && !function_exists('get_pch_size')
+    && !function_exists('user_del_valid');
 });
 
 smoke_test('public API exposes only visible React-safe post data', static function (): bool {
