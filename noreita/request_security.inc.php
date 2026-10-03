@@ -120,12 +120,6 @@ final class RequestSecurity {
     self::assertSameOriginRequest($usercode, $english);
   }
 
-  /** @param mixed $default @return mixed */
-  public static function sessionValue(string $key, $default = null) {
-    self::startSession();
-    return $_SESSION[$key] ?? $default;
-  }
-
   private static function isHttps(): bool {
     return isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && strtolower((string)$_SERVER['HTTPS']) !== 'off';
   }

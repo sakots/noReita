@@ -1204,11 +1204,12 @@ smoke_test('SQLite read and write', static function (): bool {
   return $db->query('SELECT value FROM smoke')->fetchColumn() === 'noReita';
 });
 
-smoke_test('repository does not retain superseded query helpers', static function (): bool {
+smoke_test('superseded internal helpers are removed', static function (): bool {
   $repository = new ReflectionClass(BoardRepository::class);
   return !$repository->hasMethod('searchComments')
     && !$repository->hasMethod('searchAuthors')
-    && !$repository->hasMethod('hidePost');
+    && !$repository->hasMethod('hidePost')
+    && !(new ReflectionClass(RequestSecurity::class))->hasMethod('sessionValue');
 });
 
 smoke_test('public API exposes only visible React-safe post data', static function (): bool {
