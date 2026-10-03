@@ -96,6 +96,7 @@ api.php?mode=search&q=風景&target=comment&image=with
       "image": {
         "url": "https://bbs.example.com/noreita/img/example.png",
         "thumbnail_url": "https://bbs.example.com/noreita/img/example_thumb.webp",
+        "alt": "夕暮れの海を描いたイラスト",
         "width": 640,
         "height": 480,
         "nsfw": false
@@ -122,6 +123,7 @@ api.php?mode=search&q=風景&target=comment&image=with
 - `created_at`・`modified_at` はDBの日時文字列です。タイムゾーンオフセット付きのISO 8601形式ではありません。
 - `image` は画像がない場合 `null` です。`width`・`height` は元画像のピクセル寸法です。
 - `thumbnail_url` はサムネイル未登録時に元画像URLへフォールバックします。
+- `alt` は投稿者が指定した画像の説明です。説明が空の場合も、投稿者名と題名から作る代替文が文字列として入ります。画像を表示するクライアントは、この値を`img`要素の`alt`属性へ渡してください。
 - NSFW画像でも `image.url` に元画像URLが含まれます。OGPとは異なりAPI自体は原寸URLを隠しません。
   クライアントは `image.nsfw` を確認して表示を制御してください。
 - パスワードハッシュ、接続元ホスト、メールアドレスなどの内部フィールドは返しません。
