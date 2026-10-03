@@ -8,7 +8,7 @@ return [
   'engine' => 'twig',
   'requires' => [
     'php' => '8.1.0',
-    'noreita' => '4.13.0',
+    'noreita' => '4.13.1',
   ],
   'templates' => [
     'main' => 'eda_main', 'response' => 'eda_res', 'paint' => 'eda_paint',
