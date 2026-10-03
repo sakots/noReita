@@ -1204,6 +1204,13 @@ smoke_test('SQLite read and write', static function (): bool {
   return $db->query('SELECT value FROM smoke')->fetchColumn() === 'noReita';
 });
 
+smoke_test('repository does not retain superseded query helpers', static function (): bool {
+  $repository = new ReflectionClass(BoardRepository::class);
+  return !$repository->hasMethod('searchComments')
+    && !$repository->hasMethod('searchAuthors')
+    && !$repository->hasMethod('hidePost');
+});
+
 smoke_test('public API exposes only visible React-safe post data', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();

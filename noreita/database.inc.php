@@ -240,18 +240,6 @@ final class BoardRepository {
     return $statement->fetch(PDO::FETCH_ASSOC);
   }
 
-  public function searchComments(string $query): array {
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE com LIKE ? AND invz=0 ORDER BY age DESC, tree DESC');
-    $statement->execute(['%' . $query . '%']);
-    return $statement->fetchAll(PDO::FETCH_ASSOC);
-  }
-
-  public function searchAuthors(string $query, bool $partial = false): array {
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND picfile > 0 ORDER BY age DESC, tree DESC');
-    $statement->execute([$partial ? '%' . $query . '%' : $query]);
-    return $statement->fetchAll(PDO::FETCH_ASSOC);
-  }
-
   public function deletePost(int $id, bool $with_replies = false): void {
     $sql = $with_replies
       ? 'DELETE FROM board_log WHERE tid = ? OR parent = ?'
@@ -277,11 +265,6 @@ final class BoardRepository {
       if ($statement->fetchColumn() !== false) return true;
     }
     return false;
-  }
-
-  public function hidePost(int $id): void {
-    $statement = $this->db->prepare('UPDATE board_log SET invz=1 WHERE tid = ?');
-    $statement->execute([$id]);
   }
 
   public function setPostsVisibility(array $ids, bool $hidden): int {
