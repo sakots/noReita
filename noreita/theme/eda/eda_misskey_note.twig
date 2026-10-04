@@ -6,6 +6,7 @@
   <title>{{ board_title }}</title>
   {% include 'components/eda_headCss.twig' %}
   <style>
+    .comment { white-space: pre-wrap; }
     .form-group {
       margin: 1em 0;
     }
@@ -96,7 +97,7 @@
             </a>
           </div>
           {% endif %}
-          <p class="comment">{{ post['com']|raw }}</p>
+          <p class="comment">{{ post['com'] }}</p>
           <p class="painttime">描画時間 : {{ post['utime'] }} tool : {{ post['tool'] }}</p>
         </div>
         <hr>
@@ -215,7 +216,7 @@
               <img src="{{ path }}{{ post['picfile'] }}" alt="{{ post['image_alt']|default(post['sub']) }}" width="{{ post['img_w'] }}" height="{{ post['img_h'] }}">
             </a>
           </div>
-          <p class="comment">{{ post['com']|raw }}</p>
+          <p class="comment">{{ post['com'] }}</p>
         </div>
         <hr>
         {% endif %}

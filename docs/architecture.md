@@ -94,4 +94,6 @@ Misskeyへのノートは、`features.misskey_note`が有効な場合だけ利�
 
 Misskey連携の確認画面と投稿設定画面でも、DBの`image_alt`を画像の代替テキストに使います。説明が空の場合は件名へ戻し、両テーマで属性値をHTMLエスケープします。
 
+Misskey連携画面の本文は、DBのプレーンテキストを両テーマでHTMLエスケープして表示します。改行はCSSの`white-space: pre-wrap`で維持し、本文のHTMLタグは実行しません。投稿用のtextareaには元の本文を渡し、表示用HTMLを混ぜません。
+
 `misskey_post_authorization.inc.php`の`MisskeyPostAuthorization`を、投稿画面と独立したコールバックで共用します。認可時の投稿内容をハッシュで記録し、DB上の画像名・投稿内容・認可が変わった場合は送信待ちデータも破棄します。コールバック開始時と画像アップロード・ノート作成の直前に再確認し、外部認証中やAPI通信中の変更も検出します。「そうだね」の加算は認可の失効対象に含めません。

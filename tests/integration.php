@@ -1706,6 +1706,46 @@ PHP;
     }
   }
 
+  // 実際の編集経路で保存したHTMLが、公開確認画面・認可後の画面で実行されないことを確認する。
+  $misskey_xss_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $misskey_xss_original_comment = (string)$db->query('SELECT com FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  $misskey_xss_comment = "<img src=x onerror=\"alert(1)\">\n<script>alert('xss')</script>\n</textarea><svg onload=\"alert(2)\"> & \"引用\"";
+  [$misskey_xss_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'sub' => 'Image subject', 'com' => $misskey_xss_comment, 'image_alt' => $edited_image_alt,
+    'pwd' => 'image-pass', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  try {
+    foreach (['eda', 'monoreita'] as $misskey_xss_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $misskey_xss_theme . "'],", $misskey_enabled_config));
+      [$misskey_xss_before_status, $misskey_xss_before_body] = http_request(
+        $base_url . '?mode=before_misskey_note&no=' . $image_post_id, $root . '/misskey-xss-' . $misskey_xss_theme . '.txt'
+      );
+      [$misskey_xss_form_status, $misskey_xss_form_body] = http_request(
+        $base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+        ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]
+      );
+      integration_test('Misskey screens escape stored HTML and preserve plain text: ' . $misskey_xss_theme,
+        static function () use ($misskey_xss_edit_status, $misskey_xss_before_status, $misskey_xss_before_body,
+          $misskey_xss_form_status, $misskey_xss_form_body, $misskey_xss_comment): bool {
+          if ($misskey_xss_edit_status !== 200 || $misskey_xss_before_status !== 200 || $misskey_xss_form_status !== 200) return false;
+          $expected = htmlspecialchars($misskey_xss_comment, ENT_QUOTES, 'UTF-8');
+          foreach ([$misskey_xss_before_body, $misskey_xss_form_body] as $html) {
+            if (!str_contains($html, '<p class="comment">' . $expected . '</p>')
+              || !str_contains($html, '.comment { white-space: pre-wrap; }')
+              || str_contains($html, '<img src=x') || str_contains($html, '<script>alert(')
+              || str_contains($html, '<svg onload=')) return false;
+          }
+          return preg_match('~<textarea[^>]*id="com"[^>]*>(.*?)</textarea>~s', $misskey_xss_form_body, $textarea) === 1
+            && $textarea[1] === $expected;
+        });
+    }
+  } finally {
+    $db->prepare('UPDATE board_log SET com = ? WHERE tid = ?')->execute([$misskey_xss_original_comment, $image_post_id]);
+    file_put_contents($webroot . '/config.local.php', $misskey_xss_original_config);
+  }
+
   // 返信は検索結果でカタログ用テンプレートのko側に渡される。
   $catalog_original_config = (string)file_get_contents($webroot . '/config.local.php');
   $catalog_reply_subject = 'catalog-reply-' . bin2hex(random_bytes(6));

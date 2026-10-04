@@ -9,6 +9,7 @@
   <title>{{$board_title}}</title>
   @include('components.monoreita_headCss')
   <style>
+    .comment { white-space: pre-wrap; }
     .form-group {
       margin: 1em 0;
     }
@@ -99,7 +100,7 @@
             </a>
           </div>
           @endif
-          <p class="comment">{!! $post['com'] !!}</p>
+          <p class="comment">{{ $post['com'] }}</p>
           <p class="painttime">描画時間 : {{ $post['utime'] }} tool : {{ $post['tool'] }}</p>
         </div>
         <hr>
@@ -218,7 +219,7 @@
               <img src="{{$path}}{{$post['picfile']}}" alt="{{$post_image_alt}}" width="{{$post['img_w']}}" height="{{$post['img_h']}}">
             </a>
           </div>
-          <p class="comment">{!! $post['com'] !!}</p>
+          <p class="comment">{{ $post['com'] }}</p>
         </div>
         <hr>
         @endif
