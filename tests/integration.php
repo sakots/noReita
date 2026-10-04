@@ -1742,6 +1742,7 @@ $fields = connect_misskey_api::uploadFields('probe-token', __DIR__ . '/img/' . $
 $update = connect_misskey_api::updateFields('probe-token', 'probe-file', (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
 header('Content-Type: application/json');
 echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'], 'upload' => $fields['isSensitive'],
+  'force' => $fields['force'] ?? null,
   'upload_comment' => $fields['comment'] ?? null, 'update_comment' => $update['comment'] ?? null]);
 PHP;
   file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
@@ -1780,6 +1781,7 @@ PHP;
         $misskey_alt_payload = json_decode($misskey_alt_payload_body, true);
         $misskey_alt_upload_results[] = $misskey_alt_pending_status === 400 && $misskey_alt_payload_status === 200
           && ($misskey_alt_payload['upload_comment'] ?? null) === $misskey_alt_description
+          && ($misskey_alt_payload['force'] ?? null) === 'true'
           && ($misskey_alt_payload['update_comment'] ?? null) === $misskey_alt_description;
       }
       integration_test('Misskey screens use escaped image alt and fall back to subject: ' . $misskey_alt_theme,
@@ -1821,7 +1823,8 @@ PHP;
         $sensitive_flags = json_decode($sensitive_probe_body, true);
         $sensitive_results[] = $sensitive_form_status === 200 && $sensitive_form_valid && $sensitive_pending_status === 400
           && $sensitive_probe_status === 200 && ($sensitive_flags['pending'] ?? null) === $expected_sensitive
-          && ($sensitive_flags['upload'] ?? null) === ($expected_sensitive ? 'true' : 'false');
+          && ($sensitive_flags['upload'] ?? null) === ($expected_sensitive ? 'true' : 'false')
+          && ($sensitive_flags['force'] ?? null) === 'true';
       }
       integration_test('Misskey sharing preserves NSFW and allows marking safe images sensitive: ' . $sensitive_theme,
         static fn (): bool => !in_array(false, $sensitive_results, true));

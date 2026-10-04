@@ -176,6 +176,8 @@ class connect_misskey_api{
 		return [
 			'i' => $access_token,
 			'file' => new CURLFile($image_path),
+			// 既存の同一画像を再利用せず、過去の共有の説明・NSFW設定を変更しない。
+			'force' => 'true',
 			'isSensitive' => $sensitive ? 'true' : 'false',
 			'comment' => $description,
 		];
