@@ -417,6 +417,18 @@ function connect_misskey_api_dispatch(): void {
 	};
 
 	connect_misskey_api::validatePostingSession($context);
+	$skip_auth_check = (bool)filter_input_data('GET','skip_auth_check',FILTER_VALIDATE_BOOLEAN);
+	// 通常のMiAuthはsession、保存済みトークンの再利用はs_idで同じ認証フローを照合する。
+	$callback_session_id = filter_input_data('GET', $skip_auth_check ? 's_id' : 'session');
+	$expected_session_id = $_SESSION['sns_api_session_id'];
+	if (!is_string($callback_session_id) || !is_string($expected_session_id)
+		|| $expected_session_id === '' || !hash_equals($expected_session_id, $callback_session_id)) {
+		misskey_api_error(
+			$en ? 'Operation failed.' : '失敗しました。',
+			403,
+			'Misskey callback state did not match the session.'
+		);
+	}
 	$baseUrl = MisskeyServerSecurity::normalizeBaseUrl(
 		(string)($_SESSION['misskey_server_radio'] ?? '')
 	);
@@ -430,15 +442,7 @@ function connect_misskey_api_dispatch(): void {
 	$_SESSION['misskey_server_radio'] = $baseUrl;
 	$context = new MisskeyApiContext($context->english, $baseUrl);
 
-	$skip_auth_check = (bool)filter_input_data('GET','skip_auth_check',FILTER_VALIDATE_BOOLEAN);
 	if($skip_auth_check){
-		if((string)filter_input_data('GET','s_id') !== $_SESSION['sns_api_session_id']){
-			misskey_api_error(
-				$en ? 'Operation failed.' : '失敗しました。',
-				403,
-				'Misskey callback state did not match the session.'
-			);
-		}
 		connect_misskey_api::create_misskey_note($context);
 		return;
 	}

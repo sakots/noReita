@@ -1030,7 +1030,7 @@ require_once __DIR__ . '/connect_misskey_api.php';
 RequestSecurity::startSession();
 $_SESSION['accessToken'] = 'misskey-probe-token';
 if (($_GET['forge_image'] ?? '') === '1') $_SESSION['sns_api_val'][1] = 'other-image.png';
-if (($_GET['callback'] ?? '') === '1') {
+if (($_GET['callback'] ?? '') === '1' || ($_GET['callback_state'] ?? '') === '1') {
   $_SESSION['sns_api_session_id'] = 'probe-state';
   $_SESSION['misskey_server_radio'] = 'https://127.0.0.1';
   connect_misskey_api_dispatch();
@@ -1080,6 +1080,37 @@ PHP;
     } finally {
       $animation_db->prepare('DELETE FROM board_log WHERE tid = ?')->execute([$send_post_id]);
     }
+  }
+
+  $state_cookies = $root . '/misskey-callback-state.txt';
+  http_request($base_url, $state_cookies);
+  $state_token = hash('sha256', (string)cookie_value($state_cookies, 'noreita_session'));
+  [$state_form_status] = http_request($base_url . '?mode=misskey_note_edit_form', $state_cookies,
+    ['no' => (string)$misskey_post['tid'], 'pwd' => 'misskey-owner-pass', 'token' => $state_token]);
+  [$state_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $state_cookies,
+    ['no' => (string)$misskey_post['tid'], 'token' => $state_token,
+      'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1']);
+  foreach ([
+    'missing' => ['', false],
+    'empty' => ['&session=', false],
+    'mismatch' => ['&session=wrong-state', false],
+    'array' => ['&session[]=probe-state', false],
+    'wrong parameter' => ['&s_id=probe-state', false],
+    'matching' => ['&session=probe-state', true],
+    'skip missing' => ['&skip_auth_check=on', false],
+    'skip mismatch' => ['&skip_auth_check=on&s_id=wrong-state', false],
+    'skip matching' => ['&skip_auth_check=on&s_id=probe-state', true],
+  ] as $state_case => [$state_query, $state_matches]) {
+    [$state_status, $state_body] = http_request(
+      $origin_url . '/misskey-send-probe.php?callback_state=1' . $state_query, $state_cookies);
+    integration_test('Misskey callback validates authentication state: ' . $state_case,
+      static function () use ($state_form_status, $state_pending_status, $state_matches, $state_status, $state_body): bool {
+        // 一致時だけ後段のループバックURL拒否へ進む。外部APIには接続しない。
+        return $state_form_status === 200 && $state_pending_status === 400
+          && ($state_matches
+            ? $state_status === 400 && $state_body === 'Error: Invalid Misskey server URL.'
+            : $state_status === 403 && $state_body === 'Error: Operation failed.');
+      });
   }
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
