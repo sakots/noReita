@@ -28,7 +28,7 @@ if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260820) {
 // request_security.inc
 check_file(__DIR__.'/request_security.inc.php', $en);
 require_once(__DIR__.'/request_security.inc.php');
-if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260726) {
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20261004) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
@@ -498,11 +498,21 @@ switch ($mode) {
 function trip_preview(ApplicationContext $context): void {
   header('Content-Type: application/json; charset=UTF-8');
   header('X-Content-Type-Options: nosniff');
+  header('Cache-Control: no-store, private');
 
   if ($context->requestMethod !== 'POST') {
     http_response_code(405);
     header('Allow: POST');
     echo json_encode(['error' => 'Method not allowed.']);
+    return;
+  }
+
+  try {
+    // 設定で投稿時のCSRFを無効にしていても、計算APIでは必ず検証する。
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $context->english);
+  } catch (RequestSecurityException $e) {
+    http_response_code($e->getCode() ?: 403);
+    echo json_encode(['error' => 'Invalid request.']);
     return;
   }
 
@@ -512,6 +522,22 @@ function trip_preview(ApplicationContext $context): void {
   )) {
     http_response_code(422);
     echo json_encode(['error' => 'Invalid input.']);
+    return;
+  }
+
+  try {
+    $limiter = new TripPreviewRateLimiter(__DIR__ . '/session', Config::string('admin.password'));
+    $retry_after = $limiter->consume(RequestInfo::clientIp());
+  } catch (Throwable $e) {
+    ApplicationErrorHandler::reportHttpError(503, 'Trip preview limit storage failed.', $e);
+    http_response_code(503);
+    echo json_encode(['error' => 'Preview unavailable.']);
+    return;
+  }
+  if ($retry_after > 0) {
+    http_response_code(429);
+    header('Retry-After: ' . $retry_after);
+    echo json_encode(['error' => 'Too many preview requests.']);
     return;
   }
 
@@ -1296,12 +1322,8 @@ function res(ApplicationContext $context): void {
   $uuid = trim((string)filter_input(INPUT_GET, 'uuid'));
 
   //csrfトークンをセット
-  $dat['token'] = '';
-  if (Config::bool('features.csrf')) {
-    $token = RequestSecurity::csrfToken();
-    $_SESSION['token'] = $token;
-    $dat['token'] = $token;
-  }
+  // ライブプレビューは設定にかかわらずCSRFトークンを必要とする。
+  $dat['token'] = RequestSecurity::csrfToken();
 
   //古いスレのレスフォームを表示しない
   $elapsed_time = Config::int('board.elapsed_reply_days') * 86400; //デフォルトの1年だと31536000
@@ -1725,12 +1747,8 @@ function paint_com(ApplicationContext $context, string $tmpmode): void {
   //----------
 
   //csrfトークンをセット
-  $dat['token'] = '';
-  if (Config::bool('features.csrf')) {
-    $token = RequestSecurity::csrfToken();
-    $_SESSION['token'] = $token;
-    $dat['token'] = $token;
-  }
+  // ライブプレビューは設定にかかわらずCSRFトークンを必要とする。
+  $dat['token'] = RequestSecurity::csrfToken();
 
   //投稿途中一覧 or 画像新規投稿 or 画像差し替え
   if ($tmpmode == "tmp") {
@@ -2162,12 +2180,8 @@ function editform(ApplicationContext $context, ?int $authorized_post_id = null, 
   $en = $context->english;
 
   //csrfトークンをセット
-  $dat['token'] = '';
-  if (Config::bool('features.csrf')) {
-    $token = RequestSecurity::csrfToken();
-    $_SESSION['token'] = $token;
-    $dat['token'] = $token;
-  }
+  // ライブプレビューは設定にかかわらずCSRFトークンを必要とする。
+  $dat['token'] = RequestSecurity::csrfToken();
 
   //入力されたパスワード
   $post_pwd = $authorized_password ?? filter_input(INPUT_POST, 'pwd');

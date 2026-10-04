@@ -75,7 +75,7 @@ function remove_tree(string $path): void {
   rmdir($path);
 }
 
-function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1'): array {
+function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1', string $origin = 'http://localhost'): array {
   $curl = curl_init($url);
   $response_headers = [];
   curl_setopt_array($curl, [
@@ -85,7 +85,7 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
     CURLOPT_COOKIEJAR => $cookie_jar,
     CURLOPT_COOKIEFILE => $cookie_jar,
     CURLOPT_HTTPHEADER => [
-      'Host: localhost', 'Origin: http://localhost',
+      'Host: localhost', 'Origin: ' . $origin,
       'X-Forwarded-For: ' . $forwarded_for,
     ],
     CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$response_headers): int {
@@ -521,6 +521,51 @@ PHP;
   [$status, $pictmp_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
+  [$trip_get_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar);
+  [$trip_missing_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar, ['value' => 'name#secret']);
+  [$trip_wrong_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar, ['value' => 'name#secret', 'token' => 'wrong']);
+  [$trip_origin_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar,
+    ['value' => 'name#secret', 'token' => $token], '192.0.2.55', 'https://example.org');
+  [$trip_ok_status, $trip_ok_body, , $trip_headers] = http_request($base_url . '?mode=trip_preview', $cookie_jar,
+    ['value' => 'name#secret', 'token' => $token], '192.0.2.55');
+  for ($i = 1; $i < 60; $i++) {
+    http_request($base_url . '?mode=trip_preview', $cookie_jar, ['value' => 'name#secret', 'token' => $token], '192.0.2.55');
+  }
+  [$trip_limit_status, $trip_limit_body, , $trip_limit_headers] = http_request($base_url . '?mode=trip_preview', $cookie_jar,
+    ['value' => 'name#secret', 'token' => $token], '192.0.2.55');
+  $trip_new_cookies = $root . '/trip-new-cookies.txt';
+  http_request($base_url . '?mode=pictmp', $trip_new_cookies);
+  $trip_new_token = hash('sha256', (string)cookie_value($trip_new_cookies, 'noreita_session'));
+  [$trip_new_session_status] = http_request($base_url . '?mode=trip_preview', $trip_new_cookies,
+    ['value' => 'name#secret', 'token' => $trip_new_token], '192.0.2.55');
+  integration_test('trip preview requires CSRF and limits repeated calculations by IP', static function () use (
+    $trip_get_status, $trip_missing_status, $trip_wrong_status, $trip_origin_status, $trip_ok_status, $trip_ok_body,
+    $trip_headers, $trip_limit_status, $trip_limit_body, $trip_limit_headers, $trip_new_session_status
+  ): bool {
+    return $trip_get_status === 405 && $trip_missing_status === 403 && $trip_wrong_status === 403 && $trip_origin_status === 403
+      && $trip_ok_status === 200 && is_string(json_decode($trip_ok_body, true)['preview'] ?? null)
+      && str_contains($trip_headers['cache-control'] ?? '', 'no-store')
+      && $trip_limit_status === 429 && isset(json_decode($trip_limit_body, true)['error'])
+      && $trip_new_session_status === 429
+      && (int)($trip_limit_headers['retry-after'] ?? 0) > 0;
+  });
+  $trip_no_csrf_config = str_replace("    'image_upload' => true,", "    'image_upload' => true,\n    'csrf' => false,", $config_local);
+  if (file_put_contents($webroot . '/config.local.php', $trip_no_csrf_config) === false) {
+    throw new RuntimeException('Could not disable posting CSRF for preview tests.');
+  }
+  [$trip_form_status, $trip_form_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
+  [$trip_no_csrf_missing_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar, ['value' => 'name#secret']);
+  [$trip_no_csrf_valid_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar,
+    ['value' => 'name#secret', 'token' => $token], '192.0.2.56');
+  if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
+    throw new RuntimeException('Could not restore posting CSRF configuration.');
+  }
+  integration_test('trip preview stays protected and usable when posting CSRF is disabled', static function () use (
+    $trip_form_status, $trip_form_body, $token, $trip_no_csrf_missing_status, $trip_no_csrf_valid_status
+  ): bool {
+    return $trip_form_status === 200 && str_contains($trip_form_body, 'name="token" value="' . $token . '"')
+      && $trip_no_csrf_missing_status === 403 && $trip_no_csrf_valid_status === 200;
+  });
   $upload_mimes = [];
   $upload_labels = [];
   foreach ([

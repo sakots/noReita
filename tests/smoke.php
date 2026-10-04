@@ -96,7 +96,7 @@ smoke_test('trip preview uses the server trip generator without sending secrets 
   $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
   return is_string($script) && is_string($index)
     && str_contains($script, "method: 'POST'")
-    && str_contains($script, 'URLSearchParams({ value })')
+    && str_contains($script, 'URLSearchParams({ value, token: token.value })')
     && !str_contains($script, 'endpoint +')
     && str_contains($index, "case 'trip_preview':")
     && str_contains($index, 'generate_trip($value)');
@@ -1066,6 +1066,25 @@ smoke_test('legacy administrator session secrets use constant-time comparison', 
     && !AdminAuth::secondaryPasswordMatches('not-the-secondary-admin-secret', 'smoke-secondary-admin-secret')
     && !AdminAuth::secondaryPasswordMatches('', 'smoke-secondary-admin-secret')
     && !AdminAuth::secondaryPasswordMatches('smoke-secondary-admin-secret', '');
+});
+
+smoke_test('trip preview limit persists across instances, isolates IPs, and expires', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_trip_limit_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $limiter = new TripPreviewRateLimiter($directory, 'test-secret');
+    for ($i = 0; $i < 60; $i++) {
+      if ($limiter->consume('192.0.2.10', 100) !== 0) return false;
+    }
+    $another = new TripPreviewRateLimiter($directory, 'test-secret');
+    return $another->consume('192.0.2.10', 101) === 59
+      && $another->consume('192.0.2.11', 101) === 0
+      && $another->consume('192.0.2.10', 160) === 0
+      && !str_contains((string)file_get_contents($directory . '/trip-preview-limits.json'), '192.0.2.10');
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $file) unlink($file);
+    rmdir($directory);
+  }
 });
 
 smoke_test('administrator login rate limit locks by IP, clears after success, and removes expired records', static function (): bool {

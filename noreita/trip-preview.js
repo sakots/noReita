@@ -13,12 +13,14 @@
   const endpoint = loader.dataset.endpoint;
   document.querySelectorAll('[data-trip-preview-input]').forEach((input) => {
     const preview = input.parentElement && input.parentElement.querySelector('[data-trip-preview]');
-    if (!preview) return;
+    const token = input.form && input.form.querySelector('input[name="token"]');
+    if (!preview || !token) return;
 
     // 入力ごとに通信するとリクエストが増えすぎるため、200ms 入力が止まってから送信する。
     let timer = 0;
     // 新しい入力時には古い通信を中断し、古い結果が後から表示されないようにする。
     let request = null;
+    let retryAt = 0;
     const clear = () => {
       if (request) request.abort();
       request = null;
@@ -28,6 +30,7 @@
     };
     const update = async () => {
       const value = input.value;
+      if (Date.now() < retryAt) return;
       if (!value.includes('#')) {
         clear();
         return;
@@ -37,7 +40,7 @@
       const activeRequest = request;
       try {
         // 入力値は application/x-www-form-urlencoded の POST 本文にのみ入る。
-        const body = new URLSearchParams({ value });
+        const body = new URLSearchParams({ value, token: token.value });
         const response = await fetch(endpoint, {
           method: 'POST', credentials: 'same-origin',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
@@ -45,7 +48,18 @@
         });
         // サーバー側は generate_trip(value) を { preview: "..." } として返す。
         const payload = await response.json();
-        if (!response.ok || typeof payload.preview !== 'string' || request !== activeRequest) return;
+        if (request !== activeRequest) return;
+        if (response.status === 429) {
+          retryAt = Date.now() + Math.max(1, Number(response.headers.get('Retry-After')) || 60) * 1000;
+          clear();
+          preview.textContent = 'トリッププレビューが混み合っています。少し待ってから入力してください。';
+          preview.hidden = false;
+          return;
+        }
+        if (!response.ok || typeof payload.preview !== 'string') {
+          clear();
+          return;
+        }
         preview.textContent = `トリップ: ${payload.preview}`;
         preview.hidden = false;
       } catch (error) {
