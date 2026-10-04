@@ -1532,6 +1532,43 @@ PHP;
       && is_array($api) && ($api['thread']['image']['alt'] ?? '') === $edited_image_alt;
   });
 
+  // DBから取得した画像説明が、両テーマのMisskey確認・設定画面まで届くことを検証する。
+  $misskey_alt_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  try {
+    foreach (['eda', 'monoreita'] as $misskey_alt_theme) {
+      $misskey_alt_config = str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $misskey_alt_theme . "'],", $misskey_enabled_config);
+      if (file_put_contents($webroot . '/config.local.php', $misskey_alt_config) === false) {
+        throw new RuntimeException('Could not select the Misskey alt test theme.');
+      }
+      $misskey_alt_results = [];
+      foreach ([$edited_image_alt, ''] as $misskey_alt_description) {
+        $db->prepare('UPDATE board_log SET image_alt = ? WHERE tid = ?')
+          ->execute([$misskey_alt_description, $image_post_id]);
+        $misskey_alt_expected = 'alt="' . htmlspecialchars(
+          $misskey_alt_description !== '' ? $misskey_alt_description : 'Image subject', ENT_QUOTES, 'UTF-8'
+        ) . '"';
+        [$misskey_alt_before_status, $misskey_alt_before_body] = http_request(
+          $base_url . '?mode=before_misskey_note&no=' . $image_post_id, $cookie_jar
+        );
+        [$misskey_alt_form_status, $misskey_alt_form_body] = http_request(
+          $base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+          ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]
+        );
+        $misskey_alt_results[] = $misskey_alt_before_status === 200 && $misskey_alt_form_status === 200
+          && str_contains($misskey_alt_before_body, $misskey_alt_expected)
+          && str_contains($misskey_alt_form_body, $misskey_alt_expected);
+      }
+      integration_test('Misskey screens use escaped image alt and fall back to subject: ' . $misskey_alt_theme,
+        static fn (): bool => !in_array(false, $misskey_alt_results, true));
+    }
+  } finally {
+    $db->prepare('UPDATE board_log SET image_alt = ? WHERE tid = ?')->execute([$edited_image_alt, $image_post_id]);
+    if (file_put_contents($webroot . '/config.local.php', $misskey_alt_original_config) === false) {
+      throw new RuntimeException('Could not restore the Misskey alt test configuration.');
+    }
+  }
+
   $admin_temporary_base = 'admin-temp-' . bin2hex(random_bytes(6));
   $admin_temporary_name = $admin_temporary_base . '.png';
   file_put_contents($webroot . '/tmp/' . $admin_temporary_name, $png);
