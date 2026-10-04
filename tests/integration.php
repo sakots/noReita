@@ -1746,9 +1746,11 @@ $post = connect_misskey_api::validatePostingSession(new MisskeyApiContext(true, 
 $fields = connect_misskey_api::uploadFields('probe-token', __DIR__ . '/img/' . $post['picfile'],
   (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
 $update = connect_misskey_api::updateFields('probe-token', 'probe-file', (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
+$note = connect_misskey_api::noteFields('probe-token', 'probe-file', (string)$_SESSION['sns_api_val'][0], $_SESSION['sns_api_val'][7]);
 header('Content-Type: application/json');
 echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'], 'upload' => $fields['isSensitive'],
   'force' => $fields['force'] ?? null,
+  'note_cw' => $note['cw'],
   'upload_comment' => $fields['comment'] ?? null, 'update_comment' => $update['comment'] ?? null]);
 PHP;
   file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
@@ -1861,6 +1863,47 @@ PHP;
   } finally {
     $db->prepare('UPDATE board_log SET nsfw = ? WHERE tid = ?')->execute([$sensitive_original_nsfw, $image_post_id]);
     file_put_contents($webroot . '/config.local.php', $sensitive_original_config);
+  }
+
+  // 両テーマのフォームと同じ項目だけをPOSTし、入力した注釈が送信データまで届くことを確認する。
+  $cw_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  try {
+    foreach (['eda', 'monoreita'] as $cw_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $cw_theme . "'],", $misskey_enabled_config));
+      foreach ([
+        'missing' => [null, null, null],
+        'empty' => ['', null, null],
+        'whitespace' => ['   ', null, null],
+        'normal' => ['画像の注釈', '画像の注釈', null],
+        'zero' => ['0', '0', null],
+        'special characters' => ['<注意> & "引用"', '<注意> & "引用"', null],
+        '100 characters' => [str_repeat('あ', 100), str_repeat('あ', 100), null],
+        'too long' => [str_repeat('あ', 101), null, 'Content warning must be 100 characters or fewer.'],
+        'array' => [['invalid'], null, 'Invalid content warning.'],
+      ] as $cw_case => [$cw_input, $cw_expected, $cw_error]) {
+        [$cw_form_status, $cw_form_body] = http_request($base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+          ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]);
+        $cw_request = ['no' => (string)$image_post_id, 'token' => $token, 'hide_thumbnail' => '1',
+          'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1'];
+        if ($cw_input !== null) $cw_request['cw'] = $cw_input;
+        [$cw_status, $cw_body] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar, $cw_request);
+        $cw_payload = null;
+        if ($cw_error === null) {
+          [$cw_probe_status, $cw_probe_body] = http_request($origin_url . '/misskey-sensitive-probe.php', $cookie_jar);
+          $cw_payload = json_decode($cw_probe_body, true);
+        }
+        integration_test('Misskey form passes CW to note payload: ' . $cw_theme . '/' . $cw_case,
+          static function () use ($cw_form_status, $cw_form_body, $cw_status, $cw_body,
+            $cw_error, $cw_payload, $cw_expected): bool {
+            return $cw_form_status === 200 && str_contains($cw_form_body, 'name="cw"') && $cw_status === 400
+              && ($cw_error !== null ? str_contains($cw_body, $cw_error)
+                : is_array($cw_payload) && array_key_exists('note_cw', $cw_payload) && $cw_payload['note_cw'] === $cw_expected);
+          });
+      }
+    }
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $cw_original_config);
   }
 
   // 実際の編集経路で保存したHTMLが、公開確認画面・認可後の画面で実行されないことを確認する。

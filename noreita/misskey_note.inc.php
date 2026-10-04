@@ -186,8 +186,16 @@ class misskey_note {
     $hide_thumbnail = (bool)filter_input_data('POST', 'hide_thumbnail', FILTER_VALIDATE_BOOLEAN);
     $show_painttime = (bool)filter_input_data('POST', 'show_painttime', FILTER_VALIDATE_BOOLEAN);
     $article_url_link = (bool)filter_input_data('POST', 'article_url_link', FILTER_VALIDATE_BOOLEAN);
-    $hide_content = (bool)filter_input_data('POST', 'hide_content', FILTER_VALIDATE_BOOLEAN);
-    $cw = t(filter_input_data('POST', 'cw'));
+    $cw_input = filter_input_data('POST', 'cw');
+    if ($cw_input !== null && (!is_string($cw_input) || !mb_check_encoding($cw_input, 'UTF-8'))) {
+      render_error($context, $en ? 'Invalid content warning.' : '注釈の入力が不正です。', 400);
+    }
+    $cw = trim(t($cw_input));
+    if (mb_strlen($cw, 'UTF-8') > 100) {
+      render_error($context, $en ? 'Content warning must be 100 characters or fewer.' : '注釈は100文字以内で入力してください。', 400);
+    }
+    // 両テーマにある注釈欄の内容で判断する。空欄だけを注釈なしとし、「0」は残す。
+    $cw = $cw !== '' ? $cw : null;
 
     $post = $no ? MisskeyPostAuthorization::authorizedPost((int)$no, $context->usercode) : null;
     if ($post === null) {
@@ -205,13 +213,8 @@ class misskey_note {
       render_error($context, $en ? 'The post does not contain an image.' : '投稿画像がありません。', 400);
     }
 
-    if ($hide_content && !$cw) {
-      render_error($context, $en ? 'Content warning field is empty.' : '注釈がありません。', 400);
-    }
-
     check_AsyncRequest();
 
-    $cw = $hide_content ? $cw : null;
     $tool = switch_tool((string)$post['tool']);
 
     $painttime = calcPtime((int)$post['psec']);
