@@ -946,6 +946,71 @@ PHP;
       && $misskey_port_status === 400;
   });
 
+  // 別ブラウザーで管理者認可を取得し、失効後に投稿やコールバックを再利用できないことを確認する。
+  $misskey_expiry_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
+require_once __DIR__ . '/request_security.inc.php';
+RequestSecurity::startSession();
+$_SESSION['admin_auth_last_activity'] = 0;
+http_response_code(204);
+PHP;
+  file_put_contents($webroot . '/misskey-expiry-probe.php', $misskey_expiry_probe);
+  foreach (['logout', 'expired', 'password changed', 'owner logout'] as $misskey_revocation) {
+    $grant_callback_status = 0;
+    $grant_callback_body = '';
+    $grant_cookies = $root . '/misskey-grant-' . str_replace(' ', '-', $misskey_revocation) . '.txt';
+    http_request($base_url, $grant_cookies);
+    $grant_token = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+    if ($misskey_revocation !== 'owner logout') {
+      http_request($base_url . '?mode=admin_login', $grant_cookies,
+        ['adminpass' => 'integration-admin-pass', 'token' => $grant_token]);
+      $grant_token = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+    }
+    [$grant_form_status] = http_request($base_url . '?mode=misskey_note_edit_form', $grant_cookies,
+      ['no' => (string)$misskey_post['tid'], 'pwd' => $misskey_revocation === 'owner logout' ? 'misskey-owner-pass' : '',
+        'token' => $grant_token]);
+    $grant_request = ['no' => (string)$misskey_post['tid'], 'token' => $grant_token,
+      'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1'];
+    // 認可成功後のURL検証で止め、外部へ送信せずに送信待ちデータを作る。
+    [$grant_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $grant_cookies, $grant_request);
+    try {
+      if ($misskey_revocation === 'expired') {
+        http_request($origin_url . '/misskey-expiry-probe.php', $grant_cookies);
+      } elseif ($misskey_revocation === 'password changed') {
+        file_put_contents($webroot . '/config.local.php', str_replace('integration-admin-pass', 'changed-admin-pass', $misskey_enabled_config));
+      } else {
+        http_request($base_url . '?mode=admin_logout', $grant_cookies, ['token' => $grant_token]);
+      }
+      if ($misskey_revocation !== 'owner logout') {
+        [$grant_callback_status, $grant_callback_body] = http_request($origin_url . '/connect_misskey_api.php', $grant_cookies);
+      }
+      http_request($base_url, $grant_cookies);
+      $grant_request['token'] = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+      [$grant_reuse_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $grant_cookies, $grant_request);
+      integration_test('Misskey authorization lifecycle: ' . $misskey_revocation, static function () use (
+        $misskey_revocation, $grant_form_status, $grant_pending_status, $grant_reuse_status,
+        $grant_callback_status, $grant_callback_body
+      ): bool {
+        return $grant_form_status === 200 && $grant_pending_status === 400
+          && ($misskey_revocation === 'owner logout' ? $grant_reuse_status === 400
+            : $grant_reuse_status === 403 && $grant_callback_status === 400
+              && str_contains($grant_callback_body, 'The Misskey posting session is missing.'));
+      });
+      if ($misskey_revocation === 'logout') {
+        http_request($base_url . '?mode=admin_login', $grant_cookies,
+          ['adminpass' => 'integration-admin-pass', 'token' => $grant_request['token']]);
+        $grant_request['token'] = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+        [$grant_relogin_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $grant_cookies, $grant_request);
+        integration_test('Misskey administrator relogin does not restore a revoked grant',
+          static fn (): bool => $grant_relogin_status === 403);
+      }
+    } finally {
+      file_put_contents($webroot . '/config.local.php', $misskey_enabled_config);
+    }
+  }
+
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_errorlog_unauthorized_status] = http_request($base_url . '?mode=admin_errorlog', $cookie_jar);
   [$admin_auditlog_unauthorized_status] = http_request($base_url . '?mode=admin_auditlog', $cookie_jar);

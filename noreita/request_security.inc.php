@@ -246,6 +246,13 @@ final class AdminAuth {
 
   private static function clear(): void {
     unset($_SESSION[self::SESSION_FINGERPRINT], $_SESSION[self::SESSION_LAST_ACTIVITY]);
+    // 管理者権限から得たMisskey認可は、ログアウト・期限切れ・パス変更と同時に失効する。
+    // 投稿者パスワードで得た認可は、管理者セッションに依存しない。
+    $grant = $_SESSION['misskey_authorized_post'] ?? null;
+    if (is_array($grant) && ($grant['role'] ?? null) !== 'owner') {
+      unset($_SESSION['misskey_authorized_post'], $_SESSION['misskey_note_data'],
+        $_SESSION['sns_api_val'], $_SESSION['sns_api_session_id']);
+    }
   }
 }
 

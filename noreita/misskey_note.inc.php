@@ -81,10 +81,14 @@ final class MisskeyPostAuthorization {
   /** @param array<string,mixed> $post */
   public static function remember(array $post, ApplicationContext $context): void {
     RequestSecurity::startSession();
+    $role = self::isAdministrator() ? 'admin' : 'owner';
+    // 別の投稿の認可で、以前の送信待ちデータを引き継がない。
+    unset($_SESSION['misskey_note_data'], $_SESSION['sns_api_val'], $_SESSION['sns_api_session_id']);
     $_SESSION[self::SESSION_KEY] = [
       'tid' => (int)$post['tid'],
       'picfile' => (string)$post['picfile'],
       'usercode' => $context->usercode,
+      'role' => $role,
     ];
   }
 
@@ -92,7 +96,12 @@ final class MisskeyPostAuthorization {
   public static function authorizedPost(int $post_id, ApplicationContext $context): ?array {
     RequestSecurity::startSession();
     $grant = $_SESSION[self::SESSION_KEY] ?? null;
-    if (!is_array($grant) || (int)($grant['tid'] ?? 0) !== $post_id
+    // 管理者による認可は、現在も有効な管理者セッションに限る。
+    if (!is_array($grant) || !in_array($grant['role'] ?? null, ['admin', 'owner'], true)
+      || ($grant['role'] === 'admin' && !self::isAdministrator())) {
+      return null;
+    }
+    if ((int)($grant['tid'] ?? 0) !== $post_id
       || !is_string($grant['usercode'] ?? null)
       || !hash_equals($context->usercode, $grant['usercode'])) {
       return null;

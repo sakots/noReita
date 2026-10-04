@@ -370,7 +370,9 @@ function connect_misskey_api_dispatch(): void {
 		);
 	}
 
-	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
+		// 外部認証から戻る間に管理者認証が失効していれば、送信待ちデータも破棄する。
+		AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'));
+		if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
 		misskey_api_error(
 			$en ? 'The Misskey posting session is missing.' : 'セッションがありません。Misskey投稿フローが正しく動作していません。',
 			400,
@@ -378,7 +380,15 @@ function connect_misskey_api_dispatch(): void {
 		);
 	};
 
-	$baseUrl = MisskeyServerSecurity::normalizeBaseUrl(
+		$grant = $_SESSION['misskey_authorized_post'] ?? null;
+		if (!is_array($grant) || !in_array($grant['role'] ?? null, ['admin', 'owner'], true)) {
+			misskey_api_error(
+				$en ? 'Post authorization is required.' : '投稿者認証が必要です。',
+				403,
+				'Misskey callback had no valid post authorization.'
+			);
+		}
+		$baseUrl = MisskeyServerSecurity::normalizeBaseUrl(
 		(string)($_SESSION['misskey_server_radio'] ?? '')
 	);
 	if($baseUrl === false){
