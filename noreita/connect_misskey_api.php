@@ -19,7 +19,7 @@ if (!class_exists('Database', false)) {
 	require_once(__DIR__.'/database.inc.php');
 }
 
-const CONNECT_MISSKEY_API_VER = 20260817;
+const CONNECT_MISSKEY_API_VER = 20261004;
 
 final class MisskeyApiContext {
   public function __construct(
@@ -362,6 +362,13 @@ function connect_misskey_api_dispatch(): void {
 	RequestSecurity::startSession();
 	$context = new MisskeyApiContext(MisskeyApiContext::englishFromRequest(), '');
 	$en = $context->english;
+	if (!Config::bool('features.misskey_note')) {
+		misskey_api_error(
+			$en ? 'Misskey sharing is disabled.' : 'Misskey連携は無効です。',
+			404,
+			'Misskey callback was requested while the feature was disabled.'
+		);
+	}
 
 	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
 		misskey_api_error(

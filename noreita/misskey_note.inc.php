@@ -4,7 +4,7 @@
 //https://oekakibbs.moe/
 //APIを使ってお絵かき掲示板からMisskeyにノート noReita版
 
-const MISSKEY_NOTE_VER = 20260817; //misskey_note.inc.phpのバージョン
+const MISSKEY_NOTE_VER = 20261004; //misskey_note.inc.phpのバージョン
 
 //設定読み込み
 require_once __DIR__ . '/index.php';
@@ -28,7 +28,6 @@ function get_post_from_db(int $no, ApplicationContext $context): ?array {
       'tid'      => $post['tid'],
       'sub'      => $post['sub'],
       'a_name'   => $post['a_name'],
-      'admins'   => $post['admins'],
       'com'      => $post['com'],
       'mail'     => $post['mail'],
       'a_url'    => $post['a_url'],
@@ -43,7 +42,9 @@ function get_post_from_db(int $no, ApplicationContext $context): ?array {
       'created'  => $post['created'],
       'modified' => $post['modified'],
       'parent'   => $post['parent'],
-      'pwd'      => $post['pwd'],
+      'psec'     => $post['psec'],
+      'invz'     => $post['invz'],
+      'image_alt'=> $post['image_alt'],
     ];
   } catch (PDOException $e) {
     render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
@@ -51,87 +52,68 @@ function get_post_from_db(int $no, ApplicationContext $context): ?array {
   return null;
 }
 
-// 投稿の存在確認
-function check_post_exists(int $no, ApplicationContext $context): bool {
-  $en = $context->english;
-  try {
-    $db = Database::connect();
+/** Misskey連携で使う投稿認可を、フォーム値と切り離して管理する。 */
+final class MisskeyPostAuthorization {
+  private const SESSION_KEY = 'misskey_authorized_post';
 
-    $sql = "SELECT COUNT(*) as count FROM board_log WHERE tid = :no";
-    $stmt = $db->prepare($sql);
-    $stmt->execute([':no' => $no]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    return $result['count'] > 0;
-  } catch (PDOException $e) {
-    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+  public static function assertFeatureEnabled(ApplicationContext $context): void {
+    if (!Config::bool('features.misskey_note')) {
+      render_error($context, $context->english ? 'Misskey sharing is disabled.' : 'Misskey連携は無効です。', 404);
+    }
   }
-  return false;
-}
 
-// 投稿のパスワード検証
-function verify_post_password(int $no, string $id, string $pwd, ApplicationContext $context): bool {
-  $en = $context->english;
-  try {
-    $db = Database::connect();
-
-    $sql = "SELECT pwd FROM board_log WHERE tid = :no AND id = :id";
-    $stmt = $db->prepare($sql);
-    $stmt->execute([':no' => $no, ':id' => $id]);
-    $post = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$post) {
-      return false;
-    }
-
-    return password_verify($pwd, $post['pwd']);
-  } catch (PDOException $e) {
-    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
+  public static function isAdministrator(): bool {
+    return AdminAuth::isAuthenticated(
+      Config::string('admin.password'), Config::int('admin.session_lifetime')
+    );
   }
-  return false;
-}
 
-// 投稿の編集権限チェック
-function check_edit_permission(int $no, string $id, string $pwd, bool $admin, ApplicationContext $context): bool {
-  $en = $context->english;
-  try {
-    $db = Database::connect();
-
-    $sql = "SELECT created, admins FROM board_log WHERE tid = :no AND id = :id";
-    $stmt = $db->prepare($sql);
-    $stmt->execute([':no' => $no, ':id' => $id]);
-    $post = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$post) {
-      return false;
+  /** @return array<string,mixed>|null */
+  public static function authorize(int $post_id, string $password): ?array {
+    try {
+      $service = new PostService(new BoardRepository(), Config::string('paths.images'));
+      return $service->authorize($post_id, $password, self::isAdministrator())['post'];
+    } catch (PostNotFoundException|PostAuthorizationException) {
+      return null;
     }
-
-    if ($admin || $post['admins'] === 'admin_post') {
-      return true;
-    }
-
-    if (!$pwd) {
-      return false;
-    }
-
-    return verify_post_password($no, $id, $pwd, $context);
-  } catch (PDOException $e) {
-    render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
-  return false;
+
+  /** @param array<string,mixed> $post */
+  public static function remember(array $post, ApplicationContext $context): void {
+    RequestSecurity::startSession();
+    $_SESSION[self::SESSION_KEY] = [
+      'tid' => (int)$post['tid'],
+      'picfile' => (string)$post['picfile'],
+      'usercode' => $context->usercode,
+    ];
+  }
+
+  /** @return array<string,mixed>|null */
+  public static function authorizedPost(int $post_id, ApplicationContext $context): ?array {
+    RequestSecurity::startSession();
+    $grant = $_SESSION[self::SESSION_KEY] ?? null;
+    if (!is_array($grant) || (int)($grant['tid'] ?? 0) !== $post_id
+      || !is_string($grant['usercode'] ?? null)
+      || !hash_equals($context->usercode, $grant['usercode'])) {
+      return null;
+    }
+    $post = (new BoardRepository())->findPost($post_id);
+    if (!is_array($post) || !hash_equals((string)($grant['picfile'] ?? ''), (string)$post['picfile'])) {
+      unset($_SESSION[self::SESSION_KEY]);
+      return null;
+    }
+    return $post;
+  }
 }
 
 class misskey_note {
 
   //投稿済みの記事をMisskeyにノートするための前処理
   public static function before_misskey_note(ApplicationContext $context): void {
+    MisskeyPostAuthorization::assertFeatureEnabled($context);
     $en = $context->english;
     $template_engine = $context->templates;
     $dat =& $context->data;
-    //管理者判定処理
-    RequestSecurity::startSession();
-    $admin_post = admin_post_valid(null);
-    $admin_del = admin_del_valid(null);
 
     $dat['pwd_cookie'] = (string)filter_input_data('COOKIE', 'pwd_cookie');
     $dat['no'] = t(filter_input_data('POST', 'no', FILTER_VALIDATE_INT));
@@ -141,13 +123,18 @@ class misskey_note {
       render_error($context, $en ? 'Invalid post number.' : '投稿番号が無効です。');
     }
 
-    if (!check_post_exists($dat['no'], $context)) {
-      render_error($context, $en ? 'The article does not exist.' : '記事がありません。', 404);
-    }
-
     $post = get_post_from_db($dat['no'], $context);
     if (!$post) {
         render_error($context, $en ? 'The article was not found.' : '記事が見つかりません。', 404);
+    }
+
+    // 非表示投稿は、管理者または投稿パスワードを知る本人にだけ内容を表示する。
+    if ((int)$post['invz'] !== 0 && !MisskeyPostAuthorization::isAdministrator()
+      && MisskeyPostAuthorization::authorize((int)$post['tid'], $dat['pwd_cookie']) === null) {
+      $dat['token'] = RequestSecurity::csrfToken();
+      $dat['misskey_mode'] = 'authorize';
+      echo $template_engine->render(MISSKEYFILE, $dat);
+      exit();
     }
     $dat['post'] = $post;
 
@@ -170,48 +157,43 @@ class misskey_note {
 
   //投稿済みの画像をMisskeyにNoteするための投稿フォーム
   public static function misskey_note_edit_form(ApplicationContext $context): void {
+    MisskeyPostAuthorization::assertFeatureEnabled($context);
     $en = $context->english;
     $template_engine = $context->templates;
     $dat =& $context->data;
 
     try {
-      RequestSecurity::assertCurrentSameOriginRequest($context->usercode, $en);
+      RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
     } catch (RequestSecurityException $e) {
       render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
 
     $dat['token'] = RequestSecurity::csrfToken();
 
-    $dat['admin_del'] = admin_del_valid(null);
-    $dat['admin_post'] = admin_post_valid(null);
-    $dat['admin'] = ($dat['admin_del'] || $dat['admin_post']);
-
     $pwd = (string)filter_input_data('POST', 'pwd');
     $pwd_cookie = (string)filter_input_data('COOKIE', 'pwd_cookie');
     $pwd = $pwd ? $pwd : $pwd_cookie;
 
-    $id_and_no = (string)filter_input_data('POST', 'id_and_no');
-
-    list($id, $no) = explode(",", trim($id_and_no));
+    $no = filter_input_data('POST', 'no', FILTER_VALIDATE_INT);
+    if (!$no) {
+      $id_and_no = (string)filter_input_data('POST', 'id_and_no');
+      $id_and_no_parts = explode(',', trim($id_and_no), 2);
+      $no = filter_var($id_and_no_parts[1] ?? '', FILTER_VALIDATE_INT);
+    }
 
     if (!$no) {
       render_error($context, $en ? 'Invalid post number.' : '投稿番号が無効です。');
     }
 
-    if (!check_post_exists($no, $context)) {
-      render_error($context, $en ? 'The article does not exist.' : '記事がありません。', 404);
-    }
-
-    if (!check_edit_permission($no, $id, $pwd, $dat['admin'], $context)) {
+    $post = MisskeyPostAuthorization::authorize((int)$no, $pwd);
+    if ($post === null) {
       render_error($context, $en ? 'Password is incorrect.' : 'パスワードが違います。', 403);
     }
+    MisskeyPostAuthorization::remember($post, $context);
 
     check_AsyncRequest();
 
-    $post = get_post_from_db($no, $context);
-    if (!$post) {
-      render_error($context, $en ? 'The article was not found.' : '記事が見つかりません。', 404);
-    }
+    $post = get_post_from_db((int)$no, $context);
     $dat['path'] = Config::string('paths.images');
     $dat['post'] = $post;
 
@@ -230,9 +212,6 @@ class misskey_note {
 
     $image_rep = false;
 
-    $_SESSION['current_id'] = $id;
-
-    $admin_pass = null;
     // HTML出力
     $dat['misskey_mode'] = 'note_edit_form';
 
@@ -242,6 +221,7 @@ class misskey_note {
 
   //Misskeyに投稿するSESSIONデータを作成
   public static function create_misskey_note_sessiondata(ApplicationContext $context): void {
+    MisskeyPostAuthorization::assertFeatureEnabled($context);
     $en = $context->english;
 
     try {
@@ -250,17 +230,26 @@ class misskey_note {
       render_error($context, $e->getMessage(), $e->getCode() ?: 403);
     }
 
-    $userip = t(RequestInfo::clientIp());
-    $no = t(filter_input_data('POST', 'no', FILTER_VALIDATE_INT));
-    $src_image = t(filter_input_data('POST', 'src_image'));
+    $no = filter_input_data('POST', 'no', FILTER_VALIDATE_INT);
     $com = t(filter_input_data('POST', 'com'));
-    $abbr_toolname = t(filter_input_data('POST', 'abbr_toolname'));
-    $paintsec = (int)filter_input_data('POST', 'paintsec', FILTER_VALIDATE_INT);
     $hide_thumbnail = (bool)filter_input_data('POST', 'hide_thumbnail', FILTER_VALIDATE_BOOLEAN);
     $show_painttime = (bool)filter_input_data('POST', 'show_painttime', FILTER_VALIDATE_BOOLEAN);
     $article_url_link = (bool)filter_input_data('POST', 'article_url_link', FILTER_VALIDATE_BOOLEAN);
     $hide_content = (bool)filter_input_data('POST', 'hide_content', FILTER_VALIDATE_BOOLEAN);
     $cw = t(filter_input_data('POST', 'cw'));
+
+    $post = $no ? MisskeyPostAuthorization::authorizedPost((int)$no, $context) : null;
+    if ($post === null) {
+      render_error($context, $en ? 'Post authorization is required.' : '投稿者認証が必要です。', 403);
+      return;
+    }
+
+    // hidden inputの投稿番号・画像名・描画情報は信用せず、認可直後に再取得したDB値を使う。
+    $no = (int)$post['tid'];
+    $src_image = (string)$post['picfile'];
+    if ($src_image === '') {
+      render_error($context, $en ? 'The post does not contain an image.' : '投稿画像がありません。', 400);
+    }
 
     if ($hide_content && !$cw) {
       render_error($context, $en ? 'Content warning field is empty.' : '注釈がありません。', 400);
@@ -269,9 +258,9 @@ class misskey_note {
     check_AsyncRequest();
 
     $cw = $hide_content ? $cw : null;
-    $tool = switch_tool($abbr_toolname);
+    $tool = switch_tool((string)$post['tool']);
 
-    $painttime = calcPtime($paintsec);
+    $painttime = calcPtime((int)$post['psec']);
     $painttime_str = '';
     if (is_array($painttime)) {
       $painttime_str = $en ? ($painttime['en'] ?? '') : ($painttime['ja'] ?? '');
@@ -312,6 +301,7 @@ class misskey_note {
 
   // Misskeyサーバー認証URLを生成
   public static function create_misskey_authrequesturl(ApplicationContext $context): void {
+    MisskeyPostAuthorization::assertFeatureEnabled($context);
     $en = $context->english;
 
     try {
@@ -417,6 +407,7 @@ class misskey_note {
 
   // Misskeyへの投稿が成功した事を知らせる画面
   public static function misskey_success(ApplicationContext $context): void {
+    MisskeyPostAuthorization::assertFeatureEnabled($context);
     $template_engine = $context->templates;
     $dat =& $context->data;
     $no = (string)filter_input_data('GET', 'no', FILTER_VALIDATE_INT);

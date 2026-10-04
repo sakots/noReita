@@ -307,6 +307,17 @@ PHP;
     throw new RuntimeException('Application startup failed: ' . trim(strip_tags($startup_body)));
   }
 
+  // 機能を無効にした設置では、表示ボタンだけでなくMisskeyの各入口を直接指定しても使えない。
+  [$misskey_disabled_before_status] = http_request($base_url . '?mode=before_misskey_note&no=1', $cookie_jar);
+  [$misskey_disabled_session_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar, [
+    'mode' => 'create_misskey_note_sessiondata',
+  ]);
+  integration_test('disabled Misskey routes reject direct requests', static function () use (
+    $misskey_disabled_before_status, $misskey_disabled_session_status
+  ): bool {
+    return $misskey_disabled_before_status === 404 && $misskey_disabled_session_status === 404;
+  });
+
   $protected_probes = [
     'config.php' => 'admin_pass',
     'config.local.php' => 'integration-admin-pass',
@@ -481,17 +492,17 @@ PHP;
   $misskey_callback_logged = false;
   foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
     $contents = (string)file_get_contents($error_log_file);
-    if (str_contains($contents, '"http_status":400')
-      && str_contains($contents, 'Misskey API: Misskey callback session was missing.')) {
+    if (str_contains($contents, '"http_status":404')
+      && str_contains($contents, 'Misskey API: Misskey callback was requested while the feature was disabled.')) {
       $misskey_callback_logged = true;
       break;
     }
   }
-  integration_test('Misskey callback records standalone failures without exposing internals', static function () use (
+  integration_test('disabled Misskey callback rejects direct access without exposing internals', static function () use (
     $misskey_callback_status, $misskey_callback_body, $misskey_callback_logged
   ): bool {
-    return $misskey_callback_status === 400
-      && str_contains($misskey_callback_body, 'Misskey posting session is missing')
+    return $misskey_callback_status === 404
+      && str_contains($misskey_callback_body, 'Misskey sharing is disabled')
       && $misskey_callback_logged
       && !str_contains($misskey_callback_body, 'Fatal error')
       && !str_contains($misskey_callback_body, 'Class &quot;Database&quot; not found')
@@ -825,6 +836,48 @@ PHP;
       && $tgkr_row['tool'] === 'Tegaki.js'
       && is_file($webroot . '/img/' . $tgkr_image)
       && is_file($webroot . '/img/' . $tgkr_base . '.tgkr');
+  });
+
+  $misskey_enabled_config = str_replace("    'misskey_note' => false,", "    'misskey_note' => true,", $config_local);
+  if ($misskey_enabled_config === $config_local
+    || file_put_contents($webroot . '/config.local.php', $misskey_enabled_config) === false) {
+    throw new RuntimeException('Could not enable Misskey for authorization tests.');
+  }
+
+  [$hidden_post_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'Misskey owner', 'mail' => '', 'url' => '',
+    'sub' => 'Hidden Misskey post', 'com' => 'non-public Misskey content', 'pwd' => 'misskey-owner-pass',
+    'picfile' => '', 'ctype' => 'new', 'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  $misskey_post = $animation_db->query("SELECT tid FROM board_log WHERE sub = 'Hidden Misskey post' ORDER BY tid DESC LIMIT 1")
+    ->fetch(PDO::FETCH_ASSOC);
+  if ($hidden_post_status !== 200 || !is_array($misskey_post)) {
+    throw new RuntimeException('Could not prepare a hidden Misskey post.');
+  }
+  $animation_db->prepare('UPDATE board_log SET invz = 1, picfile = ? WHERE tid = ?')
+    ->execute([$tgkr_image, (int)$misskey_post['tid']]);
+  $misskey_post['picfile'] = $tgkr_image;
+  $misskey_attacker_cookie_jar = $root . DIRECTORY_SEPARATOR . 'misskey-attacker-cookies.txt';
+  [$hidden_before_status, $hidden_before_body] = http_request(
+    $base_url . '?mode=before_misskey_note&no=' . (int)$misskey_post['tid'], $misskey_attacker_cookie_jar
+  );
+  $misskey_attacker_session = cookie_value($misskey_attacker_cookie_jar, 'noreita_session');
+  $misskey_attacker_token = $misskey_attacker_session === null ? '' : hash('sha256', $misskey_attacker_session);
+  [$forged_misskey_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $misskey_attacker_cookie_jar, [
+    'mode' => 'create_misskey_note_sessiondata', 'token' => $misskey_attacker_token,
+    'no' => (string)$misskey_post['tid'], 'src_image' => (string)$misskey_post['picfile'],
+  ]);
+  [$owner_before_status, $owner_before_body] = http_request(
+    $base_url . '?mode=before_misskey_note&no=' . (int)$misskey_post['tid'], $cookie_jar
+  );
+  integration_test('Misskey sharing keeps hidden posts and forged image selections private', static function () use (
+    $hidden_before_status, $hidden_before_body, $forged_misskey_status, $owner_before_status, $owner_before_body
+  ): bool {
+    return $hidden_before_status === 200
+      && !str_contains($hidden_before_body, 'non-public Misskey content')
+      && $forged_misskey_status === 403
+      && $owner_before_status === 200
+      && str_contains($owner_before_body, 'non-public Misskey content');
   });
 
   [$misskey_loopback_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [

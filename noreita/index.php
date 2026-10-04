@@ -84,14 +84,14 @@ if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20260816) {
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php', $en);
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260817) {
+if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20261004) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
 check_file(__DIR__.'/connect_misskey_api.php', $en);
 require_once(__DIR__.'/connect_misskey_api.php');
-if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260817) {
+if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20261004) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 

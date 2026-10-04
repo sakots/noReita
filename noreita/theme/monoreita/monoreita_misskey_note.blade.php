@@ -60,6 +60,23 @@
     <hr>
   </header>
 
+  @if ($misskey_mode == 'authorize')
+  <main>
+    <div>
+      <section class="thread">
+        <h3 class="oyat">この投稿をMisskeyにノートするにはパスワードを入力してください。</h3>
+        <form action="./" method="POST">
+          <input type="hidden" name="mode" value="misskey_note_edit_form">
+          <input type="hidden" name="no" value="{{ $no }}">
+          <input type="hidden" name="token" value="{{ $token }}">
+          <label>パスワード <input type="password" name="pwd" autocomplete="off"></label>
+          <button type="submit"><span class="simple-icons--misskey"></span> ノート</button>
+        </form>
+      </section>
+    </div>
+  </main>
+  @endif
+
   @if ($misskey_mode == 'note_edit_form')
   <main>
     <div>
@@ -208,6 +225,7 @@
             <input type="hidden" name="id_and_no" value="{{$post['id']}},{{$post['tid']}}">
             <input type="hidden" name="created" value="{{$post['created']}}">
             <input type="hidden" name="modified" value="{{$post['modified']}}">
+            <input type="hidden" name="token" value="{{$token}}">
             <input type="password" name="pwd" value="{{$pwd_cookie}}" autocomplete="off">
             <input type="hidden" name="mode" value="misskey_note_edit_form">
             <button type="submit">
