@@ -332,8 +332,6 @@ class connect_misskey_api{
 			);
 		}
 
-		sleep(10);
-
 		$tool= $tool ? 'Tool:'.$tool."\n" :'';
 		$painttime= $painttime ? 'Paint time:'.$painttime."\n" :'';
 

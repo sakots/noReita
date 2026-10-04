@@ -2385,6 +2385,12 @@ smoke_test('external link previews parse cached OGP metadata without fetching in
   }
 });
 
+smoke_test('Misskey sending does not impose a fixed wait', static function (): bool {
+  $source = file_get_contents(dirname(__DIR__) . '/noreita/connect_misskey_api.php');
+  return is_string($source)
+    && !preg_match('/\b(?:sleep|usleep|time_nanosleep|time_sleep_until)\s*\(/', $source);
+});
+
 smoke_test('Misskey cached tokens are checked without creating a note', static function (): bool {
   $source = file_get_contents(dirname(__DIR__) . '/noreita/misskey_note.inc.php');
   return is_string($source)
