@@ -22,11 +22,13 @@ PHP_BIN=php81 ./scripts/integration-test.sh
 `./scripts/smoke-test.sh`ではスモークテスト、
 `./scripts/integration-test.sh`ではHTTP結合テストが行なえます。
 
+HTTP結合テストは一時ディレクトリ内の設定を切り替えて検証します。テスト用PHP開発サーバーでは`opcache.enable=0`を指定し、変更前の設定がキャッシュから読み込まれないようにします。CLI用の`opcache.enable_cli=0`だけでは、開発サーバーのOPcacheは無効になりません。実運用のOPcache設定は変更しません。
+
 成功すると最後に概ね以下のように表示されます。
 
 ```txt
-Smoke tests: 105 passed, 0 failed.
-Integration tests: 119 passed, 0 failed.
+Smoke tests: 106 passed, 0 failed.
+Integration tests: 129 passed, 0 failed.
 ```
 
 レンタルサーバーではなく、PHPと必要な拡張機能をインストールしたローカル開発環境またはCIで実行する想定です。

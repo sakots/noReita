@@ -142,6 +142,7 @@
     "onbeforeunload",
     "onclick",
     "onmouseover",
+    "OPcache",
     "OTHERFILE",
     "othermode",
     "overscroll",

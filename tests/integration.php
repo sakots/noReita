@@ -281,7 +281,8 @@ PHP;
   $log = fopen($server_log, 'ab');
   if ($log === false) throw new RuntimeException('Could not create server log');
   $process = proc_open(
-    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+    // 設定の切り替えを即時反映するため、cli-serverでもOPcacheを無効にする。
+    [PHP_BINARY, '-d', 'opcache.enable=0',
       '-S', "127.0.0.1:{$port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
@@ -2417,7 +2418,7 @@ PHP;
   $monoreita_port = (int)substr(strrchr((string)$monoreita_address, ':'), 1);
   $monoreita_base_url = "http://127.0.0.1:{$monoreita_port}/index.php";
   $process = proc_open(
-    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+    [PHP_BINARY, '-d', 'opcache.enable=0',
       '-S', "127.0.0.1:{$monoreita_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
@@ -2574,7 +2575,7 @@ PHP;
   $diary_port = (int)substr(strrchr((string)$diary_address, ':'), 1);
   $diary_base_url = "http://127.0.0.1:{$diary_port}/index.php";
   $process = proc_open(
-    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+    [PHP_BINARY, '-d', 'opcache.enable=0',
       '-S', "127.0.0.1:{$diary_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
@@ -2647,7 +2648,7 @@ PHP;
   $diary_replies_port = (int)substr(strrchr((string)$diary_replies_address, ':'), 1);
   $diary_replies_url = "http://127.0.0.1:{$diary_replies_port}/index.php";
   $process = proc_open(
-    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+    [PHP_BINARY, '-d', 'opcache.enable=0',
       '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
