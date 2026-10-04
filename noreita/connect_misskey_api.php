@@ -191,6 +191,27 @@ class connect_misskey_api{
 		];
 	}
 
+	/** @return array{0: string|false, 1: int, 2: string} */
+	public static function submitNoteRequest(CurlHandle $curl, MisskeyApiContext $context): array {
+		try {
+			self::validatePostingSession($context);
+			// 応答消失や実行中断でも再送しないよう、送信前に認可と待ちデータの破棄を永続化する。
+			MisskeyPostAuthorization::forget();
+			unset($_SESSION['userdel']);
+			if (!session_write_close()) {
+				misskey_api_error(
+					$context->english ? 'Failed to save the posting session. No note was sent.' : '投稿セッションの保存に失敗しました。ノートは送信していません。',
+					500,
+					'Misskey posting session could not be persisted before note creation.'
+				);
+			}
+			$response = curl_exec($curl);
+			return [$response, (int)curl_getinfo($curl, CURLINFO_HTTP_CODE), curl_error($curl)];
+		} finally {
+			curl_close($curl);
+		}
+	}
+
 	public static function create_misskey_note(MisskeyApiContext $context): void {
 		$en = $context->english;
 		$baseUrl = $context->baseUrl;
@@ -352,15 +373,14 @@ class connect_misskey_api{
 		curl_setopt($postCurl, CURLOPT_HTTPHEADER, $postHeaders);
 		curl_setopt($postCurl, CURLOPT_POSTFIELDS, json_encode($postData));
 		curl_setopt($postCurl, CURLOPT_RETURNTRANSFER, true);
-		self::validatePostingSession($context);
-		$postResponse = curl_exec($postCurl);
-		$postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE);
-		$postCurlError = curl_error($postCurl);
-		curl_close($postCurl);
+		[$postResponse, $postStatusCode, $postCurlError] = self::submitNoteRequest($postCurl, $context);
+		$unconfirmed_message = $en
+			? 'The posting result could not be confirmed. Check Misskey before posting again.'
+			: '投稿結果を確認できませんでした。すでに投稿されている可能性があるため、再投稿する前にMisskey側を確認してください。';
 
 		if ($postResponse === false) {
 			misskey_api_error(
-				$en ? 'Failed to post the content.' : 'Misskeyへの投稿に失敗しました。',
+				$unconfirmed_message,
 				502,
 				'Misskey note creation transport failed: ' . $postCurlError
 			);
@@ -369,7 +389,7 @@ class connect_misskey_api{
 		if ($postStatusCode !== 200 && $postStatusCode !== 204) {
 			$postResponseData = json_decode($postResponse, true);
 			misskey_api_error(
-				$en ? 'Failed to post the content.' : 'Misskeyへの投稿に失敗しました。',
+				$unconfirmed_message,
 				502,
 				'Misskey note creation returned HTTP ' . $postStatusCode . ': ' . self::responseErrorDetail($postResponseData)
 			);
@@ -378,15 +398,11 @@ class connect_misskey_api{
 		$postResult = json_decode($postResponse, true);
 		if (!empty($postResult['createdNote']["fileIds"])) {
 
-			unset($_SESSION['sns_api_session_id']);
-			unset($_SESSION['sns_api_val']);
-			unset($_SESSION['userdel']);
-
 			redirect(Config::string('site.base_url').'?mode=misskey_success&no='.$thread_no);
 		}
 		else {
 			misskey_api_error(
-				$en ? 'Failed to post the content.' : '投稿に失敗しました。',
+				$unconfirmed_message,
 				502,
 				'Misskey note creation response did not contain createdNote file IDs.'
 			);
@@ -410,7 +426,7 @@ function connect_misskey_api_dispatch(): void {
 	AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'));
 	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
 		misskey_api_error(
-			$en ? 'The Misskey posting session is missing.' : 'セッションがありません。Misskey投稿フローが正しく動作していません。',
+			$en ? 'The Misskey posting session is missing. If you already attempted to post, check Misskey before posting again.' : '投稿セッションがありません。すでに送信操作を行った場合は、再投稿する前にMisskey側を確認してください。',
 			400,
 			'Misskey callback session was missing.'
 		);

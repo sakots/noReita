@@ -1030,6 +1030,21 @@ require_once __DIR__ . '/connect_misskey_api.php';
 RequestSecurity::startSession();
 $_SESSION['accessToken'] = 'misskey-probe-token';
 if (($_GET['forge_image'] ?? '') === '1') $_SESSION['sns_api_val'][1] = 'other-image.png';
+if (($_GET['submit_note'] ?? '') === '1') {
+  // 到達しないループバックのポートで通信失敗を起こす。外部への投稿は行わない。
+  $curl = curl_init('http://127.0.0.1:1');
+  curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_PROXY => '', CURLOPT_TIMEOUT => 1]);
+  [$response] = connect_misskey_api::submitNoteRequest($curl, new MisskeyApiContext(true, 'https://127.0.0.1'));
+  header('Content-Type: application/json');
+  echo json_encode([
+    'transport_failed' => $response === false,
+    'session_closed' => session_status() === PHP_SESSION_NONE,
+    'pending_removed' => !isset($_SESSION['sns_api_val']) && !isset($_SESSION['sns_api_session_id'])
+      && !isset($_SESSION['misskey_authorized_post']),
+    'token_retained' => ($_SESSION['accessToken'] ?? '') === 'misskey-probe-token',
+  ]);
+  exit;
+}
 if (($_GET['callback'] ?? '') === '1' || ($_GET['callback_state'] ?? '') === '1') {
   $_SESSION['sns_api_session_id'] = 'probe-state';
   $_SESSION['misskey_server_radio'] = 'https://127.0.0.1';
@@ -1112,6 +1127,23 @@ PHP;
             : $state_status === 403 && $state_body === 'Error: Operation failed.');
       });
   }
+
+  [$submission_status, $submission_body] = http_request(
+    $origin_url . '/misskey-send-probe.php?submit_note=1', $state_cookies);
+  $submission_result = json_decode($submission_body, true);
+  integration_test('Misskey consumes and persists the posting session before a failed note request',
+    static fn (): bool => $submission_status === 200 && $submission_result === [
+      'transport_failed' => true, 'session_closed' => true, 'pending_removed' => true, 'token_retained' => true,
+    ]);
+  [$retry_status, $retry_body] = http_request(
+    $origin_url . '/connect_misskey_api.php?session=probe-state', $state_cookies);
+  integration_test('Misskey rejects callback retries after a note transport failure',
+    static fn (): bool => $retry_status === 400 && str_contains($retry_body, 'The Misskey posting session is missing.'));
+  [$resubmit_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $state_cookies,
+    ['no' => (string)$misskey_post['tid'], 'token' => $state_token,
+      'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1']);
+  integration_test('Misskey requires fresh post authorization after starting a note request',
+    static fn (): bool => $resubmit_status === 403);
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_errorlog_unauthorized_status] = http_request($base_url . '?mode=admin_errorlog', $cookie_jar);
