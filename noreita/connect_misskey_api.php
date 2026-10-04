@@ -193,6 +193,13 @@ class connect_misskey_api{
 		];
 	}
 
+	/** 空の本文は送らず、画像だけのノートもMisskeyの入力検証を通す。 */
+	public static function noteFields(string $access_token, string $file_id, string $text, ?string $cw): array {
+		$fields = ['i' => $access_token, 'cw' => $cw, 'fileIds' => [$file_id]];
+		if (trim($text) !== '') $fields['text'] = $text;
+		return $fields;
+	}
+
 	/** @return array{0: string|false, 1: int, 2: string} */
 	public static function submitNoteRequest(CurlHandle $curl, MisskeyApiContext $context): array {
 		try {
@@ -344,7 +351,7 @@ class connect_misskey_api{
 		$fixed_link = filter_var($fixed_link,FILTER_VALIDATE_URL) ? $fixed_link : '';
 		$article_url_link = $article_url_link ? $fixed_link : '';
 		$com=str_replace(["\r\n","\r"],"\n",$com);
-		$com=$com ? $com."\n" :'';
+		$com=$com !== '' ? $com."\n" :'';
 		$com = preg_replace("/(\s*\n){2,}/u","\n",$com); //不要改行カット
 
 		$status = $tool.$painttime.$com.$article_url_link;
@@ -353,12 +360,7 @@ class connect_misskey_api{
 		$postHeaders = array(
 			'Content-Type: application/json'
 		);
-		$postData = array(
-			'i' => $accessToken,
-			'cw' => $cw,
-			'text' => $status,
-			'fileIds' => array($fileId),
-		);
+		$postData = self::noteFields($accessToken, $fileId, $status, $cw);
 
 		$postCurl = curl_init();
 		if (!self::applySecurity($postCurl, $baseUrl)) {

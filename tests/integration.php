@@ -1736,6 +1736,12 @@ PHP;
 <?php
 require_once __DIR__ . '/connect_misskey_api.php';
 RequestSecurity::startSession();
+if (($_GET['note_fields'] ?? '') === '1') {
+  header('Content-Type: application/json');
+  echo json_encode(connect_misskey_api::noteFields('probe-token', 'probe-file',
+    (string)($_GET['text'] ?? ''), $_GET['cw'] ?? null));
+  exit;
+}
 $post = connect_misskey_api::validatePostingSession(new MisskeyApiContext(true, ''));
 $fields = connect_misskey_api::uploadFields('probe-token', __DIR__ . '/img/' . $post['picfile'],
   (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
@@ -1746,6 +1752,29 @@ echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'],
   'upload_comment' => $fields['comment'] ?? null, 'update_comment' => $update['comment'] ?? null]);
 PHP;
   file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
+
+  foreach ([
+    'image only' => ['', null],
+    'whitespace only' => [" \r\n\t", null],
+    'image with CW' => ['', '画像の注釈'],
+    'zero text' => ['0', null],
+    'comment' => ["本文\n", null],
+    'tool' => ["Tool:PaintBBS NEO\n", null],
+    'paint time' => ["Paint time:10min\n", null],
+    'article link' => ['https://example.com/?resno=1', null],
+  ] as $note_case => [$note_text, $note_cw]) {
+    $note_query = ['note_fields' => '1', 'text' => $note_text];
+    if ($note_cw !== null) $note_query['cw'] = $note_cw;
+    [$note_status, $note_body] = http_request(
+      $origin_url . '/misskey-sensitive-probe.php?' . http_build_query($note_query), $cookie_jar);
+    $note_fields = json_decode($note_body, true);
+    integration_test('Misskey note payload supports optional text: ' . $note_case,
+      static function () use ($note_status, $note_fields, $note_text, $note_cw): bool {
+        $expected = ['i' => 'probe-token', 'cw' => $note_cw, 'fileIds' => ['probe-file']];
+        if (trim($note_text) !== '') $expected['text'] = $note_text;
+        return $note_status === 200 && $note_fields === $expected;
+      });
+  }
 
   // DBから取得した画像説明が、両テーマのMisskey確認・設定画面まで届くことを検証する。
   $misskey_alt_original_config = (string)file_get_contents($webroot . '/config.local.php');
