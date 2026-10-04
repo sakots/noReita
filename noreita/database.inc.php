@@ -3,7 +3,7 @@
 
 require_once __DIR__ . '/filesystem_permissions.inc.php';
 
-const DATABASE_INC_VER = 20260910;
+const DATABASE_INC_VER = 20261004;
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -546,7 +546,8 @@ final class BoardRepository {
   }
 
   public function findPostsByImage(string $image_name): array {
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE picfile = ? ORDER BY tree DESC');
+    // 続き描画の公開確認画面には、非表示投稿の画像や説明を渡さない。
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE picfile = ? AND invz = 0 ORDER BY tree DESC');
     $statement->execute([$image_name]);
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }

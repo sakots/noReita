@@ -2342,7 +2342,7 @@ PHP;
 
   $check_continuation = static function (string $theme, string $continue_url, string $continue_cookies) use ($webroot, $upload_row): void {
     $continue_db = new PDO('sqlite:' . $webroot . '/reita.db');
-    $continue_fixture = $continue_db->query('SELECT tid, picfile, pchfile, ctype FROM board_log WHERE picfile = '
+    $continue_fixture = $continue_db->query('SELECT tid, picfile, pchfile, ctype, invz, image_alt FROM board_log WHERE picfile = '
       . $continue_db->quote((string)$upload_row['picfile']))->fetch(PDO::FETCH_ASSOC);
     $continue_animation = pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.pch';
     $continue_animation_path = $webroot . '/img/' . $continue_animation;
@@ -2365,10 +2365,33 @@ PHP;
           }
         );
       }
+      // 同じ画像が残っていても非表示投稿は公開入口から取得できない。
+      // 説明が空のときに投稿者名・件名がaltへ漏れる経路も両テーマで確認する。
+      $public_continue_cookies = dirname($webroot) . '/continue-public-' . $theme . '.txt';
+      foreach (['非表示画像の説明', ''] as $hidden_description) {
+        $continue_db->prepare('UPDATE board_log SET invz = 1, image_alt = ? WHERE tid = ?')
+          ->execute([$hidden_description, $continue_fixture['tid']]);
+        [$hidden_continue_status, $hidden_continue_body] = http_request(
+          $continue_url . '?mode=continue&no=' . rawurlencode($continue_fixture['picfile']), $public_continue_cookies
+        );
+        [$admin_continue_status] = http_request(
+          $continue_url . '?mode=continue&no=' . rawurlencode($continue_fixture['picfile']), $continue_cookies
+        );
+        integration_test('continuation rejects hidden posts: ' . $theme . '/' . ($hidden_description === '' ? 'no alt' : 'alt'),
+          static function () use ($hidden_continue_status, $hidden_continue_body, $admin_continue_status, $continue_fixture): bool {
+            return $hidden_continue_status === 404 && $admin_continue_status === 404
+              && !str_contains($hidden_continue_body, $continue_fixture['picfile'])
+              && !str_contains($hidden_continue_body, '非表示画像の説明')
+              && !str_contains($hidden_continue_body, 'name="img"')
+              && !str_contains($hidden_continue_body, 'name="pch"');
+          }
+        );
+      }
     } finally {
       if (is_file($continue_animation_path)) unlink($continue_animation_path);
-      $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ? WHERE tid = ?');
-      $statement->execute([$continue_fixture['ctype'], $continue_fixture['pchfile'], $continue_fixture['tid']]);
+      $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ?, invz = ?, image_alt = ? WHERE tid = ?');
+      $statement->execute([$continue_fixture['ctype'], $continue_fixture['pchfile'], $continue_fixture['invz'],
+        $continue_fixture['image_alt'], $continue_fixture['tid']]);
     }
   };
   $check_continuation('eda', $base_url, $cookie_jar);
