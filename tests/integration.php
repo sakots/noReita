@@ -1706,6 +1706,44 @@ PHP;
     }
   }
 
+  // 返信は検索結果でカタログ用テンプレートのko側に渡される。
+  $catalog_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $catalog_reply_subject = 'catalog-reply-' . bin2hex(random_bytes(6));
+  $catalog_thumbnail = $catalog_reply_subject . '-thumb.png';
+  $catalog_columns = array_values(array_filter($db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1),
+    static fn (string $column): bool => $column !== 'tid'));
+  $db->exec('INSERT INTO board_log (' . implode(',', $catalog_columns) . ') SELECT '
+    . implode(',', $catalog_columns) . ' FROM board_log WHERE tid = ' . $image_post_id);
+  $catalog_reply_id = (int)$db->lastInsertId();
+  $db->prepare('UPDATE board_log SET thread = 0, parent = ?, sub = ? WHERE tid = ?')
+    ->execute([$image_post_id, $catalog_reply_subject, $catalog_reply_id]);
+  file_put_contents($webroot . '/img/' . $catalog_thumbnail, $png);
+  try {
+    foreach (['eda', 'monoreita'] as $catalog_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $catalog_theme . "'],", $config_local));
+      $catalog_results = [];
+      foreach ([[0, $catalog_thumbnail], [1, $catalog_thumbnail], [0, '']] as [$catalog_nsfw, $catalog_thumb]) {
+        $db->prepare('UPDATE board_log SET nsfw = ?, thumbnail = ? WHERE tid = ?')
+          ->execute([$catalog_nsfw, $catalog_thumb, $catalog_reply_id]);
+        [$catalog_status, $catalog_body] = http_request($base_url
+          . '?mode=search&target=all&post_type=reply&search=' . rawurlencode($catalog_reply_subject), $cookie_jar);
+        $catalog_expected_image = $catalog_thumb !== '' ? $catalog_thumb : (string)$image_row['picfile'];
+        [$catalog_image_status] = http_request($origin_url . '/img/' . rawurlencode($catalog_expected_image), $cookie_jar);
+        $catalog_results[] = $catalog_status === 200 && $catalog_image_status === 200
+          && str_contains($catalog_body, 'src="img/' . $catalog_expected_image . '"')
+          && !str_contains($catalog_body, 'src="' . $catalog_expected_image . '"')
+          && str_contains($catalog_body, 'alt="' . htmlspecialchars($edited_image_alt, ENT_QUOTES, 'UTF-8') . '"');
+      }
+      integration_test('catalog reply image paths include the image directory: ' . $catalog_theme,
+        static fn (): bool => !in_array(false, $catalog_results, true));
+    }
+  } finally {
+    $db->prepare('DELETE FROM board_log WHERE tid = ?')->execute([$catalog_reply_id]);
+    unlink($webroot . '/img/' . $catalog_thumbnail);
+    file_put_contents($webroot . '/config.local.php', $catalog_original_config);
+  }
+
   $admin_temporary_base = 'admin-temp-' . bin2hex(random_bytes(6));
   $admin_temporary_name = $admin_temporary_base . '.png';
   file_put_contents($webroot . '/tmp/' . $admin_temporary_name, $png);

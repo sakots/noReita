@@ -82,7 +82,7 @@
           <div>
             @if ($res['picfile'])
               <p>
-                <a href="{{$self}}?mode=res&amp;res={{$res['parent']}}" title="{{$res['sub']}} (by {{$res['a_name']}})">@if ($res['nsfw'] == 1 && str_ends_with($res['picfile'], '.avif'))<span class="nsfw-browser-blur"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy"></span>@elseif ($res['thumb'])<img src="{{$res['thumb']}}" alt="{{$res_image_alt}}" loading="lazy">@else<img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy">@endif</a>
+                <a href="{{$self}}?mode=res&amp;res={{$res['parent']}}" title="{{$res['sub']}} (by {{$res['a_name']}})">@if ($res['nsfw'] == 1 && str_ends_with($res['picfile'], '.avif'))<span class="nsfw-browser-blur"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy"></span>@elseif ($res['thumb'])<img src="{{$path}}{{$res['thumb']}}" alt="{{$res_image_alt}}" loading="lazy">@else<img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy">@endif</a>
               </p>
             @else
               <p>
