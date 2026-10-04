@@ -1543,7 +1543,7 @@ PHP;
         throw new RuntimeException('Could not select the Misskey alt test theme.');
       }
       $misskey_alt_results = [];
-      foreach ([$edited_image_alt, ''] as $misskey_alt_description) {
+      foreach ([$edited_image_alt, '0', ''] as $misskey_alt_description) {
         $db->prepare('UPDATE board_log SET image_alt = ? WHERE tid = ?')
           ->execute([$misskey_alt_description, $image_post_id]);
         $misskey_alt_expected = 'alt="' . htmlspecialchars(

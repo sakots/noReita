@@ -1,3 +1,6 @@
+@php
+  $post_image_alt = ($post['image_alt'] ?? '') !== '' ? $post['image_alt'] : ($post['sub'] ?? '');
+@endphp
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -92,7 +95,7 @@
           @if (!empty($post['picfile']))
           <div class="image">
             <a href="{{ $path }}{{ $post['picfile'] }}" target="_blank">
-              <img src="{{ $path }}{{ $post['picfile'] }}" alt="{{ !empty($post['image_alt']) ? $post['image_alt'] : $post['sub'] }}" width="{{ $post['img_w'] }}" height="{{ $post['img_h'] }}">
+              <img src="{{ $path }}{{ $post['picfile'] }}" alt="{{ $post_image_alt }}" width="{{ $post['img_w'] }}" height="{{ $post['img_h'] }}">
             </a>
           </div>
           @endif
@@ -212,7 +215,7 @@
           </h4>
           <div class="image">
             <a href="{{$path}}{{$post['picfile']}}" target="_blank">
-              <img src="{{$path}}{{$post['picfile']}}" alt="{{!empty($post['image_alt']) ? $post['image_alt'] : $post['sub']}}" width="{{$post['img_w']}}" height="{{$post['img_h']}}">
+              <img src="{{$path}}{{$post['picfile']}}" alt="{{$post_image_alt}}" width="{{$post['img_w']}}" height="{{$post['img_h']}}">
             </a>
           </div>
           <p class="comment">{!! $post['com'] !!}</p>

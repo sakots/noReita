@@ -177,6 +177,44 @@ smoke_test('both themes limit animation links to supported tool names', static f
   }
 });
 
+smoke_test('both themes preserve zero image alt and escape descriptions', static function (): bool {
+  $cache = sys_get_temp_dir() . '/noreita_image_alt_' . bin2hex(random_bytes(8));
+  mkdir($cache, 0700, true);
+  try {
+    foreach (['eda' => 'twig', 'monoreita' => 'blade'] as $theme => $type) {
+      mkdir($cache . '/' . $theme, 0700);
+      $engine = TemplateEngineFactory::create($type, dirname(__DIR__) . '/noreita/theme/' . $theme . '/components', $cache . '/' . $theme);
+      foreach (['Oya' => 'bbsline', 'Rep' => 'res'] as $component => $key) {
+        foreach (['0', '<説明 "画像">', ''] as $description) {
+          foreach ([[0, 'record.png', ''], [0, 'record.png', 'thumb.png'],
+            [1, 'record.png', 'thumb.png'], [1, 'record.avif', '']] as [$nsfw, $image, $thumbnail]) {
+            $post = ['tool' => '', 'img_w' => 4, 'img_h' => 3, 'psec' => 0, 'utime' => '',
+              'nsfw' => $nsfw, 'picfile' => $image, 'thumb' => $thumbnail, 'pchfile' => '',
+              'a_name' => '作者', 'sub' => '件名', 'image_alt' => $description];
+            $html = $engine->render($theme . '_thread' . $component . 'Picfile', [
+              $key => $post, 'display_painttime' => false, 'path' => 'img/', 'self' => 'index.php',
+              'use_continue' => false, 'use_misskey_note' => false,
+            ]);
+            $expected = $description !== '' ? $description : '投稿画像（作者）: 件名';
+            if (!str_contains($html, 'alt="' . htmlspecialchars($expected, ENT_QUOTES, 'UTF-8') . '"')) {
+              throw new RuntimeException($theme . '/' . $component . ': unexpected image alt');
+            }
+          }
+        }
+      }
+    }
+    return true;
+  } finally {
+    $iterator = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($cache, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $item) {
+      $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+    }
+    rmdir($cache);
+  }
+});
+
 smoke_test('eda Twig theme templates compile', static function (): bool {
   $views = dirname(__DIR__) . '/noreita/theme/eda';
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_eda_twig_' . bin2hex(random_bytes(8));

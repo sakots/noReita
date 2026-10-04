@@ -2,6 +2,9 @@
   <div class="thread">
     <h1 class="oekaki">投稿フォーム</h1>
     @foreach ($oya as $bbsline)
+      @php
+        $bbsline_image_alt = ($bbsline['image_alt'] ?? '') !== '' ? $bbsline['image_alt'] : '投稿画像（'.($bbsline['a_name'] ?? '').'）: '.($bbsline['sub'] ?? '');
+      @endphp
       <form class="ppost postform" action="{{$self}}?mode=editexec" method="post">
         <table>
           <tr>
@@ -50,7 +53,7 @@
                 <span @if ((int)$bbsline['nsfw'] === 1) class="nsfw" @endif>
                   <img
                     src="{{$path}}{{$bbsline['thumbnail'] !== '' ? $bbsline['thumbnail'] : $bbsline['picfile']}}"
-                    alt="{{!empty($bbsline['image_alt']) ? $bbsline['image_alt'] : '投稿画像（'.$bbsline['a_name'].'）: '.$bbsline['sub']}}"
+                    alt="{{$bbsline_image_alt}}"
                     loading="lazy"
                     class="image">
                 </span>

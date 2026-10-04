@@ -1,3 +1,6 @@
+@php
+  $bbsline_image_alt = ($bbsline['image_alt'] ?? '') !== '' ? $bbsline['image_alt'] : '投稿画像（'.($bbsline['a_name'] ?? '').'）: '.($bbsline['sub'] ?? '');
+@endphp
 <h5>
   {{$bbsline['tool']}} ({{$bbsline['img_w']}}x{{$bbsline['img_h']}})
   @if ($bbsline['psec'] != null)
@@ -21,11 +24,11 @@
   <a class="luminous" href="{{$path}}{{$bbsline['picfile']}}">
     <span @if ($bbsline['nsfw'] == 1) class="nsfw@if (str_ends_with($bbsline['picfile'], '.avif')) nsfw-browser-blur@endif" @endif>
       @if ($bbsline['nsfw'] == 1 && str_ends_with($bbsline['picfile'], '.avif'))
-        <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{!empty($bbsline['image_alt']) ? $bbsline['image_alt'] : '投稿画像（'.$bbsline['a_name'].'）: '.$bbsline['sub']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline_image_alt}}" loading="lazy" class="image">
       @elseif ($bbsline['thumb'])
-        <img src="{{$path}}{{$bbsline['thumb']}}" alt="{{!empty($bbsline['image_alt']) ? $bbsline['image_alt'] : '投稿画像（'.$bbsline['a_name'].'）: '.$bbsline['sub']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline_image_alt}}" loading="lazy" class="image">
       @else
-        <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{!empty($bbsline['image_alt']) ? $bbsline['image_alt'] : '投稿画像（'.$bbsline['a_name'].'）: '.$bbsline['sub']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline_image_alt}}" loading="lazy" class="image">
       @endif
     </span>
   </a>

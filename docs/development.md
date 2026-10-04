@@ -27,7 +27,7 @@ HTTP結合テストは一時ディレクトリ内の設定を切り替えて検�
 成功すると最後に概ね以下のように表示されます。
 
 ```txt
-Smoke tests: 106 passed, 0 failed.
+Smoke tests: 107 passed, 0 failed.
 Integration tests: 129 passed, 0 failed.
 ```
 

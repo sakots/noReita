@@ -2,8 +2,11 @@
   <div class="thread">
     <h1 class="oekaki">続きから描く</h1>
     @foreach ($oya as $bbsline)
+      @php
+        $bbsline_image_alt = ($bbsline['image_alt'] ?? '') !== '' ? $bbsline['image_alt'] : '投稿画像（'.($bbsline['a_name'] ?? '').'）: '.($bbsline['sub'] ?? '');
+      @endphp
       <figure>
-        <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{!empty($bbsline['image_alt']) ? $bbsline['image_alt'] : '投稿画像（'.$bbsline['a_name'].'）: '.$bbsline['sub']}}">
+        <img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline_image_alt}}">
         <figcaption>
           {{$bbsline['picfile']}}
           @if ($display_painttime && ($bbsline['psec'] != null))
