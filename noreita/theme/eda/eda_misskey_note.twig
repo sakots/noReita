@@ -133,9 +133,10 @@
             {% if use_nsfw %}
             <div class="form-group">
               <label>
-                <input type="checkbox" name="hide_thumbnail" value="1">
+                <input type="checkbox" name="hide_thumbnail" value="1" {{ misskey_sensitive_checked }} {{ misskey_sensitive_disabled }}>
                 センシティブな画像として投稿
               </label>
+              <small>掲示板でNSFWに設定された画像は、共有先でもセンシティブ扱いになります。</small>
               <div class="cw-input" style="display: none;">
                 <label for="cw">注釈</label>
                 <input type="text" name="cw" id="cw" size="48" maxlength="100" placeholder="センシティブな画像の注釈を入力">
@@ -173,9 +174,14 @@
 
   <script>
     // センシティブ設定の表示/非表示
-    document.querySelector('input[name="hide_thumbnail"]').addEventListener('change', function() {
-      document.querySelector('.cw-input').style.display = this.checked ? 'block' : 'none';
-    });
+    (() => {
+      const checkbox = document.querySelector('input[name="hide_thumbnail"]');
+      const cwInput = document.querySelector('.cw-input');
+      if (!checkbox || !cwInput) return;
+      const update = () => { cwInput.style.display = checkbox.checked ? 'block' : 'none'; };
+      checkbox.addEventListener('change', update);
+      update();
+    })();
   </script>
   {% endif %}
 

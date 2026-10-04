@@ -1706,6 +1706,53 @@ PHP;
     }
   }
 
+  $misskey_sensitive_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/connect_misskey_api.php';
+RequestSecurity::startSession();
+$post = connect_misskey_api::validatePostingSession(new MisskeyApiContext(true, ''));
+$fields = connect_misskey_api::uploadFields('probe-token', __DIR__ . '/img/' . $post['picfile'], (bool)$_SESSION['sns_api_val'][4]);
+header('Content-Type: application/json');
+echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'], 'upload' => $fields['isSensitive']]);
+PHP;
+  file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
+  $sensitive_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $sensitive_original_nsfw = $db->query('SELECT nsfw FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  try {
+    foreach (['eda', 'monoreita'] as $sensitive_theme) {
+      $sensitive_results = [];
+      foreach ([[1, null, true, true], [1, '0', true, true], [0, null, false, true],
+        [0, '1', true, true], [1, null, true, false]] as [$stored_nsfw, $selected_sensitive, $expected_sensitive, $nsfw_enabled]) {
+        $sensitive_config = str_replace("'paths' => ['theme' => 'starter'],",
+          "'paths' => ['theme' => '" . $sensitive_theme . "'],", $misskey_enabled_config);
+        if (!$nsfw_enabled) $sensitive_config = str_replace("'image_upload' => true,", "'image_upload' => true, 'nsfw' => false,", $sensitive_config);
+        file_put_contents($webroot . '/config.local.php', $sensitive_config);
+        $db->prepare('UPDATE board_log SET nsfw = ? WHERE tid = ?')->execute([$stored_nsfw, $image_post_id]);
+        [$sensitive_form_status, $sensitive_form_body] = http_request($base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+          ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]);
+        $sensitive_form_valid = $nsfw_enabled
+          ? preg_match('~<input[^>]*name="hide_thumbnail"[^>]*>~', $sensitive_form_body, $checkbox) === 1
+            && (str_contains($checkbox[0], 'checked') === (bool)$stored_nsfw)
+            && (str_contains($checkbox[0], 'disabled') === (bool)$stored_nsfw)
+          : preg_match('~<input[^>]*name="hide_thumbnail"[^>]*>~', $sensitive_form_body) === 0;
+        $sensitive_request = ['no' => (string)$image_post_id, 'token' => $token,
+          'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1'];
+        if ($selected_sensitive !== null) $sensitive_request['hide_thumbnail'] = $selected_sensitive;
+        [$sensitive_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar, $sensitive_request);
+        [$sensitive_probe_status, $sensitive_probe_body] = http_request($origin_url . '/misskey-sensitive-probe.php', $cookie_jar);
+        $sensitive_flags = json_decode($sensitive_probe_body, true);
+        $sensitive_results[] = $sensitive_form_status === 200 && $sensitive_form_valid && $sensitive_pending_status === 400
+          && $sensitive_probe_status === 200 && ($sensitive_flags['pending'] ?? null) === $expected_sensitive
+          && ($sensitive_flags['upload'] ?? null) === ($expected_sensitive ? 'true' : 'false');
+      }
+      integration_test('Misskey sharing preserves NSFW and allows marking safe images sensitive: ' . $sensitive_theme,
+        static fn (): bool => !in_array(false, $sensitive_results, true));
+    }
+  } finally {
+    $db->prepare('UPDATE board_log SET nsfw = ? WHERE tid = ?')->execute([$sensitive_original_nsfw, $image_post_id]);
+    file_put_contents($webroot . '/config.local.php', $sensitive_original_config);
+  }
+
   // 実際の編集経路で保存したHTMLが、公開確認画面・認可後の画面で実行されないことを確認する。
   $misskey_xss_original_config = (string)file_get_contents($webroot . '/config.local.php');
   $misskey_xss_original_comment = (string)$db->query('SELECT com FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();

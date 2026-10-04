@@ -44,6 +44,7 @@ function get_post_from_db(int $no, ApplicationContext $context): ?array {
       'parent'   => $post['parent'],
       'psec'     => $post['psec'],
       'invz'     => $post['invz'],
+      'nsfw'     => $post['nsfw'],
       'image_alt'=> $post['image_alt'],
     ];
   } catch (PDOException $e) {
@@ -146,6 +147,8 @@ class misskey_note {
     $dat['post'] = $post;
 
     // Misskeyサーバーリストをセット
+    $dat['misskey_sensitive_checked'] = (bool)$post['nsfw'] ? 'checked' : '';
+    $dat['misskey_sensitive_disabled'] = (bool)$post['nsfw'] ? 'disabled' : '';
     $dat['misskey_servers'] = Config::array('social.misskey_servers');
 
     $dat['nsfw_c'] = (bool)filter_input_data('COOKIE', 'nsfw_c', FILTER_VALIDATE_BOOLEAN);
@@ -191,6 +194,9 @@ class misskey_note {
       render_error($context, $en ? 'Post authorization is required.' : '投稿者認証が必要です。', 403);
       return;
     }
+
+    // フォーム値が省略・改変されても、掲示板でNSFWの画像を通常画像として共有しない。
+    $hide_thumbnail = (bool)$post['nsfw'] || $hide_thumbnail;
 
     // hidden inputの投稿番号・画像名・描画情報は信用せず、認可直後に再取得したDB値を使う。
     $no = (int)$post['tid'];

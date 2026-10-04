@@ -28,7 +28,7 @@ HTTP結合テストは一時ディレクトリ内の設定を切り替えて検�
 
 ```txt
 Smoke tests: 107 passed, 0 failed.
-Integration tests: 147 passed, 0 failed.
+Integration tests: 149 passed, 0 failed.
 ```
 
 レンタルサーバーではなく、PHPと必要な拡張機能をインストールしたローカル開発環境またはCIで実行する想定です。

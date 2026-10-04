@@ -171,6 +171,15 @@ class connect_misskey_api{
 		return $post;
 	}
 
+	/** multipartの真偽値は、Misskeyが解釈できる文字列で送る。 */
+	public static function uploadFields(string $access_token, string $image_path, bool $sensitive): array {
+		return [
+			'i' => $access_token,
+			'file' => new CURLFile($image_path),
+			'isSensitive' => $sensitive ? 'true' : 'false',
+		];
+	}
+
 	public static function create_misskey_note(MisskeyApiContext $context): void {
 		$en = $context->english;
 		$baseUrl = $context->baseUrl;
@@ -187,6 +196,7 @@ class connect_misskey_api{
 		$post = self::validatePostingSession($context);
 		list($com,$src_image,$tool,$painttime,$hide_thumbnail,$no,$article_url_link,$cw) = $_SESSION['sns_api_val'];
 		$src_image = (string)$post['picfile'];
+		$hide_thumbnail = (bool)$post['nsfw'] || (bool)$hide_thumbnail;
 
 		// 画像のアップロード
 		$imagePath = __DIR__.'/'.Config::string('paths.images').$src_image;
@@ -200,10 +210,7 @@ class connect_misskey_api{
 		};
 
 		$uploadUrl = $baseUrl . "/api/drive/files/create";
-		$uploadFields = array(
-			'i' => $accessToken,
-			'file' => new CURLFile($imagePath),
-		);
+		$uploadFields = self::uploadFields($accessToken, $imagePath, $hide_thumbnail);
 		$uploadCurl = curl_init();
 		if (!self::applySecurity($uploadCurl, $baseUrl, 30)) {
 			misskey_api_error(

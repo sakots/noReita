@@ -96,4 +96,6 @@ Misskey連携の確認画面と投稿設定画面でも、DBの`image_alt`を画
 
 Misskey連携画面の本文は、DBのプレーンテキストを両テーマでHTMLエスケープして表示します。改行はCSSの`white-space: pre-wrap`で維持し、本文のHTMLタグは実行しません。投稿用のtextareaには元の本文を渡し、表示用HTMLを混ぜません。
 
+Misskey共有のセンシティブ指定は、DBの`nsfw`と共有フォームの指定のどちらかが有効なら有効になります。NSFW投稿のチェック欄は選択済み・変更不可とし、フォーム値の省略やNSFW機能の無効化でも通常画像扱いにはしません。通常投稿は共有時にセンシティブ指定を追加できます。[Misskey公式API実装](https://github.com/misskey-dev/misskey/blob/develop/packages/backend/src/server/api/endpoints/drive/files/create.ts)に合わせ、画像の初回アップロードから`isSensitive`を指定し、アップロード後の更新にも同じ設定を使います。
+
 `misskey_post_authorization.inc.php`の`MisskeyPostAuthorization`を、投稿画面と独立したコールバックで共用します。認可時の投稿内容をハッシュで記録し、DB上の画像名・投稿内容・認可が変わった場合は送信待ちデータも破棄します。コールバック開始時と画像アップロード・ノート作成の直前に再確認し、外部認証中やAPI通信中の変更も検出します。「そうだね」の加算は認可の失効対象に含めません。
