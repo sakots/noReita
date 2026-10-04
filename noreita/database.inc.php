@@ -3,7 +3,7 @@
 
 require_once __DIR__ . '/filesystem_permissions.inc.php';
 
-const DATABASE_INC_VER = 20260910;
+const DATABASE_INC_VER = 20261004;
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -240,18 +240,6 @@ final class BoardRepository {
     return $statement->fetch(PDO::FETCH_ASSOC);
   }
 
-  public function searchComments(string $query): array {
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE com LIKE ? AND invz=0 ORDER BY age DESC, tree DESC');
-    $statement->execute(['%' . $query . '%']);
-    return $statement->fetchAll(PDO::FETCH_ASSOC);
-  }
-
-  public function searchAuthors(string $query, bool $partial = false): array {
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE a_name LIKE ? AND invz=0 AND picfile > 0 ORDER BY age DESC, tree DESC');
-    $statement->execute([$partial ? '%' . $query . '%' : $query]);
-    return $statement->fetchAll(PDO::FETCH_ASSOC);
-  }
-
   public function deletePost(int $id, bool $with_replies = false): void {
     $sql = $with_replies
       ? 'DELETE FROM board_log WHERE tid = ? OR parent = ?'
@@ -277,11 +265,6 @@ final class BoardRepository {
       if ($statement->fetchColumn() !== false) return true;
     }
     return false;
-  }
-
-  public function hidePost(int $id): void {
-    $statement = $this->db->prepare('UPDATE board_log SET invz=1 WHERE tid = ?');
-    $statement->execute([$id]);
   }
 
   public function setPostsVisibility(array $ids, bool $hidden): int {
@@ -558,17 +541,13 @@ final class BoardRepository {
   }
 
   /** @return array|false */
-  public function oldestPost() {
-    return $this->db->query('SELECT * FROM board_log ORDER BY tid LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-  }
-
-  /** @return array|false */
   public function oldestThread() {
     return $this->db->query('SELECT * FROM board_log WHERE thread=1 ORDER BY tid LIMIT 1')->fetch(PDO::FETCH_ASSOC);
   }
 
   public function findPostsByImage(string $image_name): array {
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE picfile = ? ORDER BY tree DESC');
+    // 続き描画の公開確認画面には、非表示投稿の画像や説明を渡さない。
+    $statement = $this->db->prepare('SELECT * FROM board_log WHERE picfile = ? AND invz = 0 ORDER BY tree DESC');
     $statement->execute([$image_name]);
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }

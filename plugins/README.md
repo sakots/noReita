@@ -35,11 +35,11 @@ php plugins/check-image-consistency.php --root=/path/to/noreita --repair
 
 元画像の欠損、読み取り不能な画像、危険なファイル名は自動変更せず、検査結果に残します。復旧処理は排他ロックされ、DB更新はトランザクション内で行われます。
 
-## noreita3_newimg.php
+## noreita_newimg.php
 
 データベースの最新画像を表示します。
 
-## noreita3_rndimg.php
+## noreita_rndimg.php
 
 データベースからランダムに1枚、画像を表示します。
 
@@ -51,7 +51,7 @@ php plugins/check-image-consistency.php --root=/path/to/noreita --repair
 ## 使い方
 
 1. 画像と同じようにこのphpのファイルをimgタグで呼び出します。（phpファイル自体が画像として振る舞います）
-2. HTMLファイルにimgタグで画像を呼び出すのと同じように、 `<img src="https://example.com/bbs/noreita3_newimg.php" alt="" width="300">`、`<img src="https://example.com/bbs/noreita3_rndimg.php" alt="" width="300">` などと書きます。
+2. HTMLファイルにimgタグで画像を呼び出すのと同じように、 `<img src="https://example.com/bbs/noreita_newimg.php" alt="" width="300">`、`<img src="https://example.com/bbs/noreita_rndimg.php" alt="" width="300">` などと書きます。
 
 - 画像が無い時にデフォルト画像を表示させる事もできます。
 - 画像を生成して画像になるphpなので、cssに画像として埋め込むこともできます。
@@ -75,7 +75,7 @@ noReita3のindex.phpと同じディレクトリにアップロードして
 - ディレクトリ名変更
 - `check-image-consistency.php`作成
 
-### [2026/07/22] noreita3_newimg.php noreita3_rndimg.php
+### [2026/07/22] noreita_newimg.php noreita_rndimg.php
 
 - 文法エラー修正
 

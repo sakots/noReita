@@ -1,7 +1,38 @@
 <?php
 // misskey_security.inc.php for noReita (C) sakots 2026 MIT License
 
-const MISSKEY_SECURITY_VER = 20260816;
+const MISSKEY_SECURITY_VER = 20261004;
+
+/** 保存済みトークンを、ノートを作成せずにアカウント取得APIで確認する。 */
+final class MisskeyTokenVerifier {
+  public static function isValid(string $base_url, string $token): bool {
+    if ($token === '') return false;
+    $options = MisskeyServerSecurity::curlOptions($base_url);
+    if (!is_array($options)) return false;
+    $curl = curl_init();
+    if ($curl === false) return false;
+    try {
+      if (!curl_setopt_array($curl, $options + [
+        CURLOPT_URL => rtrim($base_url, '/') . '/api/i',
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode(['i' => $token]),
+        CURLOPT_RETURNTRANSFER => true,
+      ])) return false;
+      $response = curl_exec($curl);
+      return self::isValidResponse((int)curl_getinfo($curl, CURLINFO_HTTP_CODE), $response);
+    } finally {
+      curl_close($curl);
+    }
+  }
+
+  public static function isValidResponse(int $status, string|false $response): bool {
+    if ($status !== 200 || $response === false) return false;
+    $account = json_decode($response, true);
+    return is_array($account) && !isset($account['error'])
+      && isset($account['id']) && is_string($account['id']) && $account['id'] !== '';
+  }
+}
 
 /**
  * Misskey連携先のURLを正規化・検証し、SSRFにつながる接続先を拒否する。

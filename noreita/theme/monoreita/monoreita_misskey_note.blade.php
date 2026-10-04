@@ -1,3 +1,6 @@
+@php
+  $post_image_alt = ($post['image_alt'] ?? '') !== '' ? $post['image_alt'] : ($post['sub'] ?? '');
+@endphp
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -6,6 +9,7 @@
   <title>{{$board_title}}</title>
   @include('components.monoreita_headCss')
   <style>
+    .comment { white-space: pre-wrap; }
     .form-group {
       margin: 1em 0;
     }
@@ -60,6 +64,23 @@
     <hr>
   </header>
 
+  @if ($misskey_mode == 'authorize')
+  <main>
+    <div>
+      <section class="thread">
+        <h3 class="oyat">この投稿をMisskeyにノートするにはパスワードを入力してください。</h3>
+        <form action="./" method="POST">
+          <input type="hidden" name="mode" value="misskey_note_edit_form">
+          <input type="hidden" name="no" value="{{ $no }}">
+          <input type="hidden" name="token" value="{{ $token }}">
+          <label>パスワード <input type="password" name="pwd" autocomplete="off"></label>
+          <button type="submit"><span class="simple-icons--misskey"></span> ノート</button>
+        </form>
+      </section>
+    </div>
+  </main>
+  @endif
+
   @if ($misskey_mode == 'note_edit_form')
   <main>
     <div>
@@ -75,11 +96,11 @@
           @if (!empty($post['picfile']))
           <div class="image">
             <a href="{{ $path }}{{ $post['picfile'] }}" target="_blank">
-              <img src="{{ $path }}{{ $post['picfile'] }}" alt="{{ !empty($post['image_alt']) ? $post['image_alt'] : $post['sub'] }}" width="{{ $post['img_w'] }}" height="{{ $post['img_h'] }}">
+              <img src="{{ $path }}{{ $post['picfile'] }}" alt="{{ $post_image_alt }}" width="{{ $post['img_w'] }}" height="{{ $post['img_h'] }}">
             </a>
           </div>
           @endif
-          <p class="comment">{!! $post['com'] !!}</p>
+          <p class="comment">{{ $post['com'] }}</p>
           <p class="painttime">描画時間 : {{ $post['utime'] }} tool : {{ $post['tool'] }}</p>
         </div>
         <hr>
@@ -115,9 +136,10 @@
             @if ($use_nsfw)
             <div class="form-group">
               <label>
-                <input type="checkbox" name="hide_thumbnail" value="1">
+                <input type="checkbox" name="hide_thumbnail" value="1" {{$misskey_sensitive_checked}} {{$misskey_sensitive_disabled}}>
                 センシティブな画像として投稿
               </label>
+              <small>掲示板でNSFWに設定された画像は、共有先でもセンシティブ扱いになります。</small>
               <div class="cw-input" style="display: none;">
                 <label for="cw">注釈</label>
                 <input type="text" name="cw" id="cw" size="48" maxlength="100" placeholder="センシティブな画像の注釈を入力">
@@ -155,9 +177,14 @@
 
   <script>
     // センシティブ設定の表示/非表示
-    document.querySelector('input[name="hide_thumbnail"]').addEventListener('change', function() {
-      document.querySelector('.cw-input').style.display = this.checked ? 'block' : 'none';
-    });
+    (() => {
+      const checkbox = document.querySelector('input[name="hide_thumbnail"]');
+      const cwInput = document.querySelector('.cw-input');
+      if (!checkbox || !cwInput) return;
+      const update = () => { cwInput.style.display = checkbox.checked ? 'block' : 'none'; };
+      checkbox.addEventListener('change', update);
+      update();
+    })();
   </script>
   @endif
 
@@ -195,10 +222,10 @@
           </h4>
           <div class="image">
             <a href="{{$path}}{{$post['picfile']}}" target="_blank">
-              <img src="{{$path}}{{$post['picfile']}}" alt="{{!empty($post['image_alt']) ? $post['image_alt'] : $post['sub']}}" width="{{$post['img_w']}}" height="{{$post['img_h']}}">
+              <img src="{{$path}}{{$post['picfile']}}" alt="{{$post_image_alt}}" width="{{$post['img_w']}}" height="{{$post['img_h']}}">
             </a>
           </div>
-          <p class="comment">{!! $post['com'] !!}</p>
+          <p class="comment">{{ $post['com'] }}</p>
         </div>
         <hr>
         @endif
@@ -208,6 +235,7 @@
             <input type="hidden" name="id_and_no" value="{{$post['id']}},{{$post['tid']}}">
             <input type="hidden" name="created" value="{{$post['created']}}">
             <input type="hidden" name="modified" value="{{$post['modified']}}">
+            <input type="hidden" name="token" value="{{$token}}">
             <input type="password" name="pwd" value="{{$pwd_cookie}}" autocomplete="off">
             <input type="hidden" name="mode" value="misskey_note_edit_form">
             <button type="submit">

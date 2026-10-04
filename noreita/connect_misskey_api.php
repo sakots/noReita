@@ -19,7 +19,10 @@ if (!class_exists('Database', false)) {
 	require_once(__DIR__.'/database.inc.php');
 }
 
-const CONNECT_MISSKEY_API_VER = 20260817;
+const CONNECT_MISSKEY_API_VER = 20261004;
+
+require_once __DIR__ . '/misskey_post_authorization.inc.php';
+require_once __DIR__ . '/image.inc.php';
 
 final class MisskeyApiContext {
   public function __construct(
@@ -51,6 +54,8 @@ function misskey_api_error(
 
 // 認証チェック
 class connect_misskey_api{
+	private const MAX_NOTE_TEXT_LENGTH = 3000;
+
 	/** @param CurlHandle|resource|false $curl */
 	private static function applySecurity($curl, string $base_url, int $timeout = 15): bool {
 		if ($curl === false) return false;
@@ -135,6 +140,111 @@ class connect_misskey_api{
 		self::create_misskey_note($context);
 	}
 
+	/**
+	 * 外部認証の前後と実際の送信直前に、同じ投稿・画像・認可を確認する。
+	 * @return array<string,mixed>
+	 */
+	public static function validatePostingSession(MisskeyApiContext $context): array {
+		$en = $context->english;
+		$values = $_SESSION['sns_api_val'] ?? null;
+		if (!is_array($values) || !array_is_list($values) || count($values) !== 8) {
+			misskey_api_error(
+				$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
+				400, 'Misskey posting session data had an invalid structure.'
+			);
+		}
+		foreach ($values as $value) {
+			if (!is_scalar($value) && $value !== null) {
+				misskey_api_error(
+					$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
+					400, 'Misskey posting session data contained a non-scalar value.'
+				);
+			}
+		}
+		$post = MisskeyPostAuthorization::authorizedPost((int)$values[5], (string)($_SESSION['usercode'] ?? ''));
+		if ($post === null || !hash_equals((string)$post['picfile'], (string)$values[1])
+			|| !ImageService::isSafePostedImageFilename((string)$post['picfile'])) {
+			MisskeyPostAuthorization::forget();
+			misskey_api_error(
+				$en ? 'Post authorization is required.' : '投稿者認証が必要です。',
+				403, 'Misskey posting authorization was missing or the post had changed.'
+			);
+		}
+		return $post;
+	}
+
+	/** multipartの真偽値は、Misskeyが解釈できる文字列で送る。 */
+	public static function uploadFields(string $access_token, string $image_path, bool $sensitive, string $description): array {
+		return [
+			'i' => $access_token,
+			'file' => new CURLFile($image_path),
+			// 既存の同一画像を再利用せず、過去の共有の説明・NSFW設定を変更しない。
+			'force' => 'true',
+			'isSensitive' => $sensitive ? 'true' : 'false',
+			'comment' => $description,
+		];
+	}
+
+	/** 画像説明はHTMLではなく、Misskeyの画像情報として元の文字列を渡す。 */
+	public static function updateFields(string $access_token, string $file_id, bool $sensitive, string $description): array {
+		return [
+			'i' => $access_token,
+			'fileId' => $file_id,
+			'isSensitive' => $sensitive,
+			'comment' => $description,
+		];
+	}
+
+	/** 描画情報・リンクを含む最終本文を、画像アップロード前に組み立てて検証する。 */
+	public static function prepareNoteText(MisskeyApiContext $context, string $comment, string $tool, string $painttime, string $article_url): string {
+		if (!mb_check_encoding($comment . $tool . $painttime . $article_url, 'UTF-8')) {
+			misskey_api_error(
+				$context->english ? 'Invalid Misskey note text.' : 'Misskey共有本文の文字コードが不正です。',
+				400, 'Misskey note text contained invalid UTF-8 before uploading.'
+			);
+		}
+		$comment = str_replace(["\r\n", "\r"], "\n", $comment);
+		$comment = $comment !== '' ? $comment . "\n" : '';
+		$comment = preg_replace('/(\s*\n){2,}/u', "\n", $comment);
+		$text = ($tool !== '' ? 'Tool:' . $tool . "\n" : '')
+			. ($painttime !== '' ? 'Paint time:' . $painttime . "\n" : '') . $comment . $article_url;
+		if (mb_strlen($text, 'UTF-8') > self::MAX_NOTE_TEXT_LENGTH) {
+			misskey_api_error(
+				$context->english ? 'Misskey note text must be 3000 characters or fewer.' : 'Misskey共有本文は描画情報・記事リンク・改行を含めて3000文字以内にしてください。',
+				400, 'Misskey note text exceeded the length limit before uploading.'
+			);
+		}
+		return $text;
+	}
+
+	/** 空の本文は送らず、画像だけのノートもMisskeyの入力検証を通す。 */
+	public static function noteFields(string $access_token, string $file_id, string $text, ?string $cw): array {
+		$fields = ['i' => $access_token, 'cw' => $cw, 'fileIds' => [$file_id]];
+		if (trim($text) !== '') $fields['text'] = $text;
+		return $fields;
+	}
+
+	/** @return array{0: string|false, 1: int, 2: string} */
+	public static function submitNoteRequest(CurlHandle $curl, MisskeyApiContext $context): array {
+		try {
+			self::validatePostingSession($context);
+			// 応答消失や実行中断でも再送しないよう、送信前に認可と待ちデータの破棄を永続化する。
+			MisskeyPostAuthorization::forget();
+			unset($_SESSION['userdel']);
+			if (!session_write_close()) {
+				misskey_api_error(
+					$context->english ? 'Failed to save the posting session. No note was sent.' : '投稿セッションの保存に失敗しました。ノートは送信していません。',
+					500,
+					'Misskey posting session could not be persisted before note creation.'
+				);
+			}
+			$response = curl_exec($curl);
+			return [$response, (int)curl_getinfo($curl, CURLINFO_HTTP_CODE), curl_error($curl)];
+		} finally {
+			curl_close($curl);
+		}
+	}
+
 	public static function create_misskey_note(MisskeyApiContext $context): void {
 		$en = $context->english;
 		$baseUrl = $context->baseUrl;
@@ -148,26 +258,16 @@ class connect_misskey_api{
 			);
 		}
 
-		$sns_api_values = $_SESSION['sns_api_val'] ?? null;
-		if (!is_array($sns_api_values) || !array_is_list($sns_api_values) || count($sns_api_values) !== 8) {
-			misskey_api_error(
-				$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
-				400,
-				'Misskey posting session data had an invalid structure.'
-			);
-		}
-		list($com,$src_image,$tool,$painttime,$hide_thumbnail,$no,$article_url_link,$cw) = $sns_api_values;
-		foreach ([$com, $src_image, $tool, $painttime, $hide_thumbnail, $no, $article_url_link, $cw] as $value) {
-			if (!is_scalar($value) && $value !== null) {
-				misskey_api_error(
-					$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
-					400,
-					'Misskey posting session data contained a non-scalar value.'
-				);
-			}
-		}
-
-		$src_image=basename($src_image);
+		$post = self::validatePostingSession($context);
+		list($com,$src_image,$tool,$painttime,$hide_thumbnail,$no,$article_url_link,$cw) = $_SESSION['sns_api_val'];
+		$src_image = (string)$post['picfile'];
+		$hide_thumbnail = (bool)$post['nsfw'] || (bool)$hide_thumbnail;
+		$src_image_filename = pathinfo($src_image, PATHINFO_FILENAME);
+		$thread_no = self::get_thread_no((int)$no);
+		$fixed_link = Config::string('site.base_url').'?mode=res&res='.$thread_no.'#'.$src_image_filename;
+		$fixed_link = filter_var($fixed_link, FILTER_VALIDATE_URL) ? $fixed_link : '';
+		$status = self::prepareNoteText($context, (string)$com, (string)$tool, (string)$painttime,
+			$article_url_link ? $fixed_link : '');
 
 		// 画像のアップロード
 		$imagePath = __DIR__.'/'.Config::string('paths.images').$src_image;
@@ -181,10 +281,7 @@ class connect_misskey_api{
 		};
 
 		$uploadUrl = $baseUrl . "/api/drive/files/create";
-		$uploadFields = array(
-			'i' => $accessToken,
-			'file' => new CURLFile($imagePath),
-		);
+		$uploadFields = self::uploadFields($accessToken, $imagePath, $hide_thumbnail, (string)$post['image_alt']);
 		$uploadCurl = curl_init();
 		if (!self::applySecurity($uploadCurl, $baseUrl, 30)) {
 			misskey_api_error(
@@ -198,6 +295,7 @@ class connect_misskey_api{
 		curl_setopt($uploadCurl, CURLOPT_POSTFIELDS, $uploadFields);
 		curl_setopt($uploadCurl, CURLOPT_RETURNTRANSFER, true);
 
+		self::validatePostingSession($context);
 		$uploadResponse = curl_exec($uploadCurl);
 		$uploadStatusCode = curl_getinfo($uploadCurl, CURLINFO_HTTP_CODE);
 		$curlError = curl_error($uploadCurl);
@@ -236,11 +334,7 @@ class connect_misskey_api{
 		$updateHeaders = array(
 			'Content-Type: application/json'
 		);
-		$updateData = array(
-			'i' => $accessToken,
-			'fileId' => $fileId,
-			'isSensitive' => (bool)($hide_thumbnail),
-		);
+		$updateData = self::updateFields($accessToken, $fileId, $hide_thumbnail, (string)$post['image_alt']);
 
 		$updateCurl = curl_init();
 		if (!self::applySecurity($updateCurl, $baseUrl)) {
@@ -255,6 +349,7 @@ class connect_misskey_api{
 		curl_setopt($updateCurl, CURLOPT_HTTPHEADER, $updateHeaders);
 		curl_setopt($updateCurl, CURLOPT_POSTFIELDS, json_encode($updateData));
 		curl_setopt($updateCurl, CURLOPT_RETURNTRANSFER, true);
+		self::validatePostingSession($context);
 		$updateResponse = curl_exec($updateCurl);
 		$updateStatusCode = curl_getinfo($updateCurl, CURLINFO_HTTP_CODE);
 		$updateCurlError = curl_error($updateCurl);
@@ -276,33 +371,11 @@ class connect_misskey_api{
 			);
 		}
 
-		sleep(10);
-
-		$tool= $tool ? 'Tool:'.$tool."\n" :'';
-		$painttime= $painttime ? 'Paint time:'.$painttime."\n" :'';
-
-		$src_image_filename = pathinfo($src_image, PATHINFO_FILENAME );//拡張子除去
-
-		$thread_no = self::get_thread_no((int)$no);
-		$fixed_link = Config::string('site.base_url').'?mode=res&res='.$thread_no.'#'.$src_image_filename;
-		$fixed_link = filter_var($fixed_link,FILTER_VALIDATE_URL) ? $fixed_link : '';
-		$article_url_link = $article_url_link ? $fixed_link : '';
-		$com=str_replace(["\r\n","\r"],"\n",$com);
-		$com=$com ? $com."\n" :'';
-		$com = preg_replace("/(\s*\n){2,}/u","\n",$com); //不要改行カット
-
-		$status = $tool.$painttime.$com.$article_url_link;
-
 		$postUrl = $baseUrl . "/api/notes/create";
 		$postHeaders = array(
 			'Content-Type: application/json'
 		);
-		$postData = array(
-			'i' => $accessToken,
-			'cw' => $cw,
-			'text' => $status,
-			'fileIds' => array($fileId),
-		);
+		$postData = self::noteFields($accessToken, $fileId, $status, $cw);
 
 		$postCurl = curl_init();
 		if (!self::applySecurity($postCurl, $baseUrl)) {
@@ -317,14 +390,14 @@ class connect_misskey_api{
 		curl_setopt($postCurl, CURLOPT_HTTPHEADER, $postHeaders);
 		curl_setopt($postCurl, CURLOPT_POSTFIELDS, json_encode($postData));
 		curl_setopt($postCurl, CURLOPT_RETURNTRANSFER, true);
-		$postResponse = curl_exec($postCurl);
-		$postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE);
-		$postCurlError = curl_error($postCurl);
-		curl_close($postCurl);
+		[$postResponse, $postStatusCode, $postCurlError] = self::submitNoteRequest($postCurl, $context);
+		$unconfirmed_message = $en
+			? 'The posting result could not be confirmed. Check Misskey before posting again.'
+			: '投稿結果を確認できませんでした。すでに投稿されている可能性があるため、再投稿する前にMisskey側を確認してください。';
 
 		if ($postResponse === false) {
 			misskey_api_error(
-				$en ? 'Failed to post the content.' : 'Misskeyへの投稿に失敗しました。',
+				$unconfirmed_message,
 				502,
 				'Misskey note creation transport failed: ' . $postCurlError
 			);
@@ -333,7 +406,7 @@ class connect_misskey_api{
 		if ($postStatusCode !== 200 && $postStatusCode !== 204) {
 			$postResponseData = json_decode($postResponse, true);
 			misskey_api_error(
-				$en ? 'Failed to post the content.' : 'Misskeyへの投稿に失敗しました。',
+				$unconfirmed_message,
 				502,
 				'Misskey note creation returned HTTP ' . $postStatusCode . ': ' . self::responseErrorDetail($postResponseData)
 			);
@@ -342,15 +415,11 @@ class connect_misskey_api{
 		$postResult = json_decode($postResponse, true);
 		if (!empty($postResult['createdNote']["fileIds"])) {
 
-			unset($_SESSION['sns_api_session_id']);
-			unset($_SESSION['sns_api_val']);
-			unset($_SESSION['userdel']);
-
 			redirect(Config::string('site.base_url').'?mode=misskey_success&no='.$thread_no);
 		}
 		else {
 			misskey_api_error(
-				$en ? 'Failed to post the content.' : '投稿に失敗しました。',
+				$unconfirmed_message,
 				502,
 				'Misskey note creation response did not contain createdNote file IDs.'
 			);
@@ -362,15 +431,37 @@ function connect_misskey_api_dispatch(): void {
 	RequestSecurity::startSession();
 	$context = new MisskeyApiContext(MisskeyApiContext::englishFromRequest(), '');
 	$en = $context->english;
+	if (!Config::bool('features.misskey_note')) {
+		misskey_api_error(
+			$en ? 'Misskey sharing is disabled.' : 'Misskey連携は無効です。',
+			404,
+			'Misskey callback was requested while the feature was disabled.'
+		);
+	}
 
+	// 外部認証から戻る間に管理者認証が失効していれば、送信待ちデータも破棄する。
+	AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'));
 	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
 		misskey_api_error(
-			$en ? 'The Misskey posting session is missing.' : 'セッションがありません。Misskey投稿フローが正しく動作していません。',
+			$en ? 'The Misskey posting session is missing. If you already attempted to post, check Misskey before posting again.' : '投稿セッションがありません。すでに送信操作を行った場合は、再投稿する前にMisskey側を確認してください。',
 			400,
 			'Misskey callback session was missing.'
 		);
 	};
 
+	connect_misskey_api::validatePostingSession($context);
+	$skip_auth_check = (bool)filter_input_data('GET','skip_auth_check',FILTER_VALIDATE_BOOLEAN);
+	// 通常のMiAuthはsession、保存済みトークンの再利用はs_idで同じ認証フローを照合する。
+	$callback_session_id = filter_input_data('GET', $skip_auth_check ? 's_id' : 'session');
+	$expected_session_id = $_SESSION['sns_api_session_id'];
+	if (!is_string($callback_session_id) || !is_string($expected_session_id)
+		|| $expected_session_id === '' || !hash_equals($expected_session_id, $callback_session_id)) {
+		misskey_api_error(
+			$en ? 'Operation failed.' : '失敗しました。',
+			403,
+			'Misskey callback state did not match the session.'
+		);
+	}
 	$baseUrl = MisskeyServerSecurity::normalizeBaseUrl(
 		(string)($_SESSION['misskey_server_radio'] ?? '')
 	);
@@ -384,15 +475,7 @@ function connect_misskey_api_dispatch(): void {
 	$_SESSION['misskey_server_radio'] = $baseUrl;
 	$context = new MisskeyApiContext($context->english, $baseUrl);
 
-	$skip_auth_check = (bool)filter_input_data('GET','skip_auth_check',FILTER_VALIDATE_BOOLEAN);
 	if($skip_auth_check){
-		if((string)filter_input_data('GET','s_id') !== $_SESSION['sns_api_session_id']){
-			misskey_api_error(
-				$en ? 'Operation failed.' : '失敗しました。',
-				403,
-				'Misskey callback state did not match the session.'
-			);
-		}
 		connect_misskey_api::create_misskey_note($context);
 		return;
 	}

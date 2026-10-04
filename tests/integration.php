@@ -75,7 +75,7 @@ function remove_tree(string $path): void {
   rmdir($path);
 }
 
-function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1'): array {
+function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1', string $origin = 'http://localhost'): array {
   $curl = curl_init($url);
   $response_headers = [];
   curl_setopt_array($curl, [
@@ -85,7 +85,7 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
     CURLOPT_COOKIEJAR => $cookie_jar,
     CURLOPT_COOKIEFILE => $cookie_jar,
     CURLOPT_HTTPHEADER => [
-      'Host: localhost', 'Origin: http://localhost',
+      'Host: localhost', 'Origin: ' . $origin,
       'X-Forwarded-For: ' . $forwarded_for,
     ],
     CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$response_headers): int {
@@ -259,8 +259,16 @@ PHP;
   }
   $misskey_missing_image_probe = <<<'PHP'
 <?php
+define('DB_FILE', __DIR__ . '/misskey-missing-image-probe.db');
 require_once __DIR__ . '/connect_misskey_api.php';
 RequestSecurity::startSession();
+$db = Database::connect();
+(new DatabaseMigrator($db, DB_FILE, __DIR__ . '/backup'))->migrate();
+$db->exec("DELETE FROM board_log");
+$db->prepare('INSERT INTO board_log (tid, picfile, pwd, invz, nsfw) VALUES (1, ?, ?, 0, 0)')
+  ->execute(['missing-probe.png', password_hash('probe-owner-pass', PASSWORD_DEFAULT)]);
+$_SESSION['usercode'] = 'probe-usercode';
+MisskeyPostAuthorization::remember(MisskeyPostAuthorization::authorize(1, 'probe-owner-pass'), 'probe-usercode');
 $_SESSION['accessToken'] = 'misskey-probe-token';
 $_SESSION['sns_api_val'] = ['', 'missing-probe.png', '', 0, false, 1, false, ''];
 $context = new MisskeyApiContext(true, 'https://misskey.io');
@@ -281,7 +289,8 @@ PHP;
   $log = fopen($server_log, 'ab');
   if ($log === false) throw new RuntimeException('Could not create server log');
   $process = proc_open(
-    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+    // 設定の切り替えを即時反映するため、cli-serverでもOPcacheを無効にする。
+    [PHP_BINARY, '-d', 'opcache.enable=0',
       '-S', "127.0.0.1:{$port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
@@ -306,6 +315,17 @@ PHP;
   if (str_contains($startup_body, 'Please update') || str_contains($startup_body, '最新版に更新してください')) {
     throw new RuntimeException('Application startup failed: ' . trim(strip_tags($startup_body)));
   }
+
+  // 機能を無効にした設置では、表示ボタンだけでなくMisskeyの各入口を直接指定しても使えない。
+  [$misskey_disabled_before_status] = http_request($base_url . '?mode=before_misskey_note&no=1', $cookie_jar);
+  [$misskey_disabled_session_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar, [
+    'mode' => 'create_misskey_note_sessiondata',
+  ]);
+  integration_test('disabled Misskey routes reject direct requests', static function () use (
+    $misskey_disabled_before_status, $misskey_disabled_session_status
+  ): bool {
+    return $misskey_disabled_before_status === 404 && $misskey_disabled_session_status === 404;
+  });
 
   $protected_probes = [
     'config.php' => 'admin_pass',
@@ -481,17 +501,17 @@ PHP;
   $misskey_callback_logged = false;
   foreach (glob($webroot . '/errorlog/error-*.log') ?: [] as $error_log_file) {
     $contents = (string)file_get_contents($error_log_file);
-    if (str_contains($contents, '"http_status":400')
-      && str_contains($contents, 'Misskey API: Misskey callback session was missing.')) {
+    if (str_contains($contents, '"http_status":404')
+      && str_contains($contents, 'Misskey API: Misskey callback was requested while the feature was disabled.')) {
       $misskey_callback_logged = true;
       break;
     }
   }
-  integration_test('Misskey callback records standalone failures without exposing internals', static function () use (
+  integration_test('disabled Misskey callback rejects direct access without exposing internals', static function () use (
     $misskey_callback_status, $misskey_callback_body, $misskey_callback_logged
   ): bool {
-    return $misskey_callback_status === 400
-      && str_contains($misskey_callback_body, 'Misskey posting session is missing')
+    return $misskey_callback_status === 404
+      && str_contains($misskey_callback_body, 'Misskey sharing is disabled')
       && $misskey_callback_logged
       && !str_contains($misskey_callback_body, 'Fatal error')
       && !str_contains($misskey_callback_body, 'Class &quot;Database&quot; not found')
@@ -510,6 +530,51 @@ PHP;
   [$status, $pictmp_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
+  [$trip_get_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar);
+  [$trip_missing_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar, ['value' => 'name#secret']);
+  [$trip_wrong_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar, ['value' => 'name#secret', 'token' => 'wrong']);
+  [$trip_origin_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar,
+    ['value' => 'name#secret', 'token' => $token], '192.0.2.55', 'https://example.org');
+  [$trip_ok_status, $trip_ok_body, , $trip_headers] = http_request($base_url . '?mode=trip_preview', $cookie_jar,
+    ['value' => 'name#secret', 'token' => $token], '192.0.2.55');
+  for ($i = 1; $i < 60; $i++) {
+    http_request($base_url . '?mode=trip_preview', $cookie_jar, ['value' => 'name#secret', 'token' => $token], '192.0.2.55');
+  }
+  [$trip_limit_status, $trip_limit_body, , $trip_limit_headers] = http_request($base_url . '?mode=trip_preview', $cookie_jar,
+    ['value' => 'name#secret', 'token' => $token], '192.0.2.55');
+  $trip_new_cookies = $root . '/trip-new-cookies.txt';
+  http_request($base_url . '?mode=pictmp', $trip_new_cookies);
+  $trip_new_token = hash('sha256', (string)cookie_value($trip_new_cookies, 'noreita_session'));
+  [$trip_new_session_status] = http_request($base_url . '?mode=trip_preview', $trip_new_cookies,
+    ['value' => 'name#secret', 'token' => $trip_new_token], '192.0.2.55');
+  integration_test('trip preview requires CSRF and limits repeated calculations by IP', static function () use (
+    $trip_get_status, $trip_missing_status, $trip_wrong_status, $trip_origin_status, $trip_ok_status, $trip_ok_body,
+    $trip_headers, $trip_limit_status, $trip_limit_body, $trip_limit_headers, $trip_new_session_status
+  ): bool {
+    return $trip_get_status === 405 && $trip_missing_status === 403 && $trip_wrong_status === 403 && $trip_origin_status === 403
+      && $trip_ok_status === 200 && is_string(json_decode($trip_ok_body, true)['preview'] ?? null)
+      && str_contains($trip_headers['cache-control'] ?? '', 'no-store')
+      && $trip_limit_status === 429 && isset(json_decode($trip_limit_body, true)['error'])
+      && $trip_new_session_status === 429
+      && (int)($trip_limit_headers['retry-after'] ?? 0) > 0;
+  });
+  $trip_no_csrf_config = str_replace("    'image_upload' => true,", "    'image_upload' => true,\n    'csrf' => false,", $config_local);
+  if (file_put_contents($webroot . '/config.local.php', $trip_no_csrf_config) === false) {
+    throw new RuntimeException('Could not disable posting CSRF for preview tests.');
+  }
+  [$trip_form_status, $trip_form_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
+  [$trip_no_csrf_missing_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar, ['value' => 'name#secret']);
+  [$trip_no_csrf_valid_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar,
+    ['value' => 'name#secret', 'token' => $token], '192.0.2.56');
+  if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
+    throw new RuntimeException('Could not restore posting CSRF configuration.');
+  }
+  integration_test('trip preview stays protected and usable when posting CSRF is disabled', static function () use (
+    $trip_form_status, $trip_form_body, $token, $trip_no_csrf_missing_status, $trip_no_csrf_valid_status
+  ): bool {
+    return $trip_form_status === 200 && str_contains($trip_form_body, 'name="token" value="' . $token . '"')
+      && $trip_no_csrf_missing_status === 403 && $trip_no_csrf_valid_status === 200;
+  });
   $upload_mimes = [];
   $upload_labels = [];
   foreach ([
@@ -827,6 +892,48 @@ PHP;
       && is_file($webroot . '/img/' . $tgkr_base . '.tgkr');
   });
 
+  $misskey_enabled_config = str_replace("    'misskey_note' => false,", "    'misskey_note' => true,", $config_local);
+  if ($misskey_enabled_config === $config_local
+    || file_put_contents($webroot . '/config.local.php', $misskey_enabled_config) === false) {
+    throw new RuntimeException('Could not enable Misskey for authorization tests.');
+  }
+
+  [$hidden_post_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+    'mode' => 'regist', 'send' => '1', 'name' => 'Misskey owner', 'mail' => '', 'url' => '',
+    'sub' => 'Hidden Misskey post', 'com' => 'non-public Misskey content', 'pwd' => 'misskey-owner-pass',
+    'picfile' => '', 'ctype' => 'new', 'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  $misskey_post = $animation_db->query("SELECT tid FROM board_log WHERE sub = 'Hidden Misskey post' ORDER BY tid DESC LIMIT 1")
+    ->fetch(PDO::FETCH_ASSOC);
+  if ($hidden_post_status !== 200 || !is_array($misskey_post)) {
+    throw new RuntimeException('Could not prepare a hidden Misskey post.');
+  }
+  $animation_db->prepare('UPDATE board_log SET invz = 1, picfile = ? WHERE tid = ?')
+    ->execute([$tgkr_image, (int)$misskey_post['tid']]);
+  $misskey_post['picfile'] = $tgkr_image;
+  $misskey_attacker_cookie_jar = $root . DIRECTORY_SEPARATOR . 'misskey-attacker-cookies.txt';
+  [$hidden_before_status, $hidden_before_body] = http_request(
+    $base_url . '?mode=before_misskey_note&no=' . (int)$misskey_post['tid'], $misskey_attacker_cookie_jar
+  );
+  $misskey_attacker_session = cookie_value($misskey_attacker_cookie_jar, 'noreita_session');
+  $misskey_attacker_token = $misskey_attacker_session === null ? '' : hash('sha256', $misskey_attacker_session);
+  [$forged_misskey_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $misskey_attacker_cookie_jar, [
+    'mode' => 'create_misskey_note_sessiondata', 'token' => $misskey_attacker_token,
+    'no' => (string)$misskey_post['tid'], 'src_image' => (string)$misskey_post['picfile'],
+  ]);
+  [$owner_before_status, $owner_before_body] = http_request(
+    $base_url . '?mode=before_misskey_note&no=' . (int)$misskey_post['tid'], $cookie_jar
+  );
+  integration_test('Misskey sharing keeps hidden posts and forged image selections private', static function () use (
+    $hidden_before_status, $hidden_before_body, $forged_misskey_status, $owner_before_status, $owner_before_body
+  ): bool {
+    return $hidden_before_status === 200
+      && !str_contains($hidden_before_body, 'non-public Misskey content')
+      && $forged_misskey_status === 403
+      && $owner_before_status === 200
+      && str_contains($owner_before_body, 'non-public Misskey content');
+  });
+
   [$misskey_loopback_status] = http_request($base_url . '?mode=create_misskey_authrequesturl', $cookie_jar, [
     'mode' => 'create_misskey_authrequesturl', 'misskey_server_radio' => 'direct',
     'misskey_server_direct_input' => 'https://127.0.0.1',
@@ -846,6 +953,206 @@ PHP;
       && $misskey_metadata_status === 400
       && $misskey_port_status === 400;
   });
+
+  // 別ブラウザーで管理者認可を取得し、失効後に投稿やコールバックを再利用できないことを確認する。
+  $misskey_expiry_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/bootstrap.php';
+ApplicationBootstrap::boot(__DIR__);
+require_once __DIR__ . '/request_security.inc.php';
+RequestSecurity::startSession();
+$_SESSION['admin_auth_last_activity'] = 0;
+http_response_code(204);
+PHP;
+  file_put_contents($webroot . '/misskey-expiry-probe.php', $misskey_expiry_probe);
+  foreach (['logout', 'expired', 'password changed', 'owner logout'] as $misskey_revocation) {
+    $grant_callback_status = 0;
+    $grant_callback_body = '';
+    $grant_cookies = $root . '/misskey-grant-' . str_replace(' ', '-', $misskey_revocation) . '.txt';
+    http_request($base_url, $grant_cookies);
+    $grant_token = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+    if ($misskey_revocation !== 'owner logout') {
+      http_request($base_url . '?mode=admin_login', $grant_cookies,
+        ['adminpass' => 'integration-admin-pass', 'token' => $grant_token]);
+      $grant_token = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+    }
+    [$grant_form_status] = http_request($base_url . '?mode=misskey_note_edit_form', $grant_cookies,
+      ['no' => (string)$misskey_post['tid'], 'pwd' => $misskey_revocation === 'owner logout' ? 'misskey-owner-pass' : '',
+        'token' => $grant_token]);
+    $grant_request = ['no' => (string)$misskey_post['tid'], 'token' => $grant_token,
+      'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1'];
+    // 認可成功後のURL検証で止め、外部へ送信せずに送信待ちデータを作る。
+    [$grant_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $grant_cookies, $grant_request);
+    try {
+      if ($misskey_revocation === 'expired') {
+        http_request($origin_url . '/misskey-expiry-probe.php', $grant_cookies);
+      } elseif ($misskey_revocation === 'password changed') {
+        file_put_contents($webroot . '/config.local.php', str_replace('integration-admin-pass', 'changed-admin-pass', $misskey_enabled_config));
+      } else {
+        if ($misskey_revocation === 'owner logout') {
+          http_request($base_url . '?mode=admin_login', $grant_cookies,
+            ['adminpass' => 'integration-admin-pass', 'token' => $grant_token]);
+          $grant_token = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+        }
+        http_request($base_url . '?mode=admin_logout', $grant_cookies, ['token' => $grant_token]);
+      }
+      if ($misskey_revocation !== 'owner logout') {
+        [$grant_callback_status, $grant_callback_body] = http_request($origin_url . '/connect_misskey_api.php', $grant_cookies);
+      }
+      http_request($base_url, $grant_cookies);
+      $grant_request['token'] = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+      [$grant_reuse_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $grant_cookies, $grant_request);
+      integration_test('Misskey authorization lifecycle: ' . $misskey_revocation, static function () use (
+        $misskey_revocation, $grant_form_status, $grant_pending_status, $grant_reuse_status,
+        $grant_callback_status, $grant_callback_body
+      ): bool {
+        return $grant_form_status === 200 && $grant_pending_status === 400
+          && ($misskey_revocation === 'owner logout' ? $grant_reuse_status === 400
+            : $grant_reuse_status === 403 && $grant_callback_status === 400
+              && str_contains($grant_callback_body, 'The Misskey posting session is missing.'));
+      });
+      if ($misskey_revocation === 'logout') {
+        http_request($base_url . '?mode=admin_login', $grant_cookies,
+          ['adminpass' => 'integration-admin-pass', 'token' => $grant_request['token']]);
+        $grant_request['token'] = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+        [$grant_relogin_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $grant_cookies, $grant_request);
+        integration_test('Misskey administrator relogin does not restore a revoked grant',
+          static fn (): bool => $grant_relogin_status === 403);
+      }
+    } finally {
+      file_put_contents($webroot . '/config.local.php', $misskey_enabled_config);
+    }
+  }
+
+  $misskey_send_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/connect_misskey_api.php';
+RequestSecurity::startSession();
+$_SESSION['accessToken'] = 'misskey-probe-token';
+if (($_GET['forge_image'] ?? '') === '1') $_SESSION['sns_api_val'][1] = 'other-image.png';
+if (($_GET['long_text'] ?? '') === '1') {
+  $_SESSION['sns_api_val'][0] = str_repeat('あ', 3000);
+  $_SESSION['sns_api_val'][2] = '';
+  $_SESSION['sns_api_val'][3] = '';
+  $_SESSION['sns_api_val'][6] = false;
+}
+if (($_GET['submit_note'] ?? '') === '1') {
+  // 到達しないループバックのポートで通信失敗を起こす。外部への投稿は行わない。
+  $curl = curl_init('http://127.0.0.1:1');
+  curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_PROXY => '', CURLOPT_TIMEOUT => 1]);
+  [$response] = connect_misskey_api::submitNoteRequest($curl, new MisskeyApiContext(true, 'https://127.0.0.1'));
+  header('Content-Type: application/json');
+  echo json_encode([
+    'transport_failed' => $response === false,
+    'session_closed' => session_status() === PHP_SESSION_NONE,
+    'pending_removed' => !isset($_SESSION['sns_api_val']) && !isset($_SESSION['sns_api_session_id'])
+      && !isset($_SESSION['misskey_authorized_post']),
+    'token_retained' => ($_SESSION['accessToken'] ?? '') === 'misskey-probe-token',
+  ]);
+  exit;
+}
+if (($_GET['callback'] ?? '') === '1' || ($_GET['callback_state'] ?? '') === '1') {
+  $_SESSION['sns_api_session_id'] = 'probe-state';
+  $_SESSION['misskey_server_radio'] = 'https://127.0.0.1';
+  connect_misskey_api_dispatch();
+  exit;
+}
+connect_misskey_api::create_misskey_note(new MisskeyApiContext(true, 'https://127.0.0.1'));
+PHP;
+  file_put_contents($webroot . '/misskey-send-probe.php', $misskey_send_probe);
+  foreach (['unchanged', 'deleted', 'image replaced', 'visibility changed', 'NSFW changed',
+    'password changed', 'comment changed', 'forged image', 'callback deleted', 'long note'] as $send_case) {
+    $send_columns = array_values(array_filter(
+      $animation_db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1),
+      static fn (string $column): bool => $column !== 'tid'
+    ));
+    $animation_db->exec('INSERT INTO board_log (' . implode(',', $send_columns) . ') SELECT '
+      . implode(',', $send_columns) . ' FROM board_log WHERE tid = ' . (int)$misskey_post['tid']);
+    $send_post_id = (int)$animation_db->lastInsertId();
+    try {
+      $send_cookies = $root . '/misskey-send-' . str_replace(' ', '-', $send_case) . '.txt';
+      http_request($base_url, $send_cookies);
+      $send_token = hash('sha256', (string)cookie_value($send_cookies, 'noreita_session'));
+      [$send_form_status] = http_request($base_url . '?mode=misskey_note_edit_form', $send_cookies,
+        ['no' => (string)$send_post_id, 'pwd' => 'misskey-owner-pass', 'token' => $send_token]);
+      [$send_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $send_cookies,
+        ['no' => (string)$send_post_id, 'token' => $send_token,
+          'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1']);
+      $send_mutations = [
+        'deleted' => 'DELETE FROM board_log WHERE tid = ?',
+        'callback deleted' => 'DELETE FROM board_log WHERE tid = ?',
+        'image replaced' => "UPDATE board_log SET picfile = 'other-image.png' WHERE tid = ?",
+        'visibility changed' => 'UPDATE board_log SET invz = 0 WHERE tid = ?',
+        'NSFW changed' => 'UPDATE board_log SET nsfw = 1 WHERE tid = ?',
+        'password changed' => "UPDATE board_log SET pwd = 'revoked-password-hash' WHERE tid = ?",
+        'comment changed' => "UPDATE board_log SET com = 'changed content' WHERE tid = ?",
+      ];
+      if (isset($send_mutations[$send_case])) $animation_db->prepare($send_mutations[$send_case])->execute([$send_post_id]);
+      [$send_status, $send_body] = http_request($origin_url . '/misskey-send-probe.php'
+        . ($send_case === 'forged image' ? '?forge_image=1' : ($send_case === 'callback deleted' ? '?callback=1'
+          : ($send_case === 'long note' ? '?long_text=1' : ''))), $send_cookies);
+      integration_test('Misskey revalidates posts before sending: ' . $send_case, static function () use (
+        $send_case, $send_form_status, $send_pending_status, $send_status, $send_body
+      ): bool {
+        return $send_form_status === 200 && $send_pending_status === 400
+          && ($send_case === 'long note'
+            ? $send_status === 400 && str_contains($send_body, 'Misskey note text must be 3000 characters or fewer.')
+            : ($send_case === 'unchanged'
+            ? $send_status === 400 && $send_body === 'Error: Invalid Misskey server.'
+            : $send_status === 403 && $send_body === 'Error: Post authorization is required.'));
+      });
+    } finally {
+      $animation_db->prepare('DELETE FROM board_log WHERE tid = ?')->execute([$send_post_id]);
+    }
+  }
+
+  $state_cookies = $root . '/misskey-callback-state.txt';
+  http_request($base_url, $state_cookies);
+  $state_token = hash('sha256', (string)cookie_value($state_cookies, 'noreita_session'));
+  [$state_form_status] = http_request($base_url . '?mode=misskey_note_edit_form', $state_cookies,
+    ['no' => (string)$misskey_post['tid'], 'pwd' => 'misskey-owner-pass', 'token' => $state_token]);
+  [$state_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $state_cookies,
+    ['no' => (string)$misskey_post['tid'], 'token' => $state_token,
+      'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1']);
+  foreach ([
+    'missing' => ['', false],
+    'empty' => ['&session=', false],
+    'mismatch' => ['&session=wrong-state', false],
+    'array' => ['&session[]=probe-state', false],
+    'wrong parameter' => ['&s_id=probe-state', false],
+    'matching' => ['&session=probe-state', true],
+    'skip missing' => ['&skip_auth_check=on', false],
+    'skip mismatch' => ['&skip_auth_check=on&s_id=wrong-state', false],
+    'skip matching' => ['&skip_auth_check=on&s_id=probe-state', true],
+  ] as $state_case => [$state_query, $state_matches]) {
+    [$state_status, $state_body] = http_request(
+      $origin_url . '/misskey-send-probe.php?callback_state=1' . $state_query, $state_cookies);
+    integration_test('Misskey callback validates authentication state: ' . $state_case,
+      static function () use ($state_form_status, $state_pending_status, $state_matches, $state_status, $state_body): bool {
+        // 一致時だけ後段のループバックURL拒否へ進む。外部APIには接続しない。
+        return $state_form_status === 200 && $state_pending_status === 400
+          && ($state_matches
+            ? $state_status === 400 && $state_body === 'Error: Invalid Misskey server URL.'
+            : $state_status === 403 && $state_body === 'Error: Operation failed.');
+      });
+  }
+
+  [$submission_status, $submission_body] = http_request(
+    $origin_url . '/misskey-send-probe.php?submit_note=1', $state_cookies);
+  $submission_result = json_decode($submission_body, true);
+  integration_test('Misskey consumes and persists the posting session before a failed note request',
+    static fn (): bool => $submission_status === 200 && $submission_result === [
+      'transport_failed' => true, 'session_closed' => true, 'pending_removed' => true, 'token_retained' => true,
+    ]);
+  [$retry_status, $retry_body] = http_request(
+    $origin_url . '/connect_misskey_api.php?session=probe-state', $state_cookies);
+  integration_test('Misskey rejects callback retries after a note transport failure',
+    static fn (): bool => $retry_status === 400 && str_contains($retry_body, 'The Misskey posting session is missing.'));
+  [$resubmit_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $state_cookies,
+    ['no' => (string)$misskey_post['tid'], 'token' => $state_token,
+      'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1']);
+  integration_test('Misskey requires fresh post authorization after starting a note request',
+    static fn (): bool => $resubmit_status === 403);
 
   [$admin_unauthorized_status] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$admin_errorlog_unauthorized_status] = http_request($base_url . '?mode=admin_errorlog', $cookie_jar);
@@ -1433,6 +1740,314 @@ PHP;
       && $image_alt_api_status === 200
       && is_array($api) && ($api['thread']['image']['alt'] ?? '') === $edited_image_alt;
   });
+
+  $misskey_sensitive_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/connect_misskey_api.php';
+RequestSecurity::startSession();
+if (($_GET['note_fields'] ?? '') === '1') {
+  header('Content-Type: application/json');
+  echo json_encode(connect_misskey_api::noteFields('probe-token', 'probe-file',
+    (string)($_GET['text'] ?? ''), $_GET['cw'] ?? null));
+  exit;
+}
+if (($_GET['prepare_text'] ?? '') === '1') {
+  $text = connect_misskey_api::prepareNoteText(new MisskeyApiContext(true, ''),
+    (string)($_POST['text'] ?? ''), (string)($_POST['tool'] ?? ''),
+    (string)($_POST['painttime'] ?? ''), (string)($_POST['article_url'] ?? ''));
+  header('Content-Type: application/json');
+  echo json_encode(['text' => $text]);
+  exit;
+}
+$post = connect_misskey_api::validatePostingSession(new MisskeyApiContext(true, ''));
+$fields = connect_misskey_api::uploadFields('probe-token', __DIR__ . '/img/' . $post['picfile'],
+  (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
+$update = connect_misskey_api::updateFields('probe-token', 'probe-file', (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
+$note = connect_misskey_api::noteFields('probe-token', 'probe-file', (string)$_SESSION['sns_api_val'][0], $_SESSION['sns_api_val'][7]);
+header('Content-Type: application/json');
+echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'], 'upload' => $fields['isSensitive'],
+  'force' => $fields['force'] ?? null,
+  'note_cw' => $note['cw'],
+  'note_text' => $note['text'] ?? null,
+  'upload_comment' => $fields['comment'] ?? null, 'update_comment' => $update['comment'] ?? null]);
+PHP;
+  file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
+
+  foreach ([
+    'image only' => ['', '', '', '', 200, ''],
+    'zero' => ['0', '', '', '', 200, "0\n"],
+    'Japanese boundary' => [str_repeat('あ', 2999), '', '', '', 200, str_repeat('あ', 2999) . "\n"],
+    'emoji boundary' => [str_repeat('😀', 2999), '', '', '', 200, str_repeat('😀', 2999) . "\n"],
+    'too long' => [str_repeat('あ', 3000), '', '', '', 400, null],
+    'tool pushes over limit' => [str_repeat('a', 2999), 'NEO', '', '', 400, null],
+    'paint time pushes over limit' => [str_repeat('a', 2999), '', '10min', '', 400, null],
+    'link pushes over limit' => [str_repeat('a', 2999), '', '', 'https://example.com/?resno=1', 400, null],
+    'normalized text' => ["本文\r\n\r\n続き", 'NEO', '10min', 'https://example.com/?resno=1', 200,
+      "Tool:NEO\nPaint time:10min\n本文\n続き\nhttps://example.com/?resno=1"],
+  ] as $text_case => [$text_comment, $text_tool, $text_painttime, $text_url, $text_expected_status, $text_expected]) {
+    [$text_status, $text_body] = http_request($origin_url . '/misskey-sensitive-probe.php?prepare_text=1', $cookie_jar,
+      ['text' => $text_comment, 'tool' => $text_tool, 'painttime' => $text_painttime, 'article_url' => $text_url]);
+    integration_test('Misskey validates final note text before uploading: ' . $text_case,
+      static fn (): bool => $text_status === $text_expected_status
+        && ($text_expected_status === 200
+          ? (json_decode($text_body, true)['text'] ?? null) === $text_expected
+          : str_contains($text_body, 'Misskey note text must be 3000 characters or fewer.')));
+  }
+
+  foreach ([
+    'image only' => ['', null],
+    'whitespace only' => [" \r\n\t", null],
+    'image with CW' => ['', '画像の注釈'],
+    'zero text' => ['0', null],
+    'comment' => ["本文\n", null],
+    'tool' => ["Tool:PaintBBS NEO\n", null],
+    'paint time' => ["Paint time:10min\n", null],
+    'article link' => ['https://example.com/?resno=1', null],
+  ] as $note_case => [$note_text, $note_cw]) {
+    $note_query = ['note_fields' => '1', 'text' => $note_text];
+    if ($note_cw !== null) $note_query['cw'] = $note_cw;
+    [$note_status, $note_body] = http_request(
+      $origin_url . '/misskey-sensitive-probe.php?' . http_build_query($note_query), $cookie_jar);
+    $note_fields = json_decode($note_body, true);
+    integration_test('Misskey note payload supports optional text: ' . $note_case,
+      static function () use ($note_status, $note_fields, $note_text, $note_cw): bool {
+        $expected = ['i' => 'probe-token', 'cw' => $note_cw, 'fileIds' => ['probe-file']];
+        if (trim($note_text) !== '') $expected['text'] = $note_text;
+        return $note_status === 200 && $note_fields === $expected;
+      });
+  }
+
+  // DBから取得した画像説明が、両テーマのMisskey確認・設定画面まで届くことを検証する。
+  $misskey_alt_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  try {
+    foreach (['eda', 'monoreita'] as $misskey_alt_theme) {
+      $misskey_alt_config = str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $misskey_alt_theme . "'],", $misskey_enabled_config);
+      if (file_put_contents($webroot . '/config.local.php', $misskey_alt_config) === false) {
+        throw new RuntimeException('Could not select the Misskey alt test theme.');
+      }
+      $misskey_alt_results = [];
+      $misskey_alt_upload_results = [];
+      foreach ([$edited_image_alt, '0', ''] as $misskey_alt_description) {
+        $db->prepare('UPDATE board_log SET image_alt = ? WHERE tid = ?')
+          ->execute([$misskey_alt_description, $image_post_id]);
+        $misskey_alt_expected = 'alt="' . htmlspecialchars(
+          $misskey_alt_description !== '' ? $misskey_alt_description : 'Image subject', ENT_QUOTES, 'UTF-8'
+        ) . '"';
+        [$misskey_alt_before_status, $misskey_alt_before_body] = http_request(
+          $base_url . '?mode=before_misskey_note&no=' . $image_post_id, $cookie_jar
+        );
+        [$misskey_alt_form_status, $misskey_alt_form_body] = http_request(
+          $base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+          ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]
+        );
+        $misskey_alt_results[] = $misskey_alt_before_status === 200 && $misskey_alt_form_status === 200
+          && str_contains($misskey_alt_before_body, $misskey_alt_expected)
+          && str_contains($misskey_alt_form_body, $misskey_alt_expected);
+        [$misskey_alt_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar,
+          ['no' => (string)$image_post_id, 'token' => $token, 'image_alt' => 'forged-description',
+            'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1']);
+        [$misskey_alt_payload_status, $misskey_alt_payload_body] = http_request($origin_url . '/misskey-sensitive-probe.php', $cookie_jar);
+        $misskey_alt_payload = json_decode($misskey_alt_payload_body, true);
+        $misskey_alt_upload_results[] = $misskey_alt_pending_status === 400 && $misskey_alt_payload_status === 200
+          && ($misskey_alt_payload['upload_comment'] ?? null) === $misskey_alt_description
+          && ($misskey_alt_payload['force'] ?? null) === 'true'
+          && ($misskey_alt_payload['update_comment'] ?? null) === $misskey_alt_description;
+      }
+      integration_test('Misskey screens use escaped image alt and fall back to subject: ' . $misskey_alt_theme,
+        static fn (): bool => !in_array(false, $misskey_alt_results, true));
+      integration_test('Misskey upload and update payloads use unescaped DB image alt: ' . $misskey_alt_theme,
+        static fn (): bool => !in_array(false, $misskey_alt_upload_results, true));
+    }
+  } finally {
+    $db->prepare('UPDATE board_log SET image_alt = ? WHERE tid = ?')->execute([$edited_image_alt, $image_post_id]);
+    if (file_put_contents($webroot . '/config.local.php', $misskey_alt_original_config) === false) {
+      throw new RuntimeException('Could not restore the Misskey alt test configuration.');
+    }
+  }
+
+  $sensitive_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $sensitive_original_nsfw = $db->query('SELECT nsfw FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  try {
+    foreach (['eda', 'monoreita'] as $sensitive_theme) {
+      $sensitive_results = [];
+      foreach ([[1, null, true, true], [1, '0', true, true], [0, null, false, true],
+        [0, '1', true, true], [1, null, true, false]] as [$stored_nsfw, $selected_sensitive, $expected_sensitive, $nsfw_enabled]) {
+        $sensitive_config = str_replace("'paths' => ['theme' => 'starter'],",
+          "'paths' => ['theme' => '" . $sensitive_theme . "'],", $misskey_enabled_config);
+        if (!$nsfw_enabled) $sensitive_config = str_replace("'image_upload' => true,", "'image_upload' => true, 'nsfw' => false,", $sensitive_config);
+        file_put_contents($webroot . '/config.local.php', $sensitive_config);
+        $db->prepare('UPDATE board_log SET nsfw = ? WHERE tid = ?')->execute([$stored_nsfw, $image_post_id]);
+        [$sensitive_form_status, $sensitive_form_body] = http_request($base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+          ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]);
+        $sensitive_form_valid = $nsfw_enabled
+          ? preg_match('~<input[^>]*name="hide_thumbnail"[^>]*>~', $sensitive_form_body, $checkbox) === 1
+            && (str_contains($checkbox[0], 'checked') === (bool)$stored_nsfw)
+            && (str_contains($checkbox[0], 'disabled') === (bool)$stored_nsfw)
+          : preg_match('~<input[^>]*name="hide_thumbnail"[^>]*>~', $sensitive_form_body) === 0;
+        $sensitive_request = ['no' => (string)$image_post_id, 'token' => $token,
+          'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1'];
+        if ($selected_sensitive !== null) $sensitive_request['hide_thumbnail'] = $selected_sensitive;
+        [$sensitive_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar, $sensitive_request);
+        [$sensitive_probe_status, $sensitive_probe_body] = http_request($origin_url . '/misskey-sensitive-probe.php', $cookie_jar);
+        $sensitive_flags = json_decode($sensitive_probe_body, true);
+        $sensitive_results[] = $sensitive_form_status === 200 && $sensitive_form_valid && $sensitive_pending_status === 400
+          && $sensitive_probe_status === 200 && ($sensitive_flags['pending'] ?? null) === $expected_sensitive
+          && ($sensitive_flags['upload'] ?? null) === ($expected_sensitive ? 'true' : 'false')
+          && ($sensitive_flags['force'] ?? null) === 'true';
+      }
+      integration_test('Misskey sharing preserves NSFW and allows marking safe images sensitive: ' . $sensitive_theme,
+        static fn (): bool => !in_array(false, $sensitive_results, true));
+    }
+  } finally {
+    $db->prepare('UPDATE board_log SET nsfw = ? WHERE tid = ?')->execute([$sensitive_original_nsfw, $image_post_id]);
+    file_put_contents($webroot . '/config.local.php', $sensitive_original_config);
+  }
+
+  // 両テーマのフォームと同じ項目だけをPOSTし、入力した注釈が送信データまで届くことを確認する。
+  $cw_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  try {
+    foreach (['eda', 'monoreita'] as $cw_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $cw_theme . "'],", $misskey_enabled_config));
+      foreach ([
+        'missing' => [null, null, null],
+        'empty' => ['', null, null],
+        'whitespace' => ['   ', null, null],
+        'normal' => ['画像の注釈', '画像の注釈', null],
+        'zero' => ['0', '0', null],
+        'special characters' => ['<注意> & "引用"', '<注意> & "引用"', null],
+        '100 characters' => [str_repeat('あ', 100), str_repeat('あ', 100), null],
+        'too long' => [str_repeat('あ', 101), null, 'Content warning must be 100 characters or fewer.'],
+        'array' => [['invalid'], null, 'Invalid content warning.'],
+      ] as $cw_case => [$cw_input, $cw_expected, $cw_error]) {
+        [$cw_form_status, $cw_form_body] = http_request($base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+          ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]);
+        $cw_request = ['no' => (string)$image_post_id, 'token' => $token, 'hide_thumbnail' => '1',
+          'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1'];
+        if ($cw_input !== null) $cw_request['cw'] = $cw_input;
+        [$cw_status, $cw_body] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar, $cw_request);
+        $cw_payload = null;
+        if ($cw_error === null) {
+          [$cw_probe_status, $cw_probe_body] = http_request($origin_url . '/misskey-sensitive-probe.php', $cookie_jar);
+          $cw_payload = json_decode($cw_probe_body, true);
+        }
+        integration_test('Misskey form passes CW to note payload: ' . $cw_theme . '/' . $cw_case,
+          static function () use ($cw_form_status, $cw_form_body, $cw_status, $cw_body,
+            $cw_error, $cw_payload, $cw_expected): bool {
+            return $cw_form_status === 200 && str_contains($cw_form_body, 'name="cw"') && $cw_status === 400
+              && ($cw_error !== null ? str_contains($cw_body, $cw_error)
+                : is_array($cw_payload) && array_key_exists('note_cw', $cw_payload) && $cw_payload['note_cw'] === $cw_expected);
+          });
+      }
+      foreach ([
+        'missing' => [null, null, false],
+        'empty' => ['', null, false],
+        'normal' => ['共有本文 & "引用"', '共有本文 & "引用"', false],
+        'zero' => ['0', '0', false],
+        'array' => [['invalid'], null, true],
+        'invalid UTF-8' => ["\xff", null, true],
+      ] as $comment_case => [$comment_input, $comment_expected, $comment_invalid]) {
+        http_request($base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+          ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]);
+        $comment_request = ['no' => (string)$image_post_id, 'token' => $token,
+          'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1'];
+        if ($comment_input !== null) $comment_request['com'] = $comment_input;
+        [$comment_status, $comment_body] = http_request($base_url . '?mode=create_misskey_note_sessiondata',
+          $cookie_jar, $comment_request);
+        $comment_payload = null;
+        if (!$comment_invalid) {
+          [$comment_probe_status, $comment_probe_body] = http_request($origin_url . '/misskey-sensitive-probe.php', $cookie_jar);
+          $comment_payload = json_decode($comment_probe_body, true);
+        }
+        integration_test('Misskey validates sharing comment input: ' . $cw_theme . '/' . $comment_case,
+          static fn (): bool => $comment_status === 400 && !str_contains($comment_body, 'TypeError')
+            && ($comment_invalid ? str_contains($comment_body, 'Invalid sharing comment.')
+              : is_array($comment_payload) && array_key_exists('note_text', $comment_payload)
+                && $comment_payload['note_text'] === $comment_expected));
+      }
+    }
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $cw_original_config);
+  }
+
+  // 実際の編集経路で保存したHTMLが、公開確認画面・認可後の画面で実行されないことを確認する。
+  $misskey_xss_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $misskey_xss_original_comment = (string)$db->query('SELECT com FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+  $misskey_xss_comment = "<img src=x onerror=\"alert(1)\">\n<script>alert('xss')</script>\n</textarea><svg onload=\"alert(2)\"> & \"引用\"";
+  [$misskey_xss_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+    'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'sub' => 'Image subject', 'com' => $misskey_xss_comment, 'image_alt' => $edited_image_alt,
+    'pwd' => 'image-pass', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+  ]);
+  try {
+    foreach (['eda', 'monoreita'] as $misskey_xss_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $misskey_xss_theme . "'],", $misskey_enabled_config));
+      [$misskey_xss_before_status, $misskey_xss_before_body] = http_request(
+        $base_url . '?mode=before_misskey_note&no=' . $image_post_id, $root . '/misskey-xss-' . $misskey_xss_theme . '.txt'
+      );
+      [$misskey_xss_form_status, $misskey_xss_form_body] = http_request(
+        $base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+        ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]
+      );
+      integration_test('Misskey screens escape stored HTML and preserve plain text: ' . $misskey_xss_theme,
+        static function () use ($misskey_xss_edit_status, $misskey_xss_before_status, $misskey_xss_before_body,
+          $misskey_xss_form_status, $misskey_xss_form_body, $misskey_xss_comment): bool {
+          if ($misskey_xss_edit_status !== 200 || $misskey_xss_before_status !== 200 || $misskey_xss_form_status !== 200) return false;
+          $expected = htmlspecialchars($misskey_xss_comment, ENT_QUOTES, 'UTF-8');
+          foreach ([$misskey_xss_before_body, $misskey_xss_form_body] as $html) {
+            if (!str_contains($html, '<p class="comment">' . $expected . '</p>')
+              || !str_contains($html, '.comment { white-space: pre-wrap; }')
+              || str_contains($html, '<img src=x') || str_contains($html, '<script>alert(')
+              || str_contains($html, '<svg onload=')) return false;
+          }
+          return preg_match('~<textarea[^>]*id="com"[^>]*>(.*?)</textarea>~s', $misskey_xss_form_body, $textarea) === 1
+            && $textarea[1] === $expected;
+        });
+    }
+  } finally {
+    $db->prepare('UPDATE board_log SET com = ? WHERE tid = ?')->execute([$misskey_xss_original_comment, $image_post_id]);
+    file_put_contents($webroot . '/config.local.php', $misskey_xss_original_config);
+  }
+
+  // 返信は検索結果でカタログ用テンプレートのko側に渡される。
+  $catalog_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $catalog_reply_subject = 'catalog-reply-' . bin2hex(random_bytes(6));
+  $catalog_thumbnail = $catalog_reply_subject . '-thumb.png';
+  $catalog_columns = array_values(array_filter($db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1),
+    static fn (string $column): bool => $column !== 'tid'));
+  $db->exec('INSERT INTO board_log (' . implode(',', $catalog_columns) . ') SELECT '
+    . implode(',', $catalog_columns) . ' FROM board_log WHERE tid = ' . $image_post_id);
+  $catalog_reply_id = (int)$db->lastInsertId();
+  $db->prepare('UPDATE board_log SET thread = 0, parent = ?, sub = ? WHERE tid = ?')
+    ->execute([$image_post_id, $catalog_reply_subject, $catalog_reply_id]);
+  file_put_contents($webroot . '/img/' . $catalog_thumbnail, $png);
+  try {
+    foreach (['eda', 'monoreita'] as $catalog_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $catalog_theme . "'],", $config_local));
+      $catalog_results = [];
+      foreach ([[0, $catalog_thumbnail], [1, $catalog_thumbnail], [0, '']] as [$catalog_nsfw, $catalog_thumb]) {
+        $db->prepare('UPDATE board_log SET nsfw = ?, thumbnail = ? WHERE tid = ?')
+          ->execute([$catalog_nsfw, $catalog_thumb, $catalog_reply_id]);
+        [$catalog_status, $catalog_body] = http_request($base_url
+          . '?mode=search&target=all&post_type=reply&search=' . rawurlencode($catalog_reply_subject), $cookie_jar);
+        $catalog_expected_image = $catalog_thumb !== '' ? $catalog_thumb : (string)$image_row['picfile'];
+        [$catalog_image_status] = http_request($origin_url . '/img/' . rawurlencode($catalog_expected_image), $cookie_jar);
+        $catalog_results[] = $catalog_status === 200 && $catalog_image_status === 200
+          && str_contains($catalog_body, 'src="img/' . $catalog_expected_image . '"')
+          && !str_contains($catalog_body, 'src="' . $catalog_expected_image . '"')
+          && str_contains($catalog_body, 'alt="' . htmlspecialchars($edited_image_alt, ENT_QUOTES, 'UTF-8') . '"');
+      }
+      integration_test('catalog reply image paths include the image directory: ' . $catalog_theme,
+        static fn (): bool => !in_array(false, $catalog_results, true));
+    }
+  } finally {
+    $db->prepare('DELETE FROM board_log WHERE tid = ?')->execute([$catalog_reply_id]);
+    unlink($webroot . '/img/' . $catalog_thumbnail);
+    file_put_contents($webroot . '/config.local.php', $catalog_original_config);
+  }
 
   $admin_temporary_base = 'admin-temp-' . bin2hex(random_bytes(6));
   $admin_temporary_name = $admin_temporary_base . '.png';
@@ -2207,7 +2822,7 @@ PHP;
 
   $check_continuation = static function (string $theme, string $continue_url, string $continue_cookies) use ($webroot, $upload_row): void {
     $continue_db = new PDO('sqlite:' . $webroot . '/reita.db');
-    $continue_fixture = $continue_db->query('SELECT tid, picfile, pchfile, ctype FROM board_log WHERE picfile = '
+    $continue_fixture = $continue_db->query('SELECT tid, picfile, pchfile, ctype, invz, image_alt FROM board_log WHERE picfile = '
       . $continue_db->quote((string)$upload_row['picfile']))->fetch(PDO::FETCH_ASSOC);
     $continue_animation = pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.pch';
     $continue_animation_path = $webroot . '/img/' . $continue_animation;
@@ -2230,10 +2845,33 @@ PHP;
           }
         );
       }
+      // 同じ画像が残っていても非表示投稿は公開入口から取得できない。
+      // 説明が空のときに投稿者名・件名がaltへ漏れる経路も両テーマで確認する。
+      $public_continue_cookies = dirname($webroot) . '/continue-public-' . $theme . '.txt';
+      foreach (['非表示画像の説明', ''] as $hidden_description) {
+        $continue_db->prepare('UPDATE board_log SET invz = 1, image_alt = ? WHERE tid = ?')
+          ->execute([$hidden_description, $continue_fixture['tid']]);
+        [$hidden_continue_status, $hidden_continue_body] = http_request(
+          $continue_url . '?mode=continue&no=' . rawurlencode($continue_fixture['picfile']), $public_continue_cookies
+        );
+        [$admin_continue_status] = http_request(
+          $continue_url . '?mode=continue&no=' . rawurlencode($continue_fixture['picfile']), $continue_cookies
+        );
+        integration_test('continuation rejects hidden posts: ' . $theme . '/' . ($hidden_description === '' ? 'no alt' : 'alt'),
+          static function () use ($hidden_continue_status, $hidden_continue_body, $admin_continue_status, $continue_fixture): bool {
+            return $hidden_continue_status === 404 && $admin_continue_status === 404
+              && !str_contains($hidden_continue_body, $continue_fixture['picfile'])
+              && !str_contains($hidden_continue_body, '非表示画像の説明')
+              && !str_contains($hidden_continue_body, 'name="img"')
+              && !str_contains($hidden_continue_body, 'name="pch"');
+          }
+        );
+      }
     } finally {
       if (is_file($continue_animation_path)) unlink($continue_animation_path);
-      $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ? WHERE tid = ?');
-      $statement->execute([$continue_fixture['ctype'], $continue_fixture['pchfile'], $continue_fixture['tid']]);
+      $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ?, invz = ?, image_alt = ? WHERE tid = ?');
+      $statement->execute([$continue_fixture['ctype'], $continue_fixture['pchfile'], $continue_fixture['invz'],
+        $continue_fixture['image_alt'], $continue_fixture['tid']]);
     }
   };
   $check_continuation('eda', $base_url, $cookie_jar);
@@ -2259,7 +2897,7 @@ PHP;
   $monoreita_port = (int)substr(strrchr((string)$monoreita_address, ':'), 1);
   $monoreita_base_url = "http://127.0.0.1:{$monoreita_port}/index.php";
   $process = proc_open(
-    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+    [PHP_BINARY, '-d', 'opcache.enable=0',
       '-S', "127.0.0.1:{$monoreita_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
@@ -2416,7 +3054,7 @@ PHP;
   $diary_port = (int)substr(strrchr((string)$diary_address, ':'), 1);
   $diary_base_url = "http://127.0.0.1:{$diary_port}/index.php";
   $process = proc_open(
-    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+    [PHP_BINARY, '-d', 'opcache.enable=0',
       '-S', "127.0.0.1:{$diary_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,
@@ -2489,7 +3127,7 @@ PHP;
   $diary_replies_port = (int)substr(strrchr((string)$diary_replies_address, ':'), 1);
   $diary_replies_url = "http://127.0.0.1:{$diary_replies_port}/index.php";
   $process = proc_open(
-    [PHP_BINARY, '-d', 'opcache.enable_cli=0', '-d', 'opcache.file_cache_only=0',
+    [PHP_BINARY, '-d', 'opcache.enable=0',
       '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
     [STDIN, $log, $log],
     $pipes,

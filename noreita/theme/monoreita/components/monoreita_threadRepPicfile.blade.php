@@ -1,3 +1,6 @@
+@php
+  $res_image_alt = ($res['image_alt'] ?? '') !== '' ? $res['image_alt'] : '投稿画像（'.($res['a_name'] ?? '').'）: '.($res['sub'] ?? '');
+@endphp
 <h5>
   {{$res['tool']}} ({{$res['img_w']}}x{{$res['img_h']}})
   @if ($display_painttime && $res['psec'] != null)
@@ -24,20 +27,20 @@
   <a class="luminous" href="{{$path}}{{$res['picfile']}}">
     <span class="nsfw@if (str_ends_with($res['picfile'], '.avif')) nsfw-browser-blur@endif">
       @if (str_ends_with($res['picfile'], '.avif'))
-        <img src="{{$path}}{{$res['picfile']}}" alt="{{!empty($res['image_alt']) ? $res['image_alt'] : '投稿画像（'.$res['a_name'].'）: '.$res['sub']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy" class="image">
       @elseif ($res['thumb'])
-        <img src="{{$path}}{{$res['thumb']}}" alt="{{!empty($res['image_alt']) ? $res['image_alt'] : '投稿画像（'.$res['a_name'].'）: '.$res['sub']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$res['thumb']}}" alt="{{$res_image_alt}}" loading="lazy" class="image">
       @else
-        <img src="{{$path}}{{$res['picfile']}}" alt="{{!empty($res['image_alt']) ? $res['image_alt'] : '投稿画像（'.$res['a_name'].'）: '.$res['sub']}}" loading="lazy" class="image">
+        <img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy" class="image">
       @endif
     </span>
   </a>
 @else
   <a class="luminous" href="{{$path}}{{$res['picfile']}}">
   @if ($res['thumb'])
-    <img src="{{$path}}{{$res['thumb']}}" alt="{{!empty($res['image_alt']) ? $res['image_alt'] : '投稿画像（'.$res['a_name'].'）: '.$res['sub']}}" loading="lazy" class="image">
+    <img src="{{$path}}{{$res['thumb']}}" alt="{{$res_image_alt}}" loading="lazy" class="image">
   @else
-    <img src="{{$path}}{{$res['picfile']}}" alt="{{!empty($res['image_alt']) ? $res['image_alt'] : '投稿画像（'.$res['a_name'].'）: '.$res['sub']}}" loading="lazy" class="image">
+    <img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy" class="image">
   @endif
   </a>
 @endif

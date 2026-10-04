@@ -52,11 +52,14 @@
     <div class="thread" id="catalog">
       @if (!empty($oya))
         @foreach ($oya as $bbsline)
+          @php
+            $bbsline_image_alt = ($bbsline['image_alt'] ?? '') !== '' ? $bbsline['image_alt'] : $bbsline['sub'].' (by '.$bbsline['a_name'].')';
+          @endphp
           <div>
             <div>
               @if ($bbsline['picfile'])
                 <p>
-                  <a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}" title="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})">@if ($bbsline['nsfw'] == 1 && str_ends_with($bbsline['picfile'], '.avif'))<span class="nsfw-browser-blur"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{!empty($bbsline['image_alt']) ? $bbsline['image_alt'] : $bbsline['sub'].' (by '.$bbsline['a_name'].')'}}" loading="lazy"></span>@elseif ($bbsline['thumb'])<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{!empty($bbsline['image_alt']) ? $bbsline['image_alt'] : $bbsline['sub'].' (by '.$bbsline['a_name'].')'}}" loading="lazy">@else<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{!empty($bbsline['image_alt']) ? $bbsline['image_alt'] : $bbsline['sub'].' (by '.$bbsline['a_name'].')'}}" loading="lazy">@endif</a>
+                  <a href="{{$self}}?mode=res&amp;res={{$bbsline['tid']}}" title="{{$bbsline['sub']}} (by {{$bbsline['a_name']}})">@if ($bbsline['nsfw'] == 1 && str_ends_with($bbsline['picfile'], '.avif'))<span class="nsfw-browser-blur"><img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline_image_alt}}" loading="lazy"></span>@elseif ($bbsline['thumb'])<img src="{{$path}}{{$bbsline['thumb']}}" alt="{{$bbsline_image_alt}}" loading="lazy">@else<img src="{{$path}}{{$bbsline['picfile']}}" alt="{{$bbsline_image_alt}}" loading="lazy">@endif</a>
                 </p>
               @else
                 <p>
@@ -72,11 +75,14 @@
       @endif
       @if (!empty($ko))
         @foreach ($ko as $res)
+          @php
+            $res_image_alt = ($res['image_alt'] ?? '') !== '' ? $res['image_alt'] : $res['sub'].' (by '.$res['a_name'].')';
+          @endphp
         <div>
           <div>
             @if ($res['picfile'])
               <p>
-                <a href="{{$self}}?mode=res&amp;res={{$res['parent']}}" title="{{$res['sub']}} (by {{$res['a_name']}})">@if ($res['nsfw'] == 1 && str_ends_with($res['picfile'], '.avif'))<span class="nsfw-browser-blur"><img src="{{$path}}{{$res['picfile']}}" alt="{{!empty($res['image_alt']) ? $res['image_alt'] : $res['sub'].' (by '.$res['a_name'].')'}}" loading="lazy"></span>@elseif ($res['thumb'])<img src="{{$res['thumb']}}" alt="{{!empty($res['image_alt']) ? $res['image_alt'] : $res['sub'].' (by '.$res['a_name'].')'}}" loading="lazy">@else<img src="{{$path}}{{$res['picfile']}}" alt="{{!empty($res['image_alt']) ? $res['image_alt'] : $res['sub'].' (by '.$res['a_name'].')'}}" loading="lazy">@endif</a>
+                <a href="{{$self}}?mode=res&amp;res={{$res['parent']}}" title="{{$res['sub']}} (by {{$res['a_name']}})">@if ($res['nsfw'] == 1 && str_ends_with($res['picfile'], '.avif'))<span class="nsfw-browser-blur"><img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy"></span>@elseif ($res['thumb'])<img src="{{$path}}{{$res['thumb']}}" alt="{{$res_image_alt}}" loading="lazy">@else<img src="{{$path}}{{$res['picfile']}}" alt="{{$res_image_alt}}" loading="lazy">@endif</a>
               </p>
             @else
               <p>

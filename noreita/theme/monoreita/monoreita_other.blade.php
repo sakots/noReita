@@ -60,11 +60,6 @@
       @include('components.monoreita_err')
     @endif
     {{-- エラー画面 おわり --}}
-    {{-- 画像差し替え失敗専用エラー --}}
-    @if ($othermode == 'err2')
-      @include('components.monoreita_err2')
-    @endif
-    {{-- 画像差し替え失敗専用エラー おわり --}}
   </main>
   <footer id="footer">
     @include('components.monoreita_footerCopy')

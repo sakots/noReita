@@ -96,7 +96,7 @@ smoke_test('trip preview uses the server trip generator without sending secrets 
   $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
   return is_string($script) && is_string($index)
     && str_contains($script, "method: 'POST'")
-    && str_contains($script, 'URLSearchParams({ value })')
+    && str_contains($script, 'URLSearchParams({ value, token: token.value })')
     && !str_contains($script, 'endpoint +')
     && str_contains($index, "case 'trip_preview':")
     && str_contains($index, 'generate_trip($value)');
@@ -160,6 +160,44 @@ smoke_test('both themes limit animation links to supported tool names', static f
               if (str_contains($html, '?mode=anime') !== $expected) {
                 throw new RuntimeException($theme . '/' . $component . ': unexpected animation link for ' . $tool);
               }
+            }
+          }
+        }
+      }
+    }
+    return true;
+  } finally {
+    $iterator = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($cache, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $item) {
+      $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+    }
+    rmdir($cache);
+  }
+});
+
+smoke_test('both themes preserve zero image alt and escape descriptions', static function (): bool {
+  $cache = sys_get_temp_dir() . '/noreita_image_alt_' . bin2hex(random_bytes(8));
+  mkdir($cache, 0700, true);
+  try {
+    foreach (['eda' => 'twig', 'monoreita' => 'blade'] as $theme => $type) {
+      mkdir($cache . '/' . $theme, 0700);
+      $engine = TemplateEngineFactory::create($type, dirname(__DIR__) . '/noreita/theme/' . $theme . '/components', $cache . '/' . $theme);
+      foreach (['Oya' => 'bbsline', 'Rep' => 'res'] as $component => $key) {
+        foreach (['0', '<説明 "画像">', ''] as $description) {
+          foreach ([[0, 'record.png', ''], [0, 'record.png', 'thumb.png'],
+            [1, 'record.png', 'thumb.png'], [1, 'record.avif', '']] as [$nsfw, $image, $thumbnail]) {
+            $post = ['tool' => '', 'img_w' => 4, 'img_h' => 3, 'psec' => 0, 'utime' => '',
+              'nsfw' => $nsfw, 'picfile' => $image, 'thumb' => $thumbnail, 'pchfile' => '',
+              'a_name' => '作者', 'sub' => '件名', 'image_alt' => $description];
+            $html = $engine->render($theme . '_thread' . $component . 'Picfile', [
+              $key => $post, 'display_painttime' => false, 'path' => 'img/', 'self' => 'index.php',
+              'use_continue' => false, 'use_misskey_note' => false,
+            ]);
+            $expected = $description !== '' ? $description : '投稿画像（作者）: 件名';
+            if (!str_contains($html, 'alt="' . htmlspecialchars($expected, ENT_QUOTES, 'UTF-8') . '"')) {
+              throw new RuntimeException($theme . '/' . $component . ': unexpected image alt');
             }
           }
         }
@@ -1068,6 +1106,25 @@ smoke_test('legacy administrator session secrets use constant-time comparison', 
     && !AdminAuth::secondaryPasswordMatches('smoke-secondary-admin-secret', '');
 });
 
+smoke_test('trip preview limit persists across instances, isolates IPs, and expires', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_trip_limit_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $limiter = new TripPreviewRateLimiter($directory, 'test-secret');
+    for ($i = 0; $i < 60; $i++) {
+      if ($limiter->consume('192.0.2.10', 100) !== 0) return false;
+    }
+    $another = new TripPreviewRateLimiter($directory, 'test-secret');
+    return $another->consume('192.0.2.10', 101) === 59
+      && $another->consume('192.0.2.11', 101) === 0
+      && $another->consume('192.0.2.10', 160) === 0
+      && !str_contains((string)file_get_contents($directory . '/trip-preview-limits.json'), '192.0.2.10');
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $file) unlink($file);
+    rmdir($directory);
+  }
+});
+
 smoke_test('administrator login rate limit locks by IP, clears after success, and removes expired records', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_admin_limit_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
@@ -1202,6 +1259,34 @@ smoke_test('SQLite read and write', static function (): bool {
   $statement = $db->prepare('INSERT INTO smoke (value) VALUES (:value)');
   $statement->execute(['value' => 'noReita']);
   return $db->query('SELECT value FROM smoke')->fetchColumn() === 'noReita';
+});
+
+smoke_test('superseded internal helpers are removed', static function (): bool {
+  $repository = new ReflectionClass(BoardRepository::class);
+  return !$repository->hasMethod('searchComments')
+    && !$repository->hasMethod('searchAuthors')
+    && !$repository->hasMethod('hidePost')
+    && !$repository->hasMethod('oldestPost')
+    && !(new ReflectionClass(RequestSecurity::class))->hasMethod('sessionValue')
+    && !(new ReflectionClass(Config::class))->hasMethod('resetForTesting')
+    && !(new ReflectionClass(Thumbnail::class))->hasMethod('getOutputUrl')
+    && !function_exists('error2')
+    && !function_exists('set_page_context_to_session')
+    && !function_exists('is_neo')
+    && !function_exists('get_pch_size')
+    && !function_exists('user_del_valid');
+});
+
+smoke_test('themes do not retain the removed err2 mode', static function (): bool {
+  $root = dirname(__DIR__) . '/noreita/theme';
+  $eda = file_get_contents($root . '/eda/eda_other.twig');
+  $monoreita = file_get_contents($root . '/monoreita/monoreita_other.blade.php');
+  return is_string($eda)
+    && is_string($monoreita)
+    && !str_contains($eda, "othermode == 'err2'")
+    && !str_contains($eda, 'eda_err2.twig')
+    && !str_contains($monoreita, "othermode == 'err2'")
+    && !str_contains($monoreita, 'monoreita_err2');
 });
 
 smoke_test('public API exposes only visible React-safe post data', static function (): bool {
@@ -2298,6 +2383,42 @@ smoke_test('external link previews parse cached OGP metadata without fetching in
     if (is_dir($directory . DIRECTORY_SEPARATOR . '.external-link-previews')) rmdir($directory . DIRECTORY_SEPARATOR . '.external-link-previews');
     if (is_dir($directory)) rmdir($directory);
   }
+});
+
+smoke_test('Misskey sending does not impose a fixed wait', static function (): bool {
+  $source = file_get_contents(dirname(__DIR__) . '/noreita/connect_misskey_api.php');
+  return is_string($source)
+    && !preg_match('/\b(?:sleep|usleep|time_nanosleep|time_sleep_until)\s*\(/', $source);
+});
+
+smoke_test('Misskey cached tokens are checked without creating a note', static function (): bool {
+  $source = file_get_contents(dirname(__DIR__) . '/noreita/misskey_note.inc.php');
+  return is_string($source)
+    && str_contains($source, 'permission=read:account,write:notes,write:drive')
+    && str_contains($source, 'MisskeyTokenVerifier::isValid(')
+    && !str_contains($source, '/api/notes/create');
+});
+
+foreach ([
+  'valid account' => [200, '{"id":"account-id","username":"test"}', true],
+  'unauthorized' => [401, '{"error":{"code":"AUTHENTICATION_FAILED"}}', false],
+  'missing permission' => [403, '{"error":{"code":"PERMISSION_DENIED"}}', false],
+  'server error' => [500, '{"id":"account-id"}', false],
+  'transport error' => [0, false, false],
+  'empty response' => [204, '', false],
+  'invalid JSON' => [200, '<html>error</html>', false],
+  'API error' => [200, '{"error":{"code":"ERROR"}}', false],
+  'empty account ID' => [200, '{"id":""}', false],
+  'invalid account ID' => [200, '{"id":[]}', false],
+] as $case => [$status, $response, $expected]) {
+  smoke_test('Misskey cached token response: ' . $case, static fn (): bool =>
+    MisskeyTokenVerifier::isValidResponse($status, $response) === $expected);
+}
+
+smoke_test('Misskey token verification rejects unsafe servers and empty tokens', static function (): bool {
+  return !MisskeyTokenVerifier::isValid('https://127.0.0.1', 'test-token')
+    && !MisskeyTokenVerifier::isValid('https://localhost', 'test-token')
+    && !MisskeyTokenVerifier::isValid('https://example.com', '');
 });
 
 smoke_test('Misskey server URLs reject SSRF destinations', static function (): bool {

@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.13.0 lot.260930.0';
+const REITA_VER = 'v4.13.1 lot.261003.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -28,7 +28,7 @@ if (!defined('ERROR_HANDLER_INC_VER') || ERROR_HANDLER_INC_VER < 20260820) {
 // request_security.inc
 check_file(__DIR__.'/request_security.inc.php', $en);
 require_once(__DIR__.'/request_security.inc.php');
-if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20260726) {
+if(!defined('REQUEST_SECURITY_INC_VER') || REQUEST_SECURITY_INC_VER < 20261004) {
   die($en ? 'Please update request_security.inc.php to the latest version.' : 'request_security.inc.phpを最新版に更新してください。');
 }
 
@@ -42,7 +42,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20260910) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261004) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -77,21 +77,21 @@ if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
 // misskey_security.inc
 check_file(__DIR__.'/misskey_security.inc.php', $en);
 require_once(__DIR__.'/misskey_security.inc.php');
-if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20260816) {
+if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20261004) {
   die($en ? 'Please update misskey_security.inc.php to the latest version.' : 'misskey_security.inc.phpを最新版に更新してください。');
 }
 
 // misskey_note.inc
 check_file(__DIR__.'/misskey_note.inc.php', $en);
 require_once(__DIR__.'/misskey_note.inc.php');
-if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20260817) {
+if(!defined('MISSKEY_NOTE_VER') || MISSKEY_NOTE_VER < 20261004) {
   die($en ? 'Please update misskey_note.inc.php to the latest version.' : 'misskey_note.inc.phpを最新版に更新してください。');
 }
 
 // connect_misskey_api.php
 check_file(__DIR__.'/connect_misskey_api.php', $en);
 require_once(__DIR__.'/connect_misskey_api.php');
-if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20260817) {
+if(!defined('CONNECT_MISSKEY_API_VER') || CONNECT_MISSKEY_API_VER < 20261004) {
   die($en ? 'Please update connect_misskey_api.php to the latest version.' : 'connect_misskey_api.phpを最新版に更新してください。');
 }
 
@@ -498,11 +498,21 @@ switch ($mode) {
 function trip_preview(ApplicationContext $context): void {
   header('Content-Type: application/json; charset=UTF-8');
   header('X-Content-Type-Options: nosniff');
+  header('Cache-Control: no-store, private');
 
   if ($context->requestMethod !== 'POST') {
     http_response_code(405);
     header('Allow: POST');
     echo json_encode(['error' => 'Method not allowed.']);
+    return;
+  }
+
+  try {
+    // 設定で投稿時のCSRFを無効にしていても、計算APIでは必ず検証する。
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $context->english);
+  } catch (RequestSecurityException $e) {
+    http_response_code($e->getCode() ?: 403);
+    echo json_encode(['error' => 'Invalid request.']);
     return;
   }
 
@@ -512,6 +522,22 @@ function trip_preview(ApplicationContext $context): void {
   )) {
     http_response_code(422);
     echo json_encode(['error' => 'Invalid input.']);
+    return;
+  }
+
+  try {
+    $limiter = new TripPreviewRateLimiter(__DIR__ . '/session', Config::string('admin.password'));
+    $retry_after = $limiter->consume(RequestInfo::clientIp());
+  } catch (Throwable $e) {
+    ApplicationErrorHandler::reportHttpError(503, 'Trip preview limit storage failed.', $e);
+    http_response_code(503);
+    echo json_encode(['error' => 'Preview unavailable.']);
+    return;
+  }
+  if ($retry_after > 0) {
+    http_response_code(429);
+    header('Retry-After: ' . $retry_after);
+    echo json_encode(['error' => 'Too many preview requests.']);
     return;
   }
 
@@ -1296,12 +1322,8 @@ function res(ApplicationContext $context): void {
   $uuid = trim((string)filter_input(INPUT_GET, 'uuid'));
 
   //csrfトークンをセット
-  $dat['token'] = '';
-  if (Config::bool('features.csrf')) {
-    $token = RequestSecurity::csrfToken();
-    $_SESSION['token'] = $token;
-    $dat['token'] = $token;
-  }
+  // ライブプレビューは設定にかかわらずCSRFトークンを必要とする。
+  $dat['token'] = RequestSecurity::csrfToken();
 
   //古いスレのレスフォームを表示しない
   $elapsed_time = Config::int('board.elapsed_reply_days') * 86400; //デフォルトの1年だと31536000
@@ -1725,12 +1747,8 @@ function paint_com(ApplicationContext $context, string $tmpmode): void {
   //----------
 
   //csrfトークンをセット
-  $dat['token'] = '';
-  if (Config::bool('features.csrf')) {
-    $token = RequestSecurity::csrfToken();
-    $_SESSION['token'] = $token;
-    $dat['token'] = $token;
-  }
+  // ライブプレビューは設定にかかわらずCSRFトークンを必要とする。
+  $dat['token'] = RequestSecurity::csrfToken();
 
   //投稿途中一覧 or 画像新規投稿 or 画像差し替え
   if ($tmpmode == "tmp") {
@@ -2162,12 +2180,8 @@ function editform(ApplicationContext $context, ?int $authorized_post_id = null, 
   $en = $context->english;
 
   //csrfトークンをセット
-  $dat['token'] = '';
-  if (Config::bool('features.csrf')) {
-    $token = RequestSecurity::csrfToken();
-    $_SESSION['token'] = $token;
-    $dat['token'] = $token;
-  }
+  // ライブプレビューは設定にかかわらずCSRFトークンを必要とする。
+  $dat['token'] = RequestSecurity::csrfToken();
 
   //入力されたパスワード
   $post_pwd = $authorized_password ?? filter_input(INPUT_POST, 'pwd');
@@ -3078,22 +3092,4 @@ function render_bootstrap_error(string $mes, int $status = 400, ?Throwable $caus
   http_response_code($status);
   header('Content-Type: text/plain; charset=UTF-8');
   exit($mes);
-}
-
-//画像差し替え失敗
-function error2(ApplicationContext $context): void {
-  $template_engine = $context->templates;
-  $dat =& $context->data;
-  $en = $context->english;
-  http_response_code(500);
-
-  $self = Config::string('site.script_name');
-  $dat['othermode'] = 'err2';
-  $async_flag = (bool)filter_input(INPUT_POST,'asyncflag',FILTER_VALIDATE_BOOLEAN);
-  $http_x_requested_with = (bool)(isset($_SERVER['HTTP_X_REQUESTED_WITH']));
-  if($http_x_requested_with || $async_flag){
-    die($en ? "error?\nImage not found. There might be a failure in the posting.<a href=\"{{$self}}?mode=piccom\">Uploaded images</a> might still be available." : "error?\n画像が見当たりません。投稿に失敗している可能性があります。<a href=\"{{$self}}?mode=piccom\">アップロード途中の画像</a>に残っているかもしれません。");
-  }
-  echo $template_engine->render(OTHERFILE, $dat);
-  exit;
 }

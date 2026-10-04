@@ -122,12 +122,6 @@ final class Config {
     self::$root = '[test]';
   }
 
-  /** Test processes may load one isolated configuration at a time. */
-  public static function resetForTesting(): void {
-    self::$values = null;
-    self::$root = null;
-  }
-
   /**
    * @param array<string,mixed> $defaults
    * @param array<string,mixed> $overrides

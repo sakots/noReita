@@ -1,7 +1,7 @@
 <?php
 // request_security.inc.php for noReita (C) sakots 2026 MIT License
 
-const REQUEST_SECURITY_INC_VER = 20260726;
+const REQUEST_SECURITY_INC_VER = 20261004;
 
 final class RequestSecurityException extends RuntimeException {
 }
@@ -118,12 +118,6 @@ final class RequestSecurity {
 
   public static function assertCurrentSameOriginRequest(string $usercode, bool $english): void {
     self::assertSameOriginRequest($usercode, $english);
-  }
-
-  /** @param mixed $default @return mixed */
-  public static function sessionValue(string $key, $default = null) {
-    self::startSession();
-    return $_SESSION[$key] ?? $default;
   }
 
   private static function isHttps(): bool {
@@ -252,6 +246,54 @@ final class AdminAuth {
 
   private static function clear(): void {
     unset($_SESSION[self::SESSION_FINGERPRINT], $_SESSION[self::SESSION_LAST_ACTIVITY]);
+    // 管理者権限から得たMisskey認可は、ログアウト・期限切れ・パス変更と同時に失効する。
+    // 投稿者パスワードで得た認可は、管理者セッションに依存しない。
+    $grant = $_SESSION['misskey_authorized_post'] ?? null;
+    if (is_array($grant) && ($grant['role'] ?? null) !== 'owner') {
+      unset($_SESSION['misskey_authorized_post'], $_SESSION['misskey_note_data'],
+        $_SESSION['sns_api_val'], $_SESSION['sns_api_session_id']);
+    }
+  }
+}
+
+/** プレビュー計算回数をIP単位で記録する。入力値は保存しない。 */
+final class TripPreviewRateLimiter {
+  public function __construct(private string $directory, private string $secret) {}
+
+  /** 許可時は0、制限時は次の計算までの秒数を返す。 */
+  public function consume(string $ip, ?int $now = null): int {
+    $now = $now ?? time();
+    $path = $this->directory . '/trip-preview-limits.json';
+    $handle = @fopen($path, 'c+');
+    if ($handle === false) throw new RuntimeException('Failed to open preview limit record.');
+    @chmod($path, Config::int('permissions.private_file'));
+    try {
+      if (!flock($handle, LOCK_EX)) throw new RuntimeException('Failed to lock preview limit record.');
+      $json = stream_get_contents($handle, 1048576);
+      $records = is_string($json) ? json_decode($json, true) : null;
+      $records = is_array($records) ? $records : [];
+      // 期限切れIPを毎回取り除き、記録サイズにも上限を設ける。
+      foreach ($records as $key => $record) {
+        if (!is_array($record) || (int)($record['until'] ?? 0) <= $now) unset($records[$key]);
+      }
+      $key = hash_hmac('sha256', $ip !== '' ? $ip : 'unknown', $this->secret);
+      $record = $records[$key] ?? null;
+      if ($record === null) {
+        if (count($records) >= 4096) return 60;
+        $record = ['until' => $now + 60, 'count' => 0];
+      }
+      if ((int)$record['count'] >= 60) return max(1, (int)$record['until'] - $now);
+      $record['count']++;
+      $records[$key] = $record;
+      $encoded = json_encode($records, JSON_THROW_ON_ERROR);
+      rewind($handle);
+      if (!ftruncate($handle, 0) || fwrite($handle, $encoded) !== strlen($encoded) || !fflush($handle)) {
+        throw new RuntimeException('Failed to write preview limit record.');
+      }
+      return 0;
+    } finally {
+      fclose($handle);
+    }
   }
 }
 
