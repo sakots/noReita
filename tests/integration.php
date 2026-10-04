@@ -1669,6 +1669,20 @@ PHP;
       && is_array($api) && ($api['thread']['image']['alt'] ?? '') === $edited_image_alt;
   });
 
+  $misskey_sensitive_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/connect_misskey_api.php';
+RequestSecurity::startSession();
+$post = connect_misskey_api::validatePostingSession(new MisskeyApiContext(true, ''));
+$fields = connect_misskey_api::uploadFields('probe-token', __DIR__ . '/img/' . $post['picfile'],
+  (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
+$update = connect_misskey_api::updateFields('probe-token', 'probe-file', (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
+header('Content-Type: application/json');
+echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'], 'upload' => $fields['isSensitive'],
+  'upload_comment' => $fields['comment'] ?? null, 'update_comment' => $update['comment'] ?? null]);
+PHP;
+  file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
+
   // DBから取得した画像説明が、両テーマのMisskey確認・設定画面まで届くことを検証する。
   $misskey_alt_original_config = (string)file_get_contents($webroot . '/config.local.php');
   try {
@@ -1679,6 +1693,7 @@ PHP;
         throw new RuntimeException('Could not select the Misskey alt test theme.');
       }
       $misskey_alt_results = [];
+      $misskey_alt_upload_results = [];
       foreach ([$edited_image_alt, '0', ''] as $misskey_alt_description) {
         $db->prepare('UPDATE board_log SET image_alt = ? WHERE tid = ?')
           ->execute([$misskey_alt_description, $image_post_id]);
@@ -1695,9 +1710,19 @@ PHP;
         $misskey_alt_results[] = $misskey_alt_before_status === 200 && $misskey_alt_form_status === 200
           && str_contains($misskey_alt_before_body, $misskey_alt_expected)
           && str_contains($misskey_alt_form_body, $misskey_alt_expected);
+        [$misskey_alt_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar,
+          ['no' => (string)$image_post_id, 'token' => $token, 'image_alt' => 'forged-description',
+            'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1']);
+        [$misskey_alt_payload_status, $misskey_alt_payload_body] = http_request($origin_url . '/misskey-sensitive-probe.php', $cookie_jar);
+        $misskey_alt_payload = json_decode($misskey_alt_payload_body, true);
+        $misskey_alt_upload_results[] = $misskey_alt_pending_status === 400 && $misskey_alt_payload_status === 200
+          && ($misskey_alt_payload['upload_comment'] ?? null) === $misskey_alt_description
+          && ($misskey_alt_payload['update_comment'] ?? null) === $misskey_alt_description;
       }
       integration_test('Misskey screens use escaped image alt and fall back to subject: ' . $misskey_alt_theme,
         static fn (): bool => !in_array(false, $misskey_alt_results, true));
+      integration_test('Misskey upload and update payloads use unescaped DB image alt: ' . $misskey_alt_theme,
+        static fn (): bool => !in_array(false, $misskey_alt_upload_results, true));
     }
   } finally {
     $db->prepare('UPDATE board_log SET image_alt = ? WHERE tid = ?')->execute([$edited_image_alt, $image_post_id]);
@@ -1706,16 +1731,6 @@ PHP;
     }
   }
 
-  $misskey_sensitive_probe = <<<'PHP'
-<?php
-require_once __DIR__ . '/connect_misskey_api.php';
-RequestSecurity::startSession();
-$post = connect_misskey_api::validatePostingSession(new MisskeyApiContext(true, ''));
-$fields = connect_misskey_api::uploadFields('probe-token', __DIR__ . '/img/' . $post['picfile'], (bool)$_SESSION['sns_api_val'][4]);
-header('Content-Type: application/json');
-echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'], 'upload' => $fields['isSensitive']]);
-PHP;
-  file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
   $sensitive_original_config = (string)file_get_contents($webroot . '/config.local.php');
   $sensitive_original_nsfw = $db->query('SELECT nsfw FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
   try {

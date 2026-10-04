@@ -172,11 +172,22 @@ class connect_misskey_api{
 	}
 
 	/** multipartの真偽値は、Misskeyが解釈できる文字列で送る。 */
-	public static function uploadFields(string $access_token, string $image_path, bool $sensitive): array {
+	public static function uploadFields(string $access_token, string $image_path, bool $sensitive, string $description): array {
 		return [
 			'i' => $access_token,
 			'file' => new CURLFile($image_path),
 			'isSensitive' => $sensitive ? 'true' : 'false',
+			'comment' => $description,
+		];
+	}
+
+	/** 画像説明はHTMLではなく、Misskeyの画像情報として元の文字列を渡す。 */
+	public static function updateFields(string $access_token, string $file_id, bool $sensitive, string $description): array {
+		return [
+			'i' => $access_token,
+			'fileId' => $file_id,
+			'isSensitive' => $sensitive,
+			'comment' => $description,
 		];
 	}
 
@@ -210,7 +221,7 @@ class connect_misskey_api{
 		};
 
 		$uploadUrl = $baseUrl . "/api/drive/files/create";
-		$uploadFields = self::uploadFields($accessToken, $imagePath, $hide_thumbnail);
+		$uploadFields = self::uploadFields($accessToken, $imagePath, $hide_thumbnail, (string)$post['image_alt']);
 		$uploadCurl = curl_init();
 		if (!self::applySecurity($uploadCurl, $baseUrl, 30)) {
 			misskey_api_error(
@@ -263,11 +274,7 @@ class connect_misskey_api{
 		$updateHeaders = array(
 			'Content-Type: application/json'
 		);
-		$updateData = array(
-			'i' => $accessToken,
-			'fileId' => $fileId,
-			'isSensitive' => (bool)($hide_thumbnail),
-		);
+		$updateData = self::updateFields($accessToken, $fileId, $hide_thumbnail, (string)$post['image_alt']);
 
 		$updateCurl = curl_init();
 		if (!self::applySecurity($updateCurl, $baseUrl)) {
@@ -282,6 +289,7 @@ class connect_misskey_api{
 		curl_setopt($updateCurl, CURLOPT_HTTPHEADER, $updateHeaders);
 		curl_setopt($updateCurl, CURLOPT_POSTFIELDS, json_encode($updateData));
 		curl_setopt($updateCurl, CURLOPT_RETURNTRANSFER, true);
+		self::validatePostingSession($context);
 		$updateResponse = curl_exec($updateCurl);
 		$updateStatusCode = curl_getinfo($updateCurl, CURLINFO_HTTP_CODE);
 		$updateCurlError = curl_error($updateCurl);

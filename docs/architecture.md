@@ -94,6 +94,8 @@ Misskeyへのノートは、`features.misskey_note`が有効な場合だけ利�
 
 Misskey連携の確認画面と投稿設定画面でも、DBの`image_alt`を画像の代替テキストに使います。説明が空の場合は件名へ戻し、両テーマで属性値をHTMLエスケープします。
 
+共有先にもDBの`image_alt`を画像説明として渡します。Misskeyの画像アップロード・アップロード後の更新の両方で`comment`へ元の文字列を送信し、画面表示用のHTMLエスケープは行いません。説明が「0」でも保持し、空欄は空文字列として送信します。フォームからの画像説明は信用せず、送信直前に認可を再確認したDB値を使います。
+
 Misskey連携画面の本文は、DBのプレーンテキストを両テーマでHTMLエスケープして表示します。改行はCSSの`white-space: pre-wrap`で維持し、本文のHTMLタグは実行しません。投稿用のtextareaには元の本文を渡し、表示用HTMLを混ぜません。
 
 Misskey共有のセンシティブ指定は、DBの`nsfw`と共有フォームの指定のどちらかが有効なら有効になります。NSFW投稿のチェック欄は選択済み・変更不可とし、フォーム値の省略やNSFW機能の無効化でも通常画像扱いにはしません。通常投稿は共有時にセンシティブ指定を追加できます。[Misskey公式API実装](https://github.com/misskey-dev/misskey/blob/develop/packages/backend/src/server/api/endpoints/drive/files/create.ts)に合わせ、画像の初回アップロードから`isSensitive`を指定し、アップロード後の更新にも同じ設定を使います。
