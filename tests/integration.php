@@ -259,8 +259,16 @@ PHP;
   }
   $misskey_missing_image_probe = <<<'PHP'
 <?php
+define('DB_FILE', __DIR__ . '/misskey-missing-image-probe.db');
 require_once __DIR__ . '/connect_misskey_api.php';
 RequestSecurity::startSession();
+$db = Database::connect();
+(new DatabaseMigrator($db, DB_FILE, __DIR__ . '/backup'))->migrate();
+$db->exec("DELETE FROM board_log");
+$db->prepare('INSERT INTO board_log (tid, picfile, pwd, invz, nsfw) VALUES (1, ?, ?, 0, 0)')
+  ->execute(['missing-probe.png', password_hash('probe-owner-pass', PASSWORD_DEFAULT)]);
+$_SESSION['usercode'] = 'probe-usercode';
+MisskeyPostAuthorization::remember(MisskeyPostAuthorization::authorize(1, 'probe-owner-pass'), 'probe-usercode');
 $_SESSION['accessToken'] = 'misskey-probe-token';
 $_SESSION['sns_api_val'] = ['', 'missing-probe.png', '', 0, false, 1, false, ''];
 $context = new MisskeyApiContext(true, 'https://misskey.io');
@@ -981,6 +989,11 @@ PHP;
       } elseif ($misskey_revocation === 'password changed') {
         file_put_contents($webroot . '/config.local.php', str_replace('integration-admin-pass', 'changed-admin-pass', $misskey_enabled_config));
       } else {
+        if ($misskey_revocation === 'owner logout') {
+          http_request($base_url . '?mode=admin_login', $grant_cookies,
+            ['adminpass' => 'integration-admin-pass', 'token' => $grant_token]);
+          $grant_token = hash('sha256', (string)cookie_value($grant_cookies, 'noreita_session'));
+        }
         http_request($base_url . '?mode=admin_logout', $grant_cookies, ['token' => $grant_token]);
       }
       if ($misskey_revocation !== 'owner logout') {
@@ -1008,6 +1021,64 @@ PHP;
       }
     } finally {
       file_put_contents($webroot . '/config.local.php', $misskey_enabled_config);
+    }
+  }
+
+  $misskey_send_probe = <<<'PHP'
+<?php
+require_once __DIR__ . '/connect_misskey_api.php';
+RequestSecurity::startSession();
+$_SESSION['accessToken'] = 'misskey-probe-token';
+if (($_GET['forge_image'] ?? '') === '1') $_SESSION['sns_api_val'][1] = 'other-image.png';
+if (($_GET['callback'] ?? '') === '1') {
+  $_SESSION['sns_api_session_id'] = 'probe-state';
+  $_SESSION['misskey_server_radio'] = 'https://127.0.0.1';
+  connect_misskey_api_dispatch();
+  exit;
+}
+connect_misskey_api::create_misskey_note(new MisskeyApiContext(true, 'https://127.0.0.1'));
+PHP;
+  file_put_contents($webroot . '/misskey-send-probe.php', $misskey_send_probe);
+  foreach (['unchanged', 'deleted', 'image replaced', 'visibility changed', 'NSFW changed',
+    'password changed', 'comment changed', 'forged image', 'callback deleted'] as $send_case) {
+    $send_columns = array_values(array_filter(
+      $animation_db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1),
+      static fn (string $column): bool => $column !== 'tid'
+    ));
+    $animation_db->exec('INSERT INTO board_log (' . implode(',', $send_columns) . ') SELECT '
+      . implode(',', $send_columns) . ' FROM board_log WHERE tid = ' . (int)$misskey_post['tid']);
+    $send_post_id = (int)$animation_db->lastInsertId();
+    try {
+      $send_cookies = $root . '/misskey-send-' . str_replace(' ', '-', $send_case) . '.txt';
+      http_request($base_url, $send_cookies);
+      $send_token = hash('sha256', (string)cookie_value($send_cookies, 'noreita_session'));
+      [$send_form_status] = http_request($base_url . '?mode=misskey_note_edit_form', $send_cookies,
+        ['no' => (string)$send_post_id, 'pwd' => 'misskey-owner-pass', 'token' => $send_token]);
+      [$send_pending_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $send_cookies,
+        ['no' => (string)$send_post_id, 'token' => $send_token,
+          'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1']);
+      $send_mutations = [
+        'deleted' => 'DELETE FROM board_log WHERE tid = ?',
+        'callback deleted' => 'DELETE FROM board_log WHERE tid = ?',
+        'image replaced' => "UPDATE board_log SET picfile = 'other-image.png' WHERE tid = ?",
+        'visibility changed' => 'UPDATE board_log SET invz = 0 WHERE tid = ?',
+        'NSFW changed' => 'UPDATE board_log SET nsfw = 1 WHERE tid = ?',
+        'password changed' => "UPDATE board_log SET pwd = 'revoked-password-hash' WHERE tid = ?",
+        'comment changed' => "UPDATE board_log SET com = 'changed content' WHERE tid = ?",
+      ];
+      if (isset($send_mutations[$send_case])) $animation_db->prepare($send_mutations[$send_case])->execute([$send_post_id]);
+      [$send_status, $send_body] = http_request($origin_url . '/misskey-send-probe.php'
+        . ($send_case === 'forged image' ? '?forge_image=1' : ($send_case === 'callback deleted' ? '?callback=1' : '')), $send_cookies);
+      integration_test('Misskey revalidates posts before sending: ' . $send_case, static function () use (
+        $send_case, $send_form_status, $send_pending_status, $send_status, $send_body
+      ): bool {
+        return $send_form_status === 200 && $send_pending_status === 400
+          && ($send_case === 'unchanged'
+            ? $send_status === 400 && $send_body === 'Error: Invalid Misskey server.'
+            : $send_status === 403 && $send_body === 'Error: Post authorization is required.');
+      });
+    } finally {
+      $animation_db->prepare('DELETE FROM board_log WHERE tid = ?')->execute([$send_post_id]);
     }
   }
 

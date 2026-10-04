@@ -52,68 +52,7 @@ function get_post_from_db(int $no, ApplicationContext $context): ?array {
   return null;
 }
 
-/** Misskey連携で使う投稿認可を、フォーム値と切り離して管理する。 */
-final class MisskeyPostAuthorization {
-  private const SESSION_KEY = 'misskey_authorized_post';
-
-  public static function assertFeatureEnabled(ApplicationContext $context): void {
-    if (!Config::bool('features.misskey_note')) {
-      render_error($context, $context->english ? 'Misskey sharing is disabled.' : 'Misskey連携は無効です。', 404);
-    }
-  }
-
-  public static function isAdministrator(): bool {
-    return AdminAuth::isAuthenticated(
-      Config::string('admin.password'), Config::int('admin.session_lifetime')
-    );
-  }
-
-  /** @return array<string,mixed>|null */
-  public static function authorize(int $post_id, string $password): ?array {
-    try {
-      $service = new PostService(new BoardRepository(), Config::string('paths.images'));
-      return $service->authorize($post_id, $password, self::isAdministrator())['post'];
-    } catch (PostNotFoundException|PostAuthorizationException) {
-      return null;
-    }
-  }
-
-  /** @param array<string,mixed> $post */
-  public static function remember(array $post, ApplicationContext $context): void {
-    RequestSecurity::startSession();
-    $role = self::isAdministrator() ? 'admin' : 'owner';
-    // 別の投稿の認可で、以前の送信待ちデータを引き継がない。
-    unset($_SESSION['misskey_note_data'], $_SESSION['sns_api_val'], $_SESSION['sns_api_session_id']);
-    $_SESSION[self::SESSION_KEY] = [
-      'tid' => (int)$post['tid'],
-      'picfile' => (string)$post['picfile'],
-      'usercode' => $context->usercode,
-      'role' => $role,
-    ];
-  }
-
-  /** @return array<string,mixed>|null */
-  public static function authorizedPost(int $post_id, ApplicationContext $context): ?array {
-    RequestSecurity::startSession();
-    $grant = $_SESSION[self::SESSION_KEY] ?? null;
-    // 管理者による認可は、現在も有効な管理者セッションに限る。
-    if (!is_array($grant) || !in_array($grant['role'] ?? null, ['admin', 'owner'], true)
-      || ($grant['role'] === 'admin' && !self::isAdministrator())) {
-      return null;
-    }
-    if ((int)($grant['tid'] ?? 0) !== $post_id
-      || !is_string($grant['usercode'] ?? null)
-      || !hash_equals($context->usercode, $grant['usercode'])) {
-      return null;
-    }
-    $post = (new BoardRepository())->findPost($post_id);
-    if (!is_array($post) || !hash_equals((string)($grant['picfile'] ?? ''), (string)$post['picfile'])) {
-      unset($_SESSION[self::SESSION_KEY]);
-      return null;
-    }
-    return $post;
-  }
-}
+require_once __DIR__ . '/misskey_post_authorization.inc.php';
 
 class misskey_note {
 
@@ -194,11 +133,11 @@ class misskey_note {
       render_error($context, $en ? 'Invalid post number.' : '投稿番号が無効です。');
     }
 
-    $post = MisskeyPostAuthorization::authorize((int)$no, $pwd);
-    if ($post === null) {
+    $authorization = MisskeyPostAuthorization::authorize((int)$no, $pwd);
+    if ($authorization === null) {
       render_error($context, $en ? 'Password is incorrect.' : 'パスワードが違います。', 403);
     }
-    MisskeyPostAuthorization::remember($post, $context);
+    MisskeyPostAuthorization::remember($authorization, $context->usercode);
 
     check_AsyncRequest();
 
@@ -247,7 +186,7 @@ class misskey_note {
     $hide_content = (bool)filter_input_data('POST', 'hide_content', FILTER_VALIDATE_BOOLEAN);
     $cw = t(filter_input_data('POST', 'cw'));
 
-    $post = $no ? MisskeyPostAuthorization::authorizedPost((int)$no, $context) : null;
+    $post = $no ? MisskeyPostAuthorization::authorizedPost((int)$no, $context->usercode) : null;
     if ($post === null) {
       render_error($context, $en ? 'Post authorization is required.' : '投稿者認証が必要です。', 403);
       return;

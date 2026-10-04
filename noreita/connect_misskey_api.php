@@ -21,6 +21,9 @@ if (!class_exists('Database', false)) {
 
 const CONNECT_MISSKEY_API_VER = 20261004;
 
+require_once __DIR__ . '/misskey_post_authorization.inc.php';
+require_once __DIR__ . '/image.inc.php';
+
 final class MisskeyApiContext {
   public function __construct(
     public readonly bool $english,
@@ -135,6 +138,39 @@ class connect_misskey_api{
 		self::create_misskey_note($context);
 	}
 
+	/**
+	 * 外部認証の前後と実際の送信直前に、同じ投稿・画像・認可を確認する。
+	 * @return array<string,mixed>
+	 */
+	public static function validatePostingSession(MisskeyApiContext $context): array {
+		$en = $context->english;
+		$values = $_SESSION['sns_api_val'] ?? null;
+		if (!is_array($values) || !array_is_list($values) || count($values) !== 8) {
+			misskey_api_error(
+				$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
+				400, 'Misskey posting session data had an invalid structure.'
+			);
+		}
+		foreach ($values as $value) {
+			if (!is_scalar($value) && $value !== null) {
+				misskey_api_error(
+					$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
+					400, 'Misskey posting session data contained a non-scalar value.'
+				);
+			}
+		}
+		$post = MisskeyPostAuthorization::authorizedPost((int)$values[5], (string)($_SESSION['usercode'] ?? ''));
+		if ($post === null || !hash_equals((string)$post['picfile'], (string)$values[1])
+			|| !ImageService::isSafePostedImageFilename((string)$post['picfile'])) {
+			MisskeyPostAuthorization::forget();
+			misskey_api_error(
+				$en ? 'Post authorization is required.' : '投稿者認証が必要です。',
+				403, 'Misskey posting authorization was missing or the post had changed.'
+			);
+		}
+		return $post;
+	}
+
 	public static function create_misskey_note(MisskeyApiContext $context): void {
 		$en = $context->english;
 		$baseUrl = $context->baseUrl;
@@ -148,26 +184,9 @@ class connect_misskey_api{
 			);
 		}
 
-		$sns_api_values = $_SESSION['sns_api_val'] ?? null;
-		if (!is_array($sns_api_values) || !array_is_list($sns_api_values) || count($sns_api_values) !== 8) {
-			misskey_api_error(
-				$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
-				400,
-				'Misskey posting session data had an invalid structure.'
-			);
-		}
-		list($com,$src_image,$tool,$painttime,$hide_thumbnail,$no,$article_url_link,$cw) = $sns_api_values;
-		foreach ([$com, $src_image, $tool, $painttime, $hide_thumbnail, $no, $article_url_link, $cw] as $value) {
-			if (!is_scalar($value) && $value !== null) {
-				misskey_api_error(
-					$en ? 'Invalid posting session.' : '投稿セッションが不正です。',
-					400,
-					'Misskey posting session data contained a non-scalar value.'
-				);
-			}
-		}
-
-		$src_image=basename($src_image);
+		$post = self::validatePostingSession($context);
+		list($com,$src_image,$tool,$painttime,$hide_thumbnail,$no,$article_url_link,$cw) = $_SESSION['sns_api_val'];
+		$src_image = (string)$post['picfile'];
 
 		// 画像のアップロード
 		$imagePath = __DIR__.'/'.Config::string('paths.images').$src_image;
@@ -198,6 +217,7 @@ class connect_misskey_api{
 		curl_setopt($uploadCurl, CURLOPT_POSTFIELDS, $uploadFields);
 		curl_setopt($uploadCurl, CURLOPT_RETURNTRANSFER, true);
 
+		self::validatePostingSession($context);
 		$uploadResponse = curl_exec($uploadCurl);
 		$uploadStatusCode = curl_getinfo($uploadCurl, CURLINFO_HTTP_CODE);
 		$curlError = curl_error($uploadCurl);
@@ -317,6 +337,7 @@ class connect_misskey_api{
 		curl_setopt($postCurl, CURLOPT_HTTPHEADER, $postHeaders);
 		curl_setopt($postCurl, CURLOPT_POSTFIELDS, json_encode($postData));
 		curl_setopt($postCurl, CURLOPT_RETURNTRANSFER, true);
+		self::validatePostingSession($context);
 		$postResponse = curl_exec($postCurl);
 		$postStatusCode = curl_getinfo($postCurl, CURLINFO_HTTP_CODE);
 		$postCurlError = curl_error($postCurl);
@@ -370,9 +391,9 @@ function connect_misskey_api_dispatch(): void {
 		);
 	}
 
-		// 外部認証から戻る間に管理者認証が失効していれば、送信待ちデータも破棄する。
-		AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'));
-		if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
+	// 外部認証から戻る間に管理者認証が失効していれば、送信待ちデータも破棄する。
+	AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'));
+	if((!isset($_SESSION['sns_api_session_id'])) || (!isset($_SESSION['sns_api_val']))) {
 		misskey_api_error(
 			$en ? 'The Misskey posting session is missing.' : 'セッションがありません。Misskey投稿フローが正しく動作していません。',
 			400,
@@ -380,15 +401,8 @@ function connect_misskey_api_dispatch(): void {
 		);
 	};
 
-		$grant = $_SESSION['misskey_authorized_post'] ?? null;
-		if (!is_array($grant) || !in_array($grant['role'] ?? null, ['admin', 'owner'], true)) {
-			misskey_api_error(
-				$en ? 'Post authorization is required.' : '投稿者認証が必要です。',
-				403,
-				'Misskey callback had no valid post authorization.'
-			);
-		}
-		$baseUrl = MisskeyServerSecurity::normalizeBaseUrl(
+	connect_misskey_api::validatePostingSession($context);
+	$baseUrl = MisskeyServerSecurity::normalizeBaseUrl(
 		(string)($_SESSION['misskey_server_radio'] ?? '')
 	);
 	if($baseUrl === false){
