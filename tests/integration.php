@@ -1768,6 +1768,7 @@ header('Content-Type: application/json');
 echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'], 'upload' => $fields['isSensitive'],
   'force' => $fields['force'] ?? null,
   'note_cw' => $note['cw'],
+  'note_text' => $note['text'] ?? null,
   'upload_comment' => $fields['comment'] ?? null, 'update_comment' => $update['comment'] ?? null]);
 PHP;
   file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
@@ -1938,6 +1939,32 @@ PHP;
               && ($cw_error !== null ? str_contains($cw_body, $cw_error)
                 : is_array($cw_payload) && array_key_exists('note_cw', $cw_payload) && $cw_payload['note_cw'] === $cw_expected);
           });
+      }
+      foreach ([
+        'missing' => [null, null, false],
+        'empty' => ['', null, false],
+        'normal' => ['共有本文 & "引用"', '共有本文 & "引用"', false],
+        'zero' => ['0', '0', false],
+        'array' => [['invalid'], null, true],
+        'invalid UTF-8' => ["\xff", null, true],
+      ] as $comment_case => [$comment_input, $comment_expected, $comment_invalid]) {
+        http_request($base_url . '?mode=misskey_note_edit_form', $cookie_jar,
+          ['no' => (string)$image_post_id, 'pwd' => 'image-pass', 'token' => $token]);
+        $comment_request = ['no' => (string)$image_post_id, 'token' => $token,
+          'misskey_server_radio' => 'direct', 'misskey_server_direct_input' => 'https://127.0.0.1'];
+        if ($comment_input !== null) $comment_request['com'] = $comment_input;
+        [$comment_status, $comment_body] = http_request($base_url . '?mode=create_misskey_note_sessiondata',
+          $cookie_jar, $comment_request);
+        $comment_payload = null;
+        if (!$comment_invalid) {
+          [$comment_probe_status, $comment_probe_body] = http_request($origin_url . '/misskey-sensitive-probe.php', $cookie_jar);
+          $comment_payload = json_decode($comment_probe_body, true);
+        }
+        integration_test('Misskey validates sharing comment input: ' . $cw_theme . '/' . $comment_case,
+          static fn (): bool => $comment_status === 400 && !str_contains($comment_body, 'TypeError')
+            && ($comment_invalid ? str_contains($comment_body, 'Invalid sharing comment.')
+              : is_array($comment_payload) && array_key_exists('note_text', $comment_payload)
+                && $comment_payload['note_text'] === $comment_expected));
       }
     }
   } finally {

@@ -182,7 +182,12 @@ class misskey_note {
     }
 
     $no = filter_input_data('POST', 'no', FILTER_VALIDATE_INT);
-    $com = t(filter_input_data('POST', 'com'));
+    $com_input = filter_input_data('POST', 'com');
+    // 型付き関数へ渡す前に検証し、配列や不正な文字コードを入力エラーとして扱う。
+    if ($com_input !== null && (!is_string($com_input) || !mb_check_encoding($com_input, 'UTF-8'))) {
+      render_error($context, $en ? 'Invalid sharing comment.' : '共有本文の入力が不正です。', 400);
+    }
+    $com = t($com_input);
     $hide_thumbnail = (bool)filter_input_data('POST', 'hide_thumbnail', FILTER_VALIDATE_BOOLEAN);
     $show_painttime = (bool)filter_input_data('POST', 'show_painttime', FILTER_VALIDATE_BOOLEAN);
     $article_url_link = (bool)filter_input_data('POST', 'article_url_link', FILTER_VALIDATE_BOOLEAN);
