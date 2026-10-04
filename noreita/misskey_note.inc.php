@@ -320,39 +320,15 @@ class misskey_note {
     $_SESSION['misskey_server_radio'] = $baseUrl_to_set_in_session;
 
     //アプリを認証するためのURL
-    $Location = "{$baseUrl_to_set_in_session}/miauth/{$sns_api_session_id}?name=noReita&callback={$encoded_root_url}connect_misskey_api.php&permission=write:notes,write:drive";
+    $Location = "{$baseUrl_to_set_in_session}/miauth/{$sns_api_session_id}?name=noReita&callback={$encoded_root_url}connect_misskey_api.php&permission=read:account,write:notes,write:drive";
 
-    if (isset($_SESSION['accessToken'])) { //SESSIONのトークンが有効か確認
-      // ダミーの投稿を試みる（textフィールドを空にする）
-      $postUrl = "{$baseUrl_to_set_in_session}/api/notes/create";
-      $postData = array(
-        'i' => $_SESSION['accessToken'],
-        'text' => '', // 投稿を成功させないようにするためtextフィールドを空にする
-      );
-
-      $postCurl = curl_init();
-      $security_options = MisskeyServerSecurity::curlOptions($baseUrl_to_set_in_session);
-      $safe_curl = $postCurl !== false && is_array($security_options)
-        && curl_setopt_array($postCurl, $security_options);
-      if (!$safe_curl) {
-        unset($_SESSION['accessToken']);
-      } else {
-        curl_setopt($postCurl, CURLOPT_URL, $postUrl);
-        curl_setopt($postCurl, CURLOPT_POST, true);
-        curl_setopt($postCurl, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-        curl_setopt($postCurl, CURLOPT_POSTFIELDS, json_encode($postData));
-        curl_setopt($postCurl, CURLOPT_RETURNTRANSFER, true);
-      }
-      $postResponse = $safe_curl ? curl_exec($postCurl) : false;
-      $postStatusCode = $safe_curl ? (int)curl_getinfo($postCurl, CURLINFO_HTTP_CODE) : 0;
-      if ($postCurl !== false) curl_close($postCurl);
-
-      // HTTPステータスコードが403の時は、トークン不一致と判断しアプリを認証
-      if ($postStatusCode === 403 || $postResponse === false) {
-        unset($_SESSION['accessToken']); //トークンをクリア
-      } elseif (in_array($postStatusCode, [200, 204], true)) {
-        //アプリの認証をスキップするURL
+    if (isset($_SESSION['accessToken'])) {
+      // アカウント取得に成功したトークンだけ再利用する。権限不足・失効・通信失敗時は再認証する。
+      if (is_string($_SESSION['accessToken'])
+        && MisskeyTokenVerifier::isValid($baseUrl_to_set_in_session, $_SESSION['accessToken'])) {
         $Location = Config::string('site.base_url') . "connect_misskey_api.php?skip_auth_check=on&s_id={$sns_api_session_id}";
+      } else {
+        unset($_SESSION['accessToken']);
       }
     }
 

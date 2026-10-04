@@ -2385,6 +2385,36 @@ smoke_test('external link previews parse cached OGP metadata without fetching in
   }
 });
 
+smoke_test('Misskey cached tokens are checked without creating a note', static function (): bool {
+  $source = file_get_contents(dirname(__DIR__) . '/noreita/misskey_note.inc.php');
+  return is_string($source)
+    && str_contains($source, 'permission=read:account,write:notes,write:drive')
+    && str_contains($source, 'MisskeyTokenVerifier::isValid(')
+    && !str_contains($source, '/api/notes/create');
+});
+
+foreach ([
+  'valid account' => [200, '{"id":"account-id","username":"test"}', true],
+  'unauthorized' => [401, '{"error":{"code":"AUTHENTICATION_FAILED"}}', false],
+  'missing permission' => [403, '{"error":{"code":"PERMISSION_DENIED"}}', false],
+  'server error' => [500, '{"id":"account-id"}', false],
+  'transport error' => [0, false, false],
+  'empty response' => [204, '', false],
+  'invalid JSON' => [200, '<html>error</html>', false],
+  'API error' => [200, '{"error":{"code":"ERROR"}}', false],
+  'empty account ID' => [200, '{"id":""}', false],
+  'invalid account ID' => [200, '{"id":[]}', false],
+] as $case => [$status, $response, $expected]) {
+  smoke_test('Misskey cached token response: ' . $case, static fn (): bool =>
+    MisskeyTokenVerifier::isValidResponse($status, $response) === $expected);
+}
+
+smoke_test('Misskey token verification rejects unsafe servers and empty tokens', static function (): bool {
+  return !MisskeyTokenVerifier::isValid('https://127.0.0.1', 'test-token')
+    && !MisskeyTokenVerifier::isValid('https://localhost', 'test-token')
+    && !MisskeyTokenVerifier::isValid('https://example.com', '');
+});
+
 smoke_test('Misskey server URLs reject SSRF destinations', static function (): bool {
   return MisskeyServerSecurity::resolvePublicIp('127.0.0.1') === false
     && MisskeyServerSecurity::resolvePublicIp('169.254.169.254') === false

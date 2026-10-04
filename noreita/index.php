@@ -77,7 +77,7 @@ if(!defined('SHARE_INC_VER') || SHARE_INC_VER < 20260725) {
 // misskey_security.inc
 check_file(__DIR__.'/misskey_security.inc.php', $en);
 require_once(__DIR__.'/misskey_security.inc.php');
-if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20260816) {
+if(!defined('MISSKEY_SECURITY_VER') || MISSKEY_SECURITY_VER < 20261004) {
   die($en ? 'Please update misskey_security.inc.php to the latest version.' : 'misskey_security.inc.phpを最新版に更新してください。');
 }
 
