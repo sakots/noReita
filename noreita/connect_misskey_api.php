@@ -54,6 +54,8 @@ function misskey_api_error(
 
 // 認証チェック
 class connect_misskey_api{
+	private const MAX_NOTE_TEXT_LENGTH = 3000;
+
 	/** @param CurlHandle|resource|false $curl */
 	private static function applySecurity($curl, string $base_url, int $timeout = 15): bool {
 		if ($curl === false) return false;
@@ -193,6 +195,28 @@ class connect_misskey_api{
 		];
 	}
 
+	/** 描画情報・リンクを含む最終本文を、画像アップロード前に組み立てて検証する。 */
+	public static function prepareNoteText(MisskeyApiContext $context, string $comment, string $tool, string $painttime, string $article_url): string {
+		if (!mb_check_encoding($comment . $tool . $painttime . $article_url, 'UTF-8')) {
+			misskey_api_error(
+				$context->english ? 'Invalid Misskey note text.' : 'Misskey共有本文の文字コードが不正です。',
+				400, 'Misskey note text contained invalid UTF-8 before uploading.'
+			);
+		}
+		$comment = str_replace(["\r\n", "\r"], "\n", $comment);
+		$comment = $comment !== '' ? $comment . "\n" : '';
+		$comment = preg_replace('/(\s*\n){2,}/u', "\n", $comment);
+		$text = ($tool !== '' ? 'Tool:' . $tool . "\n" : '')
+			. ($painttime !== '' ? 'Paint time:' . $painttime . "\n" : '') . $comment . $article_url;
+		if (mb_strlen($text, 'UTF-8') > self::MAX_NOTE_TEXT_LENGTH) {
+			misskey_api_error(
+				$context->english ? 'Misskey note text must be 3000 characters or fewer.' : 'Misskey共有本文は描画情報・記事リンク・改行を含めて3000文字以内にしてください。',
+				400, 'Misskey note text exceeded the length limit before uploading.'
+			);
+		}
+		return $text;
+	}
+
 	/** 空の本文は送らず、画像だけのノートもMisskeyの入力検証を通す。 */
 	public static function noteFields(string $access_token, string $file_id, string $text, ?string $cw): array {
 		$fields = ['i' => $access_token, 'cw' => $cw, 'fileIds' => [$file_id]];
@@ -238,6 +262,12 @@ class connect_misskey_api{
 		list($com,$src_image,$tool,$painttime,$hide_thumbnail,$no,$article_url_link,$cw) = $_SESSION['sns_api_val'];
 		$src_image = (string)$post['picfile'];
 		$hide_thumbnail = (bool)$post['nsfw'] || (bool)$hide_thumbnail;
+		$src_image_filename = pathinfo($src_image, PATHINFO_FILENAME);
+		$thread_no = self::get_thread_no((int)$no);
+		$fixed_link = Config::string('site.base_url').'?mode=res&res='.$thread_no.'#'.$src_image_filename;
+		$fixed_link = filter_var($fixed_link, FILTER_VALIDATE_URL) ? $fixed_link : '';
+		$status = self::prepareNoteText($context, (string)$com, (string)$tool, (string)$painttime,
+			$article_url_link ? $fixed_link : '');
 
 		// 画像のアップロード
 		$imagePath = __DIR__.'/'.Config::string('paths.images').$src_image;
@@ -340,21 +370,6 @@ class connect_misskey_api{
 				'Misskey drive update returned HTTP ' . $updateStatusCode . ': ' . self::responseErrorDetail($updateResponseData)
 			);
 		}
-
-		$tool= $tool ? 'Tool:'.$tool."\n" :'';
-		$painttime= $painttime ? 'Paint time:'.$painttime."\n" :'';
-
-		$src_image_filename = pathinfo($src_image, PATHINFO_FILENAME );//拡張子除去
-
-		$thread_no = self::get_thread_no((int)$no);
-		$fixed_link = Config::string('site.base_url').'?mode=res&res='.$thread_no.'#'.$src_image_filename;
-		$fixed_link = filter_var($fixed_link,FILTER_VALIDATE_URL) ? $fixed_link : '';
-		$article_url_link = $article_url_link ? $fixed_link : '';
-		$com=str_replace(["\r\n","\r"],"\n",$com);
-		$com=$com !== '' ? $com."\n" :'';
-		$com = preg_replace("/(\s*\n){2,}/u","\n",$com); //不要改行カット
-
-		$status = $tool.$painttime.$com.$article_url_link;
 
 		$postUrl = $baseUrl . "/api/notes/create";
 		$postHeaders = array(

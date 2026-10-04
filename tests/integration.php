@@ -1030,6 +1030,12 @@ require_once __DIR__ . '/connect_misskey_api.php';
 RequestSecurity::startSession();
 $_SESSION['accessToken'] = 'misskey-probe-token';
 if (($_GET['forge_image'] ?? '') === '1') $_SESSION['sns_api_val'][1] = 'other-image.png';
+if (($_GET['long_text'] ?? '') === '1') {
+  $_SESSION['sns_api_val'][0] = str_repeat('あ', 3000);
+  $_SESSION['sns_api_val'][2] = '';
+  $_SESSION['sns_api_val'][3] = '';
+  $_SESSION['sns_api_val'][6] = false;
+}
 if (($_GET['submit_note'] ?? '') === '1') {
   // 到達しないループバックのポートで通信失敗を起こす。外部への投稿は行わない。
   $curl = curl_init('http://127.0.0.1:1');
@@ -1055,7 +1061,7 @@ connect_misskey_api::create_misskey_note(new MisskeyApiContext(true, 'https://12
 PHP;
   file_put_contents($webroot . '/misskey-send-probe.php', $misskey_send_probe);
   foreach (['unchanged', 'deleted', 'image replaced', 'visibility changed', 'NSFW changed',
-    'password changed', 'comment changed', 'forged image', 'callback deleted'] as $send_case) {
+    'password changed', 'comment changed', 'forged image', 'callback deleted', 'long note'] as $send_case) {
     $send_columns = array_values(array_filter(
       $animation_db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1),
       static fn (string $column): bool => $column !== 'tid'
@@ -1083,14 +1089,17 @@ PHP;
       ];
       if (isset($send_mutations[$send_case])) $animation_db->prepare($send_mutations[$send_case])->execute([$send_post_id]);
       [$send_status, $send_body] = http_request($origin_url . '/misskey-send-probe.php'
-        . ($send_case === 'forged image' ? '?forge_image=1' : ($send_case === 'callback deleted' ? '?callback=1' : '')), $send_cookies);
+        . ($send_case === 'forged image' ? '?forge_image=1' : ($send_case === 'callback deleted' ? '?callback=1'
+          : ($send_case === 'long note' ? '?long_text=1' : ''))), $send_cookies);
       integration_test('Misskey revalidates posts before sending: ' . $send_case, static function () use (
         $send_case, $send_form_status, $send_pending_status, $send_status, $send_body
       ): bool {
         return $send_form_status === 200 && $send_pending_status === 400
-          && ($send_case === 'unchanged'
+          && ($send_case === 'long note'
+            ? $send_status === 400 && str_contains($send_body, 'Misskey note text must be 3000 characters or fewer.')
+            : ($send_case === 'unchanged'
             ? $send_status === 400 && $send_body === 'Error: Invalid Misskey server.'
-            : $send_status === 403 && $send_body === 'Error: Post authorization is required.');
+            : $send_status === 403 && $send_body === 'Error: Post authorization is required.'));
       });
     } finally {
       $animation_db->prepare('DELETE FROM board_log WHERE tid = ?')->execute([$send_post_id]);
@@ -1742,6 +1751,14 @@ if (($_GET['note_fields'] ?? '') === '1') {
     (string)($_GET['text'] ?? ''), $_GET['cw'] ?? null));
   exit;
 }
+if (($_GET['prepare_text'] ?? '') === '1') {
+  $text = connect_misskey_api::prepareNoteText(new MisskeyApiContext(true, ''),
+    (string)($_POST['text'] ?? ''), (string)($_POST['tool'] ?? ''),
+    (string)($_POST['painttime'] ?? ''), (string)($_POST['article_url'] ?? ''));
+  header('Content-Type: application/json');
+  echo json_encode(['text' => $text]);
+  exit;
+}
 $post = connect_misskey_api::validatePostingSession(new MisskeyApiContext(true, ''));
 $fields = connect_misskey_api::uploadFields('probe-token', __DIR__ . '/img/' . $post['picfile'],
   (bool)$_SESSION['sns_api_val'][4], (string)$post['image_alt']);
@@ -1754,6 +1771,27 @@ echo json_encode(['pending' => $_SESSION['misskey_note_data']['hide_thumbnail'],
   'upload_comment' => $fields['comment'] ?? null, 'update_comment' => $update['comment'] ?? null]);
 PHP;
   file_put_contents($webroot . '/misskey-sensitive-probe.php', $misskey_sensitive_probe);
+
+  foreach ([
+    'image only' => ['', '', '', '', 200, ''],
+    'zero' => ['0', '', '', '', 200, "0\n"],
+    'Japanese boundary' => [str_repeat('あ', 2999), '', '', '', 200, str_repeat('あ', 2999) . "\n"],
+    'emoji boundary' => [str_repeat('😀', 2999), '', '', '', 200, str_repeat('😀', 2999) . "\n"],
+    'too long' => [str_repeat('あ', 3000), '', '', '', 400, null],
+    'tool pushes over limit' => [str_repeat('a', 2999), 'NEO', '', '', 400, null],
+    'paint time pushes over limit' => [str_repeat('a', 2999), '', '10min', '', 400, null],
+    'link pushes over limit' => [str_repeat('a', 2999), '', '', 'https://example.com/?resno=1', 400, null],
+    'normalized text' => ["本文\r\n\r\n続き", 'NEO', '10min', 'https://example.com/?resno=1', 200,
+      "Tool:NEO\nPaint time:10min\n本文\n続き\nhttps://example.com/?resno=1"],
+  ] as $text_case => [$text_comment, $text_tool, $text_painttime, $text_url, $text_expected_status, $text_expected]) {
+    [$text_status, $text_body] = http_request($origin_url . '/misskey-sensitive-probe.php?prepare_text=1', $cookie_jar,
+      ['text' => $text_comment, 'tool' => $text_tool, 'painttime' => $text_painttime, 'article_url' => $text_url]);
+    integration_test('Misskey validates final note text before uploading: ' . $text_case,
+      static fn (): bool => $text_status === $text_expected_status
+        && ($text_expected_status === 200
+          ? (json_decode($text_body, true)['text'] ?? null) === $text_expected
+          : str_contains($text_body, 'Misskey note text must be 3000 characters or fewer.')));
+  }
 
   foreach ([
     'image only' => ['', null],
