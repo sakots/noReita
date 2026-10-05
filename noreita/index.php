@@ -419,8 +419,7 @@ switch ($mode) {
     PaintController::continue($application_context); return;
   case 'contpaint':
     $type = filter_input(INPUT_POST, 'type');
-    if (Config::bool('features.continue_password') || $type === 'rep') usrchk($application_context);
-    PaintController::paint($application_context, $type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
+    PaintController::continuePainting($application_context, (string)$type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'picrep':
     PostController::replaceImage($application_context); return;
   case 'picrep_form':

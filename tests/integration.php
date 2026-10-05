@@ -2898,12 +2898,18 @@ PHP;
     return $unsupported_avif_rejected;
   });
 
-  $check_continuation = static function (string $theme, string $continue_url, string $continue_cookies) use ($webroot, $upload_row): void {
+  $check_continuation = static function (string $theme, string $continue_url, string $continue_cookies) use ($webroot, $upload_row, $pending_replacement_row): void {
     $continue_db = new PDO('sqlite:' . $webroot . '/reita.db');
     $continue_fixture = $continue_db->query('SELECT tid, picfile, pchfile, ctype, invz, image_alt FROM board_log WHERE picfile = '
       . $continue_db->quote((string)$upload_row['picfile']))->fetch(PDO::FETCH_ASSOC);
     $continue_animation = pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.pch';
     $continue_animation_path = $webroot . '/img/' . $continue_animation;
+    $continue_psd_path = $webroot . '/img/' . pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.psd';
+    $continue_chi = pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.chi';
+    $continue_chi_path = $webroot . '/img/' . $continue_chi;
+    $other_visible_id = (int)$continue_db->query('SELECT tid FROM board_log WHERE picfile = '
+      . $continue_db->quote((string)$pending_replacement_row['picfile']) . ' AND invz = 0')->fetchColumn();
+    if ($other_visible_id <= 0 || file_exists($continue_psd_path) || file_exists($continue_chi_path)) throw new RuntimeException('Could not prepare continuation POST fixtures.');
     if (file_exists($continue_animation_path)) throw new RuntimeException('Continuation fixture already has animation.');
     try {
       foreach ([['pch', false, false], ['spch', false, false], ['pch', true, true], ['img', true, false]] as [$stored_ctype, $has_animation, $expected_animation]) {
@@ -2922,6 +2928,51 @@ PHP;
               && str_contains($continue_body, '<option value="img"');
           }
         );
+      }
+      file_put_contents($continue_animation_path, 'NEO test replay');
+      file_put_contents($continue_psd_path, 'Klecks test layers');
+      $continue_db->prepare('UPDATE board_log SET pchfile = ? WHERE tid = ?')
+        ->execute([$continue_animation, $continue_fixture['tid']]);
+      $continue_request = [
+        'mode' => 'contpaint', 'type' => 'new', 'no' => (string)$continue_fixture['tid'],
+        'img' => $continue_fixture['picfile'], 'picw' => '300', 'pich' => '300', 'anime' => 'true',
+      ];
+      foreach (['img' => 'neo', 'pch' => 'neo', 'psd' => 'klecks'] as $source => $tool) {
+        $request = $continue_request + ['ctype' => $source, 'tools' => $tool];
+        if ($source === 'pch') $request['pch'] = $continue_animation;
+        [$direct_status, $direct_body] = http_request($continue_url, $continue_cookies, $request);
+        integration_test('visible continuation accepts direct POST: ' . $theme . '/' . $source,
+          static fn(): bool => $direct_status === 200
+            && str_contains($direct_body, 'img/' . ($source === 'pch' ? $continue_animation : $continue_fixture['picfile'])));
+      }
+      file_put_contents($continue_chi_path, 'ChickenPaint test layers');
+      $continue_db->prepare('UPDATE board_log SET pchfile = ? WHERE tid = ?')
+        ->execute([$continue_chi, $continue_fixture['tid']]);
+      [$chi_status, $chi_body] = http_request($continue_url, $continue_cookies,
+        $continue_request + ['ctype' => 'pch', 'tools' => 'chicken', 'pch' => $continue_chi]);
+      integration_test('visible continuation accepts ChickenPaint layers: ' . $theme,
+        static fn(): bool => $chi_status === 200 && str_contains($chi_body, 'img/' . $continue_chi));
+      $continue_db->prepare('UPDATE board_log SET pchfile = ? WHERE tid = ?')
+        ->execute([$continue_animation, $continue_fixture['tid']]);
+      $continue_db->prepare('UPDATE board_log SET invz = 1 WHERE tid = ?')->execute([$continue_fixture['tid']]);
+      foreach (['img', 'pch', 'psd', 'rep', 'missing number', 'forged number', 'forged replay'] as $attack) {
+        $request = $continue_request + ['ctype' => $attack === 'psd' ? 'psd' : 'img', 'tools' => $attack === 'psd' ? 'klecks' : 'neo'];
+        if ($attack === 'pch') { $request['ctype'] = 'pch'; $request['pch'] = $continue_animation; }
+        if ($attack === 'rep') { $request['type'] = 'rep'; $request['pwd'] = 'upload-delete-pass'; }
+        if ($attack === 'missing number') unset($request['no']);
+        if ($attack === 'forged number') $request['no'] = (string)$other_visible_id;
+        if ($attack === 'forged replay') {
+          $request['no'] = (string)$other_visible_id;
+          $request['img'] = (string)$pending_replacement_row['picfile'];
+          $request['ctype'] = 'pch'; $request['pch'] = $continue_animation;
+        }
+        foreach (['public' => dirname($webroot) . '/continue-direct-public-' . $theme . '.txt', 'administrator' => $continue_cookies] as $role => $cookies) {
+          [$direct_status, $direct_body] = http_request($continue_url, $cookies, $request);
+          integration_test('hidden continuation rejects direct POST: ' . $theme . '/' . $attack . '/' . $role,
+            static fn(): bool => $direct_status === 404
+              && !str_contains($direct_body, $continue_fixture['picfile'])
+              && !str_contains($direct_body, $continue_animation));
+        }
       }
       // 同じ画像が残っていても非表示投稿は公開入口から取得できない。
       // 説明が空のときに投稿者名・件名がaltへ漏れる経路も両テーマで確認する。
@@ -2947,6 +2998,8 @@ PHP;
       }
     } finally {
       if (is_file($continue_animation_path)) unlink($continue_animation_path);
+      if (is_file($continue_psd_path)) unlink($continue_psd_path);
+      if (is_file($continue_chi_path)) unlink($continue_chi_path);
       $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ?, invz = ?, image_alt = ? WHERE tid = ?');
       $statement->execute([$continue_fixture['ctype'], $continue_fixture['pchfile'], $continue_fixture['invz'],
         $continue_fixture['image_alt'], $continue_fixture['tid']]);
