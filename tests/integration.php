@@ -2480,6 +2480,27 @@ PHP;
       && $continued_content['com'] === $continued_comment;
   });
 
+  // 別ブラウザー相当のセッションで同じ画像から描画を開始し、後から保存する側を用意する。
+  $stale_drawing_cookies = $root . '/stale-drawing-cookies.txt';
+  [$stale_form_status, $stale_form_body] = http_request($base_url, $stale_drawing_cookies, [
+    'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
+    'img' => (string)$replaced_image_row['picfile'], 'ctype' => 'img', 'tools' => 'neo',
+    'picw' => '300', 'pich' => '300', 'anime' => 'true',
+  ]);
+  preg_match('/repcode=([a-f0-9]{32})/', $stale_form_body, $stale_code_match);
+  $stale_code = (string)($stale_code_match[1] ?? '');
+  $stale_session = (string)cookie_value($stale_drawing_cookies, 'noreita_session');
+  $stale_owner = (string)cookie_value($stale_drawing_cookies, 'usercode');
+  $stale_base = 'stale-drawing-' . bin2hex(random_bytes(6));
+  copy($animation_png, $webroot . '/tmp/' . $stale_base . '.png');
+  file_put_contents($webroot . '/tmp/' . $stale_base . '.pch', 'stale replay');
+  file_put_contents($webroot . '/tmp/' . $stale_base . '.psd', 'stale layers');
+  file_put_contents($webroot . '/tmp/' . $stale_base . '.dat',
+    "127.0.0.1\tlocalhost\tagent\t.png\t{$stale_owner}\t{$stale_code}\t200\t260\t0\tneo");
+  integration_test('independent sessions can start replacing the same current image', static fn(): bool =>
+    $stale_form_status === 200 && $stale_code !== '' && $stale_session !== ''
+      && $stale_session !== cookie_value($cookie_jar, 'noreita_session'));
+
   // Tegakiは画像からの続き描きではリプレイを生成しない。そのためPNGだけを
   // saveimageへ送信してから、POSTのpicrepで差し替える実際の経路を確認する。
   [$tegaki_continue_form_status, $tegaki_continue_form_body] = http_request($base_url, $cookie_jar, [
@@ -2535,6 +2556,27 @@ PHP;
       && is_file($webroot . '/img/' . $tegaki_replaced_row['picfile'])
       && str_contains($tegaki_replace_body, 'action="index.php?mode=editexec"')
       && $tegaki_base !== '';
+  });
+
+  $winning_row = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $conflict_files = [];
+  foreach (array_merge(
+    glob($webroot . '/img/' . pathinfo((string)$winning_row['picfile'], PATHINFO_FILENAME) . '*') ?: [],
+    glob($webroot . '/tmp/' . $stale_base . '.*') ?: []
+  ) as $path) $conflict_files[$path] = hash_file('sha256', $path);
+  [$stale_status] = http_request($base_url, $stale_drawing_cookies, [
+    'mode' => 'picrep', 'no' => (string)$image_post_id, 'repcode' => $stale_code,
+    'token' => hash('sha256', $stale_session), 'nsfw' => '0',
+  ]);
+  $row_after_stale_save = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  integration_test('stale drawing cannot overwrite another session image or remove pending files', static function () use (
+    $stale_status, $winning_row, $row_after_stale_save, $conflict_files
+  ): bool {
+    if ($stale_status !== 409 || $winning_row !== $row_after_stale_save || count($conflict_files) < 5) return false;
+    foreach ($conflict_files as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+    }
+    return true;
   });
 
   [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);

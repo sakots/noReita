@@ -2120,6 +2120,12 @@ function picreplace(ApplicationContext $context): void {
       render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
       return;
     }
+    // 保存時の画像名ではなく、描画を開始した画像名と照合して古い描画による上書きを防ぐ。
+    $source_picfile = (string)($authorization['source_picfile'] ?? '');
+    if ($source_picfile === '' || !hash_equals($source_picfile, (string)$msg_d['picfile'])) {
+      render_error($context, $en ? 'The image changed while drawing. Please start again.' : '描画中に投稿画像が変更されました。もう一度続きを描く操作からやり直してください。', 409);
+      return;
+    }
     //パスワード照合
     // $flag = false;
     if (password_verify($pwd_f, $msg_d["pwd"])) {
@@ -2166,7 +2172,7 @@ function picreplace(ApplicationContext $context): void {
         'img_w' => $replacement['img_w'], 'img_h' => $replacement['img_h'],
         'tool' => ImageService::toolDisplayName((string)$temporary_image['tool']),
         'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw, 'thumbnail' => $thumbnail,
-        'expected_picfile' => (string)$msg_d['picfile'],
+        'expected_picfile' => $source_picfile,
       ]);
       ImageService::completePostedReplacement($replacement);
       unset($_SESSION['image_replacement_authorization']);
@@ -2940,6 +2946,11 @@ function usrchk(ApplicationContext $context): void {
     if (password_verify($pwd_f, $msg['pwd'])) {
       $flag = true;
       if (filter_input_data('POST', 'type') === 'rep') {
+        // 公開状態の検証後に別セッションが画像を変えた場合も、その画像へ認可を付け替えない。
+        if (!hash_equals((string)$msg['picfile'], (string)filter_input(INPUT_POST, 'img'))) {
+          render_error($context, $en ? 'The image changed before drawing started. Please start again.' : '投稿画像が変更されました。もう一度続きを描く操作からやり直してください。', 409);
+          return;
+        }
         RequestSecurity::startSession();
         $encrypted_password = openssl_encrypt(
           (string)$pwd_f, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV
@@ -2950,6 +2961,7 @@ function usrchk(ApplicationContext $context): void {
         }
         $_SESSION['image_replacement_authorization'] = [
           'post_id' => (int)$no,
+          'source_picfile' => (string)$msg['picfile'],
           'password' => $encrypted_password,
           'expires_at' => time() + Config::int('security.session_file_lifetime'),
         ];
