@@ -2114,7 +2114,12 @@ function picreplace(ApplicationContext $context): void {
   // ログ読み込み
   try {
     $repository = new BoardRepository();
-    $msg_d = $repository->findPost((int)$no);
+    // 描画開始時の認可だけでは保存しない。途中で投稿や親が非表示になっていないか再確認する。
+    $msg_d = $repository->findPublicPost((int)$no);
+    if ($msg_d === false) {
+      render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
+      return;
+    }
     //パスワード照合
     // $flag = false;
     if (password_verify($pwd_f, $msg_d["pwd"])) {

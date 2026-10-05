@@ -2334,7 +2334,7 @@ PHP;
     'stime' => '300', 'nsfw' => '0', 'token' => $token,
   ];
   // 拒否した要求では投稿・一時画像・認可を維持し、本人が再試行できることも確認する。
-  foreach (['GET', 'missing token', 'invalid token', 'foreign origin', 'foreign code', 'foreign owner'] as $attack) {
+  foreach (['GET', 'missing token', 'invalid token', 'foreign origin', 'foreign code', 'foreign owner', 'hidden post', 'hidden parent'] as $attack) {
     $request = $replacement_request;
     $origin = 'http://localhost';
     if ($attack === 'missing token') unset($request['token']);
@@ -2344,15 +2344,35 @@ PHP;
     if ($attack === 'foreign owner') {
       file_put_contents($webroot . '/tmp/' . $replacement_base . '.dat', str_replace("\t{$replacement_owner}\t", "\tforeign-owner\t", $replacement_metadata));
     }
+    if ($attack === 'hidden post') $db->exec('UPDATE board_log SET invz = 1 WHERE tid = ' . $image_post_id);
+    if ($attack === 'hidden parent') {
+      $db->exec('UPDATE board_log SET thread = 0, parent = ' . $post_id . ' WHERE tid = ' . $image_post_id);
+      $db->exec('UPDATE board_log SET invz = 1 WHERE tid = ' . $post_id);
+    }
+    $replacement_files_before = [];
+    foreach (array_merge(
+      glob($webroot . '/img/' . pathinfo((string)$image_row['picfile'], PATHINFO_FILENAME) . '.*') ?: [],
+      glob($webroot . '/tmp/' . $replacement_base . '.*') ?: [],
+      [$webroot . '/img/' . $continued_from_thumbnail]
+    ) as $path) {
+      if (is_file($path)) $replacement_files_before[$path] = hash_file('sha256', $path);
+    }
+    $replacement_row_before = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
     [$attack_status] = http_request(
       $attack === 'GET' ? $base_url . '?' . http_build_query($replacement_request) : $base_url,
       $cookie_jar, $attack === 'GET' ? null : $request, '127.0.0.1', $origin
     );
     $unchanged_picfile = $db->query('SELECT picfile FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+    $replacement_row_after = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
     integration_test('image replacement rejects ' . $attack . ' without changing files', static function () use (
-      $attack_status, $unchanged_picfile, $image_row, $webroot, $replacement_base
+      $attack, $attack_status, $unchanged_picfile, $image_row, $webroot, $replacement_base,
+      $replacement_files_before, $replacement_row_before, $replacement_row_after
     ): bool {
-      return in_array($attack_status, [400, 403], true)
+      foreach ($replacement_files_before as $path => $hash) {
+        if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+      }
+      return in_array($attack_status, in_array($attack, ['hidden post', 'hidden parent'], true) ? [404] : [400, 403], true)
+        && $replacement_row_before === $replacement_row_after
         && $unchanged_picfile === $image_row['picfile']
         && is_file($webroot . '/img/' . $image_row['picfile'])
         && is_file($webroot . '/tmp/' . $replacement_base . '.png')
@@ -2360,6 +2380,11 @@ PHP;
         && is_file($webroot . '/tmp/' . $replacement_base . '.psd');
     });
     if ($attack === 'foreign owner') file_put_contents($webroot . '/tmp/' . $replacement_base . '.dat', $replacement_metadata);
+    if ($attack === 'hidden post') $db->exec('UPDATE board_log SET invz = 0 WHERE tid = ' . $image_post_id);
+    if ($attack === 'hidden parent') {
+      $db->exec('UPDATE board_log SET thread = 1, parent = NULL WHERE tid = ' . $image_post_id);
+      $db->exec('UPDATE board_log SET invz = 0 WHERE tid = ' . $post_id);
+    }
   }
   try {
     file_put_contents($webroot . '/config.local.php', str_replace("    'image_upload' => true,",
