@@ -79,15 +79,20 @@ final class PublicApi {
   /** @param array<string,mixed> $query
    * @return array<string,mixed> */
   private static function search(BoardRepository $repository, array $query): array {
-    $criteria = PublicPostSearch::normalize([
-      'query' => $query['q'] ?? $query['search'] ?? '',
-      'target' => $query['target'] ?? null,
-      'match' => $query['match'] ?? null,
-      'post_type' => $query['post_type'] ?? null,
-      'image' => $query['image'] ?? null,
-      'nsfw' => $query['nsfw'] ?? null,
-      'sort' => $query['sort'] ?? null,
-    ]);
+    try {
+      $criteria = PublicPostSearch::normalize([
+        'query' => $query['q'] ?? $query['search'] ?? '',
+        'target' => $query['target'] ?? null,
+        'match' => $query['match'] ?? null,
+        'post_type' => $query['post_type'] ?? null,
+        'image' => $query['image'] ?? null,
+        'nsfw' => $query['nsfw'] ?? null,
+        'sort' => $query['sort'] ?? null,
+      ]);
+    } catch (InvalidArgumentException $e) {
+      // 検索条件の入力エラーだけを400に変換し、DBなどの内部障害は500のままにする。
+      throw new PublicApiException($e->getMessage());
+    }
     $page_size = self::pageSize($query, Config::int('board.catalog_size'));
     $pagination = self::pagination($repository->countPublicSearch($criteria), $query, $page_size);
     $posts = $repository->searchVisiblePosts($criteria, $pagination['offset'], $page_size);

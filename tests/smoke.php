@@ -1324,6 +1324,29 @@ smoke_test('public API exposes only visible React-safe post data', static functi
     && count($catalog['items']) === 1 && count($search['items']) === 1;
 });
 
+smoke_test('public API search reports long queries as input errors without hiding database failures', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  foreach (['q' => 'a', 'search' => 'あ'] as $parameter => $character) {
+    $query = str_repeat($character, 100);
+    $response = PublicApi::dispatch($repository, ['mode' => 'search', $parameter => ' ' . $query . ' ']);
+    if (($response['criteria']['query'] ?? '') !== $query) return false;
+    try {
+      PublicApi::dispatch($repository, ['mode' => 'search', $parameter => $query . $character]);
+      return false;
+    } catch (PublicApiException $e) {
+      if ($e->status() !== 400 || $e->getMessage() !== 'Search query must not exceed 100 characters.') return false;
+    }
+  }
+  try {
+    PublicApi::dispatch(new BoardRepository(new PDO('sqlite::memory:')), ['mode' => 'search', 'q' => 'valid']);
+    return false;
+  } catch (PDOException $e) {
+    return true;
+  }
+});
+
 smoke_test('public API visibility follows the parent without changing reply visibility', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();

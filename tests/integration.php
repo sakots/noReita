@@ -1455,6 +1455,25 @@ PHP;
       && is_array($search) && str_contains(json_encode($search, JSON_UNESCAPED_UNICODE) ?: '', $marker);
   });
 
+  foreach (['q' => 'a', 'search' => 'あ'] as $parameter => $character) {
+    foreach ([100, 101] as $length) {
+      $query = str_repeat($character, $length);
+      [$status, $body, , $headers] = http_request(
+        $api_url . '?' . http_build_query(['mode' => 'search', $parameter => $query]), $cookie_jar
+      );
+      integration_test("public API search validates {$parameter} at {$length} characters", static function () use (
+        $status, $body, $headers, $query, $length
+      ): bool {
+        $response = json_decode($body, true);
+        if (($headers['content-type'] ?? '') !== 'application/json; charset=UTF-8' || !is_array($response)) return false;
+        return $length === 100
+          ? $status === 200 && ($response['criteria']['query'] ?? '') === $query
+          : $status === 400 && ($response['error']['code'] ?? '') === 'invalid_request'
+            && ($response['error']['message'] ?? '') === 'Search query must not exceed 100 characters.';
+      });
+    }
+  }
+
   $subject_escape_probe = '<b>XSS</b>';
   $subject_escape_stmt = $db->prepare('UPDATE board_log SET sub = :sub WHERE tid = :tid');
   $subject_escape_stmt->execute([':sub' => $subject_escape_probe, ':tid' => (int)($row['tid'] ?? 0)]);
