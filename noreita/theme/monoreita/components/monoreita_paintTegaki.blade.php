@@ -88,6 +88,7 @@
           // 画像差し換えに必要なフォームデータをセット
           const formData = new FormData();
           formData.append("mode", "picrep");
+          formData.append("token", "{{ $token }}");
           formData.append("no", "{{$no}}");
           formData.append("repcode", "{{$repcode}}");
           formData.append("paint_picrep", true);

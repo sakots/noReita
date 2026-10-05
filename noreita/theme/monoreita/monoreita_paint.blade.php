@@ -105,7 +105,7 @@
               }
             };
             };
-            loadPaintBbsNeo({!! json_encode($neo_dir, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}, {!! json_encode($neo_github_api, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}, window.configurePaintBbsNeo);
+            loadPaintBbsNeo({!! $neo_dir_json !!}, {!! $neo_github_api_json !!}, window.configurePaintBbsNeo);
           </script>
         </div>
         <div class="palette" id="dyntools">

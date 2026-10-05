@@ -2281,31 +2281,109 @@ PHP;
   $replacement_base = 'replacement-' . bin2hex(random_bytes(6));
   $paint_seconds_before = (int)$db->query('SELECT psec FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
   $db->exec("UPDATE board_log SET tool = 'Klecks' WHERE tid = " . $image_post_id);
-  $replacement_code = 'replace-code-' . bin2hex(random_bytes(4));
   $resized_replacement = imagecreatetruecolor(17, 11);
   imagepng($resized_replacement, $webroot . '/tmp/' . $replacement_base . '.png');
   unset($resized_replacement);
-  file_put_contents(
-    $webroot . '/tmp/' . $replacement_base . '.dat',
-    "127.0.0.1\tlocalhost\tagent\t.png\tcode\t{$replacement_code}\t200\t260\t0\tneo"
-  );
   file_put_contents($webroot . '/tmp/' . $replacement_base . '.pch', 'replacement animation');
   file_put_contents($webroot . '/tmp/' . $replacement_base . '.psd', 'replacement layers');
   $replacement_old_psd = pathinfo((string)$image_row['picfile'], PATHINFO_FILENAME) . '.psd';
   file_put_contents($webroot . '/img/' . $replacement_old_psd, 'old layers');
+  $replacement_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  try {
+    foreach (['eda', 'monoreita'] as $replacement_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $replacement_theme . "'],", $replacement_original_config));
+      foreach (['neo', 'chicken', 'klecks', 'tegaki', 'axnos'] as $replacement_tool) {
+        [$tool_status, $tool_body] = http_request($base_url, $cookie_jar, [
+          'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
+          'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
+          'tools' => $replacement_tool, 'anime' => 'true',
+        ]);
+        $safe_submission = str_contains($tool_body, 'formData.append("token", "' . $token . '")');
+        if (in_array($replacement_tool, ['neo', 'chicken'], true)) {
+          preg_match('/repcode=([a-f0-9]{32})/', $tool_body, $form_code_match);
+          [$form_status, $form_body] = http_request($base_url . '?' . http_build_query([
+            'mode' => 'picrep_form', 'no' => $image_post_id, 'repcode' => $form_code_match[1] ?? '', 'stime' => '300',
+          ]), $cookie_jar);
+          $safe_submission = str_contains($tool_body, 'mode=picrep_form&') && $form_status === 200
+            && str_contains($form_body, 'method="post"')
+            && str_contains($form_body, 'name="mode" value="picrep"')
+            && str_contains($form_body, 'name="token" value="' . $token . '"')
+            && $db->query('SELECT picfile FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn() === $image_row['picfile']
+            && is_file($webroot . '/tmp/' . $replacement_base . '.png');
+        }
+        integration_test('drawing replacement uses a CSRF protected submission: ' . $replacement_theme . '/' . $replacement_tool,
+          static fn(): bool => $tool_status === 200 && $safe_submission);
+      }
+    }
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $replacement_original_config);
+  }
   [$replacement_authorization_status, $replacement_authorization_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
     'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
     'tools' => 'neo', 'anime' => 'true',
   ]);
+  preg_match('/repcode=([a-f0-9]{32})/', $replacement_authorization_body, $replacement_code_match);
+  $replacement_code = (string)($replacement_code_match[1] ?? '');
+  $replacement_owner = cookie_value($cookie_jar, 'usercode');
+  $replacement_metadata = "127.0.0.1\tlocalhost\tagent\t.png\t{$replacement_owner}\t{$replacement_code}\t200\t260\t0\tneo";
+  file_put_contents($webroot . '/tmp/' . $replacement_base . '.dat', $replacement_metadata);
+  $replacement_request = [
+    'mode' => 'picrep', 'no' => (string)$image_post_id, 'repcode' => $replacement_code,
+    'stime' => '300', 'nsfw' => '0', 'token' => $token,
+  ];
+  // 拒否した要求では投稿・一時画像・認可を維持し、本人が再試行できることも確認する。
+  foreach (['GET', 'missing token', 'invalid token', 'foreign origin', 'foreign code', 'foreign owner'] as $attack) {
+    $request = $replacement_request;
+    $origin = 'http://localhost';
+    if ($attack === 'missing token') unset($request['token']);
+    if ($attack === 'invalid token') $request['token'] = 'invalid';
+    if ($attack === 'foreign origin') $origin = 'https://attacker.example';
+    if ($attack === 'foreign code') $request['repcode'] = str_repeat('a', 32);
+    if ($attack === 'foreign owner') {
+      file_put_contents($webroot . '/tmp/' . $replacement_base . '.dat', str_replace("\t{$replacement_owner}\t", "\tforeign-owner\t", $replacement_metadata));
+    }
+    [$attack_status] = http_request(
+      $attack === 'GET' ? $base_url . '?' . http_build_query($replacement_request) : $base_url,
+      $cookie_jar, $attack === 'GET' ? null : $request, '127.0.0.1', $origin
+    );
+    $unchanged_picfile = $db->query('SELECT picfile FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+    integration_test('image replacement rejects ' . $attack . ' without changing files', static function () use (
+      $attack_status, $unchanged_picfile, $image_row, $webroot, $replacement_base
+    ): bool {
+      return in_array($attack_status, [400, 403], true)
+        && $unchanged_picfile === $image_row['picfile']
+        && is_file($webroot . '/img/' . $image_row['picfile'])
+        && is_file($webroot . '/tmp/' . $replacement_base . '.png')
+        && is_file($webroot . '/tmp/' . $replacement_base . '.pch')
+        && is_file($webroot . '/tmp/' . $replacement_base . '.psd');
+    });
+    if ($attack === 'foreign owner') file_put_contents($webroot . '/tmp/' . $replacement_base . '.dat', $replacement_metadata);
+  }
+  try {
+    file_put_contents($webroot . '/config.local.php', str_replace("    'image_upload' => true,",
+      "    'image_upload' => true,\n    'csrf' => false,", $replacement_original_config));
+    foreach (['missing token', 'foreign origin'] as $attack) {
+      $request = $replacement_request;
+      if ($attack === 'missing token') unset($request['token']);
+      [$attack_status] = http_request($base_url, $cookie_jar, $request, '127.0.0.1',
+        $attack === 'foreign origin' ? 'https://attacker.example' : 'http://localhost');
+      integration_test('image replacement stays protected when posting CSRF is disabled: ' . $attack,
+        static fn(): bool => $attack_status === 403
+          && $db->query('SELECT picfile FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn() === $image_row['picfile']
+          && is_file($webroot . '/tmp/' . $replacement_base . '.png'));
+    }
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $replacement_original_config);
+  }
   if (!replace_cookie_value($cookie_jar, 'pwd_cookie', 'another-post-pass')) {
     throw new RuntimeException('Could not prepare a mismatched saved password');
   }
   [$replacement_status, $replacement_body] = http_request(
-    $base_url . '?mode=picrep&no=' . $image_post_id . '&repcode=' . rawurlencode($replacement_code)
-      . '&stime=300',
+    $base_url,
     $cookie_jar,
-    ['nsfw' => '0']
+    $replacement_request
   );
   $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail, img_w, img_h, tool FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
   [$replacement_page_status, $replacement_page_body] = http_request($base_url . '?resno=' . $image_post_id, $cookie_jar);
@@ -2403,7 +2481,7 @@ PHP;
   );
   [$tegaki_replace_status, $tegaki_replace_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'picrep', 'no' => $tegaki_replacement_post_id, 'repcode' => $tegaki_replacement_code,
-    'nsfw' => '0', 'paint_picrep' => 'true',
+    'nsfw' => '0', 'paint_picrep' => 'true', 'token' => $token,
   ]);
   $tegaki_replaced_row = $db->query(
     'SELECT picfile, pchfile FROM board_log WHERE tid = ' . $image_post_id

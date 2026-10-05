@@ -288,6 +288,9 @@ $dat['upload_output_format'] = Config::bool('features.upload_webp') && function_
 $dat['upload_accept'] = ImageService::uploadAccept();
 $dat['upload_format_label'] = ImageService::uploadFormatLabel();
 $dat['neo_github_api'] = Config::bool('features.neo_github_api');
+// JSONのビット演算フラグをBladeOneのパイプ構文として解釈させないよう、表示用データを先に作る。
+$dat['neo_dir_json'] = json_encode($dat['neo_dir'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$dat['neo_github_api_json'] = json_encode($dat['neo_github_api'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
 $dat['theme_name'] = $theme_runtime['name'];
 
@@ -420,6 +423,8 @@ switch ($mode) {
     PaintController::paint($application_context, $type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'picrep':
     PostController::replaceImage($application_context); return;
+  case 'picrep_form':
+    PostController::replacementForm($application_context); return;
   case 'catalog': // カタログ表示
     BoardController::catalog($application_context);
     return;
@@ -1672,7 +1677,11 @@ function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): v
       return;
     }
     $repcode = bin2hex(random_bytes(16));
-    $datmode = 'picrep&no=' . $no . '&repcode=' . $repcode;
+    // GETでの保存後遷移は確認画面へ送り、実際の差し替えはCSRF付きPOSTで行う。
+    $_SESSION['image_replacement_authorization']['replacement_code'] = $repcode;
+    $_SESSION['image_replacement_authorization']['user_code'] = $context->usercode;
+    $dat['token'] = RequestSecurity::csrfToken();
+    $datmode = 'picrep_form&no=' . $no . '&repcode=' . $repcode;
     // 非同期ツールがpicrepへPOSTする投稿番号。GET由来の未初期化値ではなく、
     // 続き描きフォームで検証済みのPOST値をテンプレートへ渡す。
     $dat['no'] = $no;
@@ -2062,26 +2071,21 @@ function delmode(ApplicationContext $context): void {
 //画像差し替え
 function picreplace(ApplicationContext $context): void {
   $en = $context->english;
-
-  $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
+  // 投稿用CSRF設定が無効でも、画像差し替えは必ずPOST・同一オリジン・トークンを検証する。
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
+  } catch (RequestSecurityException $e) {
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
+  }
+  $stime = filter_input(INPUT_POST, 'stime', FILTER_VALIDATE_INT);
   $stime = $stime ?: ($_SERVER['REQUEST_TIME'] ?? time());
-  $no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
-  $no = $no ?: filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
-  $repcode = filter_input(INPUT_GET, 'repcode');
-  $repcode = $repcode ?: filter_input(INPUT_POST, 'repcode');
+  $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
+  $repcode = filter_input(INPUT_POST, 'repcode');
   if (!$no || !$repcode) {
     render_error($context, $en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
   }
-  RequestSecurity::startSession();
-  $authorization = $_SESSION['image_replacement_authorization'] ?? null;
-  $authorized_post_id = is_array($authorization) ? (int)($authorization['post_id'] ?? 0) : 0;
-  $encrypted_password = is_array($authorization) ? (string)($authorization['password'] ?? '') : '';
-  $expires_at = is_array($authorization) ? (int)($authorization['expires_at'] ?? 0) : 0;
-  if ($authorized_post_id !== (int)$no || $encrypted_password === '' || $expires_at < time()) {
-    unset($_SESSION['image_replacement_authorization']);
-    render_error($context, $en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
-    return;
-  }
+  $authorization = PostController::replacementAuthorization($context, (int)$no, (string)$repcode);
+  $encrypted_password = (string)$authorization['password'];
   $pwd_f = openssl_decrypt($encrypted_password, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV);
   if ($pwd_f === false) {
     unset($_SESSION['image_replacement_authorization']);
@@ -2100,6 +2104,9 @@ function picreplace(ApplicationContext $context): void {
   $temporary_image = ImageService::findTemporaryImageByReplacementCode(Config::string('paths.temporary'), (string)$repcode);
   if ($temporary_image === null) {
     render_error($context, $en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。', 404);
+  }
+  if ($temporary_image['user_code'] === '' || !hash_equals($temporary_image['user_code'], $context->usercode)) {
+    render_error($context, $en ? 'This temporary image belongs to another user.' : 'この一時画像の所有者ではありません。', 403);
   }
   $filename = $temporary_image['base_name'];
   $imgext = $temporary_image['image_extension'];
