@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.13.1 lot.261003.0';
+const REITA_VER = 'v4.13.2 lot.261005.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -42,7 +42,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261004) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261005) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -288,6 +288,9 @@ $dat['upload_output_format'] = Config::bool('features.upload_webp') && function_
 $dat['upload_accept'] = ImageService::uploadAccept();
 $dat['upload_format_label'] = ImageService::uploadFormatLabel();
 $dat['neo_github_api'] = Config::bool('features.neo_github_api');
+// JSONのビット演算フラグをBladeOneのパイプ構文として解釈させないよう、表示用データを先に作る。
+$dat['neo_dir_json'] = json_encode($dat['neo_dir'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$dat['neo_github_api_json'] = json_encode($dat['neo_github_api'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
 $dat['theme_name'] = $theme_runtime['name'];
 
@@ -416,10 +419,11 @@ switch ($mode) {
     PaintController::continue($application_context); return;
   case 'contpaint':
     $type = filter_input(INPUT_POST, 'type');
-    if (Config::bool('features.continue_password') || $type === 'rep') usrchk($application_context);
-    PaintController::paint($application_context, $type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
+    PaintController::continuePainting($application_context, (string)$type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'picrep':
     PostController::replaceImage($application_context); return;
+  case 'picrep_form':
+    PostController::replacementForm($application_context); return;
   case 'catalog': // カタログ表示
     BoardController::catalog($application_context);
     return;
@@ -1340,9 +1344,9 @@ function res(ApplicationContext $context): void {
     }
     $dat['resno'] = $resno;
 
-    $thread = $repository->findPost((int)$resno);
-    // 公開画面では、非表示の記事を本文・OGPへ渡さない。
-    if ($thread === false || (int)($thread['invz'] ?? 0) !== 0) {
+    $thread = $repository->findPublicPost((int)$resno);
+    // 返信番号の直接指定でも、親が非表示の記事を本文・OGPへ渡さない。
+    if ($thread === false) {
       render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
     }
     $posts = $thread ? [$thread] : [];
@@ -1442,7 +1446,7 @@ function res(ApplicationContext $context): void {
       if ($og_image_name !== '') {
         $dat['og_image'] = Config::string('site.base_url') . Config::string('paths.images')
           . rawurlencode(basename($og_image_name));
-        $dat['og_image_alt'] = (string)($bbsline['image_alt'] ?: $bbsline['sub']);
+        $dat['og_image_alt'] = (string)($bbsline['image_alt'] !== '' ? $bbsline['image_alt'] : $bbsline['sub']);
         $dat['og_twitter_card'] = 'summary_large_image';
       }
       $dat['og_title'] = '[' . $bbsline['tid'] . '] ' . $bbsline['sub']
@@ -1672,7 +1676,11 @@ function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): v
       return;
     }
     $repcode = bin2hex(random_bytes(16));
-    $datmode = 'picrep&no=' . $no . '&repcode=' . $repcode;
+    // GETでの保存後遷移は確認画面へ送り、実際の差し替えはCSRF付きPOSTで行う。
+    $_SESSION['image_replacement_authorization']['replacement_code'] = $repcode;
+    $_SESSION['image_replacement_authorization']['user_code'] = $context->usercode;
+    $dat['token'] = RequestSecurity::csrfToken();
+    $datmode = 'picrep_form&no=' . $no . '&repcode=' . $repcode;
     // 非同期ツールがpicrepへPOSTする投稿番号。GET由来の未初期化値ではなく、
     // 続き描きフォームで検証済みのPOST値をテンプレートへ渡す。
     $dat['no'] = $no;
@@ -2062,26 +2070,21 @@ function delmode(ApplicationContext $context): void {
 //画像差し替え
 function picreplace(ApplicationContext $context): void {
   $en = $context->english;
-
-  $stime = filter_input(INPUT_GET, 'stime', FILTER_VALIDATE_INT);
+  // 投稿用CSRF設定が無効でも、画像差し替えは必ずPOST・同一オリジン・トークンを検証する。
+  try {
+    RequestSecurity::assertCurrentCsrfRequest($context->usercode, $en);
+  } catch (RequestSecurityException $e) {
+    render_error($context, $e->getMessage(), $e->getCode() ?: 403);
+  }
+  $stime = filter_input(INPUT_POST, 'stime', FILTER_VALIDATE_INT);
   $stime = $stime ?: ($_SERVER['REQUEST_TIME'] ?? time());
-  $no = filter_input(INPUT_GET, 'no', FILTER_VALIDATE_INT);
-  $no = $no ?: filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
-  $repcode = filter_input(INPUT_GET, 'repcode');
-  $repcode = $repcode ?: filter_input(INPUT_POST, 'repcode');
+  $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
+  $repcode = filter_input(INPUT_POST, 'repcode');
   if (!$no || !$repcode) {
     render_error($context, $en ? 'Invalid replacement request.' : '画像差し替えのリクエストが不正です。');
   }
-  RequestSecurity::startSession();
-  $authorization = $_SESSION['image_replacement_authorization'] ?? null;
-  $authorized_post_id = is_array($authorization) ? (int)($authorization['post_id'] ?? 0) : 0;
-  $encrypted_password = is_array($authorization) ? (string)($authorization['password'] ?? '') : '';
-  $expires_at = is_array($authorization) ? (int)($authorization['expires_at'] ?? 0) : 0;
-  if ($authorized_post_id !== (int)$no || $encrypted_password === '' || $expires_at < time()) {
-    unset($_SESSION['image_replacement_authorization']);
-    render_error($context, $en ? 'Image replacement authorization has expired.' : '画像差し替えの認証が期限切れです。もう一度やり直してください。', 403);
-    return;
-  }
+  $authorization = PostController::replacementAuthorization($context, (int)$no, (string)$repcode);
+  $encrypted_password = (string)$authorization['password'];
   $pwd_f = openssl_decrypt($encrypted_password, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV);
   if ($pwd_f === false) {
     unset($_SESSION['image_replacement_authorization']);
@@ -2101,6 +2104,9 @@ function picreplace(ApplicationContext $context): void {
   if ($temporary_image === null) {
     render_error($context, $en ? 'No temporary file found.' : 'テンポラリファイルが見つかりませんでした。', 404);
   }
+  if ($temporary_image['user_code'] === '' || !hash_equals($temporary_image['user_code'], $context->usercode)) {
+    render_error($context, $en ? 'This temporary image belongs to another user.' : 'この一時画像の所有者ではありません。', 403);
+  }
   $filename = $temporary_image['base_name'];
   $imgext = $temporary_image['image_extension'];
 
@@ -2108,7 +2114,18 @@ function picreplace(ApplicationContext $context): void {
   // ログ読み込み
   try {
     $repository = new BoardRepository();
-    $msg_d = $repository->findPost((int)$no);
+    // 描画開始時の認可だけでは保存しない。途中で投稿や親が非表示になっていないか再確認する。
+    $msg_d = $repository->findPublicPost((int)$no);
+    if ($msg_d === false) {
+      render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
+      return;
+    }
+    // 保存時の画像名ではなく、描画を開始した画像名と照合して古い描画による上書きを防ぐ。
+    $source_picfile = (string)($authorization['source_picfile'] ?? '');
+    if ($source_picfile === '' || !hash_equals($source_picfile, (string)$msg_d['picfile'])) {
+      render_error($context, $en ? 'The image changed while drawing. Please start again.' : '描画中に投稿画像が変更されました。もう一度続きを描く操作からやり直してください。', 409);
+      return;
+    }
     //パスワード照合
     // $flag = false;
     if (password_verify($pwd_f, $msg_d["pwd"])) {
@@ -2155,7 +2172,7 @@ function picreplace(ApplicationContext $context): void {
         'img_w' => $replacement['img_w'], 'img_h' => $replacement['img_h'],
         'tool' => ImageService::toolDisplayName((string)$temporary_image['tool']),
         'psec' => $psec, 'utime' => $utime, 'nsfw' => $nsfw, 'thumbnail' => $thumbnail,
-        'expected_picfile' => (string)$msg_d['picfile'],
+        'expected_picfile' => $source_picfile,
       ]);
       ImageService::completePostedReplacement($replacement);
       unset($_SESSION['image_replacement_authorization']);
@@ -2929,6 +2946,11 @@ function usrchk(ApplicationContext $context): void {
     if (password_verify($pwd_f, $msg['pwd'])) {
       $flag = true;
       if (filter_input_data('POST', 'type') === 'rep') {
+        // 公開状態の検証後に別セッションが画像を変えた場合も、その画像へ認可を付け替えない。
+        if (!hash_equals((string)$msg['picfile'], (string)filter_input(INPUT_POST, 'img'))) {
+          render_error($context, $en ? 'The image changed before drawing started. Please start again.' : '投稿画像が変更されました。もう一度続きを描く操作からやり直してください。', 409);
+          return;
+        }
         RequestSecurity::startSession();
         $encrypted_password = openssl_encrypt(
           (string)$pwd_f, CRYPT_METHOD, Config::string('security.paint_password'), true, CRYPT_IV
@@ -2939,6 +2961,7 @@ function usrchk(ApplicationContext $context): void {
         }
         $_SESSION['image_replacement_authorization'] = [
           'post_id' => (int)$no,
+          'source_picfile' => (string)$msg['picfile'],
           'password' => $encrypted_password,
           'expires_at' => time() + Config::int('security.session_file_lifetime'),
         ];

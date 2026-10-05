@@ -3,7 +3,7 @@
 
 require_once __DIR__ . '/filesystem_permissions.inc.php';
 
-const DATABASE_INC_VER = 20261004;
+const DATABASE_INC_VER = 20261005;
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -240,6 +240,14 @@ final class BoardRepository {
     return $statement->fetch(PDO::FETCH_ASSOC);
   }
 
+  /** 親スレッドの公開状態も含めて、公開経路へ渡せる投稿だけを取得する。 @return array|false */
+  public function findPublicPost(int $id) {
+    $visibility = $this->publicVisibilityCondition();
+    $statement = $this->db->prepare("SELECT * FROM board_log WHERE tid = ? AND {$visibility}");
+    $statement->execute([$id]);
+    return $statement->fetch(PDO::FETCH_ASSOC);
+  }
+
   public function deletePost(int $id, bool $with_replies = false): void {
     $sql = $with_replies
       ? 'DELETE FROM board_log WHERE tid = ? OR parent = ?'
@@ -302,7 +310,8 @@ final class BoardRepository {
   }
 
   public function findReplies(int $parent): array {
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE parent = ? AND invz = 0 ORDER BY comid ASC');
+    $visibility = $this->publicVisibilityCondition();
+    $statement = $this->db->prepare("SELECT * FROM board_log WHERE parent = ? AND {$visibility} ORDER BY comid ASC");
     $statement->execute([$parent]);
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
@@ -315,8 +324,9 @@ final class BoardRepository {
     $parents = array_values(array_unique(array_filter($parents, static fn(int $id): bool => $id > 0)));
     if ($parents === []) return [];
     $placeholders = implode(',', array_fill(0, count($parents), '?'));
+    $visibility = $this->publicVisibilityCondition();
     $statement = $this->db->prepare(
-      "SELECT * FROM board_log WHERE parent IN ({$placeholders}) AND invz = 0 ORDER BY parent ASC, comid ASC"
+      "SELECT * FROM board_log WHERE parent IN ({$placeholders}) AND {$visibility} ORDER BY parent ASC, comid ASC"
     );
     $statement->execute($parents);
     return $statement->fetchAll(PDO::FETCH_ASSOC);
@@ -415,11 +425,13 @@ final class BoardRepository {
   }
 
   public function countVisibleImages(): int {
-    return (int)$this->db->query("SELECT COUNT(*) FROM board_log WHERE picfile != '' AND invz=0")->fetchColumn();
+    $visibility = $this->publicVisibilityCondition();
+    return (int)$this->db->query("SELECT COUNT(*) FROM board_log WHERE picfile != '' AND {$visibility}")->fetchColumn();
   }
 
   public function listCatalog(int $offset, int $limit): array {
-    $statement = $this->db->prepare("SELECT * FROM board_log WHERE picfile != '' AND invz=0 ORDER BY age DESC, tree DESC LIMIT :start, :limit");
+    $visibility = $this->publicVisibilityCondition();
+    $statement = $this->db->prepare("SELECT * FROM board_log WHERE picfile != '' AND {$visibility} ORDER BY age DESC, tree DESC LIMIT :start, :limit");
     $statement->bindValue(':start', $offset, PDO::PARAM_INT);
     $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
     $statement->execute();
@@ -450,6 +462,15 @@ final class BoardRepository {
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
+  // 返信は親スレッドも公開されている場合だけ公開する。管理用の取得条件には適用しない。
+  // 件数とページ取得で同じ条件を使い、非表示の返信が件数やページ位置にも残らないようにする。
+  private function publicVisibilityCondition(): string {
+    return 'invz = 0 AND (thread = 1 OR (thread = 0 AND EXISTS (
+      SELECT 1 FROM board_log parent_thread
+      WHERE parent_thread.tid = board_log.parent AND parent_thread.thread = 1 AND parent_thread.invz = 0
+    )))';
+  }
+
   /** @param array<string,string> $criteria
    * @return array{sql:string,params:array<int,string>} */
   private function publicSearchCondition(array $criteria): array {
@@ -458,7 +479,7 @@ final class BoardRepository {
     if ($criteria['query'] === '') return ['sql' => '0 = 1', 'params' => []];
     $operator = $criteria['match'] === 'exact' ? '=' : 'LIKE';
     $value = $criteria['match'] === 'exact' ? $criteria['query'] : '%' . $criteria['query'] . '%';
-    $sql = 'invz = 0';
+    $sql = $this->publicVisibilityCondition();
     $params = [];
     if ($criteria['target'] === 'all') {
       $sql .= " AND (a_name {$operator} ? OR sub {$operator} ? OR com {$operator} ?)";
@@ -546,8 +567,9 @@ final class BoardRepository {
   }
 
   public function findPostsByImage(string $image_name): array {
-    // 続き描画の公開確認画面には、非表示投稿の画像や説明を渡さない。
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE picfile = ? AND invz = 0 ORDER BY tree DESC');
+    // 続き描画にも、記事表示やAPIと同じ親スレッド込みの公開条件を適用する。
+    $visibility = $this->publicVisibilityCondition();
+    $statement = $this->db->prepare("SELECT * FROM board_log WHERE picfile = ? AND {$visibility} ORDER BY tree DESC");
     $statement->execute([$image_name]);
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }

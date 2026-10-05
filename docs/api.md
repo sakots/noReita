@@ -71,6 +71,7 @@ api.php?mode=search&q=風景&target=comment&image=with
 | `sort` | `newest`（`age`・`tree` 降順）、`oldest`（同昇順） | `newest` |
 
 選択肢にない値は、その項目の既定値に置き換わります。
+検索語はUTF-8の文字数で判定し、前後の空白を除いて100文字を超える場合は400の `invalid_request` を返します。`search` にも同じ制限を適用します。
 レスポンスの `criteria` に、実際に使用した条件が入ります。検索語のキーは `q` ではなく `query` です。
 
 ## レスポンス
@@ -127,13 +128,13 @@ api.php?mode=search&q=風景&target=comment&image=with
 - NSFW画像でも `image.url` に元画像URLが含まれます。OGPとは異なりAPI自体は原寸URLを隠しません。
   クライアントは `image.nsfw` を確認して表示を制御してください。
 - パスワードハッシュ、接続元ホスト、メールアドレスなどの内部フィールドは返しません。
-- 非表示判定は各投稿の `invz` に基づきます。カタログ・検索では親投稿の非表示状態まで照合していません。
+- 返信は返信自身と親スレッドの両方が公開されている場合だけ返します。親が存在しない返信も除外します。
 
 ## エラー
 
 | HTTPステータス | `error.code` | 主な原因 |
 | --- | --- | --- |
-| 400 | `invalid_request` | `id`・`page`・`per_page` が不正 |
+| 400 | `invalid_request` | `id`・`page`・`per_page` が不正、検索語が100文字を超える |
 | 404 | `invalid_request` | 未対応の `mode`、存在しない・非表示のスレッド、返信番号の指定 |
 | 405 | `method_not_allowed` | GET以外のメソッド。`Allow: GET` ヘッダーも返す |
 | 500 | `server_error` | 初期化やDB処理などの例外 |
@@ -148,7 +149,6 @@ api.php?mode=search&q=風景&target=comment&image=with
 ```
 
 500では詳細な例外メッセージの代わりに `error.id` を返します。
-現状、100文字を超える検索語も500の `server_error` になるため、送信前に長さを確認してください。
 設定読み込みなどAPIの例外処理より前で失敗した場合は、このJSON形式とは限りません。
 
 ## JavaScriptからの取得例

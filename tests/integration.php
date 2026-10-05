@@ -1455,6 +1455,25 @@ PHP;
       && is_array($search) && str_contains(json_encode($search, JSON_UNESCAPED_UNICODE) ?: '', $marker);
   });
 
+  foreach (['q' => 'a', 'search' => 'あ'] as $parameter => $character) {
+    foreach ([100, 101] as $length) {
+      $query = str_repeat($character, $length);
+      [$status, $body, , $headers] = http_request(
+        $api_url . '?' . http_build_query(['mode' => 'search', $parameter => $query]), $cookie_jar
+      );
+      integration_test("public API search validates {$parameter} at {$length} characters", static function () use (
+        $status, $body, $headers, $query, $length
+      ): bool {
+        $response = json_decode($body, true);
+        if (($headers['content-type'] ?? '') !== 'application/json; charset=UTF-8' || !is_array($response)) return false;
+        return $length === 100
+          ? $status === 200 && ($response['criteria']['query'] ?? '') === $query
+          : $status === 400 && ($response['error']['code'] ?? '') === 'invalid_request'
+            && ($response['error']['message'] ?? '') === 'Search query must not exceed 100 characters.';
+      });
+    }
+  }
+
   $subject_escape_probe = '<b>XSS</b>';
   $subject_escape_stmt = $db->prepare('UPDATE board_log SET sub = :sub WHERE tid = :tid');
   $subject_escape_stmt->execute([':sub' => $subject_escape_probe, ':tid' => (int)($row['tid'] ?? 0)]);
@@ -2249,6 +2268,39 @@ PHP;
     $ogp_update->execute([$nsfw_image_row['nsfw'], $nsfw_image_row['thumbnail'], $image_post_id]);
   }
 
+  $ogp_alt_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $ogp_alt_original = $db->query('SELECT picfile, image_alt, nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $ogp_alt_update = $db->prepare('UPDATE board_log SET picfile = ?, image_alt = ?, nsfw = ?, thumbnail = ? WHERE tid = ?');
+  try {
+    foreach (['eda', 'monoreita'] as $ogp_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $ogp_theme . "'],", $config_local));
+      $ogp_alt_results = [];
+      foreach ([
+        [$image_name, '0', 0, '', '0'],
+        [$image_name, '0', 1, $nsfw_thumbnail, '0'],
+        [$image_name, '', 0, '', 'Image subject'],
+        [$image_name, '説明 & <画像> "引用"', 0, '', '説明 & <画像> "引用"'],
+        ['', '0', 0, '', null],
+        [$image_name, '0', 1, '', null],
+      ] as [$picfile, $description, $nsfw, $thumbnail, $expected_alt]) {
+        $ogp_alt_update->execute([$picfile, $description, $nsfw, $thumbnail, $image_post_id]);
+        [$status, $body] = http_request($base_url . '?resno=' . $image_post_id, $root . '/ogp-anonymous-cookies.txt');
+        $ogp_alt_results[] = $status === 200 && ($expected_alt === null
+          ? !str_contains($body, 'property="og:image:alt"') && !str_contains($body, 'property="og:image"')
+          : str_contains($body, 'property="og:image:alt" content="' . htmlspecialchars($expected_alt, ENT_QUOTES, 'UTF-8') . '"')
+            && str_contains($body, 'property="og:image" content="')
+            && str_contains($body, '/img/' . rawurlencode($nsfw ? $thumbnail : $picfile) . '"'));
+      }
+      integration_test('OGP image descriptions preserve zero and escape text: ' . $ogp_theme,
+        static fn (): bool => !in_array(false, $ogp_alt_results, true));
+    }
+  } finally {
+    $ogp_alt_update->execute([$ogp_alt_original['picfile'], $ogp_alt_original['image_alt'],
+      $ogp_alt_original['nsfw'], $ogp_alt_original['thumbnail'], $image_post_id]);
+    file_put_contents($webroot . '/config.local.php', $ogp_alt_original_config);
+  }
+
   [, $checked_edit_form_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);
@@ -2281,31 +2333,134 @@ PHP;
   $replacement_base = 'replacement-' . bin2hex(random_bytes(6));
   $paint_seconds_before = (int)$db->query('SELECT psec FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
   $db->exec("UPDATE board_log SET tool = 'Klecks' WHERE tid = " . $image_post_id);
-  $replacement_code = 'replace-code-' . bin2hex(random_bytes(4));
   $resized_replacement = imagecreatetruecolor(17, 11);
   imagepng($resized_replacement, $webroot . '/tmp/' . $replacement_base . '.png');
   unset($resized_replacement);
-  file_put_contents(
-    $webroot . '/tmp/' . $replacement_base . '.dat',
-    "127.0.0.1\tlocalhost\tagent\t.png\tcode\t{$replacement_code}\t200\t260\t0\tneo"
-  );
   file_put_contents($webroot . '/tmp/' . $replacement_base . '.pch', 'replacement animation');
   file_put_contents($webroot . '/tmp/' . $replacement_base . '.psd', 'replacement layers');
   $replacement_old_psd = pathinfo((string)$image_row['picfile'], PATHINFO_FILENAME) . '.psd';
   file_put_contents($webroot . '/img/' . $replacement_old_psd, 'old layers');
+  $replacement_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  try {
+    foreach (['eda', 'monoreita'] as $replacement_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $replacement_theme . "'],", $replacement_original_config));
+      foreach (['neo', 'chicken', 'klecks', 'tegaki', 'axnos'] as $replacement_tool) {
+        [$tool_status, $tool_body] = http_request($base_url, $cookie_jar, [
+          'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
+          'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
+          'tools' => $replacement_tool, 'anime' => 'true',
+        ]);
+        $safe_submission = str_contains($tool_body, 'formData.append("token", "' . $token . '")');
+        if (in_array($replacement_tool, ['neo', 'chicken'], true)) {
+          preg_match('/repcode=([a-f0-9]{32})/', $tool_body, $form_code_match);
+          [$form_status, $form_body] = http_request($base_url . '?' . http_build_query([
+            'mode' => 'picrep_form', 'no' => $image_post_id, 'repcode' => $form_code_match[1] ?? '', 'stime' => '300',
+          ]), $cookie_jar);
+          $safe_submission = str_contains($tool_body, 'mode=picrep_form&') && $form_status === 200
+            && str_contains($form_body, 'method="post"')
+            && str_contains($form_body, 'name="mode" value="picrep"')
+            && str_contains($form_body, 'name="token" value="' . $token . '"')
+            && $db->query('SELECT picfile FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn() === $image_row['picfile']
+            && is_file($webroot . '/tmp/' . $replacement_base . '.png');
+        }
+        integration_test('drawing replacement uses a CSRF protected submission: ' . $replacement_theme . '/' . $replacement_tool,
+          static fn(): bool => $tool_status === 200 && $safe_submission);
+      }
+    }
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $replacement_original_config);
+  }
   [$replacement_authorization_status, $replacement_authorization_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
     'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
     'tools' => 'neo', 'anime' => 'true',
   ]);
+  preg_match('/repcode=([a-f0-9]{32})/', $replacement_authorization_body, $replacement_code_match);
+  $replacement_code = (string)($replacement_code_match[1] ?? '');
+  $replacement_owner = cookie_value($cookie_jar, 'usercode');
+  $replacement_metadata = "127.0.0.1\tlocalhost\tagent\t.png\t{$replacement_owner}\t{$replacement_code}\t200\t260\t0\tneo";
+  file_put_contents($webroot . '/tmp/' . $replacement_base . '.dat', $replacement_metadata);
+  $replacement_request = [
+    'mode' => 'picrep', 'no' => (string)$image_post_id, 'repcode' => $replacement_code,
+    'stime' => '300', 'nsfw' => '0', 'token' => $token,
+  ];
+  // 拒否した要求では投稿・一時画像・認可を維持し、本人が再試行できることも確認する。
+  foreach (['GET', 'missing token', 'invalid token', 'foreign origin', 'foreign code', 'foreign owner', 'hidden post', 'hidden parent'] as $attack) {
+    $request = $replacement_request;
+    $origin = 'http://localhost';
+    if ($attack === 'missing token') unset($request['token']);
+    if ($attack === 'invalid token') $request['token'] = 'invalid';
+    if ($attack === 'foreign origin') $origin = 'https://attacker.example';
+    if ($attack === 'foreign code') $request['repcode'] = str_repeat('a', 32);
+    if ($attack === 'foreign owner') {
+      file_put_contents($webroot . '/tmp/' . $replacement_base . '.dat', str_replace("\t{$replacement_owner}\t", "\tforeign-owner\t", $replacement_metadata));
+    }
+    if ($attack === 'hidden post') $db->exec('UPDATE board_log SET invz = 1 WHERE tid = ' . $image_post_id);
+    if ($attack === 'hidden parent') {
+      $db->exec('UPDATE board_log SET thread = 0, parent = ' . $post_id . ' WHERE tid = ' . $image_post_id);
+      $db->exec('UPDATE board_log SET invz = 1 WHERE tid = ' . $post_id);
+    }
+    $replacement_files_before = [];
+    foreach (array_merge(
+      glob($webroot . '/img/' . pathinfo((string)$image_row['picfile'], PATHINFO_FILENAME) . '.*') ?: [],
+      glob($webroot . '/tmp/' . $replacement_base . '.*') ?: [],
+      [$webroot . '/img/' . $continued_from_thumbnail]
+    ) as $path) {
+      if (is_file($path)) $replacement_files_before[$path] = hash_file('sha256', $path);
+    }
+    $replacement_row_before = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+    [$attack_status] = http_request(
+      $attack === 'GET' ? $base_url . '?' . http_build_query($replacement_request) : $base_url,
+      $cookie_jar, $attack === 'GET' ? null : $request, '127.0.0.1', $origin
+    );
+    $unchanged_picfile = $db->query('SELECT picfile FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
+    $replacement_row_after = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+    integration_test('image replacement rejects ' . $attack . ' without changing files', static function () use (
+      $attack, $attack_status, $unchanged_picfile, $image_row, $webroot, $replacement_base,
+      $replacement_files_before, $replacement_row_before, $replacement_row_after
+    ): bool {
+      foreach ($replacement_files_before as $path => $hash) {
+        if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+      }
+      return in_array($attack_status, in_array($attack, ['hidden post', 'hidden parent'], true) ? [404] : [400, 403], true)
+        && $replacement_row_before === $replacement_row_after
+        && $unchanged_picfile === $image_row['picfile']
+        && is_file($webroot . '/img/' . $image_row['picfile'])
+        && is_file($webroot . '/tmp/' . $replacement_base . '.png')
+        && is_file($webroot . '/tmp/' . $replacement_base . '.pch')
+        && is_file($webroot . '/tmp/' . $replacement_base . '.psd');
+    });
+    if ($attack === 'foreign owner') file_put_contents($webroot . '/tmp/' . $replacement_base . '.dat', $replacement_metadata);
+    if ($attack === 'hidden post') $db->exec('UPDATE board_log SET invz = 0 WHERE tid = ' . $image_post_id);
+    if ($attack === 'hidden parent') {
+      $db->exec('UPDATE board_log SET thread = 1, parent = NULL WHERE tid = ' . $image_post_id);
+      $db->exec('UPDATE board_log SET invz = 0 WHERE tid = ' . $post_id);
+    }
+  }
+  try {
+    file_put_contents($webroot . '/config.local.php', str_replace("    'image_upload' => true,",
+      "    'image_upload' => true,\n    'csrf' => false,", $replacement_original_config));
+    foreach (['missing token', 'foreign origin'] as $attack) {
+      $request = $replacement_request;
+      if ($attack === 'missing token') unset($request['token']);
+      [$attack_status] = http_request($base_url, $cookie_jar, $request, '127.0.0.1',
+        $attack === 'foreign origin' ? 'https://attacker.example' : 'http://localhost');
+      integration_test('image replacement stays protected when posting CSRF is disabled: ' . $attack,
+        static fn(): bool => $attack_status === 403
+          && $db->query('SELECT picfile FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn() === $image_row['picfile']
+          && is_file($webroot . '/tmp/' . $replacement_base . '.png'));
+    }
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $replacement_original_config);
+  }
   if (!replace_cookie_value($cookie_jar, 'pwd_cookie', 'another-post-pass')) {
     throw new RuntimeException('Could not prepare a mismatched saved password');
   }
   [$replacement_status, $replacement_body] = http_request(
-    $base_url . '?mode=picrep&no=' . $image_post_id . '&repcode=' . rawurlencode($replacement_code)
-      . '&stime=300',
+    $base_url,
     $cookie_jar,
-    ['nsfw' => '0']
+    $replacement_request
   );
   $replaced_image_row = $db->query('SELECT picfile, pchfile, nsfw, thumbnail, img_w, img_h, tool FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
   [$replacement_page_status, $replacement_page_body] = http_request($base_url . '?resno=' . $image_post_id, $cookie_jar);
@@ -2377,6 +2532,27 @@ PHP;
       && $continued_content['com'] === $continued_comment;
   });
 
+  // 別ブラウザー相当のセッションで同じ画像から描画を開始し、後から保存する側を用意する。
+  $stale_drawing_cookies = $root . '/stale-drawing-cookies.txt';
+  [$stale_form_status, $stale_form_body] = http_request($base_url, $stale_drawing_cookies, [
+    'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
+    'img' => (string)$replaced_image_row['picfile'], 'ctype' => 'img', 'tools' => 'neo',
+    'picw' => '300', 'pich' => '300', 'anime' => 'true',
+  ]);
+  preg_match('/repcode=([a-f0-9]{32})/', $stale_form_body, $stale_code_match);
+  $stale_code = (string)($stale_code_match[1] ?? '');
+  $stale_session = (string)cookie_value($stale_drawing_cookies, 'noreita_session');
+  $stale_owner = (string)cookie_value($stale_drawing_cookies, 'usercode');
+  $stale_base = 'stale-drawing-' . bin2hex(random_bytes(6));
+  copy($animation_png, $webroot . '/tmp/' . $stale_base . '.png');
+  file_put_contents($webroot . '/tmp/' . $stale_base . '.pch', 'stale replay');
+  file_put_contents($webroot . '/tmp/' . $stale_base . '.psd', 'stale layers');
+  file_put_contents($webroot . '/tmp/' . $stale_base . '.dat',
+    "127.0.0.1\tlocalhost\tagent\t.png\t{$stale_owner}\t{$stale_code}\t200\t260\t0\tneo");
+  integration_test('independent sessions can start replacing the same current image', static fn(): bool =>
+    $stale_form_status === 200 && $stale_code !== '' && $stale_session !== ''
+      && $stale_session !== cookie_value($cookie_jar, 'noreita_session'));
+
   // Tegakiは画像からの続き描きではリプレイを生成しない。そのためPNGだけを
   // saveimageへ送信してから、POSTのpicrepで差し替える実際の経路を確認する。
   [$tegaki_continue_form_status, $tegaki_continue_form_body] = http_request($base_url, $cookie_jar, [
@@ -2403,7 +2579,7 @@ PHP;
   );
   [$tegaki_replace_status, $tegaki_replace_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'picrep', 'no' => $tegaki_replacement_post_id, 'repcode' => $tegaki_replacement_code,
-    'nsfw' => '0', 'paint_picrep' => 'true',
+    'nsfw' => '0', 'paint_picrep' => 'true', 'token' => $token,
   ]);
   $tegaki_replaced_row = $db->query(
     'SELECT picfile, pchfile FROM board_log WHERE tid = ' . $image_post_id
@@ -2432,6 +2608,27 @@ PHP;
       && is_file($webroot . '/img/' . $tegaki_replaced_row['picfile'])
       && str_contains($tegaki_replace_body, 'action="index.php?mode=editexec"')
       && $tegaki_base !== '';
+  });
+
+  $winning_row = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $conflict_files = [];
+  foreach (array_merge(
+    glob($webroot . '/img/' . pathinfo((string)$winning_row['picfile'], PATHINFO_FILENAME) . '*') ?: [],
+    glob($webroot . '/tmp/' . $stale_base . '.*') ?: []
+  ) as $path) $conflict_files[$path] = hash_file('sha256', $path);
+  [$stale_status] = http_request($base_url, $stale_drawing_cookies, [
+    'mode' => 'picrep', 'no' => (string)$image_post_id, 'repcode' => $stale_code,
+    'token' => hash('sha256', $stale_session), 'nsfw' => '0',
+  ]);
+  $row_after_stale_save = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  integration_test('stale drawing cannot overwrite another session image or remove pending files', static function () use (
+    $stale_status, $winning_row, $row_after_stale_save, $conflict_files
+  ): bool {
+    if ($stale_status !== 409 || $winning_row !== $row_after_stale_save || count($conflict_files) < 5) return false;
+    foreach ($conflict_files as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+    }
+    return true;
   });
 
   [$admin_page_one_status, $admin_page_one_body] = http_request($base_url . '?mode=admin&page=1', $cookie_jar);
@@ -2486,10 +2683,80 @@ PHP;
       && !str_contains($admin_with_posts_body, 'name="adminpass"');
   });
 
+  $api_visibility_marker = 'api-parent-visibility-' . bin2hex(random_bytes(6));
+  $api_reply_image = $api_visibility_marker . '.png';
+  copy($animation_png, $webroot . '/img/' . $api_reply_image);
+  $db->prepare('INSERT INTO board_log (thread, parent, comid, tree, age, a_name, sub, com, picfile, invz, pwd) VALUES (0, ?, 999, 1, 1, ?, ?, ?, ?, 0, ?)')
+    ->execute([$post_id, 'API reply', $api_visibility_marker, $api_visibility_marker, $api_reply_image, password_hash('parent-reply-pass', PASSWORD_DEFAULT)]);
+  $api_visibility_reply_id = (int)$db->lastInsertId();
+  $check_api_parent_visibility = static function (string $state, bool $visible) use (
+    $api_url, $cookie_jar, $post_id, $api_visibility_reply_id, $api_visibility_marker, $api_reply_image, $db
+  ): void {
+    foreach (['threads', 'thread', 'catalog', 'search'] as $mode) {
+      [$status, $body] = http_request($api_url . '?' . http_build_query([
+        'mode' => $mode, 'id' => $post_id, 'q' => $api_visibility_marker, 'target' => 'comment', 'per_page' => '100',
+      ]), $cookie_jar);
+      $response = json_decode($body, true);
+      integration_test('API replies follow parent visibility: ' . $state . '/' . $mode, static function () use (
+        $status, $body, $response, $mode, $visible, $api_visibility_marker, $api_reply_image, $api_visibility_reply_id, $db
+      ): bool {
+        $content = json_encode($response['items'] ?? [$response['thread'] ?? null, $response['replies'] ?? []]);
+        if ($status !== (!$visible && $mode === 'thread' ? 404 : 200)
+          || !is_array($response) || str_contains($content ?: '', $api_visibility_marker) !== $visible
+          || str_contains($body, $api_reply_image) !== $visible
+          || (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $api_visibility_reply_id)->fetchColumn() !== 0) return false;
+        return $mode !== 'search' || ($response['pagination']['total'] ?? -1) === ($visible ? 1 : 0);
+      });
+    }
+  };
+  $check_html_parent_visibility = static function (string $state, bool $visible) use (
+    $base_url, $webroot, $root, $cookie_jar, $api_visibility_reply_id, $api_visibility_marker, $api_reply_image
+  ): void {
+    $original_config = (string)file_get_contents($webroot . '/config.local.php');
+    try {
+      foreach (['eda', 'monoreita'] as $theme) {
+        file_put_contents($webroot . '/config.local.php', str_replace(
+          ["'paths' => ['theme' => 'starter'],", "'misskey_note' => false,"],
+          ["'paths' => ['theme' => '" . $theme . "'],", "'misskey_note' => true,"], $original_config));
+        $anonymous = $root . '/parent-reply-' . $theme . '-' . $state . '.txt';
+        foreach (['article', 'continue form', 'continue POST'] as $route) {
+          $url = $base_url . ($route === 'article' ? '?resno=' . $api_visibility_reply_id
+            : ($route === 'continue form' ? '?mode=continue&no=' . rawurlencode($api_reply_image) : ''));
+          $request = $route === 'continue POST' ? [
+            'mode' => 'contpaint', 'type' => 'new', 'no' => (string)$api_visibility_reply_id,
+            'img' => $api_reply_image, 'ctype' => 'img', 'tools' => 'neo', 'picw' => '300', 'pich' => '300',
+          ] : null;
+          [$status, $body] = http_request($url, $anonymous, $request);
+          integration_test('HTML replies follow parent visibility: ' . $state . '/' . $theme . '/' . $route,
+            static fn(): bool => $status === ($visible ? 200 : 404)
+              && str_contains($body, $api_reply_image) === $visible
+              && ($visible || (!str_contains($body, $api_visibility_marker) && !str_contains($body, 'property="og:image"'))));
+        }
+        [$public_status, $public_body] = http_request($base_url . '?mode=before_misskey_note&no=' . $api_visibility_reply_id, $anonymous);
+        [$admin_status, $admin_body] = http_request($base_url . '?mode=before_misskey_note&no=' . $api_visibility_reply_id, $cookie_jar);
+        $owner_token = hash('sha256', (string)cookie_value($anonymous, 'noreita_session'));
+        [$owner_status, $owner_body] = http_request($base_url, $anonymous, [
+          'mode' => 'misskey_note_edit_form', 'no' => (string)$api_visibility_reply_id,
+          'pwd' => 'parent-reply-pass', 'token' => $owner_token,
+        ]);
+        integration_test('Misskey replies require authorization when parent is hidden: ' . $state . '/' . $theme,
+          static fn(): bool => $public_status === 200 && $admin_status === 200 && $owner_status === 200
+            && str_contains($public_body, $api_visibility_marker) === $visible
+            && str_contains($public_body, $api_reply_image) === $visible
+            && str_contains($admin_body, $api_visibility_marker) && str_contains($owner_body, $api_visibility_marker));
+      }
+    } finally {
+      file_put_contents($webroot . '/config.local.php', $original_config);
+    }
+  };
+  $check_api_parent_visibility('visible', true);
+  $check_html_parent_visibility('visible', true);
   [$hide_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $hidden_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  $check_api_parent_visibility('hidden', false);
+  $check_html_parent_visibility('hidden', false);
   [$hidden_detail_status, $hidden_detail_body] = http_request(
     $base_url . '?mode=admin_post&id=' . $post_id, $cookie_jar
   );
@@ -2529,6 +2796,8 @@ PHP;
     'operation' => 'show', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $visible_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  $check_api_parent_visibility('restored', true);
+  $check_html_parent_visibility('restored', true);
   [$visible_admin_status, $visible_admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$visible_search_status, $visible_search_body] = http_request(
     $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
@@ -2820,12 +3089,18 @@ PHP;
     return $unsupported_avif_rejected;
   });
 
-  $check_continuation = static function (string $theme, string $continue_url, string $continue_cookies) use ($webroot, $upload_row): void {
+  $check_continuation = static function (string $theme, string $continue_url, string $continue_cookies) use ($webroot, $upload_row, $pending_replacement_row): void {
     $continue_db = new PDO('sqlite:' . $webroot . '/reita.db');
     $continue_fixture = $continue_db->query('SELECT tid, picfile, pchfile, ctype, invz, image_alt FROM board_log WHERE picfile = '
       . $continue_db->quote((string)$upload_row['picfile']))->fetch(PDO::FETCH_ASSOC);
     $continue_animation = pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.pch';
     $continue_animation_path = $webroot . '/img/' . $continue_animation;
+    $continue_psd_path = $webroot . '/img/' . pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.psd';
+    $continue_chi = pathinfo($continue_fixture['picfile'], PATHINFO_FILENAME) . '.chi';
+    $continue_chi_path = $webroot . '/img/' . $continue_chi;
+    $other_visible_id = (int)$continue_db->query('SELECT tid FROM board_log WHERE picfile = '
+      . $continue_db->quote((string)$pending_replacement_row['picfile']) . ' AND invz = 0')->fetchColumn();
+    if ($other_visible_id <= 0 || file_exists($continue_psd_path) || file_exists($continue_chi_path)) throw new RuntimeException('Could not prepare continuation POST fixtures.');
     if (file_exists($continue_animation_path)) throw new RuntimeException('Continuation fixture already has animation.');
     try {
       foreach ([['pch', false, false], ['spch', false, false], ['pch', true, true], ['img', true, false]] as [$stored_ctype, $has_animation, $expected_animation]) {
@@ -2844,6 +3119,51 @@ PHP;
               && str_contains($continue_body, '<option value="img"');
           }
         );
+      }
+      file_put_contents($continue_animation_path, 'NEO test replay');
+      file_put_contents($continue_psd_path, 'Klecks test layers');
+      $continue_db->prepare('UPDATE board_log SET pchfile = ? WHERE tid = ?')
+        ->execute([$continue_animation, $continue_fixture['tid']]);
+      $continue_request = [
+        'mode' => 'contpaint', 'type' => 'new', 'no' => (string)$continue_fixture['tid'],
+        'img' => $continue_fixture['picfile'], 'picw' => '300', 'pich' => '300', 'anime' => 'true',
+      ];
+      foreach (['img' => 'neo', 'pch' => 'neo', 'psd' => 'klecks'] as $source => $tool) {
+        $request = $continue_request + ['ctype' => $source, 'tools' => $tool];
+        if ($source === 'pch') $request['pch'] = $continue_animation;
+        [$direct_status, $direct_body] = http_request($continue_url, $continue_cookies, $request);
+        integration_test('visible continuation accepts direct POST: ' . $theme . '/' . $source,
+          static fn(): bool => $direct_status === 200
+            && str_contains($direct_body, 'img/' . ($source === 'pch' ? $continue_animation : $continue_fixture['picfile'])));
+      }
+      file_put_contents($continue_chi_path, 'ChickenPaint test layers');
+      $continue_db->prepare('UPDATE board_log SET pchfile = ? WHERE tid = ?')
+        ->execute([$continue_chi, $continue_fixture['tid']]);
+      [$chi_status, $chi_body] = http_request($continue_url, $continue_cookies,
+        $continue_request + ['ctype' => 'pch', 'tools' => 'chicken', 'pch' => $continue_chi]);
+      integration_test('visible continuation accepts ChickenPaint layers: ' . $theme,
+        static fn(): bool => $chi_status === 200 && str_contains($chi_body, 'img/' . $continue_chi));
+      $continue_db->prepare('UPDATE board_log SET pchfile = ? WHERE tid = ?')
+        ->execute([$continue_animation, $continue_fixture['tid']]);
+      $continue_db->prepare('UPDATE board_log SET invz = 1 WHERE tid = ?')->execute([$continue_fixture['tid']]);
+      foreach (['img', 'pch', 'psd', 'rep', 'missing number', 'forged number', 'forged replay'] as $attack) {
+        $request = $continue_request + ['ctype' => $attack === 'psd' ? 'psd' : 'img', 'tools' => $attack === 'psd' ? 'klecks' : 'neo'];
+        if ($attack === 'pch') { $request['ctype'] = 'pch'; $request['pch'] = $continue_animation; }
+        if ($attack === 'rep') { $request['type'] = 'rep'; $request['pwd'] = 'upload-delete-pass'; }
+        if ($attack === 'missing number') unset($request['no']);
+        if ($attack === 'forged number') $request['no'] = (string)$other_visible_id;
+        if ($attack === 'forged replay') {
+          $request['no'] = (string)$other_visible_id;
+          $request['img'] = (string)$pending_replacement_row['picfile'];
+          $request['ctype'] = 'pch'; $request['pch'] = $continue_animation;
+        }
+        foreach (['public' => dirname($webroot) . '/continue-direct-public-' . $theme . '.txt', 'administrator' => $continue_cookies] as $role => $cookies) {
+          [$direct_status, $direct_body] = http_request($continue_url, $cookies, $request);
+          integration_test('hidden continuation rejects direct POST: ' . $theme . '/' . $attack . '/' . $role,
+            static fn(): bool => $direct_status === 404
+              && !str_contains($direct_body, $continue_fixture['picfile'])
+              && !str_contains($direct_body, $continue_animation));
+        }
       }
       // 同じ画像が残っていても非表示投稿は公開入口から取得できない。
       // 説明が空のときに投稿者名・件名がaltへ漏れる経路も両テーマで確認する。
@@ -2869,6 +3189,8 @@ PHP;
       }
     } finally {
       if (is_file($continue_animation_path)) unlink($continue_animation_path);
+      if (is_file($continue_psd_path)) unlink($continue_psd_path);
+      if (is_file($continue_chi_path)) unlink($continue_chi_path);
       $statement = $continue_db->prepare('UPDATE board_log SET ctype = ?, pchfile = ?, invz = ?, image_alt = ? WHERE tid = ?');
       $statement->execute([$continue_fixture['ctype'], $continue_fixture['pchfile'], $continue_fixture['invz'],
         $continue_fixture['image_alt'], $continue_fixture['tid']]);
