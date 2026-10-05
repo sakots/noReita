@@ -77,8 +77,8 @@ class misskey_note {
         render_error($context, $en ? 'The article was not found.' : '記事が見つかりません。', 404);
     }
 
-    // 非表示投稿は、管理者または投稿パスワードを知る本人にだけ内容を表示する。
-    if ((int)$post['invz'] !== 0 && !MisskeyPostAuthorization::isAdministrator()
+    // 親が非表示の返信も非公開として扱い、既存の管理者・投稿者認証を要求する。
+    if ((new BoardRepository())->findPublicPost((int)$post['tid']) === false && !MisskeyPostAuthorization::isAdministrator()
       && MisskeyPostAuthorization::authorize((int)$post['tid'], $dat['pwd_cookie']) === null) {
       $dat['token'] = RequestSecurity::csrfToken();
       $dat['misskey_mode'] = 'authorize';

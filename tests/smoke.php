@@ -1335,6 +1335,10 @@ smoke_test('public API visibility follows the parent without changing reply visi
   foreach ([0, 1, 0] as $hidden) {
     $repository->setPostsVisibility([$parent], (bool)$hidden);
     $expected = $hidden ? [] : [$parent, $reply];
+    if (($repository->findPublicPost($reply) !== false) !== !$hidden
+      || count($repository->findPostsByImage('reply.png')) !== ($hidden ? 0 : 1)
+      || $repository->findPublicPost(999999) !== false
+      || $repository->findPostsByImage('orphan.png') !== []) return false;
     foreach (['catalog', 'search'] as $mode) {
       $response = PublicApi::dispatch($repository, ['mode' => $mode, 'q' => 'visibility-fixture', 'target' => 'comment', 'per_page' => '1']);
       if ($response['pagination']['total'] !== count($expected)

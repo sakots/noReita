@@ -8,7 +8,7 @@ final class PaintController {
     $animation = (string)filter_input(INPUT_POST, 'pch');
     $ctype = (string)filter_input(INPUT_POST, 'ctype');
     try {
-      $post = (new BoardRepository())->findPost($no);
+      $post = (new BoardRepository())->findPublicPost($no);
     } catch (PDOException $e) {
       render_error($context, $context->english ? 'Failed to find the image.' : '画像の検索に失敗しました。', 500, $e);
       return;
@@ -16,7 +16,7 @@ final class PaintController {
     // 確認画面を経由しないPOSTでも、公開投稿に属する画像・動画だけを使う。
     // ファイルへのアクセスや差し替え認可の発行より先に、番号とファイルの対応を確認する。
     $image_dir = Config::string('paths.images');
-    if ($post === false || (int)($post['invz'] ?? 0) !== 0
+    if ($post === false
       || !ImageService::isSafePostedImageFilename($image)
       || $image !== (string)$post['picfile']
       || !is_file($image_dir . $image) || !is_readable($image_dir . $image)

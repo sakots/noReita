@@ -42,7 +42,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261004) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261005) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -1344,9 +1344,9 @@ function res(ApplicationContext $context): void {
     }
     $dat['resno'] = $resno;
 
-    $thread = $repository->findPost((int)$resno);
-    // 公開画面では、非表示の記事を本文・OGPへ渡さない。
-    if ($thread === false || (int)($thread['invz'] ?? 0) !== 0) {
+    $thread = $repository->findPublicPost((int)$resno);
+    // 返信番号の直接指定でも、親が非表示の記事を本文・OGPへ渡さない。
+    if ($thread === false) {
       render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
     }
     $posts = $thread ? [$thread] : [];

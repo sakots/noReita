@@ -3,7 +3,7 @@
 
 require_once __DIR__ . '/filesystem_permissions.inc.php';
 
-const DATABASE_INC_VER = 20261004;
+const DATABASE_INC_VER = 20261005;
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -236,6 +236,14 @@ final class BoardRepository {
   /** @return array|false */
   public function findPost(int $id) {
     $statement = $this->db->prepare('SELECT * FROM board_log WHERE tid = ?');
+    $statement->execute([$id]);
+    return $statement->fetch(PDO::FETCH_ASSOC);
+  }
+
+  /** 親スレッドの公開状態も含めて、公開経路へ渡せる投稿だけを取得する。 @return array|false */
+  public function findPublicPost(int $id) {
+    $visibility = $this->publicVisibilityCondition();
+    $statement = $this->db->prepare("SELECT * FROM board_log WHERE tid = ? AND {$visibility}");
     $statement->execute([$id]);
     return $statement->fetch(PDO::FETCH_ASSOC);
   }
@@ -559,8 +567,9 @@ final class BoardRepository {
   }
 
   public function findPostsByImage(string $image_name): array {
-    // 続き描画の公開確認画面には、非表示投稿の画像や説明を渡さない。
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE picfile = ? AND invz = 0 ORDER BY tree DESC');
+    // 続き描画にも、記事表示やAPIと同じ親スレッド込みの公開条件を適用する。
+    $visibility = $this->publicVisibilityCondition();
+    $statement = $this->db->prepare("SELECT * FROM board_log WHERE picfile = ? AND {$visibility} ORDER BY tree DESC");
     $statement->execute([$image_name]);
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }

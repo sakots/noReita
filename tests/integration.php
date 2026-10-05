@@ -2567,8 +2567,8 @@ PHP;
   $api_visibility_marker = 'api-parent-visibility-' . bin2hex(random_bytes(6));
   $api_reply_image = $api_visibility_marker . '.png';
   copy($animation_png, $webroot . '/img/' . $api_reply_image);
-  $db->prepare('INSERT INTO board_log (thread, parent, comid, tree, age, a_name, sub, com, picfile, invz) VALUES (0, ?, 999, 1, 1, ?, ?, ?, ?, 0)')
-    ->execute([$post_id, 'API reply', $api_visibility_marker, $api_visibility_marker, $api_reply_image]);
+  $db->prepare('INSERT INTO board_log (thread, parent, comid, tree, age, a_name, sub, com, picfile, invz, pwd) VALUES (0, ?, 999, 1, 1, ?, ?, ?, ?, 0, ?)')
+    ->execute([$post_id, 'API reply', $api_visibility_marker, $api_visibility_marker, $api_reply_image, password_hash('parent-reply-pass', PASSWORD_DEFAULT)]);
   $api_visibility_reply_id = (int)$db->lastInsertId();
   $check_api_parent_visibility = static function (string $state, bool $visible) use (
     $api_url, $cookie_jar, $post_id, $api_visibility_reply_id, $api_visibility_marker, $api_reply_image, $db
@@ -2590,12 +2590,54 @@ PHP;
       });
     }
   };
+  $check_html_parent_visibility = static function (string $state, bool $visible) use (
+    $base_url, $webroot, $root, $cookie_jar, $api_visibility_reply_id, $api_visibility_marker, $api_reply_image
+  ): void {
+    $original_config = (string)file_get_contents($webroot . '/config.local.php');
+    try {
+      foreach (['eda', 'monoreita'] as $theme) {
+        file_put_contents($webroot . '/config.local.php', str_replace(
+          ["'paths' => ['theme' => 'starter'],", "'misskey_note' => false,"],
+          ["'paths' => ['theme' => '" . $theme . "'],", "'misskey_note' => true,"], $original_config));
+        $anonymous = $root . '/parent-reply-' . $theme . '-' . $state . '.txt';
+        foreach (['article', 'continue form', 'continue POST'] as $route) {
+          $url = $base_url . ($route === 'article' ? '?resno=' . $api_visibility_reply_id
+            : ($route === 'continue form' ? '?mode=continue&no=' . rawurlencode($api_reply_image) : ''));
+          $request = $route === 'continue POST' ? [
+            'mode' => 'contpaint', 'type' => 'new', 'no' => (string)$api_visibility_reply_id,
+            'img' => $api_reply_image, 'ctype' => 'img', 'tools' => 'neo', 'picw' => '300', 'pich' => '300',
+          ] : null;
+          [$status, $body] = http_request($url, $anonymous, $request);
+          integration_test('HTML replies follow parent visibility: ' . $state . '/' . $theme . '/' . $route,
+            static fn(): bool => $status === ($visible ? 200 : 404)
+              && str_contains($body, $api_reply_image) === $visible
+              && ($visible || (!str_contains($body, $api_visibility_marker) && !str_contains($body, 'property="og:image"'))));
+        }
+        [$public_status, $public_body] = http_request($base_url . '?mode=before_misskey_note&no=' . $api_visibility_reply_id, $anonymous);
+        [$admin_status, $admin_body] = http_request($base_url . '?mode=before_misskey_note&no=' . $api_visibility_reply_id, $cookie_jar);
+        $owner_token = hash('sha256', (string)cookie_value($anonymous, 'noreita_session'));
+        [$owner_status, $owner_body] = http_request($base_url, $anonymous, [
+          'mode' => 'misskey_note_edit_form', 'no' => (string)$api_visibility_reply_id,
+          'pwd' => 'parent-reply-pass', 'token' => $owner_token,
+        ]);
+        integration_test('Misskey replies require authorization when parent is hidden: ' . $state . '/' . $theme,
+          static fn(): bool => $public_status === 200 && $admin_status === 200 && $owner_status === 200
+            && str_contains($public_body, $api_visibility_marker) === $visible
+            && str_contains($public_body, $api_reply_image) === $visible
+            && str_contains($admin_body, $api_visibility_marker) && str_contains($owner_body, $api_visibility_marker));
+      }
+    } finally {
+      file_put_contents($webroot . '/config.local.php', $original_config);
+    }
+  };
   $check_api_parent_visibility('visible', true);
+  $check_html_parent_visibility('visible', true);
   [$hide_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $hidden_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
   $check_api_parent_visibility('hidden', false);
+  $check_html_parent_visibility('hidden', false);
   [$hidden_detail_status, $hidden_detail_body] = http_request(
     $base_url . '?mode=admin_post&id=' . $post_id, $cookie_jar
   );
@@ -2636,6 +2678,7 @@ PHP;
   ]);
   $visible_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
   $check_api_parent_visibility('restored', true);
+  $check_html_parent_visibility('restored', true);
   [$visible_admin_status, $visible_admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$visible_search_status, $visible_search_body] = http_request(
     $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
