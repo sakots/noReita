@@ -1324,6 +1324,35 @@ smoke_test('public API exposes only visible React-safe post data', static functi
     && count($catalog['items']) === 1 && count($search['items']) === 1;
 });
 
+smoke_test('public API visibility follows the parent without changing reply visibility', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'invz' => 0, 'picfile' => 'parent.png', 'com' => 'visibility-fixture']);
+  $reply = $repository->insertPost(['thread' => 0, 'parent' => $parent, 'invz' => 0, 'picfile' => 'reply.png', 'com' => 'visibility-fixture']);
+  $repository->insertPost(['thread' => 0, 'parent' => $parent, 'invz' => 1, 'picfile' => 'hidden.png', 'com' => 'visibility-fixture']);
+  $repository->insertPost(['thread' => 0, 'parent' => 999999, 'invz' => 0, 'picfile' => 'orphan.png', 'com' => 'visibility-fixture']);
+  foreach ([0, 1, 0] as $hidden) {
+    $repository->setPostsVisibility([$parent], (bool)$hidden);
+    $expected = $hidden ? [] : [$parent, $reply];
+    foreach (['catalog', 'search'] as $mode) {
+      $response = PublicApi::dispatch($repository, ['mode' => $mode, 'q' => 'visibility-fixture', 'target' => 'comment', 'per_page' => '1']);
+      if ($response['pagination']['total'] !== count($expected)
+        || count($response['items']) !== ($hidden ? 0 : 1)) return false;
+      if (!$hidden) {
+        $response = PublicApi::dispatch($repository, ['mode' => $mode, 'q' => 'visibility-fixture', 'target' => 'comment']);
+        $ids = array_column($response['items'], 'id');
+        sort($ids);
+        if ($ids !== $expected) return false;
+      }
+    }
+    if (array_column($repository->findReplies($parent), 'tid') !== ($hidden ? [] : [$reply])
+      || array_column($repository->findRepliesForThreads([$parent]), 'tid') !== ($hidden ? [] : [$reply])) return false;
+    if ((int)$repository->findPost($reply)['invz'] !== 0 || count($repository->findRepliesForAdmin($parent)) !== 2) return false;
+  }
+  return true;
+});
+
 smoke_test('SQLite connections wait for a temporary write lock', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_busy_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;

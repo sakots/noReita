@@ -2564,10 +2564,38 @@ PHP;
       && !str_contains($admin_with_posts_body, 'name="adminpass"');
   });
 
+  $api_visibility_marker = 'api-parent-visibility-' . bin2hex(random_bytes(6));
+  $api_reply_image = $api_visibility_marker . '.png';
+  copy($animation_png, $webroot . '/img/' . $api_reply_image);
+  $db->prepare('INSERT INTO board_log (thread, parent, comid, tree, age, a_name, sub, com, picfile, invz) VALUES (0, ?, 999, 1, 1, ?, ?, ?, ?, 0)')
+    ->execute([$post_id, 'API reply', $api_visibility_marker, $api_visibility_marker, $api_reply_image]);
+  $api_visibility_reply_id = (int)$db->lastInsertId();
+  $check_api_parent_visibility = static function (string $state, bool $visible) use (
+    $api_url, $cookie_jar, $post_id, $api_visibility_reply_id, $api_visibility_marker, $api_reply_image, $db
+  ): void {
+    foreach (['threads', 'thread', 'catalog', 'search'] as $mode) {
+      [$status, $body] = http_request($api_url . '?' . http_build_query([
+        'mode' => $mode, 'id' => $post_id, 'q' => $api_visibility_marker, 'target' => 'comment', 'per_page' => '100',
+      ]), $cookie_jar);
+      $response = json_decode($body, true);
+      integration_test('API replies follow parent visibility: ' . $state . '/' . $mode, static function () use (
+        $status, $body, $response, $mode, $visible, $api_visibility_marker, $api_reply_image, $api_visibility_reply_id, $db
+      ): bool {
+        $content = json_encode($response['items'] ?? [$response['thread'] ?? null, $response['replies'] ?? []]);
+        if ($status !== (!$visible && $mode === 'thread' ? 404 : 200)
+          || !is_array($response) || str_contains($content ?: '', $api_visibility_marker) !== $visible
+          || str_contains($body, $api_reply_image) !== $visible
+          || (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $api_visibility_reply_id)->fetchColumn() !== 0) return false;
+        return $mode !== 'search' || ($response['pagination']['total'] ?? -1) === ($visible ? 1 : 0);
+      });
+    }
+  };
+  $check_api_parent_visibility('visible', true);
   [$hide_status] = http_request($base_url . '?mode=admin_manage', $cookie_jar, [
     'operation' => 'hide', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $hidden_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  $check_api_parent_visibility('hidden', false);
   [$hidden_detail_status, $hidden_detail_body] = http_request(
     $base_url . '?mode=admin_post&id=' . $post_id, $cookie_jar
   );
@@ -2607,6 +2635,7 @@ PHP;
     'operation' => 'show', 'delno' => [(string)$post_id], 'token' => $token,
   ]);
   $visible_value = (int)$db->query('SELECT invz FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
+  $check_api_parent_visibility('restored', true);
   [$visible_admin_status, $visible_admin_body] = http_request($base_url . '?mode=admin', $cookie_jar);
   [$visible_search_status, $visible_search_body] = http_request(
     $base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar
