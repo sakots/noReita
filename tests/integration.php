@@ -2268,6 +2268,39 @@ PHP;
     $ogp_update->execute([$nsfw_image_row['nsfw'], $nsfw_image_row['thumbnail'], $image_post_id]);
   }
 
+  $ogp_alt_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $ogp_alt_original = $db->query('SELECT picfile, image_alt, nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  $ogp_alt_update = $db->prepare('UPDATE board_log SET picfile = ?, image_alt = ?, nsfw = ?, thumbnail = ? WHERE tid = ?');
+  try {
+    foreach (['eda', 'monoreita'] as $ogp_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $ogp_theme . "'],", $config_local));
+      $ogp_alt_results = [];
+      foreach ([
+        [$image_name, '0', 0, '', '0'],
+        [$image_name, '0', 1, $nsfw_thumbnail, '0'],
+        [$image_name, '', 0, '', 'Image subject'],
+        [$image_name, '説明 & <画像> "引用"', 0, '', '説明 & <画像> "引用"'],
+        ['', '0', 0, '', null],
+        [$image_name, '0', 1, '', null],
+      ] as [$picfile, $description, $nsfw, $thumbnail, $expected_alt]) {
+        $ogp_alt_update->execute([$picfile, $description, $nsfw, $thumbnail, $image_post_id]);
+        [$status, $body] = http_request($base_url . '?resno=' . $image_post_id, $root . '/ogp-anonymous-cookies.txt');
+        $ogp_alt_results[] = $status === 200 && ($expected_alt === null
+          ? !str_contains($body, 'property="og:image:alt"') && !str_contains($body, 'property="og:image"')
+          : str_contains($body, 'property="og:image:alt" content="' . htmlspecialchars($expected_alt, ENT_QUOTES, 'UTF-8') . '"')
+            && str_contains($body, 'property="og:image" content="')
+            && str_contains($body, '/img/' . rawurlencode($nsfw ? $thumbnail : $picfile) . '"'));
+      }
+      integration_test('OGP image descriptions preserve zero and escape text: ' . $ogp_theme,
+        static fn (): bool => !in_array(false, $ogp_alt_results, true));
+    }
+  } finally {
+    $ogp_alt_update->execute([$ogp_alt_original['picfile'], $ogp_alt_original['image_alt'],
+      $ogp_alt_original['nsfw'], $ogp_alt_original['thumbnail'], $image_post_id]);
+    file_put_contents($webroot . '/config.local.php', $ogp_alt_original_config);
+  }
+
   [, $checked_edit_form_body] = http_request($base_url, $cookie_jar, [
     'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);
