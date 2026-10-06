@@ -1985,6 +1985,37 @@ smoke_test('sodane increments only publicly visible posts', static function (): 
     && (int)$repository->findPost($orphan)['sodane'] === 7 && !$db->inTransaction();
 });
 
+foreach (['visible thread', 'visible reply', 'hidden post', 'hidden parent', 'deleted parent'] as $replacement_state) {
+  smoke_test('image replacement rechecks visibility when updating: ' . $replacement_state, static function () use ($replacement_state): bool {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $parent = $repository->insertPost(['thread' => 1, 'invz' => 0, 'picfile' => 'parent.png']);
+    $reply = $repository->insertPost(['thread' => 0, 'parent' => $parent, 'invz' => 0, 'picfile' => 'reply.png']);
+    $id = $replacement_state === 'visible thread' ? $parent : $reply;
+    $snapshot = $repository->findPublicPost($id);
+    if ($snapshot === false) return false;
+    // 保存処理での取得後、更新SQLの実行前に別操作が公開状態を変更する状況を再現する。
+    if ($replacement_state === 'hidden post') $repository->setPostsVisibility([$id], true);
+    if ($replacement_state === 'hidden parent') $repository->setPostsVisibility([$parent], true);
+    if ($replacement_state === 'deleted parent') $repository->deletePost($parent);
+    $before = $db->query('SELECT * FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC);
+    $visible = str_starts_with($replacement_state, 'visible');
+    try {
+      $repository->updateImage($id, [
+        'host' => 'localhost', 'picfile' => 'replacement.png', 'pchfile' => '', 'author_id' => 'artist',
+        'psec' => 42, 'utime' => '42秒', 'nsfw' => 0, 'thumbnail' => '',
+        'expected_picfile' => $snapshot['picfile'], 'img_w' => 300, 'img_h' => 400, 'tool' => 'Klecks',
+      ]);
+      $updated = $repository->findPost($id);
+      return $visible && $updated['picfile'] === 'replacement.png'
+        && (int)$updated['img_w'] === 300 && (int)$updated['img_h'] === 400;
+    } catch (RuntimeException $e) {
+      return !$visible && $db->query('SELECT * FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC) === $before;
+    }
+  });
+}
+
 smoke_test('content editing preserves sodane increments after the post was read', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();

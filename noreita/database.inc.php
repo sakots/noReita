@@ -369,9 +369,12 @@ final class BoardRepository {
   }
 
   public function updateImage(int $id, array $values): void {
+    // 取得後の非表示化・親削除も拒否できるよう、公開状態を更新と同じSQLで照合する。
+    $visibility = $this->publicVisibilityCondition();
     $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), host = :host, picfile = :picfile,
       pchfile = :pchfile, id = :author_id, psec = :psec, utime = :utime, nsfw = :nsfw,
-      thumbnail = :thumbnail, img_w = :img_w, img_h = :img_h, tool = :tool WHERE tid = :id AND picfile = :expected_picfile";
+      thumbnail = :thumbnail, img_w = :img_w, img_h = :img_h, tool = :tool
+      WHERE tid = :id AND picfile = :expected_picfile AND {$visibility}";
     $statement = $this->db->prepare($sql);
     $statement->execute([
       'host' => $values['host'], 'picfile' => $values['picfile'], 'pchfile' => $values['pchfile'],
@@ -383,7 +386,7 @@ final class BoardRepository {
       'tool' => $values['tool'],
     ]);
     if ($statement->rowCount() !== 1) {
-      throw new RuntimeException('The posted image changed before replacement completed.');
+      throw new RuntimeException('The post visibility or image changed before replacement completed.');
     }
   }
 
