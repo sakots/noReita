@@ -33,14 +33,16 @@
   </header>
   <main>
     {% if othermode == 'picreplace' %}
-      <form method="post" action="{{ self }}">
-        <input type="hidden" name="mode" value="picrep">
-        <input type="hidden" name="no" value="{{ replacement_no }}">
-        <input type="hidden" name="repcode" value="{{ replacement_code }}">
-        <input type="hidden" name="stime" value="{{ stime }}">
-        <input type="hidden" name="token" value="{{ token }}">
-        <button type="submit">{{ replacement_label }}</button>
-      </form>
+      <div class="thread">
+        <form method="post" action="{{ self }}">
+          <input type="hidden" name="mode" value="picrep">
+          <input type="hidden" name="no" value="{{ replacement_no }}">
+          <input type="hidden" name="repcode" value="{{ replacement_code }}">
+          <input type="hidden" name="stime" value="{{ stime }}">
+          <input type="hidden" name="token" value="{{ token }}">
+          <button type="submit">{{ replacement_label }}</button>
+        </form>
+      </div>
     {% endif %}
     {# 記事編集モードスタート #}
     {% if othermode == 'edit' %}
