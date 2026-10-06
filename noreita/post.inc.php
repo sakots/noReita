@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20260930;
+const POST_INC_VER = 20261006;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -309,7 +309,8 @@ final class PostService implements AdminPostManagementService {
       'image_alt' => (string)$post['picfile'] !== '' ? (string)($post['image_alt'] ?? '') : '',
       'pchfile' => $image['pchfile'], 'img_w' => $image['img_w'], 'img_h' => $image['img_h'],
       'psec' => $image['psec'], 'utime' => $image['utime'], 'pwd' => $post['pwdh'],
-      'id' => gen_id((string)$post['host'], (string)$now), 'sodane' => $post['sodane'],
+      // 新規投稿・返信の初期値は、フォーム値にかかわらずサーバー側で決める。
+      'id' => gen_id((string)$post['host'], (string)$now), 'sodane' => 0,
       'age' => $age, 'invz' => $post['invz'], 'host' => $post['host'], 'tool' => $image['tool'],
       'admins' => $post['admins'], 'shd' => 0, 'nsfw' => $image['nsfw'], 'ctype' => $image['ctype'],
       'uuid' => generate_uuid(), 'thumbnail' => $image['thumbnail'],

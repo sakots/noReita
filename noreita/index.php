@@ -63,7 +63,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260913) {
 // post.inc
 check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260930) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20261006) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 

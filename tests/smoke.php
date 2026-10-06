@@ -1945,6 +1945,26 @@ smoke_test('ctype input sources are resolved in priority order', static function
     && PostInput::resolveCtype(['direct' => '../invalid', 'usercode' => 'ctype=invalid']) === 'new';
 });
 
+smoke_test('new posts and replies always start with zero sodane', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $service = new PostService($repository, sys_get_temp_dir());
+  $parent = $repository->insertPost(['thread' => 1, 'invz' => 0, 'age' => 0, 'sodane' => 7]);
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  foreach (['', (string)$parent] as $resto) {
+    foreach ([999999, -42, null] as $value) {
+      $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+      $post += ['resto' => $resto, 'invz' => 0, 'admins' => 0];
+      if ($value !== null) $post['sodane'] = $value;
+      $id = $service->createPreparedPost($post, $image);
+      if ((int)$repository->findPost($id)['sodane'] !== 0) return false;
+    }
+  }
+  return (int)$repository->findPost($parent)['sodane'] === 7;
+});
+
 smoke_test('sodane increments only publicly visible posts', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();

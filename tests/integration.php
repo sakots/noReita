@@ -1373,7 +1373,7 @@ PHP;
   [$post_status, $post_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => $raw_trip_name, 'mail' => $raw_trip_mail, 'url' => '',
     'sub' => "Integration's subject", 'com' => "結合テスト user's {$marker}", 'pwd' => 'delete-pass',
-    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '999999', 'nsfw' => '0', 'token' => $token,
   ]);
 
   $db = new PDO('sqlite:' . $webroot . '/reita.db');
@@ -1392,6 +1392,9 @@ PHP;
       && urldecode((string)cookie_value($cookie_jar, 'email_c')) === $raw_trip_mail;
   });
 
+  integration_test('new post ignores a forged positive sodane initial value', static function () use ($db, $post_status, $row): bool {
+    return $post_status === 200 && (int)$db->query('SELECT sodane FROM board_log WHERE tid = ' . (int)$row['tid'])->fetchColumn() === 0;
+  });
   $shared_thread_id = (int)($row['tid'] ?? 0);
   $sodane_count = static fn(): int => (int)$db->query('SELECT sodane FROM board_log WHERE tid = ' . $shared_thread_id)->fetchColumn();
   foreach ([
@@ -3566,8 +3569,18 @@ PHP;
     'mode' => 'reply', 'send' => '1', 'resto' => (string)$diary_parent_id,
     'name' => 'public diary visitor', 'mail' => '', 'url' => '', 'sub' => '',
     'com' => $diary_reply_marker, 'pwd' => 'public-pass',
-    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_replies_token,
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '-42', 'nsfw' => '0', 'token' => $diary_replies_token,
   ]);
+  integration_test('new reply ignores a forged negative sodane initial value', static function () use (
+    $webroot, $diary_reply_allowed_status, $diary_reply_marker, $diary_parent_id
+  ): bool {
+    // 別リクエストの保存結果を、既存SELECTのスナップショットに影響されず取得する。
+    $reply_db = new PDO('sqlite:' . $webroot . '/reita.db');
+    $statement = $reply_db->prepare('SELECT sodane FROM board_log WHERE thread = 0 AND parent = ? AND com = ?');
+    $statement->execute([$diary_parent_id, $diary_reply_marker]);
+    $count = $statement->fetchColumn();
+    return $diary_reply_allowed_status === 200 && $count !== false && (int)$count === 0;
+  });
   [$diary_new_post_still_denied_status] = http_request($diary_replies_url . '?mode=regist', $diary_replies_cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'public diary visitor', 'mail' => '', 'url' => '',
     'sub' => 'Still denied diary post', 'com' => 'This new post must still be rejected.', 'pwd' => 'public-pass',
