@@ -1945,6 +1945,26 @@ smoke_test('ctype input sources are resolved in priority order', static function
     && PostInput::resolveCtype(['direct' => '../invalid', 'usercode' => 'ctype=invalid']) === 'new';
 });
 
+smoke_test('sodane increments only publicly visible posts', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'invz' => 0, 'sodane' => 7]);
+  $reply = $repository->insertPost(['thread' => 0, 'parent' => $parent, 'invz' => 0, 'sodane' => 7]);
+  $hidden = $repository->insertPost(['thread' => 0, 'parent' => $parent, 'invz' => 1, 'sodane' => 7]);
+  $orphan = $repository->insertPost(['thread' => 0, 'parent' => 999999, 'invz' => 0, 'sodane' => 7]);
+  foreach ([$parent, $reply] as $id) if ($repository->incrementSodane($id) !== 8) return false;
+  foreach ([$hidden, $orphan, 999999] as $id) if ($repository->incrementSodane($id) !== null) return false;
+  $repository->setPostsVisibility([$parent], true);
+  foreach ([$parent, $reply] as $id) {
+    if ($repository->incrementSodane($id) !== null || (int)$repository->findPost($id)['sodane'] !== 8) return false;
+  }
+  $repository->setPostsVisibility([$parent], false);
+  return $repository->incrementSodane($reply) === 9
+    && (int)$repository->findPost($hidden)['sodane'] === 7
+    && (int)$repository->findPost($orphan)['sodane'] === 7 && !$db->inTransaction();
+});
+
 smoke_test('content editing preserves sodane increments after the post was read', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();

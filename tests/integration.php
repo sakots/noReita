@@ -75,7 +75,7 @@ function remove_tree(string $path): void {
   rmdir($path);
 }
 
-function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1', string $origin = 'http://localhost'): array {
+function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1', string $origin = 'http://localhost', bool $ajax = false): array {
   $curl = curl_init($url);
   $response_headers = [];
   curl_setopt_array($curl, [
@@ -87,6 +87,7 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
     CURLOPT_HTTPHEADER => [
       'Host: localhost', 'Origin: ' . $origin,
       'X-Forwarded-For: ' . $forwarded_for,
+      ...($ajax ? ['X-Requested-With: XMLHttpRequest'] : []),
     ],
     CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$response_headers): int {
       $length = strlen($header);
@@ -1415,6 +1416,47 @@ PHP;
   ): bool {
     return $reaction_status === 302 && $sodane_count() === $before_count + 1;
   });
+  $reaction_columns = array_values(array_filter($db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1),
+    static fn (string $column): bool => $column !== 'tid'));
+  $reaction_fixtures = [];
+  try {
+    foreach (['hidden thread', 'hidden parent reply', 'hidden reply', 'orphan reply', 'public reply'] as $case) {
+      $db->exec('INSERT INTO board_log (' . implode(',', $reaction_columns) . ') SELECT '
+        . implode(',', $reaction_columns) . ' FROM board_log WHERE tid = ' . $shared_thread_id);
+      $id = (int)$db->lastInsertId();
+      $reaction_fixtures[$case] = $id;
+      $parent = $case === 'hidden thread' ? null : ($case === 'hidden parent reply'
+        ? $reaction_fixtures['hidden thread'] : ($case === 'orphan reply' ? 999999 : $shared_thread_id));
+      $db->prepare('UPDATE board_log SET thread = ?, parent = ?, invz = ?, sodane = 7 WHERE tid = ?')
+        ->execute([$case === 'hidden thread' ? 1 : 0, $parent, in_array($case, ['hidden thread', 'hidden reply'], true) ? 1 : 0, $id]);
+    }
+    foreach ([false, true] as $ajax) {
+      foreach ($reaction_fixtures + ['missing post' => 999999] as $case => $id) {
+        $before = $db->query('SELECT tid, sodane FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC);
+        [$reaction_status, $reaction_body, , $reaction_headers] = http_request($base_url . '?mode=sodane', $cookie_jar,
+          ['resto' => (string)$id, 'token' => $token], '127.0.0.1', 'http://localhost', $ajax);
+        $after = $db->query('SELECT tid, sodane FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC);
+        integration_test('sodane checks visibility: ' . $case . ($ajax ? ' / Ajax' : ' / POST'),
+          static function () use ($before, $after, $reaction_status, $reaction_body, $reaction_headers, $case, $id, $ajax): bool {
+            $allowed = $case === 'public reply';
+            if ($reaction_status !== ($allowed ? ($ajax ? 200 : 302) : 404)) return false;
+            $expected = $before;
+            if ($allowed) foreach ($expected as &$record) {
+              if ((int)$record['tid'] === $id) $record['sodane'] = (string)((int)$record['sodane'] + 1);
+            }
+            unset($record);
+            if ($after !== $expected) return false;
+            if (!$ajax) return true;
+            $json = json_decode($reaction_body, true);
+            return str_starts_with($reaction_headers['content-type'] ?? '', 'application/json')
+              && is_array($json) && ($json['success'] ?? null) === $allowed
+              && ($allowed ? isset($json['sodane']) : !isset($json['sodane']));
+          });
+      }
+    }
+  } finally {
+    foreach ($reaction_fixtures as $id) $db->prepare('DELETE FROM board_log WHERE tid = ?')->execute([$id]);
+  }
   [$shared_thread_status, $shared_thread_body] = http_request(
     $base_url . '?resno=' . $shared_thread_id, $cookie_jar
   );

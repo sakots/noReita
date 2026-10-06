@@ -3,7 +3,7 @@
 
 require_once __DIR__ . '/filesystem_permissions.inc.php';
 
-const DATABASE_INC_VER = 20261005;
+const DATABASE_INC_VER = 20261006;
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -338,12 +338,18 @@ final class BoardRepository {
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
-  public function incrementSodane(int $id): int {
-    $statement = $this->db->prepare('UPDATE board_log SET sodane = CAST((CAST(sodane AS INTEGER) + 1) AS TEXT) WHERE tid = ?');
-    $statement->execute([$id]);
-    $statement = $this->db->prepare('SELECT CAST(sodane AS INTEGER) FROM board_log WHERE tid = ?');
-    $statement->execute([$id]);
-    return (int)$statement->fetchColumn();
+  /** 非公開・存在しない投稿は加算せずnullを返す。 */
+  public function incrementSodane(int $id): ?int {
+    return $this->transaction(function () use ($id): ?int {
+      // 加算SQLにも公開条件を入れ、事前確認後の非表示化によるすり抜けを防ぐ。
+      $visibility = $this->publicVisibilityCondition();
+      $statement = $this->db->prepare("UPDATE board_log SET sodane = CAST((CAST(sodane AS INTEGER) + 1) AS TEXT) WHERE tid = ? AND {$visibility}");
+      $statement->execute([$id]);
+      if ($statement->rowCount() !== 1) return null;
+      $statement = $this->db->prepare('SELECT CAST(sodane AS INTEGER) FROM board_log WHERE tid = ?');
+      $statement->execute([$id]);
+      return (int)$statement->fetchColumn();
+    });
   }
 
   public function updateContent(int $id, array $values): void {

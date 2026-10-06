@@ -42,7 +42,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261005) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261006) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -1272,6 +1272,9 @@ function sodane(ApplicationContext $context): void {
       throw new RequestSecurityException('Invalid post number.', 400);
     }
     $new_sodane = (new BoardRepository())->incrementSodane((int)$resto);
+    if ($new_sodane === null) {
+      throw new RequestSecurityException($context->english ? 'Post was not found.' : '記事が見つかりません。', 404);
+    }
 
     if ($is_ajax) {
       // Ajaxリクエストの場合はJSONレスポンス
