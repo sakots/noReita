@@ -1715,6 +1715,52 @@ PHP;
   $image_alt = '投稿時の画像説明';
   $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
   if ($png === false) throw new RuntimeException('Could not decode integration PNG');
+  // 投稿画面を開いた後に親が非表示になった場合も、保存時に拒否する。
+  $db->exec('INSERT INTO board_log (thread, age, tree, invz, com, sub) VALUES (1, 0, 123, 1, \'hidden parent\', \'hidden parent\')');
+  $hidden_reply_parent = (int)$db->lastInsertId();
+  $hidden_reply_before = $db->query('SELECT * FROM board_log WHERE tid = ' . $hidden_reply_parent)->fetch(PDO::FETCH_ASSOC);
+  $hidden_reply_base = 'hidden-reply-' . bin2hex(random_bytes(6));
+  $hidden_reply_files = ['png' => $png, 'pch' => 'NEO animation', 'psd' => 'work data',
+    'dat' => "127.0.0.1\tlocalhost\tagent\t.png\t" . cookie_value($cookie_jar, 'usercode') . "\trep\t100\t160\t0\tneo"];
+  foreach ($hidden_reply_files as $extension => $content) {
+    file_put_contents($webroot . '/tmp/' . $hidden_reply_base . '.' . $extension, $content);
+  }
+  try {
+    foreach (['text', 'upload', 'drawing'] as $kind) {
+      $before_count = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+      $before_files = [];
+      foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $before_files[$path] = hash_file('sha256', $path);
+      $fields = ['mode' => 'reply', 'send' => '1', 'resto' => (string)$hidden_reply_parent,
+        'name' => 'Hidden reply test', 'mail' => '', 'url' => '', 'sub' => 'hidden reply ' . $kind,
+        'com' => 'Reply must be rejected: ' . $kind, 'pwd' => 'reply-pass',
+        'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token];
+      if ($kind === 'upload') $fields['image_upload'] = new CURLFile($webroot . '/tmp/' . $hidden_reply_base . '.png', 'image/png', 'reply.png');
+      if ($kind === 'drawing') {
+        $fields['picfile'] = $hidden_reply_base . '.png';
+        $fields['ctype'] = 'new';
+      }
+      [$status] = http_request($base_url . '?mode=reply', $cookie_jar, $fields);
+      $after_files = [];
+      foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $after_files[$path] = hash_file('sha256', $path);
+      integration_test('hidden parent rejects reply without changing posts or files: ' . $kind,
+        static function () use ($status, $db, $before_count, $hidden_reply_parent, $hidden_reply_before,
+          $before_files, $after_files, $hidden_reply_files, $webroot, $hidden_reply_base): bool {
+          if ($status !== 404 || $before_files !== $after_files
+            || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== $before_count
+            || $db->query('SELECT * FROM board_log WHERE tid = ' . $hidden_reply_parent)->fetch(PDO::FETCH_ASSOC) !== $hidden_reply_before) return false;
+          foreach ($hidden_reply_files as $extension => $content) {
+            if (@file_get_contents($webroot . '/tmp/' . $hidden_reply_base . '.' . $extension) !== $content) return false;
+          }
+          return true;
+        });
+    }
+  } finally {
+    $db->prepare('DELETE FROM board_log WHERE tid = ? OR parent = ?')->execute([$hidden_reply_parent, $hidden_reply_parent]);
+    foreach (array_keys($hidden_reply_files) as $extension) {
+      $path = $webroot . '/tmp/' . $hidden_reply_base . '.' . $extension;
+      if (is_file($path)) unlink($path);
+    }
+  }
   file_put_contents($webroot . '/tmp/' . $image_name, $png);
   file_put_contents($webroot . '/tmp/' . $image_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
   file_put_contents($webroot . '/tmp/' . $image_base . '.pch', 'NEO animation');

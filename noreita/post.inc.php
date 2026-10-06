@@ -287,7 +287,8 @@ final class PostService implements AdminPostManagementService {
 
     if ($parent !== null) {
       // 返信は親スレッドの並び順データを引き継ぐ。sage返信では意図的に並び順を更新しない。
-      $parent_post = $this->repository->findPost($parent);
+      // 画面表示後の非表示化も保存直前に検出し、親の並び順を更新する前に拒否する。
+      $parent_post = $this->repository->findPublicPost($parent);
       if (empty($parent_post) || (int)($parent_post['thread'] ?? 0) !== 1) {
         throw new PostNotFoundException('Parent post was not found.');
       }

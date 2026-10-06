@@ -1680,11 +1680,36 @@ smoke_test('reply targets must be parent threads', static function (): bool {
   return (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === 0;
 });
 
+smoke_test('reply saving rejects a parent hidden after preparation and permits republishing', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'invz' => 0]);
+  $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+  $post += ['resto' => (string)$parent, 'sodane' => 0, 'invz' => 0, 'admins' => 0];
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  $service = new PostService($repository, sys_get_temp_dir());
+  $repository->setPostsVisibility([$parent], true);
+  $before = $repository->findPost($parent);
+  try {
+    $service->createPreparedPost($post, $image);
+    return false;
+  } catch (PostNotFoundException $e) {
+  }
+  if ($repository->findPost($parent) !== $before || $db->inTransaction()
+    || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 1) return false;
+  $repository->setPostsVisibility([$parent], false);
+  $reply = $service->createPreparedPost($post, $image);
+  return (int)$repository->findPost($reply)['parent'] === $parent
+    && (int)$repository->findPost($parent)['age'] === 1;
+});
+
 smoke_test('failed reply insertion restores parent ordering', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
   $repository = new BoardRepository($db);
-  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'sub' => 'parent']);
+  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'sub' => 'parent', 'invz' => 0]);
   $before = $repository->findPost($parent);
   $db->exec("CREATE TRIGGER reject_reply BEFORE INSERT ON board_log BEGIN SELECT RAISE(ABORT, 'simulated reply failure'); END");
   $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');

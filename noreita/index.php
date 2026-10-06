@@ -860,6 +860,10 @@ function regist(ApplicationContext $context): void {
 
       $dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
     }
+  } catch (PostNotFoundException $e) {
+    if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
+    render_error($context, $en ? 'Parent post was not found.' : '返信先の記事が見つかりません。', 404);
+    return;
   } catch (ImageUploadException $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     $upload_error = $en
