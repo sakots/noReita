@@ -75,7 +75,7 @@ function remove_tree(string $path): void {
   rmdir($path);
 }
 
-function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1', string $origin = 'http://localhost'): array {
+function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1', string $origin = 'http://localhost', bool $ajax = false): array {
   $curl = curl_init($url);
   $response_headers = [];
   curl_setopt_array($curl, [
@@ -87,6 +87,7 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
     CURLOPT_HTTPHEADER => [
       'Host: localhost', 'Origin: ' . $origin,
       'X-Forwarded-For: ' . $forwarded_for,
+      ...($ajax ? ['X-Requested-With: XMLHttpRequest'] : []),
     ],
     CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$response_headers): int {
       $length = strlen($header);
@@ -1372,7 +1373,7 @@ PHP;
   [$post_status, $post_body] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => $raw_trip_name, 'mail' => $raw_trip_mail, 'url' => '',
     'sub' => "Integration's subject", 'com' => "結合テスト user's {$marker}", 'pwd' => 'delete-pass',
-    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '999999', 'nsfw' => '0', 'token' => $token,
   ]);
 
   $db = new PDO('sqlite:' . $webroot . '/reita.db');
@@ -1391,6 +1392,9 @@ PHP;
       && urldecode((string)cookie_value($cookie_jar, 'email_c')) === $raw_trip_mail;
   });
 
+  integration_test('new post ignores a forged positive sodane initial value', static function () use ($db, $post_status, $row): bool {
+    return $post_status === 200 && (int)$db->query('SELECT sodane FROM board_log WHERE tid = ' . (int)$row['tid'])->fetchColumn() === 0;
+  });
   $shared_thread_id = (int)($row['tid'] ?? 0);
   $sodane_count = static fn(): int => (int)$db->query('SELECT sodane FROM board_log WHERE tid = ' . $shared_thread_id)->fetchColumn();
   foreach ([
@@ -1415,6 +1419,47 @@ PHP;
   ): bool {
     return $reaction_status === 302 && $sodane_count() === $before_count + 1;
   });
+  $reaction_columns = array_values(array_filter($db->query('PRAGMA table_info(board_log)')->fetchAll(PDO::FETCH_COLUMN, 1),
+    static fn (string $column): bool => $column !== 'tid'));
+  $reaction_fixtures = [];
+  try {
+    foreach (['hidden thread', 'hidden parent reply', 'hidden reply', 'orphan reply', 'public reply'] as $case) {
+      $db->exec('INSERT INTO board_log (' . implode(',', $reaction_columns) . ') SELECT '
+        . implode(',', $reaction_columns) . ' FROM board_log WHERE tid = ' . $shared_thread_id);
+      $id = (int)$db->lastInsertId();
+      $reaction_fixtures[$case] = $id;
+      $parent = $case === 'hidden thread' ? null : ($case === 'hidden parent reply'
+        ? $reaction_fixtures['hidden thread'] : ($case === 'orphan reply' ? 999999 : $shared_thread_id));
+      $db->prepare('UPDATE board_log SET thread = ?, parent = ?, invz = ?, sodane = 7 WHERE tid = ?')
+        ->execute([$case === 'hidden thread' ? 1 : 0, $parent, in_array($case, ['hidden thread', 'hidden reply'], true) ? 1 : 0, $id]);
+    }
+    foreach ([false, true] as $ajax) {
+      foreach ($reaction_fixtures + ['missing post' => 999999] as $case => $id) {
+        $before = $db->query('SELECT tid, sodane FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC);
+        [$reaction_status, $reaction_body, , $reaction_headers] = http_request($base_url . '?mode=sodane', $cookie_jar,
+          ['resto' => (string)$id, 'token' => $token], '127.0.0.1', 'http://localhost', $ajax);
+        $after = $db->query('SELECT tid, sodane FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC);
+        integration_test('sodane checks visibility: ' . $case . ($ajax ? ' / Ajax' : ' / POST'),
+          static function () use ($before, $after, $reaction_status, $reaction_body, $reaction_headers, $case, $id, $ajax): bool {
+            $allowed = $case === 'public reply';
+            if ($reaction_status !== ($allowed ? ($ajax ? 200 : 302) : 404)) return false;
+            $expected = $before;
+            if ($allowed) foreach ($expected as &$record) {
+              if ((int)$record['tid'] === $id) $record['sodane'] = (string)((int)$record['sodane'] + 1);
+            }
+            unset($record);
+            if ($after !== $expected) return false;
+            if (!$ajax) return true;
+            $json = json_decode($reaction_body, true);
+            return str_starts_with($reaction_headers['content-type'] ?? '', 'application/json')
+              && is_array($json) && ($json['success'] ?? null) === $allowed
+              && ($allowed ? isset($json['sodane']) : !isset($json['sodane']));
+          });
+      }
+    }
+  } finally {
+    foreach ($reaction_fixtures as $id) $db->prepare('DELETE FROM board_log WHERE tid = ?')->execute([$id]);
+  }
   [$shared_thread_status, $shared_thread_body] = http_request(
     $base_url . '?resno=' . $shared_thread_id, $cookie_jar
   );
@@ -1715,6 +1760,52 @@ PHP;
   $image_alt = '投稿時の画像説明';
   $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
   if ($png === false) throw new RuntimeException('Could not decode integration PNG');
+  // 投稿画面を開いた後に親が非表示になった場合も、保存時に拒否する。
+  $db->exec('INSERT INTO board_log (thread, age, tree, invz, com, sub) VALUES (1, 0, 123, 1, \'hidden parent\', \'hidden parent\')');
+  $hidden_reply_parent = (int)$db->lastInsertId();
+  $hidden_reply_before = $db->query('SELECT * FROM board_log WHERE tid = ' . $hidden_reply_parent)->fetch(PDO::FETCH_ASSOC);
+  $hidden_reply_base = 'hidden-reply-' . bin2hex(random_bytes(6));
+  $hidden_reply_files = ['png' => $png, 'pch' => 'NEO animation', 'psd' => 'work data',
+    'dat' => "127.0.0.1\tlocalhost\tagent\t.png\t" . cookie_value($cookie_jar, 'usercode') . "\trep\t100\t160\t0\tneo"];
+  foreach ($hidden_reply_files as $extension => $content) {
+    file_put_contents($webroot . '/tmp/' . $hidden_reply_base . '.' . $extension, $content);
+  }
+  try {
+    foreach (['text', 'upload', 'drawing'] as $kind) {
+      $before_count = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+      $before_files = [];
+      foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $before_files[$path] = hash_file('sha256', $path);
+      $fields = ['mode' => 'reply', 'send' => '1', 'resto' => (string)$hidden_reply_parent,
+        'name' => 'Hidden reply test', 'mail' => '', 'url' => '', 'sub' => 'hidden reply ' . $kind,
+        'com' => 'Reply must be rejected: ' . $kind, 'pwd' => 'reply-pass',
+        'invz' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $token];
+      if ($kind === 'upload') $fields['image_upload'] = new CURLFile($webroot . '/tmp/' . $hidden_reply_base . '.png', 'image/png', 'reply.png');
+      if ($kind === 'drawing') {
+        $fields['picfile'] = $hidden_reply_base . '.png';
+        $fields['ctype'] = 'new';
+      }
+      [$status] = http_request($base_url . '?mode=reply', $cookie_jar, $fields);
+      $after_files = [];
+      foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $after_files[$path] = hash_file('sha256', $path);
+      integration_test('hidden parent rejects reply without changing posts or files: ' . $kind,
+        static function () use ($status, $db, $before_count, $hidden_reply_parent, $hidden_reply_before,
+          $before_files, $after_files, $hidden_reply_files, $webroot, $hidden_reply_base): bool {
+          if ($status !== 404 || $before_files !== $after_files
+            || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== $before_count
+            || $db->query('SELECT * FROM board_log WHERE tid = ' . $hidden_reply_parent)->fetch(PDO::FETCH_ASSOC) !== $hidden_reply_before) return false;
+          foreach ($hidden_reply_files as $extension => $content) {
+            if (@file_get_contents($webroot . '/tmp/' . $hidden_reply_base . '.' . $extension) !== $content) return false;
+          }
+          return true;
+        });
+    }
+  } finally {
+    $db->prepare('DELETE FROM board_log WHERE tid = ? OR parent = ?')->execute([$hidden_reply_parent, $hidden_reply_parent]);
+    foreach (array_keys($hidden_reply_files) as $extension) {
+      $path = $webroot . '/tmp/' . $hidden_reply_base . '.' . $extension;
+      if (is_file($path)) unlink($path);
+    }
+  }
   file_put_contents($webroot . '/tmp/' . $image_name, $png);
   file_put_contents($webroot . '/tmp/' . $image_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
   file_put_contents($webroot . '/tmp/' . $image_base . '.pch', 'NEO animation');
@@ -2345,6 +2436,21 @@ PHP;
     foreach (['eda', 'monoreita'] as $replacement_theme) {
       file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
         "'paths' => ['theme' => '" . $replacement_theme . "'],", $replacement_original_config));
+      foreach ([['neo', '', 400, 'Please enter the password (deletion key).'],
+        ['chicken', 'wrong-password', 403, 'The password is incorrect.']] as [$auth_tool, $auth_password, $auth_status, $auth_message]) {
+        $before_auth = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+        [$auth_response_status, $auth_body] = http_request($base_url, $cookie_jar, [
+          'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => $auth_password,
+          'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
+          'tools' => $auth_tool, 'anime' => 'true',
+        ]);
+        integration_test('continuation reports password errors clearly: ' . $replacement_theme . '/' . $auth_tool,
+          static function () use ($auth_response_status, $auth_status, $auth_body, $auth_message, $before_auth, $db, $image_post_id): bool {
+            return $auth_response_status === $auth_status && str_contains($auth_body, $auth_message)
+              && !str_contains($auth_body, 'The specified post could not be found or')
+              && $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC) === $before_auth;
+          });
+      }
       foreach (['neo', 'chicken', 'klecks', 'tegaki', 'axnos'] as $replacement_tool) {
         [$tool_status, $tool_body] = http_request($base_url, $cookie_jar, [
           'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
@@ -3478,8 +3584,18 @@ PHP;
     'mode' => 'reply', 'send' => '1', 'resto' => (string)$diary_parent_id,
     'name' => 'public diary visitor', 'mail' => '', 'url' => '', 'sub' => '',
     'com' => $diary_reply_marker, 'pwd' => 'public-pass',
-    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '0', 'nsfw' => '0', 'token' => $diary_replies_token,
+    'invz' => '0', 'img_w' => '0', 'img_h' => '0', 'sodane' => '-42', 'nsfw' => '0', 'token' => $diary_replies_token,
   ]);
+  integration_test('new reply ignores a forged negative sodane initial value', static function () use (
+    $webroot, $diary_reply_allowed_status, $diary_reply_marker, $diary_parent_id
+  ): bool {
+    // 別リクエストの保存結果を、既存SELECTのスナップショットに影響されず取得する。
+    $reply_db = new PDO('sqlite:' . $webroot . '/reita.db');
+    $statement = $reply_db->prepare('SELECT sodane FROM board_log WHERE thread = 0 AND parent = ? AND com = ?');
+    $statement->execute([$diary_parent_id, $diary_reply_marker]);
+    $count = $statement->fetchColumn();
+    return $diary_reply_allowed_status === 200 && $count !== false && (int)$count === 0;
+  });
   [$diary_new_post_still_denied_status] = http_request($diary_replies_url . '?mode=regist', $diary_replies_cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'public diary visitor', 'mail' => '', 'url' => '',
     'sub' => 'Still denied diary post', 'com' => 'This new post must still be rejected.', 'pwd' => 'public-pass',

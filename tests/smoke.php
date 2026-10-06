@@ -1680,11 +1680,36 @@ smoke_test('reply targets must be parent threads', static function (): bool {
   return (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === 0;
 });
 
+smoke_test('reply saving rejects a parent hidden after preparation and permits republishing', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'invz' => 0]);
+  $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+  $post += ['resto' => (string)$parent, 'sodane' => 0, 'invz' => 0, 'admins' => 0];
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  $service = new PostService($repository, sys_get_temp_dir());
+  $repository->setPostsVisibility([$parent], true);
+  $before = $repository->findPost($parent);
+  try {
+    $service->createPreparedPost($post, $image);
+    return false;
+  } catch (PostNotFoundException $e) {
+  }
+  if ($repository->findPost($parent) !== $before || $db->inTransaction()
+    || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 1) return false;
+  $repository->setPostsVisibility([$parent], false);
+  $reply = $service->createPreparedPost($post, $image);
+  return (int)$repository->findPost($reply)['parent'] === $parent
+    && (int)$repository->findPost($parent)['age'] === 1;
+});
+
 smoke_test('failed reply insertion restores parent ordering', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
   $repository = new BoardRepository($db);
-  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'sub' => 'parent']);
+  $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'sub' => 'parent', 'invz' => 0]);
   $before = $repository->findPost($parent);
   $db->exec("CREATE TRIGGER reject_reply BEFORE INSERT ON board_log BEGIN SELECT RAISE(ABORT, 'simulated reply failure'); END");
   $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
@@ -1919,6 +1944,77 @@ smoke_test('ctype input sources are resolved in priority order', static function
     && PostInput::resolveCtype(['session_usercode' => 'ctype=pch']) === 'pch'
     && PostInput::resolveCtype(['direct' => '../invalid', 'usercode' => 'ctype=invalid']) === 'new';
 });
+
+smoke_test('new posts and replies always start with zero sodane', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $service = new PostService($repository, sys_get_temp_dir());
+  $parent = $repository->insertPost(['thread' => 1, 'invz' => 0, 'age' => 0, 'sodane' => 7]);
+  $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+    'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+  foreach (['', (string)$parent] as $resto) {
+    foreach ([999999, -42, null] as $value) {
+      $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+      $post += ['resto' => $resto, 'invz' => 0, 'admins' => 0];
+      if ($value !== null) $post['sodane'] = $value;
+      $id = $service->createPreparedPost($post, $image);
+      if ((int)$repository->findPost($id)['sodane'] !== 0) return false;
+    }
+  }
+  return (int)$repository->findPost($parent)['sodane'] === 7;
+});
+
+smoke_test('sodane increments only publicly visible posts', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $parent = $repository->insertPost(['thread' => 1, 'invz' => 0, 'sodane' => 7]);
+  $reply = $repository->insertPost(['thread' => 0, 'parent' => $parent, 'invz' => 0, 'sodane' => 7]);
+  $hidden = $repository->insertPost(['thread' => 0, 'parent' => $parent, 'invz' => 1, 'sodane' => 7]);
+  $orphan = $repository->insertPost(['thread' => 0, 'parent' => 999999, 'invz' => 0, 'sodane' => 7]);
+  foreach ([$parent, $reply] as $id) if ($repository->incrementSodane($id) !== 8) return false;
+  foreach ([$hidden, $orphan, 999999] as $id) if ($repository->incrementSodane($id) !== null) return false;
+  $repository->setPostsVisibility([$parent], true);
+  foreach ([$parent, $reply] as $id) {
+    if ($repository->incrementSodane($id) !== null || (int)$repository->findPost($id)['sodane'] !== 8) return false;
+  }
+  $repository->setPostsVisibility([$parent], false);
+  return $repository->incrementSodane($reply) === 9
+    && (int)$repository->findPost($hidden)['sodane'] === 7
+    && (int)$repository->findPost($orphan)['sodane'] === 7 && !$db->inTransaction();
+});
+
+foreach (['visible thread', 'visible reply', 'hidden post', 'hidden parent', 'deleted parent'] as $replacement_state) {
+  smoke_test('image replacement rechecks visibility when updating: ' . $replacement_state, static function () use ($replacement_state): bool {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $parent = $repository->insertPost(['thread' => 1, 'invz' => 0, 'picfile' => 'parent.png']);
+    $reply = $repository->insertPost(['thread' => 0, 'parent' => $parent, 'invz' => 0, 'picfile' => 'reply.png']);
+    $id = $replacement_state === 'visible thread' ? $parent : $reply;
+    $snapshot = $repository->findPublicPost($id);
+    if ($snapshot === false) return false;
+    // 保存処理での取得後、更新SQLの実行前に別操作が公開状態を変更する状況を再現する。
+    if ($replacement_state === 'hidden post') $repository->setPostsVisibility([$id], true);
+    if ($replacement_state === 'hidden parent') $repository->setPostsVisibility([$parent], true);
+    if ($replacement_state === 'deleted parent') $repository->deletePost($parent);
+    $before = $db->query('SELECT * FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC);
+    $visible = str_starts_with($replacement_state, 'visible');
+    try {
+      $repository->updateImage($id, [
+        'host' => 'localhost', 'picfile' => 'replacement.png', 'pchfile' => '', 'author_id' => 'artist',
+        'psec' => 42, 'utime' => '42秒', 'nsfw' => 0, 'thumbnail' => '',
+        'expected_picfile' => $snapshot['picfile'], 'img_w' => 300, 'img_h' => 400, 'tool' => 'Klecks',
+      ]);
+      $updated = $repository->findPost($id);
+      return $visible && $updated['picfile'] === 'replacement.png'
+        && (int)$updated['img_w'] === 300 && (int)$updated['img_h'] === 400;
+    } catch (RuntimeException $e) {
+      return !$visible && $db->query('SELECT * FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC) === $before;
+    }
+  });
+}
 
 smoke_test('content editing preserves sodane increments after the post was read', static function (): bool {
   $db = new PDO('sqlite::memory:');

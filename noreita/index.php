@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.13.2 lot.261005.0';
+const REITA_VER = 'v4.13.3 lot.261006.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -42,7 +42,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261005) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261006) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -63,7 +63,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260913) {
 // post.inc
 check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20260930) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20261006) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -860,6 +860,10 @@ function regist(ApplicationContext $context): void {
 
       $dat['message'] = ($en ? 'Successfully posted.' : '書き込みに成功しました。');
     }
+  } catch (PostNotFoundException $e) {
+    if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
+    render_error($context, $en ? 'Parent post was not found.' : '返信先の記事が見つかりません。', 404);
+    return;
   } catch (ImageUploadException $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     $upload_error = $en
@@ -1268,6 +1272,9 @@ function sodane(ApplicationContext $context): void {
       throw new RequestSecurityException('Invalid post number.', 400);
     }
     $new_sodane = (new BoardRepository())->incrementSodane((int)$resto);
+    if ($new_sodane === null) {
+      throw new RequestSecurityException($context->english ? 'Post was not found.' : '記事が見つかりません。', 404);
+    }
 
     if ($is_ajax) {
       // Ajaxリクエストの場合はJSONレスポンス
@@ -2939,10 +2946,18 @@ function usrchk(ApplicationContext $context): void {
   $en = $context->english;
 
   $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
-  $pwd_f = filter_input(INPUT_POST, 'pwd');
+  $pwd_f = (string)filter_input(INPUT_POST, 'pwd');
   $flag = FALSE;
   try {
     $msg = (new BoardRepository())->findPost((int)$no);
+    if ($msg === false) {
+      render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
+      return;
+    }
+    if ($pwd_f === '') {
+      render_error($context, $en ? 'Please enter the password (deletion key).' : 'パスワード（削除キー）を入力してください。', 400);
+      return;
+    }
     if (password_verify($pwd_f, $msg['pwd'])) {
       $flag = true;
       if (filter_input_data('POST', 'type') === 'rep') {
@@ -2973,7 +2988,7 @@ function usrchk(ApplicationContext $context): void {
     render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   if (!$flag) {
-    render_error($context, $en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています", 403);
+    render_error($context, $en ? 'The password is incorrect.' : 'パスワードが間違っています。', 403);
   }
 }
 
