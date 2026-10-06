@@ -2946,10 +2946,18 @@ function usrchk(ApplicationContext $context): void {
   $en = $context->english;
 
   $no = filter_input(INPUT_POST, 'no', FILTER_VALIDATE_INT);
-  $pwd_f = filter_input(INPUT_POST, 'pwd');
+  $pwd_f = (string)filter_input(INPUT_POST, 'pwd');
   $flag = FALSE;
   try {
     $msg = (new BoardRepository())->findPost((int)$no);
+    if ($msg === false) {
+      render_error($context, $en ? 'Post was not found.' : '記事が見つかりません。', 404);
+      return;
+    }
+    if ($pwd_f === '') {
+      render_error($context, $en ? 'Please enter the password (deletion key).' : 'パスワード（削除キー）を入力してください。', 400);
+      return;
+    }
     if (password_verify($pwd_f, $msg['pwd'])) {
       $flag = true;
       if (filter_input_data('POST', 'type') === 'rep') {
@@ -2980,7 +2988,7 @@ function usrchk(ApplicationContext $context): void {
     render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
   }
   if (!$flag) {
-    render_error($context, $en ? "The specified post could not be found or the password is incorrect." : "該当記事が見つからないかパスワードが間違っています", 403);
+    render_error($context, $en ? 'The password is incorrect.' : 'パスワードが間違っています。', 403);
   }
 }
 

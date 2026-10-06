@@ -2436,6 +2436,21 @@ PHP;
     foreach (['eda', 'monoreita'] as $replacement_theme) {
       file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
         "'paths' => ['theme' => '" . $replacement_theme . "'],", $replacement_original_config));
+      foreach ([['neo', '', 400, 'Please enter the password (deletion key).'],
+        ['chicken', 'wrong-password', 403, 'The password is incorrect.']] as [$auth_tool, $auth_password, $auth_status, $auth_message]) {
+        $before_auth = $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+        [$auth_response_status, $auth_body] = http_request($base_url, $cookie_jar, [
+          'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => $auth_password,
+          'picw' => '300', 'pich' => '300', 'img' => (string)$image_row['picfile'], 'ctype' => 'img',
+          'tools' => $auth_tool, 'anime' => 'true',
+        ]);
+        integration_test('continuation reports password errors clearly: ' . $replacement_theme . '/' . $auth_tool,
+          static function () use ($auth_response_status, $auth_status, $auth_body, $auth_message, $before_auth, $db, $image_post_id): bool {
+            return $auth_response_status === $auth_status && str_contains($auth_body, $auth_message)
+              && !str_contains($auth_body, 'The specified post could not be found or')
+              && $db->query('SELECT * FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC) === $before_auth;
+          });
+      }
       foreach (['neo', 'chicken', 'klecks', 'tegaki', 'axnos'] as $replacement_tool) {
         [$tool_status, $tool_body] = http_request($base_url, $cookie_jar, [
           'mode' => 'contpaint', 'type' => 'rep', 'no' => (string)$image_post_id, 'pwd' => 'image-pass',
