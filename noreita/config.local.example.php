@@ -85,7 +85,7 @@ return [
     'image_width' => 4000,
     'image_height' => 4000,
     // 保存時に縮小する最大幅・高さです。0で該当方向の縮小を無効にします。
-    'upload_resize_width' => 1600,
+    'upload_resize_width' => 1920,
     'upload_resize_height' => 1600,
   ],
 
