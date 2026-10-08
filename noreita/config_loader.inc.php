@@ -222,6 +222,7 @@ final class Config {
       'security.session_file_lifetime' => [60, 31536000],
       'identity.cycle' => [0, 4],
       'board.log_warning_percent' => [0, 100],
+      'board.page_size' => [1, PHP_INT_MAX],
       'board.catalog_size' => [1, 200],
       'limits.paint_max_width' => [300, 10000],
       'limits.paint_max_height' => [300, 10000],
@@ -244,7 +245,7 @@ final class Config {
       }
     }
     foreach ([
-      'board.max_threads', 'board.page_size', 'board.replies_shown',
+      'board.max_threads', 'board.replies_shown',
       'board.cookie_days', 'limits.external_thumbnail_days', 'limits.upload_kb',
       'limits.image_width', 'limits.image_height', 'limits.upload_resize_width', 'limits.upload_resize_height', 'limits.name_length', 'limits.email_length',
       'limits.subject_length', 'limits.url_length', 'limits.comment_length', 'limits.temporary_days',
@@ -258,12 +259,6 @@ final class Config {
     if (self::valueAt($values, 'limits.paint_default_width') > self::valueAt($values, 'limits.paint_max_width')
       || self::valueAt($values, 'limits.paint_default_height') > self::valueAt($values, 'limits.paint_max_height')) {
       throw new ConfigException('Default paint dimensions must not exceed maximum paint dimensions.');
-    }
-    if ((self::valueAt($values, 'limits.upload_resize_width') > 0
-        && self::valueAt($values, 'limits.upload_resize_width') > self::valueAt($values, 'limits.image_width'))
-      || (self::valueAt($values, 'limits.upload_resize_height') > 0
-        && self::valueAt($values, 'limits.upload_resize_height') > self::valueAt($values, 'limits.image_height'))) {
-      throw new ConfigException('Upload resize dimensions must not exceed upload dimensions.');
     }
     if (self::valueAt($values, 'limits.paint_request_kb') < self::valueAt($values, 'limits.paint_image_kb')
       || self::valueAt($values, 'limits.paint_request_kb') < self::valueAt($values, 'limits.paint_work_kb')) {

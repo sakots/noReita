@@ -1,7 +1,7 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260913;
+const IMAGE_INC_VER = 20261008;
 
 final class ImageUploadException extends RuntimeException {
 }
@@ -101,6 +101,22 @@ final class ImageService {
     }
 
     try {
+      if ($mime_type === 'image/jpeg') {
+        $orientation = self::jpegOrientation($source);
+        if (in_array($orientation, [2, 5, 7], true)) imageflip($image, IMG_FLIP_HORIZONTAL);
+        if ($orientation === 4) imageflip($image, IMG_FLIP_VERTICAL);
+        $angle = match ($orientation) {
+          3 => 180,
+          5, 8 => 90,
+          6, 7 => -90,
+          default => 0,
+        };
+        if ($angle !== 0) {
+          $rotated = imagerotate($image, $angle, 0);
+          if ($rotated === false) throw new ImageUploadException('The uploaded image could not be processed.', 422);
+          $image = $rotated;
+        }
+      }
       $source_width = imagesx($image);
       $source_height = imagesy($image);
       if ($source_width < 1 || $source_height < 1) {
@@ -126,6 +142,11 @@ final class ImageService {
         $image = $resized;
       }
       $output_mime = $output_mime !== '' ? $output_mime : $mime_type;
+      if ($output_mime === 'image/webp' && !imageistruecolor($image)) {
+        if (!imagepalettetotruecolor($image)) {
+          throw new ImageUploadException('The uploaded image could not be processed.', 422);
+        }
+      }
       if ($output_mime === 'image/png' || $output_mime === 'image/webp' || $output_mime === 'image/avif') {
         imagealphablending($image, false);
         imagesavealpha($image, true);
@@ -145,6 +166,59 @@ final class ImageService {
     } finally {
       if ($frame !== '') safe_unlink($frame);
       unset($image);
+    }
+  }
+
+  /** Read only the IFD0 Orientation from bounded JPEG APP1 segments; no EXIF extension is needed. */
+  private static function jpegOrientation(string $source): int {
+    $stream = fopen($source, 'rb');
+    if ($stream === false) return 1;
+    try {
+      if (fread($stream, 2) !== "\xff\xd8") return 1;
+      while (!feof($stream)) {
+        if (fread($stream, 1) !== "\xff") return 1;
+        do {
+          $marker = fread($stream, 1);
+        } while ($marker === "\xff");
+        if ($marker === '' || $marker === "\xda" || $marker === "\xd9") return 1;
+        $code = ord($marker);
+        if ($code === 0x01 || ($code >= 0xd0 && $code <= 0xd7)) continue;
+        $length_bytes = fread($stream, 2);
+        if (strlen($length_bytes) !== 2) return 1;
+        $length = unpack('n', $length_bytes)[1] - 2;
+        if ($length < 0) return 1;
+        if ($code !== 0xe1) {
+          if (fseek($stream, $length, SEEK_CUR) !== 0) return 1;
+          continue;
+        }
+        $segment = $length > 0 ? fread($stream, $length) : '';
+        if (strlen($segment) !== $length) return 1;
+        if (!str_starts_with($segment, "Exif\0\0")) continue;
+        $tiff = substr($segment, 6);
+        $size = strlen($tiff);
+        if ($size < 8) return 1;
+        $order = substr($tiff, 0, 2);
+        if ($order !== 'II' && $order !== 'MM') return 1;
+        $short = $order === 'II' ? 'v' : 'n';
+        $long = $order === 'II' ? 'V' : 'N';
+        if (unpack($short, substr($tiff, 2, 2))[1] !== 42) return 1;
+        $offset = unpack($long, substr($tiff, 4, 4))[1];
+        if ($offset < 8 || $offset > $size - 2) return 1;
+        $count = unpack($short, substr($tiff, $offset, 2))[1];
+        if ($count > intdiv($size - $offset - 2, 12)) return 1;
+        for ($index = 0; $index < $count; $index++) {
+          $entry = substr($tiff, $offset + 2 + $index * 12, 12);
+          if (unpack($short, substr($entry, 0, 2))[1] !== 0x0112) continue;
+          if (unpack($short, substr($entry, 2, 2))[1] !== 3
+            || unpack($long, substr($entry, 4, 4))[1] !== 1) return 1;
+          $orientation = unpack($short, substr($entry, 8, 2))[1];
+          return $orientation >= 1 && $orientation <= 8 ? $orientation : 1;
+        }
+        return 1;
+      }
+      return 1;
+    } finally {
+      fclose($stream);
     }
   }
 
@@ -338,7 +412,7 @@ final class ImageService {
     if (!function_exists('imagecreatefromavif') || $thumbnail_width < 1 || $canvas_width < 1 || $canvas_height < 1) return '';
     $frame = @imagecreatefromavif($source);
     if ($frame === false) return '';
-    $target_height = max(1, (int)round($thumbnail_width * $canvas_height / $canvas_width));
+    [$thumbnail_width, $target_height] = Thumbnail::fitDimensions($canvas_width, $canvas_height, $thumbnail_width);
     $canvas = imagecreatetruecolor($thumbnail_width, $target_height);
     if ($canvas === false) return '';
     imagealphablending($canvas, false);
@@ -1426,7 +1500,7 @@ final class ImageService {
    */
   private static function createNsfwPlaceholderThumbnail(string $directory, int $width, int $source_width, int $source_height): string {
     if ($width < 1 || $source_width < 1 || $source_height < 1) return '';
-    $height = max(1, (int)floor($width * $source_height / $source_width));
+    [$width, $height] = Thumbnail::fitDimensions($source_width, $source_height, $width);
     $image = imagecreatetruecolor($width, $height);
     if ($image === false) return '';
     imagefill($image, 0, 0, imagecolorallocate($image, 0, 0, 0));

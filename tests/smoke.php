@@ -696,6 +696,8 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin', 'threads_per_page' => 101], 'site' => ['base_url' => 'https://configured.example/']],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 0]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 201]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['page_size' => 0]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['page_size' => -1]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_request_kb' => 32769]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_image_kb' => 2048, 'paint_work_kb' => 4096, 'paint_request_kb' => 1024]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['not-an-ip']]],
@@ -720,14 +722,35 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
   $minimum = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin'],
     'site' => ['base_url' => 'https://configured.example/'],
-    'board' => ['catalog_size' => 1],
+    'board' => ['catalog_size' => 1, 'page_size' => 1],
   ]);
   $maximum = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin'],
     'site' => ['base_url' => 'https://configured.example/'],
     'board' => ['catalog_size' => 200],
   ]);
-  return $minimum['board']['catalog_size'] === 1 && $maximum['board']['catalog_size'] === 200;
+  return $minimum['board']['catalog_size'] === 1 && $maximum['board']['catalog_size'] === 200
+    && $minimum['board']['page_size'] === 1 && $maximum['board']['page_size'] === 10;
+});
+
+smoke_test('upload input limits may be smaller than resize dimensions', static function (): bool {
+  $defaults = require dirname(__DIR__) . '/noreita/config.php';
+  foreach ([false, true] as $enabled) {
+    foreach ([['image_width' => 1000], ['image_height' => 1000], ['image_width' => 1000, 'image_height' => 1000]] as $limits) {
+      $resolved = Config::resolve($defaults, [
+        'admin' => ['password' => 'configured-admin'],
+        'site' => ['base_url' => 'https://configured.example/'],
+        'features' => ['image_upload' => $enabled],
+        'limits' => $limits,
+      ]);
+      foreach ($limits as $key => $value) {
+        if ($resolved['limits'][$key] !== $value) return false;
+      }
+      if ($resolved['limits']['upload_resize_width'] !== $defaults['limits']['upload_resize_width']
+        || $resolved['limits']['upload_resize_height'] !== $defaults['limits']['upload_resize_height']) return false;
+    }
+  }
+  return true;
 });
 
 smoke_test('v3 configuration is converted to a validated local override', static function (): bool {
@@ -2262,6 +2285,114 @@ smoke_test('direct image re-encoding removes JPEG metadata', static function ():
   }
 });
 
+smoke_test('JPEG orientation is applied before resizing and metadata removal', static function (): bool {
+  $source = tempnam(sys_get_temp_dir(), 'noreita_orientation_source_');
+  $destination = tempnam(sys_get_temp_dir(), 'noreita_orientation_destination_');
+  if ($source === false || $destination === false) return false;
+  try {
+    $canvas = imagecreatetruecolor(80, 40);
+    $colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00];
+    foreach ($colors as $index => $color) {
+      $x = ($index % 2) * 40;
+      $y = intdiv($index, 2) * 20;
+      imagefilledrectangle($canvas, $x, $y, $x + 39, $y + 19, $color);
+    }
+    if (!imagejpeg($canvas, $source, 100)) return false;
+    $jpeg = file_get_contents($source);
+    if (!is_string($jpeg)) return false;
+    $corners = [1 => [0, 1, 2, 3], 2 => [1, 0, 3, 2], 3 => [3, 2, 1, 0], 4 => [2, 3, 0, 1],
+      5 => [0, 2, 1, 3], 6 => [2, 0, 3, 1], 7 => [3, 1, 2, 0], 8 => [1, 3, 0, 2]];
+    $formats = function_exists('imagewebp') ? ['image/jpeg', 'image/webp'] : ['image/jpeg'];
+    $method = new ReflectionMethod(ImageService::class, 'reencodeUploadedImage');
+    foreach (['II', 'MM'] as $order) {
+      foreach ($corners as $orientation => $expected_corners) {
+        $exif = "Exif\0\0" . $order . ($order === 'II'
+          ? pack('vVv', 42, 8, 1) . pack('vvVv', 0x112, 3, 1, $orientation)
+          : pack('nNn', 42, 8, 1) . pack('nnNn', 0x112, 3, 1, $orientation)) . "\0\0\0\0\0\0";
+        file_put_contents($source, substr($jpeg, 0, 2) . "\xff\xe1" . pack('n', strlen($exif) + 2)
+          . $exif . substr($jpeg, 2));
+        foreach ($formats as $format) {
+          $result = $method->invoke(null, $source, $destination, 'image/jpeg', $format, 40, 50);
+          $width = $orientation >= 5 ? 25 : 40;
+          $height = $orientation >= 5 ? 50 : 20;
+          if ($result !== ['width' => $width, 'height' => $height]) {
+            throw new RuntimeException("Wrong dimensions: {$order}/{$orientation}/{$format}");
+          }
+          $bytes = file_get_contents($destination);
+          if (!is_string($bytes) || str_contains($bytes, "Exif\0\0")) return false;
+          $saved = imagecreatefromstring($bytes);
+          if ($saved === false || imagesx($saved) !== $width || imagesy($saved) !== $height) return false;
+          foreach ($expected_corners as $index => $expected_color) {
+            $pixel = imagecolorat($saved, (int)(($index % 2 + 0.5) * $width / 2), (int)((intdiv($index, 2) + 0.5) * $height / 2));
+            foreach ([16, 8, 0] as $shift) {
+              if (abs((($pixel >> $shift) & 255) - (($colors[$expected_color] >> $shift) & 255)) > 60) {
+                throw new RuntimeException("Wrong corner {$index}: {$order}/{$orientation}/{$format}");
+              }
+            }
+          }
+        }
+      }
+    }
+    return true;
+  } finally {
+    if (is_file($source)) unlink($source);
+    if (is_file($destination)) unlink($destination);
+  }
+});
+
+smoke_test('invalid JPEG orientation metadata is ignored safely', static function (): bool {
+  $source = tempnam(sys_get_temp_dir(), 'noreita_invalid_exif_source_');
+  $destination = tempnam(sys_get_temp_dir(), 'noreita_invalid_exif_destination_');
+  if ($source === false || $destination === false) return false;
+  try {
+    $canvas = imagecreatetruecolor(8, 4);
+    if (!imagejpeg($canvas, $source)) return false;
+    $jpeg = file_get_contents($source);
+    $method = new ReflectionMethod(ImageService::class, 'reencodeUploadedImage');
+    foreach (['', "Exif\0\0", "Exif\0\0II" . pack('vV', 42, 0xffffffff),
+      "Exif\0\0MM" . pack('nNn', 42, 8, 1) . pack('nnNn', 0x112, 3, 1, 9) . "\0\0\0\0\0\0"] as $exif) {
+      file_put_contents($source, substr($jpeg, 0, 2) . "\xff\xe1" . pack('n', strlen($exif) + 2) . $exif . substr($jpeg, 2));
+      if ($method->invoke(null, $source, $destination, 'image/jpeg') !== ['width' => 8, 'height' => 4]) return false;
+    }
+    return true;
+  } finally {
+    if (is_file($source)) unlink($source);
+    if (is_file($destination)) unlink($destination);
+  }
+});
+
+foreach (['gif', 'png'] as $palette_format) {
+  smoke_test('small palette ' . $palette_format . ' converts to WebP with transparency', static function () use ($palette_format): bool {
+    if (!function_exists('imagewebp') || !function_exists('imagecreatefromwebp')) return true;
+    $source = tempnam(sys_get_temp_dir(), 'noreita_palette_source_');
+    $destination = tempnam(sys_get_temp_dir(), 'noreita_palette_destination_');
+    if ($source === false || $destination === false) return false;
+    try {
+      $canvas = imagecreate(4, 2);
+      if ($canvas === false) return false;
+      $transparent = imagecolorallocate($canvas, 0, 0, 0);
+      imagecolortransparent($canvas, $transparent);
+      $red = imagecolorallocate($canvas, 255, 0, 0);
+      imagesetpixel($canvas, 3, 1, $red);
+      $encoder = $palette_format === 'gif' ? 'imagegif' : 'imagepng';
+      if (!$encoder($canvas, $source)) return false;
+      $method = new ReflectionMethod(ImageService::class, 'reencodeUploadedImage');
+      $result = $method->invoke(null, $source, $destination, 'image/' . $palette_format, 'image/webp', 1600, 1600);
+      $info = getimagesize($destination);
+      $saved = imagecreatefromwebp($destination);
+      if ($saved === false) return false;
+      $clear_pixel = imagecolorsforindex($saved, imagecolorat($saved, 0, 0));
+      $opaque_pixel = imagecolorsforindex($saved, imagecolorat($saved, 3, 1));
+      return $result === ['width' => 4, 'height' => 2]
+        && is_array($info) && $info['mime'] === 'image/webp' && $info[0] === 4 && $info[1] === 2
+        && $clear_pixel['alpha'] === 127 && $opaque_pixel['alpha'] === 0;
+    } finally {
+      if (is_file($source)) unlink($source);
+      if (is_file($destination)) unlink($destination);
+    }
+  });
+}
+
 smoke_test('animated WebP is accepted without GD frame decoding and remains intact for NSFW', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_animated_webp_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
@@ -2606,6 +2737,32 @@ smoke_test('cached external image thumbnail link', static function (): bool {
   }
 });
 
+smoke_test('external image URLs decode HTML once for cache lookup and escape links once', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_external_query_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $service = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 0);
+    foreach (['?a=1&b=2', '?token=a%26b%3Dc&size=200', '?value=&amp;&size=200', '?value="\'<> &size=200'] as $query) {
+      $url = 'https://example.com/picture.png' . str_replace(' ', '%20', $query);
+      $escaped = htmlspecialchars($url, ENT_QUOTES | ENT_HTML5);
+      $thumbnail = md5($url) . '_thumb.jpg';
+      if (file_put_contents($directory . '/' . $thumbnail, 'cached thumbnail') === false) return false;
+      $html = $service->addThumbnailLinks(auto_link('image: ' . $escaped));
+      if (!str_contains($html, 'src="thumbnail/' . $thumbnail . '"')
+        || substr_count($html, 'href="' . $escaped . '"') !== 2
+        || $service->thumbnailUrlFor($url) !== 'thumbnail/' . $thumbnail) return false;
+      preg_match_all('/href="([^"]+)"/', $html, $links);
+      foreach ($links[1] as $link) {
+        if (html_entity_decode($link, ENT_QUOTES | ENT_HTML5) !== $url) return false;
+      }
+    }
+    return true;
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $file) unlink($file);
+    rmdir($directory);
+  }
+});
+
 smoke_test('external image thumbnails use a stable cache filename and remove legacy files', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_cache_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
@@ -2651,18 +2808,19 @@ smoke_test('external image thumbnails limit URLs and cache failures briefly', st
       || str_contains($html, md5($cached_urls[2]) . '_thumb.jpg')) return false;
 
     $failed_urls = [
-      'http://127.0.0.1/blocked-one.png',
+      'http://127.0.0.1/blocked-one.png?a=1&b=2',
       'http://127.0.0.1/blocked-two.png',
       'http://127.0.0.1/blocked-three.png',
     ];
     $limited = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 1, 300);
-    $limited->addThumbnailLinks($failed_urls[0] . ' ' . $failed_urls[1]);
+    $limited->addThumbnailLinks(htmlspecialchars($failed_urls[0] . ' ' . $failed_urls[1], ENT_QUOTES | ENT_HTML5));
     $failure_directory = $directory . DIRECTORY_SEPARATOR . '.external-image-failures';
-    if (count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) !== 1) return false;
+    if (count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) !== 1
+      || !is_file($failure_directory . DIRECTORY_SEPARATOR . hash('sha256', $failed_urls[0]) . '.failure.dat')) return false;
 
     // 既知の失敗は取得枠を消費せず、同一リクエスト内の次のURLを1件だけ試行できる。
     $with_negative_cache = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 1, 300);
-    $with_negative_cache->addThumbnailLinks($failed_urls[0] . ' ' . $failed_urls[2]);
+    $with_negative_cache->addThumbnailLinks(htmlspecialchars($failed_urls[0] . ' ' . $failed_urls[2], ENT_QUOTES | ENT_HTML5));
     return count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) === 2;
   } finally {
     $failure_directory = $directory . DIRECTORY_SEPARATOR . '.external-image-failures';
@@ -2705,12 +2863,16 @@ smoke_test('GD thumbnail generation', static function (): bool {
 });
 
 foreach ([
-  'wide image' => [1000, 1, 300, false, 1],
-  'NSFW wide image' => [1000, 10, 300, true, 3],
-  'NSFW small width' => [4, 4, 5, true, 5],
-] as $case => [$source_width, $source_height, $width, $nsfw, $expected_height]) {
+  'wide image' => [1000, 1, 300, false, 300, 1],
+  'NSFW wide image' => [1000, 10, 300, true, 300, 3],
+  'NSFW small width' => [4, 4, 5, true, 4, 4],
+  'small image is not enlarged' => [1, 10, 20, false, 1, 10],
+  'portrait fits both dimensions' => [50, 100, 20, false, 10, 20],
+  'NSFW portrait fits both dimensions' => [50, 100, 20, true, 10, 20],
+  'extremely tall image' => [1, 10000, 2, false, 1, 2],
+] as $case => [$source_width, $source_height, $width, $nsfw, $expected_width, $expected_height]) {
   smoke_test('GD thumbnails support positive dimensions: ' . $case, static function () use (
-    $source_width, $source_height, $width, $nsfw, $expected_height
+    $source_width, $source_height, $width, $nsfw, $expected_width, $expected_height
   ): bool {
     $directory = sys_get_temp_dir() . '/noreita_thin_thumbnail_' . bin2hex(random_bytes(8));
     if (!mkdir($directory, 0700)) return false;
@@ -2725,13 +2887,50 @@ foreach ([
       // 生成した画像を実際にデコードして寸法を検証する。
       $bytes = $output !== null ? file_get_contents($output) : false;
       $decoded = is_string($bytes) ? imagecreatefromstring($bytes) : false;
-      return $decoded !== false && imagesx($decoded) === $width && imagesy($decoded) === $expected_height;
+      return $decoded !== false && imagesx($decoded) === $expected_width && imagesy($decoded) === $expected_height;
     } finally {
       foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
       rmdir($directory);
     }
   });
 }
+
+smoke_test('thumbnail dimension calculation caps oversized requests without allocating a canvas', static function (): bool {
+  return Thumbnail::fitDimensions(10000, 10000, PHP_INT_MAX) === [2048, 2048]
+    && Thumbnail::fitDimensions(1, 16384, 200) === [1, 200]
+    && Thumbnail::fitDimensions(400, 200, 200) === [200, 100];
+});
+
+smoke_test('animated AVIF intermediate canvases also fit the size limit', static function (): bool {
+  if (!function_exists('imageavif') || !function_exists('imagecreatefromavif')) return true;
+  $directory = sys_get_temp_dir() . '/noreita_avif_canvas_size_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $image = imagecreatetruecolor(2, 2);
+    if (!imageavif($image, $directory . '/input.avif')) return false;
+    $method = new ReflectionMethod(ImageService::class, 'animatedAvifThumbnailSource');
+    $path = $method->invoke(null, $directory . '/input.avif', $directory, 2, 1, 10000);
+    $decoded = $path !== '' ? imagecreatefromstring((string)file_get_contents($path)) : false;
+    return $decoded !== false && imagesx($decoded) === 1 && imagesy($decoded) === 2;
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
+    rmdir($directory);
+  }
+});
+
+smoke_test('NSFW placeholder thumbnails also fit the size limit', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_placeholder_size_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $method = new ReflectionMethod(ImageService::class, 'createNsfwPlaceholderThumbnail');
+    $name = $method->invoke(null, $directory, 20, 1, 10);
+    $decoded = $name !== '' ? imagecreatefromstring((string)file_get_contents($directory . '/' . $name)) : false;
+    return $decoded !== false && imagesx($decoded) === 1 && imagesy($decoded) === 10;
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
+    rmdir($directory);
+  }
+});
 
 smoke_test('GD thumbnails preserve transparent pixels for supported input formats', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_transparent_thumbnail_' . bin2hex(random_bytes(8));

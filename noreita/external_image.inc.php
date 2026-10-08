@@ -55,8 +55,9 @@ final class ExternalImageService {
       array_unique($matches[0]),
       static fn(string $url): bool => preg_match('/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i', $url) === 1
     ));
-    foreach (array_slice($image_urls, 0, $this->max_urls_per_post) as $url) {
-
+    foreach (array_slice($image_urls, 0, $this->max_urls_per_post) as $matched_url) {
+      // 本文はHTMLエスケープ済み。取得・キャッシュには復号した元のURLを使う。
+      $url = html_entity_decode($matched_url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
       $thumbnail_base = rtrim($this->thumbnail_dir, '/\\') . DIRECTORY_SEPARATOR . md5($url) . '_thumb';
       $thumbnail_path = $this->findThumbnail($thumbnail_base);
       if ($thumbnail_path === null) {
@@ -71,7 +72,7 @@ final class ExternalImageService {
         . '" target="_blank" rel="nofollow noopener noreferrer"><img src="' . $thumbnail_url
         . '" alt="thumbnail" style="max-width:' . $this->thumbnail_width . 'px; max-height:'
         . $this->thumbnail_width . 'px;"></a>';
-      $comment = str_replace($url, $replacement, $comment);
+      $comment = str_replace($matched_url, $replacement, $comment);
     }
     return $comment;
   }
