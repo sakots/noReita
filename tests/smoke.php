@@ -2737,6 +2737,32 @@ smoke_test('cached external image thumbnail link', static function (): bool {
   }
 });
 
+smoke_test('external image URLs decode HTML once for cache lookup and escape links once', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_external_query_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $service = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 0);
+    foreach (['?a=1&b=2', '?token=a%26b%3Dc&size=200', '?value=&amp;&size=200', '?value="\'<> &size=200'] as $query) {
+      $url = 'https://example.com/picture.png' . str_replace(' ', '%20', $query);
+      $escaped = htmlspecialchars($url, ENT_QUOTES | ENT_HTML5);
+      $thumbnail = md5($url) . '_thumb.jpg';
+      if (file_put_contents($directory . '/' . $thumbnail, 'cached thumbnail') === false) return false;
+      $html = $service->addThumbnailLinks(auto_link('image: ' . $escaped));
+      if (!str_contains($html, 'src="thumbnail/' . $thumbnail . '"')
+        || substr_count($html, 'href="' . $escaped . '"') !== 2
+        || $service->thumbnailUrlFor($url) !== 'thumbnail/' . $thumbnail) return false;
+      preg_match_all('/href="([^"]+)"/', $html, $links);
+      foreach ($links[1] as $link) {
+        if (html_entity_decode($link, ENT_QUOTES | ENT_HTML5) !== $url) return false;
+      }
+    }
+    return true;
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $file) unlink($file);
+    rmdir($directory);
+  }
+});
+
 smoke_test('external image thumbnails use a stable cache filename and remove legacy files', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_cache_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
@@ -2782,18 +2808,19 @@ smoke_test('external image thumbnails limit URLs and cache failures briefly', st
       || str_contains($html, md5($cached_urls[2]) . '_thumb.jpg')) return false;
 
     $failed_urls = [
-      'http://127.0.0.1/blocked-one.png',
+      'http://127.0.0.1/blocked-one.png?a=1&b=2',
       'http://127.0.0.1/blocked-two.png',
       'http://127.0.0.1/blocked-three.png',
     ];
     $limited = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 1, 300);
-    $limited->addThumbnailLinks($failed_urls[0] . ' ' . $failed_urls[1]);
+    $limited->addThumbnailLinks(htmlspecialchars($failed_urls[0] . ' ' . $failed_urls[1], ENT_QUOTES | ENT_HTML5));
     $failure_directory = $directory . DIRECTORY_SEPARATOR . '.external-image-failures';
-    if (count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) !== 1) return false;
+    if (count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) !== 1
+      || !is_file($failure_directory . DIRECTORY_SEPARATOR . hash('sha256', $failed_urls[0]) . '.failure.dat')) return false;
 
     // 既知の失敗は取得枠を消費せず、同一リクエスト内の次のURLを1件だけ試行できる。
     $with_negative_cache = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600, 2, 1, 300);
-    $with_negative_cache->addThumbnailLinks($failed_urls[0] . ' ' . $failed_urls[2]);
+    $with_negative_cache->addThumbnailLinks(htmlspecialchars($failed_urls[0] . ' ' . $failed_urls[2], ENT_QUOTES | ENT_HTML5));
     return count(glob($failure_directory . DIRECTORY_SEPARATOR . '*.failure.dat') ?: []) === 2;
   } finally {
     $failure_directory = $directory . DIRECTORY_SEPARATOR . '.external-image-failures';
