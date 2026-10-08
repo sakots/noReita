@@ -10,16 +10,17 @@
 // 使い方
 // $thumb = new Thumbnail('input.png', 'thumb_dir', 300, 1);
 // $thumb->create();
-// これでinput.pngを幅300pxにしてthumb_dirディレクトリに保存します。
+// これでinput.pngを拡大せず300px四方に収めてthumb_dirディレクトリに保存します。
 // nsfwスイッチを1またはtrueにすると、サムネイル画像をぼかします。
 // 省略またはfalse、0ならぼかしません。
 
-const THUMBNAIL_VER = 20260820; //thumbnail.inc.phpのバージョン
+const THUMBNAIL_VER = 20261008; //thumbnail.inc.phpのバージョン
 
 class Thumbnail {
+  private const MAX_DIMENSION = 2048;
   private string $image_url; // 入力画像URL
   private string $thumb_dir; // 出力ディレクトリ
-  private int $thumb_width; // サムネイルの幅（高さは幅で決まります）
+  private int $thumb_width; // サムネイルの幅・高さの上限
   private bool $nsfw; // nsfwスイッチ
   private ?string $output_basename;
   private ?string $last_output_path = null;
@@ -44,6 +45,16 @@ class Thumbnail {
 
   public function getOutputName(): ?string {
     return $this->last_output_path ? basename($this->last_output_path) : null;
+  }
+
+  /** @return array{int,int} */
+  public static function fitDimensions(int $width, int $height, int $limit): array {
+    if ($width < 1 || $height < 1 || $limit < 1) {
+      throw new InvalidArgumentException('Thumbnail dimensions must be positive.');
+    }
+    // Both sides are bounded, so even oversized requests cannot exceed 2048² pixels.
+    $scale = min(1, min($limit, self::MAX_DIMENSION) / max($width, $height));
+    return [max(1, (int)floor($width * $scale)), max(1, (int)floor($height * $scale))];
   }
 
   /** @return GdImage|false */
@@ -80,8 +91,7 @@ class Thumbnail {
       return false;
     }
 
-    // 縦横比を維持してサムネイルの高さを計算
-    $thumb_height = max(1, (int)($this->thumb_width * $src_height / $src_width));
+    [$thumb_width, $thumb_height] = self::fitDimensions($src_width, $src_height, $this->thumb_width);
 
     // 入力画像を読み込む
     switch ($mime) {
@@ -114,29 +124,29 @@ class Thumbnail {
     }
 
     // サムネイル用の空の画像を作成
-    $thumb_image = self::createTransparentCanvas($this->thumb_width, $thumb_height);
+    $thumb_image = self::createTransparentCanvas($thumb_width, $thumb_height);
     if ($thumb_image === false) {
       return false; // サムネイル画像の作成に失敗
     }
 
     // 画像をリサイズしてサムネイルにコピー
-    if (!imagecopyresampled($thumb_image, $src_image, 0, 0, 0, 0, $this->thumb_width, $thumb_height, $src_width, $src_height)) {
+    if (!imagecopyresampled($thumb_image, $src_image, 0, 0, 0, 0, $thumb_width, $thumb_height, $src_width, $src_height)) {
       return false; // リサイズに失敗
     }
     // nsfwスイッチがオンならぼかす
     if ($this->nsfw) {
       // ぼかしの強さを調整するために、サムネイルをさらに縮小してから拡大する方法を取ります。
       $blur_strength = 10; // ぼかしの強さ（数値が大きいほどぼかしが強くなります）
-      $small_width = max(1, (int)($this->thumb_width / $blur_strength));
+      $small_width = max(1, (int)($thumb_width / $blur_strength));
       $small_height = max(1, (int)($thumb_height / $blur_strength));
 
       // 小さい画像を作成
       $small_image = self::createTransparentCanvas($small_width, $small_height);
       if ($small_image === false) return false;
-      imagecopyresampled($small_image, $thumb_image, 0, 0, 0, 0, $small_width, $small_height, $this->thumb_width, $thumb_height);
+      imagecopyresampled($small_image, $thumb_image, 0, 0, 0, 0, $small_width, $small_height, $thumb_width, $thumb_height);
 
       // 小さい画像を元のサイズに拡大してぼかす
-      imagecopyresampled($thumb_image, $small_image, 0, 0, 0, 0, $this->thumb_width, $thumb_height, $small_width, $small_height);
+      imagecopyresampled($thumb_image, $small_image, 0, 0, 0, 0, $thumb_width, $thumb_height, $small_width, $small_height);
 
     }
 
@@ -156,10 +166,10 @@ class Thumbnail {
     } else {
       $filename_jpg = $output_base . '.jpg';
       // JPEGはアルファチャンネルを持たないため、透明部分を黒ではなく白で合成する。
-      $jpeg_image = imagecreatetruecolor($this->thumb_width, $thumb_height);
+      $jpeg_image = imagecreatetruecolor($thumb_width, $thumb_height);
       if ($jpeg_image === false) return false;
       imagefill($jpeg_image, 0, 0, imagecolorallocate($jpeg_image, 255, 255, 255));
-      imagecopy($jpeg_image, $thumb_image, 0, 0, 0, 0, $this->thumb_width, $thumb_height);
+      imagecopy($jpeg_image, $thumb_image, 0, 0, 0, 0, $thumb_width, $thumb_height);
       $result = imagejpeg($jpeg_image, $filename_jpg, 80);
       if ($result) {
         $this->last_output_path = $filename_jpg;

@@ -56,7 +56,7 @@ if(!defined('INITIALIZATION_INC_VER') || INITIALIZATION_INC_VER < 20260817) {
 // image.inc
 check_file(__DIR__.'/image.inc.php', $en);
 require_once(__DIR__.'/image.inc.php');
-if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20260913) {
+if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20261008) {
   die($en ? 'Please update image.inc.php to the latest version.' : 'image.inc.phpを最新版に更新してください。');
 }
 
@@ -105,7 +105,7 @@ if(!defined('SAVE_INC_VER') || SAVE_INC_VER < 20260820) {
 // thumbnail.inc
 check_file(__DIR__.'/thumbnail.inc.php', $en);
 require_once(__DIR__.'/thumbnail.inc.php');
-if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20260820) {
+if(!defined('THUMBNAIL_VER') || THUMBNAIL_VER < 20261008) {
   render_bootstrap_error($en ? 'Please update thumbnail.inc.php to the latest version.' : 'thumbnail.inc.phpを最新版に更新してください。', 500);
 }
 

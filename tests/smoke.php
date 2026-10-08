@@ -2833,12 +2833,16 @@ smoke_test('GD thumbnail generation', static function (): bool {
 });
 
 foreach ([
-  'wide image' => [1000, 1, 300, false, 1],
-  'NSFW wide image' => [1000, 10, 300, true, 3],
-  'NSFW small width' => [4, 4, 5, true, 5],
-] as $case => [$source_width, $source_height, $width, $nsfw, $expected_height]) {
+  'wide image' => [1000, 1, 300, false, 300, 1],
+  'NSFW wide image' => [1000, 10, 300, true, 300, 3],
+  'NSFW small width' => [4, 4, 5, true, 4, 4],
+  'small image is not enlarged' => [1, 10, 20, false, 1, 10],
+  'portrait fits both dimensions' => [50, 100, 20, false, 10, 20],
+  'NSFW portrait fits both dimensions' => [50, 100, 20, true, 10, 20],
+  'extremely tall image' => [1, 10000, 2, false, 1, 2],
+] as $case => [$source_width, $source_height, $width, $nsfw, $expected_width, $expected_height]) {
   smoke_test('GD thumbnails support positive dimensions: ' . $case, static function () use (
-    $source_width, $source_height, $width, $nsfw, $expected_height
+    $source_width, $source_height, $width, $nsfw, $expected_width, $expected_height
   ): bool {
     $directory = sys_get_temp_dir() . '/noreita_thin_thumbnail_' . bin2hex(random_bytes(8));
     if (!mkdir($directory, 0700)) return false;
@@ -2853,13 +2857,50 @@ foreach ([
       // 生成した画像を実際にデコードして寸法を検証する。
       $bytes = $output !== null ? file_get_contents($output) : false;
       $decoded = is_string($bytes) ? imagecreatefromstring($bytes) : false;
-      return $decoded !== false && imagesx($decoded) === $width && imagesy($decoded) === $expected_height;
+      return $decoded !== false && imagesx($decoded) === $expected_width && imagesy($decoded) === $expected_height;
     } finally {
       foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
       rmdir($directory);
     }
   });
 }
+
+smoke_test('thumbnail dimension calculation caps oversized requests without allocating a canvas', static function (): bool {
+  return Thumbnail::fitDimensions(10000, 10000, PHP_INT_MAX) === [2048, 2048]
+    && Thumbnail::fitDimensions(1, 16384, 200) === [1, 200]
+    && Thumbnail::fitDimensions(400, 200, 200) === [200, 100];
+});
+
+smoke_test('animated AVIF intermediate canvases also fit the size limit', static function (): bool {
+  if (!function_exists('imageavif') || !function_exists('imagecreatefromavif')) return true;
+  $directory = sys_get_temp_dir() . '/noreita_avif_canvas_size_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $image = imagecreatetruecolor(2, 2);
+    if (!imageavif($image, $directory . '/input.avif')) return false;
+    $method = new ReflectionMethod(ImageService::class, 'animatedAvifThumbnailSource');
+    $path = $method->invoke(null, $directory . '/input.avif', $directory, 2, 1, 10000);
+    $decoded = $path !== '' ? imagecreatefromstring((string)file_get_contents($path)) : false;
+    return $decoded !== false && imagesx($decoded) === 1 && imagesy($decoded) === 2;
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
+    rmdir($directory);
+  }
+});
+
+smoke_test('NSFW placeholder thumbnails also fit the size limit', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_placeholder_size_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $method = new ReflectionMethod(ImageService::class, 'createNsfwPlaceholderThumbnail');
+    $name = $method->invoke(null, $directory, 20, 1, 10);
+    $decoded = $name !== '' ? imagecreatefromstring((string)file_get_contents($directory . '/' . $name)) : false;
+    return $decoded !== false && imagesx($decoded) === 1 && imagesy($decoded) === 10;
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
+    rmdir($directory);
+  }
+});
 
 smoke_test('GD thumbnails preserve transparent pixels for supported input formats', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_transparent_thumbnail_' . bin2hex(random_bytes(8));

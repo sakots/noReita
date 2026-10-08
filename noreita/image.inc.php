@@ -1,7 +1,7 @@
 <?php
 // image.inc.php for noReita (C) sakots 2026 MIT License
 
-const IMAGE_INC_VER = 20260913;
+const IMAGE_INC_VER = 20261008;
 
 final class ImageUploadException extends RuntimeException {
 }
@@ -412,7 +412,7 @@ final class ImageService {
     if (!function_exists('imagecreatefromavif') || $thumbnail_width < 1 || $canvas_width < 1 || $canvas_height < 1) return '';
     $frame = @imagecreatefromavif($source);
     if ($frame === false) return '';
-    $target_height = max(1, (int)round($thumbnail_width * $canvas_height / $canvas_width));
+    [$thumbnail_width, $target_height] = Thumbnail::fitDimensions($canvas_width, $canvas_height, $thumbnail_width);
     $canvas = imagecreatetruecolor($thumbnail_width, $target_height);
     if ($canvas === false) return '';
     imagealphablending($canvas, false);
@@ -1500,7 +1500,7 @@ final class ImageService {
    */
   private static function createNsfwPlaceholderThumbnail(string $directory, int $width, int $source_width, int $source_height): string {
     if ($width < 1 || $source_width < 1 || $source_height < 1) return '';
-    $height = max(1, (int)floor($width * $source_height / $source_width));
+    [$width, $height] = Thumbnail::fitDimensions($source_width, $source_height, $width);
     $image = imagecreatetruecolor($width, $height);
     if ($image === false) return '';
     imagefill($image, 0, 0, imagecolorallocate($image, 0, 0, 0));
