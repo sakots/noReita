@@ -109,6 +109,7 @@
                 <input type="file" name="image_upload" accept="{{$upload_accept}}" data-image-upload-file>
                 <button class="button" type="button" data-image-upload-cancel disabled>選択を取り消す</button>（{{$upload_format_label}}、{{$upload_max_kb}}KBまで）
                 <small>保存時: {{$upload_resize_label}}、{{$upload_output_format}}形式</small>
+                <small>アニメーション画像は最初のフレームだけを静止画として保存します。</small>
               </td>
             </tr>
             @endif

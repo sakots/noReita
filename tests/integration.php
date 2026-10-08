@@ -600,6 +600,7 @@ PHP;
       && str_contains($pictmp_body, 'data-image-upload-cancel')
       && str_contains($pictmp_body, 'data-animation-upload-cancel')
       && str_contains($pictmp_body, '保存時: 最大2 × 2px')
+      && str_contains($pictmp_body, 'アニメーション画像は最初のフレームだけを静止画として保存します。')
       && str_contains($pictmp_body, 'data-upload-resize-width="2"')
       && str_contains($pictmp_body, 'data-upload-output-format=')
       && str_contains($pictmp_body, 'data-post-preview-row')
