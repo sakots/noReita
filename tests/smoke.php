@@ -730,6 +730,26 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
   return $minimum['board']['catalog_size'] === 1 && $maximum['board']['catalog_size'] === 200;
 });
 
+smoke_test('upload input limits may be smaller than resize dimensions', static function (): bool {
+  $defaults = require dirname(__DIR__) . '/noreita/config.php';
+  foreach ([false, true] as $enabled) {
+    foreach ([['image_width' => 1000], ['image_height' => 1000], ['image_width' => 1000, 'image_height' => 1000]] as $limits) {
+      $resolved = Config::resolve($defaults, [
+        'admin' => ['password' => 'configured-admin'],
+        'site' => ['base_url' => 'https://configured.example/'],
+        'features' => ['image_upload' => $enabled],
+        'limits' => $limits,
+      ]);
+      foreach ($limits as $key => $value) {
+        if ($resolved['limits'][$key] !== $value) return false;
+      }
+      if ($resolved['limits']['upload_resize_width'] !== $defaults['limits']['upload_resize_width']
+        || $resolved['limits']['upload_resize_height'] !== $defaults['limits']['upload_resize_height']) return false;
+    }
+  }
+  return true;
+});
+
 smoke_test('v3 configuration is converted to a validated local override', static function (): bool {
   $file = tempnam(sys_get_temp_dir(), 'noreita_v3_config_');
   if ($file === false) return false;

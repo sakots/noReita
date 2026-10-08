@@ -259,12 +259,6 @@ final class Config {
       || self::valueAt($values, 'limits.paint_default_height') > self::valueAt($values, 'limits.paint_max_height')) {
       throw new ConfigException('Default paint dimensions must not exceed maximum paint dimensions.');
     }
-    if ((self::valueAt($values, 'limits.upload_resize_width') > 0
-        && self::valueAt($values, 'limits.upload_resize_width') > self::valueAt($values, 'limits.image_width'))
-      || (self::valueAt($values, 'limits.upload_resize_height') > 0
-        && self::valueAt($values, 'limits.upload_resize_height') > self::valueAt($values, 'limits.image_height'))) {
-      throw new ConfigException('Upload resize dimensions must not exceed upload dimensions.');
-    }
     if (self::valueAt($values, 'limits.paint_request_kb') < self::valueAt($values, 'limits.paint_image_kb')
       || self::valueAt($values, 'limits.paint_request_kb') < self::valueAt($values, 'limits.paint_work_kb')) {
       throw new ConfigException('Paint request limit must cover each paint upload file limit.');
