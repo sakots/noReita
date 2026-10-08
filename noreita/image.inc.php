@@ -126,6 +126,11 @@ final class ImageService {
         $image = $resized;
       }
       $output_mime = $output_mime !== '' ? $output_mime : $mime_type;
+      if ($output_mime === 'image/webp' && !imageistruecolor($image)) {
+        if (!imagepalettetotruecolor($image)) {
+          throw new ImageUploadException('The uploaded image could not be processed.', 422);
+        }
+      }
       if ($output_mime === 'image/png' || $output_mime === 'image/webp' || $output_mime === 'image/avif') {
         imagealphablending($image, false);
         imagesavealpha($image, true);

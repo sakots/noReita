@@ -2262,6 +2262,38 @@ smoke_test('direct image re-encoding removes JPEG metadata', static function ():
   }
 });
 
+foreach (['gif', 'png'] as $palette_format) {
+  smoke_test('small palette ' . $palette_format . ' converts to WebP with transparency', static function () use ($palette_format): bool {
+    if (!function_exists('imagewebp') || !function_exists('imagecreatefromwebp')) return true;
+    $source = tempnam(sys_get_temp_dir(), 'noreita_palette_source_');
+    $destination = tempnam(sys_get_temp_dir(), 'noreita_palette_destination_');
+    if ($source === false || $destination === false) return false;
+    try {
+      $canvas = imagecreate(4, 2);
+      if ($canvas === false) return false;
+      $transparent = imagecolorallocate($canvas, 0, 0, 0);
+      imagecolortransparent($canvas, $transparent);
+      $red = imagecolorallocate($canvas, 255, 0, 0);
+      imagesetpixel($canvas, 3, 1, $red);
+      $encoder = $palette_format === 'gif' ? 'imagegif' : 'imagepng';
+      if (!$encoder($canvas, $source)) return false;
+      $method = new ReflectionMethod(ImageService::class, 'reencodeUploadedImage');
+      $result = $method->invoke(null, $source, $destination, 'image/' . $palette_format, 'image/webp', 1600, 1600);
+      $info = getimagesize($destination);
+      $saved = imagecreatefromwebp($destination);
+      if ($saved === false) return false;
+      $clear_pixel = imagecolorsforindex($saved, imagecolorat($saved, 0, 0));
+      $opaque_pixel = imagecolorsforindex($saved, imagecolorat($saved, 3, 1));
+      return $result === ['width' => 4, 'height' => 2]
+        && is_array($info) && $info['mime'] === 'image/webp' && $info[0] === 4 && $info[1] === 2
+        && $clear_pixel['alpha'] === 127 && $opaque_pixel['alpha'] === 0;
+    } finally {
+      if (is_file($source)) unlink($source);
+      if (is_file($destination)) unlink($destination);
+    }
+  });
+}
+
 smoke_test('animated WebP is accepted without GD frame decoding and remains intact for NSFW', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_animated_webp_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
