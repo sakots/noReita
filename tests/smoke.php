@@ -2282,6 +2282,82 @@ smoke_test('direct image re-encoding removes JPEG metadata', static function ():
   }
 });
 
+smoke_test('JPEG orientation is applied before resizing and metadata removal', static function (): bool {
+  $source = tempnam(sys_get_temp_dir(), 'noreita_orientation_source_');
+  $destination = tempnam(sys_get_temp_dir(), 'noreita_orientation_destination_');
+  if ($source === false || $destination === false) return false;
+  try {
+    $canvas = imagecreatetruecolor(80, 40);
+    $colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00];
+    foreach ($colors as $index => $color) {
+      $x = ($index % 2) * 40;
+      $y = intdiv($index, 2) * 20;
+      imagefilledrectangle($canvas, $x, $y, $x + 39, $y + 19, $color);
+    }
+    if (!imagejpeg($canvas, $source, 100)) return false;
+    $jpeg = file_get_contents($source);
+    if (!is_string($jpeg)) return false;
+    $corners = [1 => [0, 1, 2, 3], 2 => [1, 0, 3, 2], 3 => [3, 2, 1, 0], 4 => [2, 3, 0, 1],
+      5 => [0, 2, 1, 3], 6 => [2, 0, 3, 1], 7 => [3, 1, 2, 0], 8 => [1, 3, 0, 2]];
+    $formats = function_exists('imagewebp') ? ['image/jpeg', 'image/webp'] : ['image/jpeg'];
+    $method = new ReflectionMethod(ImageService::class, 'reencodeUploadedImage');
+    foreach (['II', 'MM'] as $order) {
+      foreach ($corners as $orientation => $expected_corners) {
+        $exif = "Exif\0\0" . $order . ($order === 'II'
+          ? pack('vVv', 42, 8, 1) . pack('vvVv', 0x112, 3, 1, $orientation)
+          : pack('nNn', 42, 8, 1) . pack('nnNn', 0x112, 3, 1, $orientation)) . "\0\0\0\0\0\0";
+        file_put_contents($source, substr($jpeg, 0, 2) . "\xff\xe1" . pack('n', strlen($exif) + 2)
+          . $exif . substr($jpeg, 2));
+        foreach ($formats as $format) {
+          $result = $method->invoke(null, $source, $destination, 'image/jpeg', $format, 40, 50);
+          $width = $orientation >= 5 ? 25 : 40;
+          $height = $orientation >= 5 ? 50 : 20;
+          if ($result !== ['width' => $width, 'height' => $height]) {
+            throw new RuntimeException("Wrong dimensions: {$order}/{$orientation}/{$format}");
+          }
+          $bytes = file_get_contents($destination);
+          if (!is_string($bytes) || str_contains($bytes, "Exif\0\0")) return false;
+          $saved = imagecreatefromstring($bytes);
+          if ($saved === false || imagesx($saved) !== $width || imagesy($saved) !== $height) return false;
+          foreach ($expected_corners as $index => $expected_color) {
+            $pixel = imagecolorat($saved, (int)(($index % 2 + 0.5) * $width / 2), (int)((intdiv($index, 2) + 0.5) * $height / 2));
+            foreach ([16, 8, 0] as $shift) {
+              if (abs((($pixel >> $shift) & 255) - (($colors[$expected_color] >> $shift) & 255)) > 60) {
+                throw new RuntimeException("Wrong corner {$index}: {$order}/{$orientation}/{$format}");
+              }
+            }
+          }
+        }
+      }
+    }
+    return true;
+  } finally {
+    if (is_file($source)) unlink($source);
+    if (is_file($destination)) unlink($destination);
+  }
+});
+
+smoke_test('invalid JPEG orientation metadata is ignored safely', static function (): bool {
+  $source = tempnam(sys_get_temp_dir(), 'noreita_invalid_exif_source_');
+  $destination = tempnam(sys_get_temp_dir(), 'noreita_invalid_exif_destination_');
+  if ($source === false || $destination === false) return false;
+  try {
+    $canvas = imagecreatetruecolor(8, 4);
+    if (!imagejpeg($canvas, $source)) return false;
+    $jpeg = file_get_contents($source);
+    $method = new ReflectionMethod(ImageService::class, 'reencodeUploadedImage');
+    foreach (['', "Exif\0\0", "Exif\0\0II" . pack('vV', 42, 0xffffffff),
+      "Exif\0\0MM" . pack('nNn', 42, 8, 1) . pack('nnNn', 0x112, 3, 1, 9) . "\0\0\0\0\0\0"] as $exif) {
+      file_put_contents($source, substr($jpeg, 0, 2) . "\xff\xe1" . pack('n', strlen($exif) + 2) . $exif . substr($jpeg, 2));
+      if ($method->invoke(null, $source, $destination, 'image/jpeg') !== ['width' => 8, 'height' => 4]) return false;
+    }
+    return true;
+  } finally {
+    if (is_file($source)) unlink($source);
+    if (is_file($destination)) unlink($destination);
+  }
+});
+
 foreach (['gif', 'png'] as $palette_format) {
   smoke_test('small palette ' . $palette_format . ' converts to WebP with transparency', static function () use ($palette_format): bool {
     if (!function_exists('imagewebp') || !function_exists('imagecreatefromwebp')) return true;
