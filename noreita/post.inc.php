@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20261006;
+const POST_INC_VER = 20261009;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -98,16 +98,16 @@ final class PostService implements AdminPostManagementService {
         ImageService::updateNsfwThumbnail(
           $this->image_dir, (string)$post['picfile'], $values['thumbnail'], $nsfw,
           $this->thumbnail_width, $this->file_permission,
-          function (string $thumbnail) use ($post_id, $values): void {
+          function (string $thumbnail) use ($post_id, $values, $post): void {
             $values['thumbnail'] = $thumbnail;
-            $this->repository->updateContent($post_id, $values);
+            $this->repository->updateContent($post_id, $values, $post);
           }
         );
         return $authorization['role'];
       }
       $values['nsfw'] = (int)$nsfw;
     }
-    $this->repository->updateContent($post_id, $values);
+    $this->repository->updateContent($post_id, $values, $post);
     return $authorization['role'];
   }
 

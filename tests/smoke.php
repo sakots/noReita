@@ -2053,7 +2053,7 @@ smoke_test('content editing preserves sodane increments after the post was read'
   $repository->updateContent($id, [
     'name' => 'Author', 'mail' => '', 'sub' => 'After', 'com' => 'Edited', 'url' => '', 'host' => 'localhost',
     'sodane' => $snapshot['sodane'], 'pwdh' => $snapshot['pwd'], 'nsfw' => 0, 'thumbnail' => '',
-  ]);
+  ], $snapshot);
   $updated = $repository->findPost($id);
   return (int)$updated['sodane'] === 8 && $updated['sub'] === 'After' && $updated['com'] === 'Edited';
 });
@@ -2069,10 +2069,74 @@ smoke_test('content updates fail when the target was deleted before saving', sta
     $repository->updateContent($id, [
       'name' => $snapshot['a_name'], 'mail' => '', 'sub' => 'After', 'com' => 'Edited',
       'url' => '', 'host' => 'localhost', 'pwdh' => '', 'nsfw' => 0, 'thumbnail' => '',
-    ]);
+    ], $snapshot);
     return false;
   } catch (RuntimeException $e) {
     return $repository->findPost($id) === false;
+  }
+});
+
+foreach ([
+  'image replacement' => ['picfile' => 'new.png', 'nsfw' => 1, 'thumbnail' => 'new-blurred.png'],
+  'NSFW enabled without replacement' => ['nsfw' => 1],
+  'thumbnail refreshed without replacement' => ['thumbnail' => 'new-thumb.png'],
+] as $case => $changes) {
+  smoke_test('content edit rejects stale image state: ' . $case, static function () use ($changes): bool {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $id = $repository->insertPost(['thread' => 1, 'a_name' => 'Owner', 'sub' => 'Before',
+      'com' => 'Before', 'picfile' => 'old.png', 'nsfw' => 0, 'thumbnail' => 'old-thumb.png']);
+    $snapshot = $repository->findPost($id);
+    foreach ($changes as $column => $value) {
+      $db->prepare('UPDATE board_log SET ' . $column . ' = ? WHERE tid = ?')->execute([$value, $id]);
+    }
+    $before = $repository->findPost($id);
+    try {
+      $repository->updateContent($id, ['name' => 'Owner', 'mail' => '', 'sub' => 'Edited',
+        'com' => 'Edited', 'url' => '', 'host' => 'localhost', 'pwdh' => '',
+        'nsfw' => 0, 'thumbnail' => $snapshot['thumbnail']], $snapshot);
+      return false;
+    } catch (PostContentConflictException $e) {
+      return $repository->findPost($id) === $before;
+    }
+  });
+}
+
+smoke_test('NSFW edit rolls back generated thumbnails after an image conflict', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_edit_conflict_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', $directory))->migrate();
+    $repository = new BoardRepository($db);
+    $id = $repository->insertPost(['thread' => 1, 'a_name' => 'Owner', 'com' => 'Before',
+      'picfile' => 'old.png', 'nsfw' => 0, 'thumbnail' => 'old-thumb.png']);
+    $snapshot = $repository->findPost($id);
+    $image = imagecreatetruecolor(4, 4);
+    if (!imagepng($image, $directory . '/old.png') || !imagepng($image, $directory . '/new.png')) return false;
+    file_put_contents($directory . '/old-thumb.png', 'old thumbnail');
+    file_put_contents($directory . '/winner-thumb.png', 'winning thumbnail');
+    $files_before = glob($directory . '/*');
+    $winner = null;
+    try {
+      ImageService::updateNsfwThumbnail($directory, 'old.png', 'old-thumb.png', true, 2, 0600,
+        static function (string $thumbnail) use ($db, $repository, $id, $snapshot, &$winner): void {
+          $db->prepare('UPDATE board_log SET picfile = ?, nsfw = 1, thumbnail = ? WHERE tid = ?')
+            ->execute(['new.png', 'winner-thumb.png', $id]);
+          $winner = $repository->findPost($id);
+          $repository->updateContent($id, ['name' => 'Owner', 'mail' => '', 'sub' => 'Edited',
+            'com' => 'Edited', 'url' => '', 'host' => 'localhost', 'pwdh' => '',
+            'nsfw' => 1, 'thumbnail' => $thumbnail], $snapshot);
+        });
+      return false;
+    } catch (PostContentConflictException $e) {
+      return $repository->findPost($id) === $winner && glob($directory . '/*') === $files_before
+        && file_get_contents($directory . '/winner-thumb.png') === 'winning thumbnail';
+    }
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
+    rmdir($directory);
   }
 });
 

@@ -42,7 +42,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261006) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261009) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -63,7 +63,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20261008) {
 // post.inc
 check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20261006) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20261009) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -2322,6 +2322,9 @@ function editexec(ApplicationContext $context): void {
       );
     }
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
+  } catch (PostContentConflictException $e) {
+    render_error($context, $en ? 'The post image or NSFW setting changed. Please reopen the edit form.' : '投稿画像またはNSFW設定が変更されました。編集画面を開き直してください。', 409);
+    return;
   } catch (PostNotFoundException $e) {
     render_error($context, $en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
     return;

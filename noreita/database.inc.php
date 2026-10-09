@@ -3,7 +3,9 @@
 
 require_once __DIR__ . '/filesystem_permissions.inc.php';
 
-const DATABASE_INC_VER = 20261006;
+const DATABASE_INC_VER = 20261009;
+
+final class PostContentConflictException extends RuntimeException {}
 
 final class AdminPostFilter {
   private const ENUMS = [
@@ -352,19 +354,25 @@ final class BoardRepository {
     });
   }
 
-  public function updateContent(int $id, array $values): void {
+  public function updateContent(int $id, array $values, array $expected_post): void {
     $sql = "UPDATE board_log SET modified = datetime('now', 'localtime'), a_name = :name, mail = :mail,
       sub = :sub, com = :com, a_url = :url, host = :host, pwd = :pwdh,
-      nsfw = :nsfw, thumbnail = :thumbnail, image_alt = :image_alt WHERE tid = :id";
+      nsfw = :nsfw, thumbnail = :thumbnail, image_alt = :image_alt WHERE tid = :id
+      AND COALESCE(picfile, '') = :expected_picfile
+      AND CAST(COALESCE(nsfw, 0) AS INTEGER) = :expected_nsfw
+      AND COALESCE(thumbnail, '') = :expected_thumbnail";
     $statement = $this->db->prepare($sql);
     $statement->execute([
       'name' => $values['name'], 'mail' => $values['mail'], 'sub' => $values['sub'], 'com' => $values['com'],
       'url' => $values['url'], 'host' => $values['host'],
       'pwdh' => $values['pwdh'], 'nsfw' => $values['nsfw'], 'thumbnail' => $values['thumbnail'],
       'image_alt' => $values['image_alt'] ?? '', 'id' => $id,
+      'expected_picfile' => (string)($expected_post['picfile'] ?? ''),
+      'expected_nsfw' => (int)($expected_post['nsfw'] ?? 0),
+      'expected_thumbnail' => (string)($expected_post['thumbnail'] ?? ''),
     ]);
     if ($statement->rowCount() !== 1) {
-      throw new RuntimeException('The post could not be updated.');
+      throw new PostContentConflictException('The post image state changed before editing completed.');
     }
   }
 

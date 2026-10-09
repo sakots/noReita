@@ -2306,11 +2306,11 @@ PHP;
       $failure_db->exec('DROP TRIGGER fail_nsfw_edit');
     }
     integration_test('failed NSFW edit preserves database and thumbnail files: ' . $nsfw . ($ignore_update ? ' / zero rows' : ''),
-      static function () use ($status, $before, $files_before, $failure_db, $image_post_id, $webroot): bool {
+      static function () use ($status, $before, $files_before, $failure_db, $image_post_id, $webroot, $ignore_update): bool {
         clearstatcache();
         $files_after = [];
         foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $files_after[$path] = hash_file('sha256', $path);
-        return $status === 500 && $files_before === $files_after
+        return $status === ($ignore_update ? 409 : 500) && $files_before === $files_after
           && $failure_db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC) === $before;
       }
     );
