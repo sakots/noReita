@@ -1418,6 +1418,27 @@ PHP;
     return $post_status === 200 && (int)$db->query('SELECT sodane FROM board_log WHERE tid = ' . (int)$row['tid'])->fetchColumn() === 0;
   });
   $shared_thread_id = (int)($row['tid'] ?? 0);
+  integration_test('zero max_threads rejects list requests without deleting existing posts',
+    static function () use ($webroot, $db, $base_url, $cookie_jar): bool {
+      $config_path = $webroot . '/config.local.php';
+      $saved_config = file_get_contents($config_path);
+      $override = require $config_path;
+      $override['board']['max_threads'] = 0;
+      $before = $db->query('SELECT * FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC);
+      if ($before === [] || !is_string($saved_config)) return false;
+      try {
+        if (file_put_contents($config_path, '<?php return ' . var_export($override, true) . ';') === false) return false;
+        [$public_status] = http_request($base_url, $cookie_jar);
+        [$debug_status, $debug_body] = http_request($base_url, $cookie_jar, null, '198.51.100.99');
+        return $public_status === 500 && $debug_status === 500
+          && str_contains($debug_body, 'board.max_threads')
+          && $db->query('SELECT * FROM board_log ORDER BY tid')->fetchAll(PDO::FETCH_ASSOC) === $before;
+      } finally {
+        if (file_put_contents($config_path, $saved_config) === false) {
+          throw new RuntimeException('Could not restore max_threads test configuration.');
+        }
+      }
+    });
   $sodane_count = static fn(): int => (int)$db->query('SELECT sodane FROM board_log WHERE tid = ' . $shared_thread_id)->fetchColumn();
   foreach ([
     'GET' => [null, 405],

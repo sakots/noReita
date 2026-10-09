@@ -698,6 +698,8 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 201]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['page_size' => 0]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['page_size' => -1]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['max_threads' => 0]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['max_threads' => -1]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_request_kb' => 32769]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_image_kb' => 2048, 'paint_work_kb' => 4096, 'paint_request_kb' => 1024]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['not-an-ip']]],
@@ -722,7 +724,7 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
   $minimum = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin'],
     'site' => ['base_url' => 'https://configured.example/'],
-    'board' => ['catalog_size' => 1, 'page_size' => 1],
+    'board' => ['catalog_size' => 1, 'page_size' => 1, 'max_threads' => 1],
   ]);
   $maximum = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin'],
@@ -730,7 +732,8 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     'board' => ['catalog_size' => 200],
   ]);
   return $minimum['board']['catalog_size'] === 1 && $maximum['board']['catalog_size'] === 200
-    && $minimum['board']['page_size'] === 1 && $maximum['board']['page_size'] === 10;
+    && $minimum['board']['page_size'] === 1 && $maximum['board']['page_size'] === 10
+    && $minimum['board']['max_threads'] === 1 && $maximum['board']['max_threads'] === 1000;
 });
 
 smoke_test('upload input limits may be smaller than resize dimensions', static function (): bool {
