@@ -945,39 +945,15 @@ function def(ApplicationContext $context): void {
   //ページング
   try {
     $count = $repository->countThreads(true);
-    if (isset($_GET['page']) && is_numeric($_GET['page'])) {
-      $page = $_GET['page'];
-      $page = max($page, 1);
-    } else {
-      $page = 1;
-    }
-    $start = $page_def * ($page - 1);
-
-    //最大何ページあるのか
-    $max_page = floor($count / $page_def) + 1;
-    //最後にスレ数0のページができたら表示しない処理
-    if (($count % $page_def) == 0) {
-      $max_page = $max_page - 1;
-      //ただしそれが1ページ目なら困るから表示
-      $max_page = max($max_page, 1);
-    }
-    $dat['max_page'] = $max_page;
-
-    //リンク作成用
-    $dat['nowpage'] = $page;
-    $p = 1;
-    $pp = array();
-    $paging = array();
-    while ($p <= $max_page) {
-      $paging[($p)] = compact('p');
-      $pp[] = $paging;
-      $p++;
-    }
-    $dat['paging'] = $paging;
-    $dat['pp'] = $pp;
-
-    $dat['back'] = ($page - 1);
-    $dat['next'] = ($page + 1);
+    $page_value = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $pagination = catalog_paging($count, $page_def, $page_value === false || $page_value === null ? 1 : $page_value);
+    $start = $pagination['start'];
+    $dat['max_page'] = $pagination['max_page'];
+    $dat['nowpage'] = $pagination['page'];
+    $dat['paging'] = $pagination['paging'];
+    $dat['pp'] = $pagination['pp'];
+    $dat['back'] = $pagination['back'];
+    $dat['next'] = $pagination['next'];
 
   } catch (PDOException $e) {
     render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);

@@ -317,6 +317,27 @@ PHP;
     throw new RuntimeException('Application startup failed: ' . trim(strip_tags($startup_body)));
   }
 
+  $check_public_pages = static function (string $label, string $url, string $jar) use ($webroot): void {
+    $paging_db = new PDO('sqlite:' . $webroot . '/reita.db');
+    $defaults = require $webroot . '/config.php';
+    $local = require $webroot . '/config.local.php';
+    $per_page = $local['board']['page_size'] ?? $defaults['board']['page_size'];
+    $total = (int)$paging_db->query('SELECT COUNT(*) FROM board_log WHERE thread=1 AND invz=0')->fetchColumn();
+    $last = max(1, (int)ceil($total / $per_page));
+    integration_test('public list validates and clamps page numbers: ' . $label,
+      static function () use ($url, $jar, $last): bool {
+        foreach (['' => 1, '?page=1' => 1, '?page=2' => min(2, $last),
+          '?page=' . PHP_INT_MAX => $last, '?page=' . PHP_INT_MAX . '0' => 1,
+          '?page=1e309' => 1, '?page=1.5' => 1, '?page=0' => 1,
+          '?page=-1' => 1, '?page=invalid' => 1, '?page%5B%5D=1' => 1] as $query => $expected) {
+          [$status, $body] = http_request($url . $query, $jar);
+          if ($status !== 200 || !str_contains($body, '<em class="thispage">[' . $expected . ']</em>')) return false;
+        }
+        return true;
+      });
+  };
+  $check_public_pages('eda / empty board', $base_url, $cookie_jar);
+
   // 機能を無効にした設置では、表示ボタンだけでなくMisskeyの各入口を直接指定しても使えない。
   [$misskey_disabled_before_status] = http_request($base_url . '?mode=before_misskey_note&no=1', $cookie_jar);
   [$misskey_disabled_session_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar, [
@@ -3351,6 +3372,7 @@ PHP;
     }
   }
   if (!$monoreita_ready) throw new RuntimeException('Monoreita PHP server did not become ready.');
+  $check_public_pages('monoreita', $monoreita_base_url, $root . '/monoreita-ready-cookies.txt');
   $monoreita_cookie_jar = $root . '/monoreita-cookies.txt';
   [$monoreita_login_form_status, $monoreita_login_form_body] = http_request(
     $monoreita_base_url . '?mode=admin_in', $monoreita_cookie_jar
