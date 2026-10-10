@@ -698,6 +698,8 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['catalog_size' => 201]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['page_size' => 0]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['page_size' => -1]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['max_threads' => 0]],
+    ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'board' => ['max_threads' => -1]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_request_kb' => 32769]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'limits' => ['paint_image_kb' => 2048, 'paint_work_kb' => 4096, 'paint_request_kb' => 1024]],
     ['admin' => ['password' => 'configured-admin'], 'site' => ['base_url' => 'https://configured.example/'], 'security' => ['trusted_proxies' => ['not-an-ip']]],
@@ -722,7 +724,7 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
   $minimum = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin'],
     'site' => ['base_url' => 'https://configured.example/'],
-    'board' => ['catalog_size' => 1, 'page_size' => 1],
+    'board' => ['catalog_size' => 1, 'page_size' => 1, 'max_threads' => 1],
   ]);
   $maximum = Config::resolve($defaults, [
     'admin' => ['password' => 'configured-admin'],
@@ -730,7 +732,8 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     'board' => ['catalog_size' => 200],
   ]);
   return $minimum['board']['catalog_size'] === 1 && $maximum['board']['catalog_size'] === 200
-    && $minimum['board']['page_size'] === 1 && $maximum['board']['page_size'] === 10;
+    && $minimum['board']['page_size'] === 1 && $maximum['board']['page_size'] === 10
+    && $minimum['board']['max_threads'] === 1 && $maximum['board']['max_threads'] === 1000;
 });
 
 smoke_test('upload input limits may be smaller than resize dimensions', static function (): bool {
@@ -2053,7 +2056,7 @@ smoke_test('content editing preserves sodane increments after the post was read'
   $repository->updateContent($id, [
     'name' => 'Author', 'mail' => '', 'sub' => 'After', 'com' => 'Edited', 'url' => '', 'host' => 'localhost',
     'sodane' => $snapshot['sodane'], 'pwdh' => $snapshot['pwd'], 'nsfw' => 0, 'thumbnail' => '',
-  ]);
+  ], $snapshot);
   $updated = $repository->findPost($id);
   return (int)$updated['sodane'] === 8 && $updated['sub'] === 'After' && $updated['com'] === 'Edited';
 });
@@ -2069,12 +2072,98 @@ smoke_test('content updates fail when the target was deleted before saving', sta
     $repository->updateContent($id, [
       'name' => $snapshot['a_name'], 'mail' => '', 'sub' => 'After', 'com' => 'Edited',
       'url' => '', 'host' => 'localhost', 'pwdh' => '', 'nsfw' => 0, 'thumbnail' => '',
-    ]);
+    ], $snapshot);
     return false;
   } catch (RuntimeException $e) {
     return $repository->findPost($id) === false;
   }
 });
+
+foreach ([
+  'image replacement' => ['picfile' => 'new.png', 'nsfw' => 1, 'thumbnail' => 'new-blurred.png'],
+  'NSFW enabled without replacement' => ['nsfw' => 1],
+  'thumbnail refreshed without replacement' => ['thumbnail' => 'new-thumb.png'],
+] as $case => $changes) {
+  smoke_test('content edit rejects stale image state: ' . $case, static function () use ($changes): bool {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $id = $repository->insertPost(['thread' => 1, 'a_name' => 'Owner', 'sub' => 'Before',
+      'com' => 'Before', 'picfile' => 'old.png', 'nsfw' => 0, 'thumbnail' => 'old-thumb.png']);
+    $snapshot = $repository->findPost($id);
+    foreach ($changes as $column => $value) {
+      $db->prepare('UPDATE board_log SET ' . $column . ' = ? WHERE tid = ?')->execute([$value, $id]);
+    }
+    $before = $repository->findPost($id);
+    try {
+      $repository->updateContent($id, ['name' => 'Owner', 'mail' => '', 'sub' => 'Edited',
+        'com' => 'Edited', 'url' => '', 'host' => 'localhost', 'pwdh' => '',
+        'nsfw' => 0, 'thumbnail' => $snapshot['thumbnail']], $snapshot);
+      return false;
+    } catch (PostContentConflictException $e) {
+      return $repository->findPost($id) === $before;
+    }
+  });
+}
+
+smoke_test('NSFW edit rolls back generated thumbnails after an image conflict', static function (): bool {
+  $directory = sys_get_temp_dir() . '/noreita_edit_conflict_' . bin2hex(random_bytes(8));
+  if (!mkdir($directory, 0700)) return false;
+  try {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', $directory))->migrate();
+    $repository = new BoardRepository($db);
+    $id = $repository->insertPost(['thread' => 1, 'a_name' => 'Owner', 'com' => 'Before',
+      'picfile' => 'old.png', 'nsfw' => 0, 'thumbnail' => 'old-thumb.png']);
+    $snapshot = $repository->findPost($id);
+    $image = imagecreatetruecolor(4, 4);
+    if (!imagepng($image, $directory . '/old.png') || !imagepng($image, $directory . '/new.png')) return false;
+    file_put_contents($directory . '/old-thumb.png', 'old thumbnail');
+    file_put_contents($directory . '/winner-thumb.png', 'winning thumbnail');
+    $files_before = glob($directory . '/*');
+    $winner = null;
+    try {
+      ImageService::updateNsfwThumbnail($directory, 'old.png', 'old-thumb.png', true, 2, 0600,
+        static function (string $thumbnail) use ($db, $repository, $id, $snapshot, &$winner): void {
+          $db->prepare('UPDATE board_log SET picfile = ?, nsfw = 1, thumbnail = ? WHERE tid = ?')
+            ->execute(['new.png', 'winner-thumb.png', $id]);
+          $winner = $repository->findPost($id);
+          $repository->updateContent($id, ['name' => 'Owner', 'mail' => '', 'sub' => 'Edited',
+            'com' => 'Edited', 'url' => '', 'host' => 'localhost', 'pwdh' => '',
+            'nsfw' => 1, 'thumbnail' => $thumbnail], $snapshot);
+        });
+      return false;
+    } catch (PostContentConflictException $e) {
+      return $repository->findPost($id) === $winner && glob($directory . '/*') === $files_before
+        && file_get_contents($directory . '/winner-thumb.png') === 'winning thumbnail';
+    }
+  } finally {
+    foreach (glob($directory . '/*') ?: [] as $path) unlink($path);
+    rmdir($directory);
+  }
+});
+
+foreach (['stale', 'missing', 'invalid'] as $case) {
+  smoke_test('old edit form cannot clear replacement NSFW: ' . $case, static function () use ($case): bool {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $id = $repository->insertPost(['thread' => 1, 'a_name' => 'Owner', 'pwd' => password_hash('owner', PASSWORD_DEFAULT),
+      'picfile' => 'old.png', 'nsfw' => 0, 'thumbnail' => '', 'com' => 'Before']);
+    $form_state = PostService::imageStateForEdit($repository->findPost($id));
+    $db->exec("UPDATE board_log SET picfile='new.png', nsfw=1, thumbnail='new-blurred.png'");
+    $before = $repository->findPost($id);
+    $values = ['name' => 'Owner', 'mail' => '', 'sub' => 'Edited', 'com' => 'Edited',
+      'url' => '', 'host' => 'localhost', 'edit_nsfw' => false];
+    if ($case !== 'missing') $values['edit_image_state'] = $case === 'stale' ? $form_state : ['invalid'];
+    try {
+      (new PostService($repository, sys_get_temp_dir()))->edit($id, 'owner', $values);
+      return false;
+    } catch (PostContentConflictException $e) {
+      return $repository->findPost($id) === $before;
+    }
+  });
+}
 
 smoke_test('old thread warnings are recalculated instead of accumulating', static function (): bool {
   $db = new PDO('sqlite::memory:');
@@ -2122,6 +2211,7 @@ smoke_test('post service centralizes edit and delete authorization', static func
     $service->edit($edit_id, 'owner-pass', [
       'name' => '編集者', 'mail' => '', 'sub' => '編集後', 'com' => '編集本文',
       'url' => '', 'host' => 'localhost', 'sodane' => 0,
+      'edit_image_state' => PostService::imageStateForEdit($repository->findPost($edit_id)),
     ]);
     $edited_post = $repository->findPost($edit_id);
     if (($edited_post['sub'] ?? '') !== '編集後' || (int)($edited_post['sodane'] ?? 0) !== 7) return false;
@@ -2762,6 +2852,43 @@ smoke_test('external image URLs decode HTML once for cache lookup and escape lin
     rmdir($directory);
   }
 });
+
+foreach (['short first', 'long first', 'URL limit', 'short cached only'] as $case) {
+  smoke_test('external image URLs with a shared prefix stay independent: ' . $case, static function () use ($case): bool {
+    $directory = sys_get_temp_dir() . '/noreita_external_prefix_' . bin2hex(random_bytes(8));
+    if (!mkdir($directory, 0700)) return false;
+    $short = 'https://example.com/picture.png';
+    $long = $short . '?a=1&amp;b=2';
+    $urls = $case === 'long first' ? [$long, $short, $short] : [$short, $long, $short];
+    $unchanged = $short . '.txt';
+    $selected = $case === 'URL limit' || $case === 'short cached only' ? [$short] : [$short, $long];
+    try {
+      foreach ($case === 'short cached only' ? [$short] : [$short, $long] as $url) {
+        $filename = md5(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8')) . '_thumb.jpg';
+        if (file_put_contents($directory . '/' . $filename, 'cached thumbnail') === false) return false;
+      }
+      $service = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600,
+        $case === 'URL limit' ? 1 : 2, 0);
+      $html = $service->addThumbnailLinks(implode(' ', $urls) . ' ' . $unchanged);
+      $expected_links = [];
+      foreach ($urls as $url) {
+        if (in_array($url, $selected, true)) {
+          array_push($expected_links, $url, $url);
+        } elseif (!str_contains($html, $url)) {
+          return false;
+        }
+      }
+      preg_match_all('/href="([^"]+)"/', $html, $links);
+      return $links[1] === $expected_links
+        && substr_count($html, '<img ') === count($expected_links) / 2
+        && str_contains($html, $unchanged)
+        && !str_contains($html, '</a>?a=1');
+    } finally {
+      foreach (glob($directory . '/*') ?: [] as $file) unlink($file);
+      rmdir($directory);
+    }
+  });
+}
 
 smoke_test('external image thumbnails use a stable cache filename and remove legacy files', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_cache_' . bin2hex(random_bytes(8));

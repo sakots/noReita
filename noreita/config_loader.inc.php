@@ -222,6 +222,7 @@ final class Config {
       'security.session_file_lifetime' => [60, 31536000],
       'identity.cycle' => [0, 4],
       'board.log_warning_percent' => [0, 100],
+      'board.max_threads' => [1, PHP_INT_MAX],
       'board.page_size' => [1, PHP_INT_MAX],
       'board.catalog_size' => [1, 200],
       'limits.paint_max_width' => [300, 10000],
@@ -245,7 +246,7 @@ final class Config {
       }
     }
     foreach ([
-      'board.max_threads', 'board.replies_shown',
+      'board.replies_shown',
       'board.cookie_days', 'limits.external_thumbnail_days', 'limits.upload_kb',
       'limits.image_width', 'limits.image_height', 'limits.upload_resize_width', 'limits.upload_resize_height', 'limits.name_length', 'limits.email_length',
       'limits.subject_length', 'limits.url_length', 'limits.comment_length', 'limits.temporary_days',

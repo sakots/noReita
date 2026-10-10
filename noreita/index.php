@@ -5,7 +5,7 @@
 //--------------------------------------------------
 
 // スクリプトのバージョン
-const REITA_VER = 'v4.13.4 lot.261008.0';
+const REITA_VER = 'v4.13.5 lot.261010.0';
 
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
@@ -42,7 +42,7 @@ if(!defined('REQUEST_INFO_INC_VER') || REQUEST_INFO_INC_VER < 20260816) {
 // database.inc
 check_file(__DIR__.'/database.inc.php', $en);
 require_once(__DIR__.'/database.inc.php');
-if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261006) {
+if(!defined('DATABASE_INC_VER') || DATABASE_INC_VER < 20261009) {
   die($en ? 'Please update database.inc.php to the latest version.' : 'database.inc.phpを最新版に更新してください。');
 }
 
@@ -63,7 +63,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20261008) {
 // post.inc
 check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20261006) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20261010) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -945,39 +945,15 @@ function def(ApplicationContext $context): void {
   //ページング
   try {
     $count = $repository->countThreads(true);
-    if (isset($_GET['page']) && is_numeric($_GET['page'])) {
-      $page = $_GET['page'];
-      $page = max($page, 1);
-    } else {
-      $page = 1;
-    }
-    $start = $page_def * ($page - 1);
-
-    //最大何ページあるのか
-    $max_page = floor($count / $page_def) + 1;
-    //最後にスレ数0のページができたら表示しない処理
-    if (($count % $page_def) == 0) {
-      $max_page = $max_page - 1;
-      //ただしそれが1ページ目なら困るから表示
-      $max_page = max($max_page, 1);
-    }
-    $dat['max_page'] = $max_page;
-
-    //リンク作成用
-    $dat['nowpage'] = $page;
-    $p = 1;
-    $pp = array();
-    $paging = array();
-    while ($p <= $max_page) {
-      $paging[($p)] = compact('p');
-      $pp[] = $paging;
-      $p++;
-    }
-    $dat['paging'] = $paging;
-    $dat['pp'] = $pp;
-
-    $dat['back'] = ($page - 1);
-    $dat['next'] = ($page + 1);
+    $page_value = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $pagination = catalog_paging($count, $page_def, $page_value === false || $page_value === null ? 1 : $page_value);
+    $start = $pagination['start'];
+    $dat['max_page'] = $pagination['max_page'];
+    $dat['nowpage'] = $pagination['page'];
+    $dat['paging'] = $pagination['paging'];
+    $dat['pp'] = $pagination['pp'];
+    $dat['back'] = $pagination['back'];
+    $dat['next'] = $pagination['next'];
 
   } catch (PDOException $e) {
     render_error($context, $en ? 'Database operation failed.' : 'データベース処理に失敗しました。', 500, $e);
@@ -2241,6 +2217,7 @@ function editform(ApplicationContext $context, ?int $authorized_post_id = null, 
       ? (string)$post_pwd
       : '';
     $msg['admin_edit'] = $authorization['role'] === 'admin';
+    $msg['edit_image_state'] = PostService::imageStateForEdit($msg);
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
@@ -2306,6 +2283,7 @@ function editexec(ApplicationContext $context): void {
     $edit_role = $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'image_alt' => $image_alt, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
+      'edit_image_state' => filter_input(INPUT_POST, 'edit_image_state'),
     ], $edit_as_admin);
     if ($edit_role === 'admin') {
       ApplicationErrorHandler::reportAdminAudit('post-edit', ['posts' => 1]);
@@ -2322,6 +2300,9 @@ function editexec(ApplicationContext $context): void {
       );
     }
     $dat['message'] = $en ? 'Editing completed successfully.' : '編集完了しました。';
+  } catch (PostContentConflictException $e) {
+    render_error($context, $en ? 'The post image or NSFW setting changed. Please reopen the edit form.' : '投稿画像またはNSFW設定が変更されました。編集画面を開き直してください。', 409);
+    return;
   } catch (PostNotFoundException $e) {
     render_error($context, $en ? 'That post does not exist.' : 'そんな記事ないです。', 404);
     return;

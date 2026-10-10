@@ -24,6 +24,7 @@
             <input type="hidden" name="sodane" value="{{ bbsline['sodane'] }}">
             <input type="hidden" name="nsfw" value="0">
             <input type="hidden" name="e_no" value="{{ bbsline['tid'] }}">
+            <input type="hidden" name="edit_image_state" value="{{ bbsline['edit_image_state'] }}">
             {% if bbsline['admin_edit'] ?? false %}
             <input type="hidden" name="admin_edit" value="1">
             {% endif %}
