@@ -50,11 +50,13 @@ final class ExternalImageService {
 
   // 本文中の外部画像URLへ、キャッシュしたサムネイルを追加する。
   public function addThumbnailLinks(string $comment): string {
-    preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+/i', $comment, $matches);
+    $url_pattern = '/https?:\/\/[^\s<>"\'{}|\\^`[\]]+/i';
+    preg_match_all($url_pattern, $comment, $matches);
     $image_urls = array_values(array_filter(
       array_unique($matches[0]),
       static fn(string $url): bool => preg_match('/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i', $url) === 1
     ));
+    $replacements = [];
     foreach (array_slice($image_urls, 0, $this->max_urls_per_post) as $matched_url) {
       // 本文はHTMLエスケープ済み。取得・キャッシュには復号した元のURLを使う。
       $url = html_entity_decode($matched_url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -72,9 +74,11 @@ final class ExternalImageService {
         . '" target="_blank" rel="nofollow noopener noreferrer"><img src="' . $thumbnail_url
         . '" alt="thumbnail" style="max-width:' . $this->thumbnail_width . 'px; max-height:'
         . $this->thumbnail_width . 'px;"></a>';
-      $comment = str_replace($matched_url, $replacement, $comment);
+      $replacements[$matched_url] = $replacement;
     }
-    return $comment;
+    // 元の本文のURL全体だけを置換し、長いURLの一部や生成済みHTMLを巻き込まない。
+    return preg_replace_callback($url_pattern,
+      static fn(array $match): string => $replacements[$match[0]] ?? $match[0], $comment);
   }
 
   // OGP画像など、拡張子を持たない画像URLにもキャッシュ済みサムネイルを返す。

@@ -2853,6 +2853,43 @@ smoke_test('external image URLs decode HTML once for cache lookup and escape lin
   }
 });
 
+foreach (['short first', 'long first', 'URL limit', 'short cached only'] as $case) {
+  smoke_test('external image URLs with a shared prefix stay independent: ' . $case, static function () use ($case): bool {
+    $directory = sys_get_temp_dir() . '/noreita_external_prefix_' . bin2hex(random_bytes(8));
+    if (!mkdir($directory, 0700)) return false;
+    $short = 'https://example.com/picture.png';
+    $long = $short . '?a=1&amp;b=2';
+    $urls = $case === 'long first' ? [$long, $short, $short] : [$short, $long, $short];
+    $unchanged = $short . '.txt';
+    $selected = $case === 'URL limit' || $case === 'short cached only' ? [$short] : [$short, $long];
+    try {
+      foreach ($case === 'short cached only' ? [$short] : [$short, $long] as $url) {
+        $filename = md5(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8')) . '_thumb.jpg';
+        if (file_put_contents($directory . '/' . $filename, 'cached thumbnail') === false) return false;
+      }
+      $service = new ExternalImageService($directory, 'thumbnail/', 200, 0600, 0700, 0600,
+        $case === 'URL limit' ? 1 : 2, 0);
+      $html = $service->addThumbnailLinks(implode(' ', $urls) . ' ' . $unchanged);
+      $expected_links = [];
+      foreach ($urls as $url) {
+        if (in_array($url, $selected, true)) {
+          array_push($expected_links, $url, $url);
+        } elseif (!str_contains($html, $url)) {
+          return false;
+        }
+      }
+      preg_match_all('/href="([^"]+)"/', $html, $links);
+      return $links[1] === $expected_links
+        && substr_count($html, '<img ') === count($expected_links) / 2
+        && str_contains($html, $unchanged)
+        && !str_contains($html, '</a>?a=1');
+    } finally {
+      foreach (glob($directory . '/*') ?: [] as $file) unlink($file);
+      rmdir($directory);
+    }
+  });
+}
+
 smoke_test('external image thumbnails use a stable cache filename and remove legacy files', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_external_cache_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
