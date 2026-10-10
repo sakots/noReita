@@ -1,7 +1,7 @@
 <?php
 // post.inc.php for noReita (C) sakots 2026 MIT License
 
-const POST_INC_VER = 20261009;
+const POST_INC_VER = 20261010;
 
 final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
@@ -71,10 +71,21 @@ final class PostService implements AdminPostManagementService {
     throw new PostAuthorizationException('Invalid password.');
   }
 
+  public static function imageStateForEdit(array $post): string {
+    return hash('sha256', json_encode([
+      (int)$post['tid'], (string)($post['picfile'] ?? ''),
+      (int)($post['nsfw'] ?? 0), (string)($post['thumbnail'] ?? ''),
+    ], JSON_THROW_ON_ERROR));
+  }
+
   /** @param array<string,mixed> $values */
   public function edit(int $post_id, string $password, array $values, bool $edit_as_admin = false): string {
     $authorization = $this->authorize($post_id, $password, $edit_as_admin);
     $post = $authorization['post'];
+    $form_state = $values['edit_image_state'] ?? null;
+    if (!is_string($form_state) || !hash_equals(self::imageStateForEdit($post), $form_state)) {
+      throw new PostContentConflictException('The post image state changed since the edit form was opened.');
+    }
     $submitted_name = (string)($values['name'] ?? '');
     // 表示済みトリップを再変換すると◆が◇になるため、未変更ならそのまま保存する。
     $values['name'] = hash_equals((string)$post['a_name'], $submitted_name)

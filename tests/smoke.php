@@ -2143,6 +2143,28 @@ smoke_test('NSFW edit rolls back generated thumbnails after an image conflict', 
   }
 });
 
+foreach (['stale', 'missing', 'invalid'] as $case) {
+  smoke_test('old edit form cannot clear replacement NSFW: ' . $case, static function () use ($case): bool {
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $id = $repository->insertPost(['thread' => 1, 'a_name' => 'Owner', 'pwd' => password_hash('owner', PASSWORD_DEFAULT),
+      'picfile' => 'old.png', 'nsfw' => 0, 'thumbnail' => '', 'com' => 'Before']);
+    $form_state = PostService::imageStateForEdit($repository->findPost($id));
+    $db->exec("UPDATE board_log SET picfile='new.png', nsfw=1, thumbnail='new-blurred.png'");
+    $before = $repository->findPost($id);
+    $values = ['name' => 'Owner', 'mail' => '', 'sub' => 'Edited', 'com' => 'Edited',
+      'url' => '', 'host' => 'localhost', 'edit_nsfw' => false];
+    if ($case !== 'missing') $values['edit_image_state'] = $case === 'stale' ? $form_state : ['invalid'];
+    try {
+      (new PostService($repository, sys_get_temp_dir()))->edit($id, 'owner', $values);
+      return false;
+    } catch (PostContentConflictException $e) {
+      return $repository->findPost($id) === $before;
+    }
+  });
+}
+
 smoke_test('old thread warnings are recalculated instead of accumulating', static function (): bool {
   $db = new PDO('sqlite::memory:');
   $db->exec('CREATE TABLE board_log (tid INTEGER PRIMARY KEY, thread INTEGER, shd TEXT)');
@@ -2189,6 +2211,7 @@ smoke_test('post service centralizes edit and delete authorization', static func
     $service->edit($edit_id, 'owner-pass', [
       'name' => '編集者', 'mail' => '', 'sub' => '編集後', 'com' => '編集本文',
       'url' => '', 'host' => 'localhost', 'sodane' => 0,
+      'edit_image_state' => PostService::imageStateForEdit($repository->findPost($edit_id)),
     ]);
     $edited_post = $repository->findPost($edit_id);
     if (($edited_post['sub'] ?? '') !== '編集後' || (int)($edited_post['sodane'] ?? 0) !== 7) return false;

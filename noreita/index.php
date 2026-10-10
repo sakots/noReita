@@ -63,7 +63,7 @@ if(!defined('IMAGE_INC_VER') || IMAGE_INC_VER < 20261008) {
 // post.inc
 check_file(__DIR__.'/post.inc.php', $en);
 require_once(__DIR__.'/post.inc.php');
-if(!defined('POST_INC_VER') || POST_INC_VER < 20261009) {
+if(!defined('POST_INC_VER') || POST_INC_VER < 20261010) {
   die($en ? 'Please update post.inc.php to the latest version.' : 'post.inc.phpを最新版に更新してください。');
 }
 
@@ -2217,6 +2217,7 @@ function editform(ApplicationContext $context, ?int $authorized_post_id = null, 
       ? (string)$post_pwd
       : '';
     $msg['admin_edit'] = $authorization['role'] === 'admin';
+    $msg['edit_image_state'] = PostService::imageStateForEdit($msg);
     $dat['oya'] = [$msg];
 
     $dat['othermode'] = 'edit'; //編集モード
@@ -2282,6 +2283,7 @@ function editexec(ApplicationContext $context): void {
     $edit_role = $service->edit((int)$e_no, $pwd, [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'image_alt' => $image_alt, 'url' => $url,
       'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
+      'edit_image_state' => filter_input(INPUT_POST, 'edit_image_state'),
     ], $edit_as_admin);
     if ($edit_role === 'admin') {
       ApplicationErrorHandler::reportAdminAudit('post-edit', ['posts' => 1]);

@@ -120,6 +120,13 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
   return [$status, $body, $redirect_url, $response_headers];
 }
 
+function edit_image_state(string $form): string {
+  if (preg_match('/name="edit_image_state" value="([a-f0-9]{64})"/', $form, $match) !== 1) {
+    throw new RuntimeException('Edit form image state is missing.');
+  }
+  return $match[1];
+}
+
 function cookie_value(string $cookie_jar, string $name): ?string {
   foreach (file($cookie_jar, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
     if (str_starts_with($line, '#HttpOnly_')) {
@@ -1670,6 +1677,7 @@ PHP;
   [$trip_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => $raw_trip_name, 'mail' => $raw_trip_mail, 'url' => '',
     'sub' => "Integration's subject", 'com' => "結合テスト user's {$marker}", 'pwd' => 'delete-pass',
+    'edit_image_state' => edit_image_state($owner_edit_form_body),
     'sodane' => '0', 'token' => $token,
   ]);
   $trip_after_edit = $db->query(
@@ -1742,6 +1750,7 @@ PHP;
   [$edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => "Edited O'Brien", 'mail' => '', 'url' => '',
     'sub' => "Edited user's subject", 'com' => "編集後 user's 結合テスト {$marker}", 'pwd' => 'delete-pass',
+    'edit_image_state' => edit_image_state($owner_edit_form_body),
     'sodane' => '0', 'token' => $token,
   ]);
   $edited = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
@@ -1754,6 +1763,7 @@ PHP;
   [$admin_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Administrator', 'mail' => '', 'url' => '',
     'sub' => "Administrator's edit", 'com' => "管理者編集 user's {$marker}", 'pwd' => 'wrong-and-ignored',
+    'edit_image_state' => edit_image_state($admin_detail_edit_body),
     'sodane' => '0', 'admin_edit' => '1', 'token' => $token,
   ]);
   $admin_edited = $db->query('SELECT sub, com, pwd FROM board_log WHERE tid = ' . $post_id)->fetch(PDO::FETCH_ASSOC);
@@ -1872,9 +1882,80 @@ PHP;
 
   $image_post_id = (int)($image_row['tid'] ?? 0);
   $edited_image_alt = '編集後の説明 & <安全な文字列>';
+  [, $initial_image_edit_form] = http_request($base_url . '?mode=edit', $cookie_jar,
+    ['delno' => (string)$image_post_id, 'pwd' => 'image-pass']);
+  $edit_fixture = $db->query('SELECT * FROM board_log WHERE tid=' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
+  unset($edit_fixture['tid']);
+  $check_stale_edit_form = static function (string $theme, string $url, string $jar) use ($db, $webroot, $edit_fixture): void {
+    foreach ([false, true] as $admin) {
+      integration_test('old image edit form is rejected: ' . $theme . ($admin ? ' / admin' : ' / owner'),
+        static function () use ($db, $webroot, $edit_fixture, $url, $jar, $admin): bool {
+          $columns = array_keys($edit_fixture);
+          $db->prepare('INSERT INTO board_log (' . implode(',', $columns) . ') VALUES ('
+            . implode(',', array_fill(0, count($columns), '?')) . ')')->execute(array_values($edit_fixture));
+          $id = (int)$db->lastInsertId();
+          $original_picture = 'stale-form-' . $id . '-original.png';
+          $picture = 'stale-form-' . $id . '.png';
+          $thumbnail = 'stale-form-' . $id . '-blur.png';
+          try {
+            $db->prepare('UPDATE board_log SET picfile=?, nsfw=0, thumbnail=\'\', thread=1, parent=NULL, invz=0 WHERE tid=?')
+              ->execute([$original_picture, $id]);
+            $blur = imagecreatetruecolor(2, 2);
+            foreach ([$original_picture, $picture, $thumbnail] as $file) {
+              if (!imagepng($blur, $webroot . '/img/' . $file)) throw new RuntimeException('Could not create an edit fixture image.');
+            }
+            $open_form = static function () use ($url, $jar, $admin, $id): string {
+              [$status, $form] = $admin
+                ? http_request($url . '?mode=admin_edit&id=' . $id, $jar)
+                : http_request($url . '?mode=edit', $jar, ['delno' => (string)$id, 'pwd' => 'image-pass']);
+              if ($status !== 200) throw new RuntimeException('Could not open image edit form.');
+              return $form;
+            };
+            $old_form = $open_form();
+            preg_match('/name="token" value="([^"]+)"/', $old_form, $token_match);
+            $db->prepare('UPDATE board_log SET picfile=?, nsfw=1, thumbnail=? WHERE tid=?')->execute([$picture, $thumbnail, $id]);
+            $winner = $db->query('SELECT * FROM board_log WHERE tid=' . $id)->fetch(PDO::FETCH_ASSOC);
+            $picture_hash = hash_file('sha256', $webroot . '/img/' . $picture);
+            $thumbnail_hash = hash_file('sha256', $webroot . '/img/' . $thumbnail);
+            $payload = ['e_no' => (string)$id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+              'sub' => 'Edited', 'com' => 'Edited comment', 'pwd' => 'image-pass', 'nsfw' => '0',
+              'token' => $token_match[1] ?? '', 'admin_edit' => $admin ? '1' : '0'];
+            foreach ([edit_image_state($old_form), null, str_repeat('0', 64)] as $state) {
+              $request = $payload;
+              if ($state !== null) $request['edit_image_state'] = $state;
+              [$status] = http_request($url . '?mode=editexec', $jar, $request);
+              if ($status !== 409) throw new RuntimeException('Stale or invalid edit returned HTTP ' . $status);
+              if ($db->query('SELECT * FROM board_log WHERE tid=' . $id)->fetch(PDO::FETCH_ASSOC) !== $winner) {
+                throw new RuntimeException('Rejected edit changed the post.');
+              }
+            }
+            $payload['edit_image_state'] = edit_image_state($open_form());
+            $payload['nsfw'] = '1';
+            [$status] = http_request($url . '?mode=editexec', $jar, $payload);
+            $edited = $db->query('SELECT * FROM board_log WHERE tid=' . $id)->fetch(PDO::FETCH_ASSOC);
+            if ($status !== 200) throw new RuntimeException('Fresh edit returned HTTP ' . $status);
+            foreach (['com' => 'Edited comment', 'nsfw' => 1, 'picfile' => $picture, 'thumbnail' => $thumbnail] as $field => $expected) {
+              if ((string)$edited[$field] !== (string)$expected) throw new RuntimeException('Fresh edit has unexpected ' . $field);
+            }
+            if (hash_file('sha256', $webroot . '/img/' . $picture) !== $picture_hash) {
+              throw new RuntimeException('Fresh edit changed the image file.');
+            }
+            if (hash_file('sha256', $webroot . '/img/' . $thumbnail) !== $thumbnail_hash) {
+              throw new RuntimeException('Fresh edit changed the thumbnail file.');
+            }
+            return true;
+          } finally {
+            $db->exec('DELETE FROM board_log WHERE tid=' . $id);
+            foreach ([$original_picture, $picture, $thumbnail] as $file) if (is_file($webroot . '/img/' . $file)) unlink($webroot . '/img/' . $file);
+          }
+        });
+    }
+  };
+  $check_stale_edit_form('eda', $base_url, $cookie_jar);
   [$image_alt_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
     'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'image_alt' => $edited_image_alt,
+    'edit_image_state' => edit_image_state($initial_image_edit_form),
     'pwd' => 'image-pass', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
   ]);
   $stored_image_alt = $db->query('SELECT image_alt FROM board_log WHERE tid = ' . $image_post_id)->fetchColumn();
@@ -2131,6 +2212,7 @@ PHP;
   [$misskey_xss_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
     'sub' => 'Image subject', 'com' => $misskey_xss_comment, 'image_alt' => $edited_image_alt,
+    'edit_image_state' => edit_image_state($initial_image_edit_form),
     'pwd' => 'image-pass', 'sodane' => '0', 'nsfw' => '0', 'token' => $token,
   ]);
   try {
@@ -2331,6 +2413,8 @@ PHP;
   });
 
   $check_failed_nsfw_edit = static function (string $nsfw, bool $ignore_update = false) use ($webroot, $base_url, $cookie_jar, $token, $image_post_id): void {
+    [, $form] = http_request($base_url . '?mode=edit', $cookie_jar,
+      ['delno' => (string)$image_post_id, 'pwd' => 'image-pass']);
     $failure_db = new PDO('sqlite:' . $webroot . '/reita.db');
     $before = $failure_db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
     $files_before = [];
@@ -2343,6 +2427,7 @@ PHP;
         'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
         'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
         'sodane' => '0', 'nsfw' => $nsfw, 'token' => $token,
+        'edit_image_state' => edit_image_state($form),
       ]);
     } finally {
       $failure_db->exec('DROP TRIGGER fail_nsfw_edit');
@@ -2363,6 +2448,7 @@ PHP;
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
     'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
     'sodane' => '0', 'nsfw' => '1', 'token' => $token,
+    'edit_image_state' => edit_image_state($image_edit_form_body),
   ]);
   $nsfw_image_row = $db->query('SELECT nsfw, thumbnail FROM board_log WHERE tid = ' . $image_post_id)->fetch(PDO::FETCH_ASSOC);
   $nsfw_thumbnail = (string)($nsfw_image_row['thumbnail'] ?? '');
@@ -2446,6 +2532,7 @@ PHP;
   $check_failed_nsfw_edit('0', true);
   [$image_safe_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'edit_image_state' => edit_image_state($checked_edit_form_body),
     'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
     'sodane' => '0', 'nsfw' => '0', 'token' => $token,
   ]);
@@ -2457,8 +2544,12 @@ PHP;
       && !is_file($webroot . '/img/' . $nsfw_thumbnail);
   });
 
+  [, $safe_edit_form_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'edit', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
+  ]);
   http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$image_post_id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+    'edit_image_state' => edit_image_state($safe_edit_form_body),
     'sub' => 'Image subject', 'com' => "画像付き投稿の本文です\n二行目です", 'pwd' => 'image-pass',
     'sodane' => '0', 'nsfw' => '1', 'token' => $token,
   ]);
@@ -2666,6 +2757,7 @@ PHP;
     'mail' => 'continued@example.com', 'url' => 'https://example.com/continued',
     'sub' => $continued_subject, 'com' => $continued_comment, 'pwd' => 'image-pass',
     'sodane' => '0', 'nsfw' => '0', 'token' => $replacement_edit_token,
+    'edit_image_state' => edit_image_state($replacement_body),
   ]);
   $continued_content = $db->query(
     'SELECT a_name, mail, a_url, sub, com FROM board_log WHERE tid = ' . $image_post_id
@@ -3013,6 +3105,7 @@ PHP;
   $upload_row_statement = $db->prepare('SELECT picfile, img_w, img_h, tool, thumbnail FROM board_log WHERE com = :comment LIMIT 1');
   $upload_row_statement->execute([':comment' => "画像アップロード {$upload_marker}"]);
   $upload_row = $upload_row_statement->fetch(PDO::FETCH_ASSOC);
+  $upload_row_statement->closeCursor();
   integration_test('direct image upload uses an oekaki-style generated filename', static function () use (
     $direct_upload_status, $upload_row, $webroot
   ): bool {
@@ -3041,6 +3134,7 @@ PHP;
   $resize_upload_statement = $resize_upload_db->prepare('SELECT picfile, img_w, img_h FROM board_log WHERE com = :comment LIMIT 1');
   $resize_upload_statement->execute([':comment' => $resize_upload_comment]);
   $resize_upload_row = $resize_upload_statement->fetch(PDO::FETCH_ASSOC);
+  $resize_upload_statement->closeCursor();
   integration_test('direct image upload is resized and converted to WebP when available', static function () use (
     $resize_upload_status, $resize_upload_row, $webroot
   ): bool {
@@ -3079,6 +3173,7 @@ PHP;
   $jpeg_upload_statement = $jpeg_upload_db->prepare('SELECT picfile, img_w, img_h FROM board_log WHERE com = :comment LIMIT 1');
   $jpeg_upload_statement->execute([':comment' => "JPEGアップロード {$jpeg_upload_comment}"]);
   $jpeg_upload_row = $jpeg_upload_statement->fetch(PDO::FETCH_ASSOC);
+  $jpeg_upload_statement->closeCursor();
   $jpeg_uploaded_file = $webroot . '/img/' . (string)($jpeg_upload_row['picfile'] ?? '');
   integration_test('direct JPEG upload applies orientation before resizing and removes EXIF', static function () use (
     $jpeg_upload_status, $jpeg_uploaded_file, $jpeg_marker, $jpeg_upload_row
@@ -3159,6 +3254,7 @@ PHP;
   );
   $pending_replacement_statement->execute([':comment' => "お絵かき差し替え {$pending_replacement_marker}"]);
   $pending_replacement_row = $pending_replacement_statement->fetch(PDO::FETCH_ASSOC);
+  $pending_replacement_statement->closeCursor();
   integration_test('an uploaded image can replace a pending drawing and cleans its temporary files', static function () use (
     $pending_replacement_status, $pending_replacement_row, $pending_drawing_image,
     $pending_drawing_base, $webroot
@@ -3203,6 +3299,7 @@ PHP;
   );
   $multiple_pending_statement->execute([':comment' => "複数画像 {$multiple_marker}"]);
   $multiple_pending_row = $multiple_pending_statement->fetch(PDO::FETCH_ASSOC);
+  $multiple_pending_statement->closeCursor();
   integration_test('piccom allows selecting another owned image when multiple pending drawings exist', static function () use (
     $multiple_piccom_status, $multiple_pending_first, $multiple_pending_second,
     $multiple_piccom_body, $multiple_selection_status, $multiple_pending_row
@@ -3236,6 +3333,7 @@ PHP;
     $unsupported_avif_rejected = $unsupported_avif_status === 415
       && str_contains($unsupported_avif_body, 'not supported by this server')
       && (int)$avif_row_statement->fetchColumn() === 0;
+    $avif_row_statement->closeCursor();
   }
   integration_test('unsupported AVIF uploads are rejected before database storage', static function () use (
     $unsupported_avif_rejected
@@ -3448,6 +3546,7 @@ PHP;
       && str_contains($monoreita_temporary_body, 'mode=admin_temporary_images_manage');
   });
   $check_continuation('monoreita', $monoreita_base_url, $monoreita_cookie_jar);
+  $check_stale_edit_form('monoreita', $monoreita_base_url, $monoreita_cookie_jar);
   $base_url = $monoreita_base_url;
 
   [$admin_logout_status] = http_request($base_url . '?mode=admin_logout', $cookie_jar, ['token' => $token]);
