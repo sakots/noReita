@@ -2523,6 +2523,69 @@ PHP;
       && $nsfw_thumbnail !== '' && is_file($webroot . '/img/' . $nsfw_thumbnail);
   });
 
+  $nsfw_edit_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  try {
+    foreach (['eda', 'monoreita'] as $nsfw_edit_theme) {
+      $disabled_nsfw_config = str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $nsfw_edit_theme . "'],", $nsfw_edit_original_config);
+      $disabled_nsfw_config = str_replace("'image_upload' => true,",
+        "'image_upload' => true, 'nsfw' => false,", $disabled_nsfw_config);
+      file_put_contents($webroot . '/config.local.php', $disabled_nsfw_config);
+      foreach ([false, true] as $admin) {
+        integration_test('disabled NSFW edits preserve stored image state: ' . $nsfw_edit_theme . ($admin ? ' / admin' : ' / owner'),
+          static function () use ($db, $webroot, $root, $base_url, $cookie_jar, $edit_fixture, $admin): bool {
+            $columns = array_keys($edit_fixture);
+            $db->prepare('INSERT INTO board_log (' . implode(',', $columns) . ') VALUES ('
+              . implode(',', array_fill(0, count($columns), '?')) . ')')->execute(array_values($edit_fixture));
+            $id = (int)$db->lastInsertId();
+            $picture = 'disabled-nsfw-' . $id . '.png';
+            $thumbnail = 'disabled-nsfw-' . $id . '-blur.png';
+            try {
+              $image = imagecreatetruecolor(2, 2);
+              imagepng($image, $webroot . '/img/' . $picture);
+              imagepng($image, $webroot . '/img/' . $thumbnail);
+              $picture_hash = hash_file('sha256', $webroot . '/img/' . $picture);
+              $thumbnail_hash = hash_file('sha256', $webroot . '/img/' . $thumbnail);
+              foreach ([1, 0] as $stored_nsfw) {
+                $stored_thumbnail = $stored_nsfw ? $thumbnail : '';
+                $db->prepare('UPDATE board_log SET picfile=?, nsfw=?, thumbnail=? WHERE tid=?')
+                  ->execute([$picture, $stored_nsfw, $stored_thumbnail, $id]);
+                [$form_status, $form] = $admin
+                  ? http_request($base_url . '?mode=admin_edit&id=' . $id, $cookie_jar)
+                  : http_request($base_url . '?mode=edit', $cookie_jar, ['delno' => (string)$id, 'pwd' => 'image-pass']);
+                if ($form_status !== 200 || str_contains($form, 'id="edit_nsfw"')) return false;
+                preg_match('/name="token" value="([^"]+)"/', $form, $token_match);
+                $comment = 'NSFW機能を無効にした状態で本文を編集します。' . $stored_nsfw;
+                [$edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
+                  'e_no' => (string)$id, 'name' => 'Image test', 'mail' => '', 'url' => '',
+                  'sub' => 'NSFW disabled edit', 'com' => $comment, 'pwd' => $admin ? '' : 'image-pass',
+                  'token' => $token_match[1] ?? '', 'admin_edit' => $admin ? '1' : '0',
+                  'edit_image_state' => edit_image_state($form), 'nsfw' => (string)(1 - $stored_nsfw),
+                ]);
+                $edited = $db->query('SELECT picfile, nsfw, thumbnail, com FROM board_log WHERE tid=' . $id)->fetch(PDO::FETCH_ASSOC);
+                clearstatcache();
+                if ($edit_status !== 200 || $edited['com'] !== $comment
+                  || (int)$edited['nsfw'] !== $stored_nsfw || $edited['thumbnail'] !== $stored_thumbnail
+                  || $edited['picfile'] !== $picture || !is_file($webroot . '/img/' . $thumbnail)
+                  || hash_file('sha256', $webroot . '/img/' . $picture) !== $picture_hash
+                  || hash_file('sha256', $webroot . '/img/' . $thumbnail) !== $thumbnail_hash) return false;
+                [$page_status, $page] = http_request($base_url . '?resno=' . $id, $root . '/nsfw-edit-public-cookies.txt');
+                preg_match('/<meta property="og:image" content="([^"]+)"/', $page, $image_match);
+                if ($page_status !== 200 || !str_ends_with($image_match[1] ?? '',
+                  '/img/' . rawurlencode($stored_nsfw ? $thumbnail : $picture))) return false;
+              }
+              return true;
+            } finally {
+              $db->exec('DELETE FROM board_log WHERE tid=' . $id);
+              foreach ([$picture, $thumbnail] as $file) if (is_file($webroot . '/img/' . $file)) unlink($webroot . '/img/' . $file);
+            }
+          });
+      }
+    }
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $nsfw_edit_original_config);
+  }
+
   // 一時テストDBだけを更新し、旧データなどでサムネイルが未登録の場合も検証する。
   $ogp_update = $db->prepare('UPDATE board_log SET nsfw = ?, thumbnail = ? WHERE tid = ?');
   try {

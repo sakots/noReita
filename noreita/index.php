@@ -2258,7 +2258,6 @@ function editexec(ApplicationContext $context): void {
   $picfile = (string)$input['picfile'];
   $pwd = $input['pwd'];
   $sodane = $input['sodane'];
-  $edit_nsfw = Config::bool('features.nsfw') && $input['nsfw_flag'] === '1';
   $edit_as_admin = filter_input_data('POST', 'admin_edit') === '1';
   if ($edit_as_admin
     && !AdminAuth::isAuthenticated(Config::string('admin.password'), Config::int('admin.session_lifetime'))) {
@@ -2280,11 +2279,15 @@ function editexec(ApplicationContext $context): void {
 
   try {
     $service = new PostService(new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
-    $edit_role = $service->edit((int)$e_no, $pwd, [
+    $edit_values = [
       'name' => $name, 'mail' => $mail, 'sub' => $sub, 'com' => $com, 'image_alt' => $image_alt, 'url' => $url,
-      'host' => $host, 'sodane' => $sodane, 'edit_nsfw' => $edit_nsfw,
+      'host' => $host, 'sodane' => $sodane,
       'edit_image_state' => filter_input(INPUT_POST, 'edit_image_state'),
-    ], $edit_as_admin);
+    ];
+    if (Config::bool('features.nsfw')) {
+      $edit_values['edit_nsfw'] = $input['nsfw_flag'] === '1';
+    }
+    $edit_role = $service->edit((int)$e_no, $pwd, $edit_values, $edit_as_admin);
     if ($edit_role === 'admin') {
       ApplicationErrorHandler::reportAdminAudit('post-edit', ['posts' => 1]);
     }
