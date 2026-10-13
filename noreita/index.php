@@ -2035,7 +2035,10 @@ function delmode(ApplicationContext $context): void {
   }
 
   try {
-    $service = new PostService(new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'));
+    $service = new PostService(
+      new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'),
+      __DIR__ . '/backup/delete-staging'
+    );
     $service->delete((int)$delno, (string)$p_pwd, $admin_delete);
     $dat['message'] = $en ? 'Successfully deleted.' : '削除しました。';
   } catch (PostNotFoundException $e) {
@@ -2432,7 +2435,8 @@ function admin_manage(ApplicationContext $context, ?string $forced_operation = n
   try {
     /** @var AdminPostManagementService $service */
     $service = new PostService(
-      new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file')
+      new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'),
+      __DIR__ . '/backup/delete-staging'
     );
     if ($operation === 'delete') {
       $count = $service->deleteManyAsAdmin($selected);
@@ -3074,7 +3078,8 @@ function logdel(ApplicationContext $context): void {
       $repository,
       Config::string('paths.images'),
       Config::int('limits.paint_default_width'),
-      Config::int('permissions.public_file')
+      Config::int('permissions.public_file'),
+      __DIR__ . '/backup/delete-staging'
     );
     $service->deleteManyAsAdmin([(int)$msg['tid']]);
   } catch (Throwable $e) {

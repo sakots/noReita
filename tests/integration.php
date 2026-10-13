@@ -4054,6 +4054,117 @@ PHP;
         || str_contains($diary_reply_allowed_body, 'Successfully posted.'))
       && $diary_new_post_still_denied_status === 403;
   });
+
+  // Block the DB write after files have been staged, then terminate the HTTP
+  // process. The next real request must find and restore that same operation.
+  file_put_contents($webroot . '/config.local.php', $config_local);
+  $nested_config = require $webroot . '/config.local.php';
+  $nested_config['paths']['images'] = 'media/uploads/img/';
+  $nested_config['board']['max_threads'] = 2;
+  $nested_images = $webroot . '/media/uploads/img';
+  $nested_db = new PDO('sqlite:' . $webroot . '/reita.db');
+  $nested_db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+  $restart_nested_server = static function () use (&$process, $diary_replies_port, $webroot, $log): void {
+    $process = proc_open(
+      [PHP_BINARY, '-d', 'opcache.enable=0',
+        '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+      [STDIN, $log, $log], $pipes, $webroot
+    );
+    if (!is_resource($process)) throw new RuntimeException('Could not restart deletion recovery server.');
+    for ($attempt = 0; $attempt < 50; $attempt++) {
+      $socket = @stream_socket_client("tcp://127.0.0.1:{$diary_replies_port}", $errno, $error, 0.1);
+      if ($socket !== false) {
+        fclose($socket);
+        return;
+      }
+      usleep(20000);
+    }
+    throw new RuntimeException('Deletion recovery server did not become ready.');
+  };
+  foreach (['owner', 'bulk', 'automatic'] as $deletion_route) {
+    integration_test('nested image deletion recovers after process termination: ' . $deletion_route,
+      static function () use (
+        &$process, &$nested_config, $nested_db, $nested_images, $webroot, $root,
+        $diary_replies_url, $restart_nested_server, $deletion_route
+      ): bool {
+        $nested_db->exec('DELETE FROM board_log');
+        $nested_config['board']['max_threads'] = 2;
+        file_put_contents($webroot . '/config.local.php', "<?php\nreturn " . var_export($nested_config, true) . ";\n");
+        $cookies = $root . '/nested-' . $deletion_route . '-cookies.txt';
+        http_request($diary_replies_url . '?mode=admin_in', $cookies);
+        $token = hash('sha256', (string)cookie_value($cookies, 'noreita_session'));
+        if ($deletion_route === 'bulk') {
+          [$login_status] = http_request($diary_replies_url . '?mode=admin_login', $cookies,
+            ['adminpass' => 'integration-admin-pass', 'token' => $token], '203.0.113.88');
+          if ($login_status !== 302) return false;
+          $token = hash('sha256', (string)cookie_value($cookies, 'noreita_session'));
+        }
+        $insert = $nested_db->prepare('INSERT INTO board_log (tid, thread, picfile, pwd) VALUES (?, 1, ?, ?)');
+        $insert->execute([80001, 'nested.png', password_hash('nested-owner', PASSWORD_DEFAULT)]);
+        $files = ['nested.png', 'nested.pch', 'nested_thumb_safe_test.webp'];
+        foreach ($files as $file) file_put_contents($nested_images . '/' . $file, $file);
+        $url = $diary_replies_url;
+        $post = ['mode' => 'del', 'delno' => '80001', 'pwd' => 'nested-owner', 'token' => $token];
+        if ($deletion_route === 'bulk') {
+          $url .= '?mode=admin_manage';
+          $post = ['operation' => 'delete', 'delno' => ['80001'], 'token' => $token];
+        } elseif ($deletion_route === 'automatic') {
+          $insert->execute([80002, '', '']);
+          $nested_config['board']['max_threads'] = 1;
+          file_put_contents($webroot . '/config.local.php', "<?php\nreturn " . var_export($nested_config, true) . ";\n");
+          $post = null;
+        }
+        $request = curl_init($url);
+        curl_setopt_array($request, [
+          CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_COOKIEFILE => $cookies,
+          CURLOPT_HTTPHEADER => ['Host: localhost', 'Origin: http://localhost'],
+        ]);
+        if ($post !== null) curl_setopt($request, CURLOPT_POSTFIELDS, http_build_query($post));
+        $multi = curl_multi_init();
+        curl_multi_add_handle($multi, $request);
+        $nested_db->exec('BEGIN IMMEDIATE');
+        $staged = false;
+        try {
+          $deadline = microtime(true) + 3;
+          do {
+            curl_multi_exec($multi, $running);
+            clearstatcache();
+            $operations = array_merge(
+              glob($webroot . '/backup/delete-staging/delete-*') ?: [],
+              glob($webroot . '/media/uploads/backup/delete-staging/delete-*') ?: []
+            );
+            foreach ($operations as $operation) {
+              if (is_file($operation . '/nested_thumb_safe_test.webp')) {
+                $staged = dirname($operation) === $webroot . '/backup/delete-staging';
+                break 2;
+              }
+            }
+            curl_multi_select($multi, 0.01);
+          } while ($running && microtime(true) < $deadline);
+        } finally {
+          proc_terminate($process, 9);
+          proc_close($process);
+          $process = null;
+          $nested_db->exec('ROLLBACK');
+          curl_multi_remove_handle($multi, $request);
+          curl_multi_close($multi);
+          unset($request);
+          $restart_nested_server();
+        }
+        [$status] = http_request($diary_replies_url . '?mode=admin_in', $cookies);
+        clearstatcache();
+        $restored = $status === ($deletion_route === 'bulk' ? 302 : 200)
+          && (int)$nested_db->query('SELECT COUNT(*) FROM board_log WHERE tid = 80001')->fetchColumn() === 1
+          && (glob($webroot . '/backup/delete-staging/delete-*') ?: []) === [];
+        foreach ($files as $file) {
+          $path = $nested_images . '/' . $file;
+          $restored = $restored && is_file($path) && file_get_contents($path) === $file;
+        }
+        remove_tree($webroot . '/media/uploads/backup');
+        return $staged && $restored;
+      }
+    );
+  }
 } catch (Throwable $e) {
   echo "FAIL: integration setup ({$e->getMessage()})\n";
   $failed++;
