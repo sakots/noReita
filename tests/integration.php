@@ -299,7 +299,7 @@ PHP;
   $process = proc_open(
     // 設定の切り替えを即時反映するため、cli-serverでもOPcacheを無効にする。
     [PHP_BINARY, '-d', 'opcache.enable=0',
-      '-S', "127.0.0.1:{$port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+      '-S', "127.0.0.1:{$port}", '-t', $webroot, dirname(__DIR__) . '/scripts/dev-router.php'],
     [STDIN, $log, $log],
     $pipes,
     $webroot
@@ -403,8 +403,63 @@ PHP;
     $protected_results[$relative_path] = $probe_status === 403 && !str_contains($probe_body, $secret);
   }
   integration_test('private files and runtime directories reject HTTP access', static function () use ($protected_results): bool {
-    return count($protected_results) === 26 && !in_array(false, $protected_results, true);
+    return !in_array(false, $protected_results, true);
   });
+  integration_test('development router protects custom temporary paths and aliases without blocking public files',
+    static function () use ($webroot, $origin_url, $base_url, $cookie_jar, $config_local): bool {
+      $temporary = 'draft uploads/未投稿';
+      $public = 'draft uploads/未投稿-public';
+      $private_body = 'custom-temporary-secret';
+      $public_body = 'public-image-probe';
+      mkdir($webroot . '/' . $temporary, 0700, true);
+      mkdir($webroot . '/' . $public, 0700, true);
+      file_put_contents($webroot . '/' . $temporary . '/pending.png', $private_body);
+      file_put_contents($webroot . '/' . $public . '/posted.png', $public_body);
+      symlink($webroot . '/' . $temporary, $webroot . '/temporary-alias');
+      symlink($webroot . '/' . $temporary . '/pending.png', $webroot . '/temporary-alias.png');
+      $override = require $webroot . '/config.local.php';
+      $override['paths']['temporary'] = './' . $temporary . '/';
+      file_put_contents($webroot . '/config.local.php', "<?php\nreturn " . var_export($override, true) . ";\n");
+      try {
+        $encoded = implode('/', array_map('rawurlencode', explode('/', $temporary)));
+        foreach ([
+          '/' . $encoded . '/pending.png',
+          '/' . $encoded . '/pending.png?download=1',
+          '//' . $encoded . '/pending.png',
+          '/' . $encoded . '%2fpending.png',
+          '/temporary-alias/pending.png',
+          '/temporary-alias.png',
+          '/theme/%2e%2e/' . $encoded . '/pending.png',
+          '/%2ehtaccess',
+          '/tmp',
+        ] as $path) {
+          [$status, $body] = http_request($origin_url . $path, $cookie_jar);
+          if ($status !== 403 || str_contains($body, $private_body)) return false;
+        }
+        $encoded_public = implode('/', array_map('rawurlencode', explode('/', $public)));
+        [$image_status, $image_body] = http_request($origin_url . '/' . $encoded_public . '/posted.png', $cookie_jar);
+        [$css_status, $css_body] = http_request($origin_url . '/theme/eda/css/eda_index.min.css', $cookie_jar);
+        [$page_status] = http_request($base_url, $cookie_jar);
+        if ($image_status !== 200 || $image_body !== $public_body || $css_status !== 200
+          || !str_contains($css_body, 'body') || $page_status !== 200) return false;
+
+        $override['paths']['temporary'] = './';
+        file_put_contents($webroot . '/config.local.php', "<?php\nreturn " . var_export($override, true) . ";\n");
+        [$root_status, $root_body] = http_request($origin_url . '/' . $encoded_public . '/posted.png', $cookie_jar);
+        if ($root_status !== 403 || str_contains($root_body, $public_body)) return false;
+
+        // Invalid configuration must not expose a configured private PNG.
+        file_put_contents($webroot . '/config.local.php', "<?php\nreturn ['paths' => ['temporary' => '../unsafe/']];\n");
+        [$invalid_status, $invalid_body] = http_request($origin_url . '/' . $encoded . '/pending.png', $cookie_jar);
+        return $invalid_status === 503 && !str_contains($invalid_body, $private_body);
+      } finally {
+        file_put_contents($webroot . '/config.local.php', $config_local);
+        unlink($webroot . '/temporary-alias');
+        unlink($webroot . '/temporary-alias.png');
+        remove_tree($webroot . '/draft uploads');
+      }
+    }
+  );
 
   integration_test('version 1 board database is migrated before HTTP requests', static function () use ($webroot): bool {
     $db = new PDO('sqlite:' . $webroot . '/reita.db');
@@ -3769,7 +3824,7 @@ PHP;
   $monoreita_base_url = "http://127.0.0.1:{$monoreita_port}/index.php";
   $process = proc_open(
     [PHP_BINARY, '-d', 'opcache.enable=0',
-      '-S', "127.0.0.1:{$monoreita_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+      '-S', "127.0.0.1:{$monoreita_port}", '-t', $webroot, dirname(__DIR__) . '/scripts/dev-router.php'],
     [STDIN, $log, $log],
     $pipes,
     $webroot
@@ -3928,7 +3983,7 @@ PHP;
   $diary_base_url = "http://127.0.0.1:{$diary_port}/index.php";
   $process = proc_open(
     [PHP_BINARY, '-d', 'opcache.enable=0',
-      '-S', "127.0.0.1:{$diary_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+      '-S', "127.0.0.1:{$diary_port}", '-t', $webroot, dirname(__DIR__) . '/scripts/dev-router.php'],
     [STDIN, $log, $log],
     $pipes,
     $webroot
@@ -4001,7 +4056,7 @@ PHP;
   $diary_replies_url = "http://127.0.0.1:{$diary_replies_port}/index.php";
   $process = proc_open(
     [PHP_BINARY, '-d', 'opcache.enable=0',
-      '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+      '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, dirname(__DIR__) . '/scripts/dev-router.php'],
     [STDIN, $log, $log],
     $pipes,
     $webroot
@@ -4067,7 +4122,7 @@ PHP;
   $restart_nested_server = static function () use (&$process, $diary_replies_port, $webroot, $log): void {
     $process = proc_open(
       [PHP_BINARY, '-d', 'opcache.enable=0',
-        '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, __DIR__ . '/http-router.php'],
+        '-S', "127.0.0.1:{$diary_replies_port}", '-t', $webroot, dirname(__DIR__) . '/scripts/dev-router.php'],
       [STDIN, $log, $log], $pipes, $webroot
     );
     if (!is_resource($process)) throw new RuntimeException('Could not restart deletion recovery server.');
