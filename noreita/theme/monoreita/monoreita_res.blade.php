@@ -100,7 +100,7 @@
                 @endif
                 <script>
                   function add_to_com() {
-                    document.getElementById("p_input_com").value += "{{$resname}}さん";
+                    document.getElementById("p_input_com").value += {!! $resname_json !!} + "さん";
                   }
                 </script>
                 @if ($elapsed_time === 0 || $nowtime - $bbsline['past'] < $elapsed_time)

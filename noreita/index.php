@@ -1419,8 +1419,10 @@ function res(ApplicationContext $context): void {
         $bbsline['a_url'] = "";
       }
       //名前付きレス用
-      $resname = implode(A_NAME_SAN . ' ', $r_res_name);
-      $dat['resname'] = $resname;
+      $dat['resname_json'] = json_encode(
+        implode(A_NAME_SAN . ' ', $r_res_name),
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
+      );
 
       $bbsline['encoded_t'] = urlencode('['.$bbsline['tid'].']'.$bbsline['sub'].($bbsline['a_name'] ? ' by '.$bbsline['a_name'] : '').' - '.Config::string('site.title'));
       $bbsline['encoded_u'] = urlencode(Config::string('site.base_url').'?resno='.$bbsline['tid']);
