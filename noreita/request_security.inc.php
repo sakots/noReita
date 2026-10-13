@@ -29,6 +29,8 @@ final class RequestSecurity {
       'httponly' => true,
       'samesite' => 'Lax',
     ]);
+    // キャッシュ方針は各画面で設定し、セッション開始時の自動ヘッダーで上書きしない。
+    session_cache_limiter('');
     session_start();
     try {
       if (random_int(1, 100) === 1) {
@@ -39,12 +41,10 @@ final class RequestSecurity {
     } catch (Throwable $e) {
       // セッション掃除の失敗で通常のリクエストを停止しない。
     }
-    self::disableCacheHeaders();
   }
 
   public static function csrfToken(): string {
     self::startSession();
-    self::disableCacheHeaders();
     if (!isset($_SESSION['token']) || !is_string($_SESSION['token']) || $_SESSION['token'] === '') {
       // トークンはセッションに結び付け、検証時はhash_equals()で比較する。
       $_SESSION['token'] = hash('sha256', session_id(), false);
@@ -134,13 +134,6 @@ final class RequestSecurity {
       throw new RuntimeException('security.session_file_lifetime must be between 60 and 31536000 seconds.');
     }
     return $lifetime;
-  }
-
-  private static function disableCacheHeaders(): void {
-    if (headers_sent()) return;
-    header('Expires:');
-    header('Cache-Control:');
-    header('Pragma:');
   }
 }
 

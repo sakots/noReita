@@ -1734,6 +1734,45 @@ PHP;
       && str_contains($admin_detail_edit_body, '管理者セッションで認証済み');
   });
 
+  $admin_cache_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  try {
+    foreach (['eda', 'monoreita'] as $admin_cache_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $admin_cache_theme . "'],", $admin_cache_original_config));
+      integration_test('administrator responses prohibit caching after CSRF token generation: ' . $admin_cache_theme,
+        static function () use ($base_url, $cookie_jar, $root, $post_id, $admin_cache_theme): bool {
+          $guest_cookies = $root . '/admin-cache-guest-' . $admin_cache_theme . '.txt';
+          foreach ([
+            ['admin', $cookie_jar, null, 200],
+            ['admin_config', $cookie_jar, null, 200],
+            ['admin_post&id=' . $post_id, $cookie_jar, null, 200],
+            ['admin_edit&id=' . $post_id, $cookie_jar, null, 200],
+            ['admin_errorlog', $cookie_jar, null, 200],
+            ['admin_auditlog', $cookie_jar, null, 200],
+            ['admin_temporary_images', $cookie_jar, null, 200],
+            ['admin_in', $guest_cookies, null, 200],
+            ['admin_config', $guest_cookies, null, 403],
+            ['admin_config_save', $cookie_jar, ['token' => 'invalid-token'], 403],
+          ] as [$route, $cookies, $post, $expected_status]) {
+            [$status, $body, , $headers] = http_request($base_url . '?mode=' . $route, $cookies, $post);
+            $directives = array_map('trim', explode(',', strtolower((string)($headers['cache-control'] ?? ''))));
+            if ($status !== $expected_status || !in_array('no-store', $directives, true)
+              || !in_array('private', $directives, true)
+              || strtolower((string)($headers['pragma'] ?? '')) !== 'no-cache') {
+              throw new RuntimeException('Missing cache protection on ' . $route . ' (HTTP ' . $status . ').');
+            }
+            if ($route === 'admin_config' && $expected_status === 200
+              && !str_contains($body, 'integration-admin-pass')) {
+              throw new RuntimeException('Administrator configuration was not rendered.');
+            }
+          }
+          return true;
+        });
+    }
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $admin_cache_original_config);
+  }
+
   $password_hash_before_edit = (string)$db->query('SELECT pwd FROM board_log WHERE tid = ' . $post_id)->fetchColumn();
   [$rejected_edit_status] = http_request($base_url . '?mode=editexec', $cookie_jar, [
     'mode' => 'editexec', 'e_no' => (string)$post_id, 'name' => 'Attacker', 'mail' => '', 'url' => '',
