@@ -87,7 +87,7 @@ function auto_link(string $proto): string {
   if (!(stripos($proto, "script") !== false)) { //scriptがなければ続行
     // 画像URLを一時的にプレースホルダーに置き換え
     $image_urls = [];
-    preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?/i', $proto, $matches);
+    preg_match_all('/https?:\/\/[^\s<>"\'{}|\\^`[\]]+\.(jpg|jpeg|png|gif|webp|avif)(\?[^\s<>"\'{}|\\^`[\]]*)?/i', $proto, $matches);
     foreach ($matches[0] as $img_url) {
       $placeholder = '<!--IMGURL' . md5($img_url) . '-->';
       $proto = str_replace($img_url, $placeholder, $proto);
