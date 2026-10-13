@@ -1938,6 +1938,68 @@ PHP;
       if (is_file($path)) unlink($path);
     }
   }
+
+  $expiry_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $expiry_config = str_replace("'features' => [", "'board' => ['elapsed_reply_days' => 1],\n  'features' => [", $expiry_original_config);
+  file_put_contents($webroot . '/config.local.php', $expiry_config);
+  $db->exec('INSERT INTO board_log (' . implode(',', $reaction_columns) . ') SELECT '
+    . implode(',', $reaction_columns) . ' FROM board_log WHERE tid=' . $shared_thread_id);
+  $expiry_parent = (int)$db->lastInsertId();
+  $db->prepare('UPDATE board_log SET created=?, modified=datetime(\'now\', \'localtime\'), invz=0 WHERE tid=?')
+    ->execute([date('Y-m-d H:i:s', time() - 172800), $expiry_parent]);
+  $expiry_base = 'expired-reply-' . bin2hex(random_bytes(6));
+  $expiry_public_before = glob($webroot . '/img/*') ?: [];
+  $expiry_guest_jar = $root . '/expiry-guest-cookies.txt';
+  [, $expiry_guest_form] = http_request($base_url . '?mode=admin_in', $expiry_guest_jar);
+  preg_match('/name="token" value="([^"]+)"/', $expiry_guest_form, $expiry_token_match);
+  try {
+    foreach (['guest' => [$expiry_guest_jar, $expiry_token_match[1] ?? ''], 'admin' => [$cookie_jar, $token]] as $role => [$jar, $request_token]) {
+      foreach (['text', 'upload', 'drawing'] as $kind) {
+        $temporary_files = ['png' => $png, 'pch' => 'NEO replay', 'psd' => 'PSD working data',
+          'dat' => "127.0.0.1\tlocalhost\tagent\t.png\t" . cookie_value($jar, 'usercode') . "\t\t100\t160\t0\tneo"];
+        foreach ($temporary_files as $extension => $content) file_put_contents($webroot . '/tmp/' . $expiry_base . '.' . $extension, $content);
+        $before_parent = $db->query('SELECT * FROM board_log WHERE tid=' . $expiry_parent)->fetch(PDO::FETCH_ASSOC);
+        $before_rows = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+        $before_files = [];
+        foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $before_files[$path] = hash_file('sha256', $path);
+        $fields = ['send' => '1', 'resto' => (string)$expiry_parent, 'name' => 'Expiry test',
+          'sub' => 'expired reply ' . $role . $kind, 'com' => '期限後の返信 ' . $role . $kind,
+          'pwd' => 'expiry-pass', 'invz' => '0', 'token' => $request_token];
+        if ($kind === 'upload') $fields['image_upload'] = new CURLFile($webroot . '/tmp/' . $expiry_base . '.png', 'image/png', 'reply.png');
+        if ($kind === 'drawing') $fields += ['picfile' => $expiry_base . '.png', 'ctype' => 'new'];
+        [$status] = http_request($base_url . '?mode=reply', $jar, $fields);
+        $after_files = [];
+        foreach (glob($webroot . '/img/*') ?: [] as $path) if (is_file($path)) $after_files[$path] = hash_file('sha256', $path);
+        integration_test('expired thread rejects direct reply without changing posts or files: ' . $role . '/' . $kind,
+          static function () use ($status, $db, $expiry_parent, $before_parent, $before_rows, $before_files, $after_files, $temporary_files, $webroot, $expiry_base): bool {
+            if ($status !== 403 || $before_files !== $after_files
+              || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== $before_rows
+              || $db->query('SELECT * FROM board_log WHERE tid=' . $expiry_parent)->fetch(PDO::FETCH_ASSOC) !== $before_parent) return false;
+            foreach ($temporary_files as $extension => $content) {
+              if (@file_get_contents($webroot . '/tmp/' . $expiry_base . '.' . $extension) !== $content) return false;
+            }
+            return true;
+          });
+      }
+    }
+    file_put_contents($webroot . '/config.local.php', str_replace("'elapsed_reply_days' => 1", "'elapsed_reply_days' => 0", $expiry_config));
+    [$unlimited_status] = http_request($base_url . '?mode=reply', $expiry_guest_jar, [
+      'send' => '1', 'resto' => (string)$expiry_parent, 'name' => 'Expiry test',
+      'sub' => 'Unlimited reply', 'com' => '制限なし設定で古いスレッドに返信します。',
+      'pwd' => 'expiry-pass', 'invz' => '0', 'token' => $expiry_token_match[1] ?? '',
+    ]);
+    integration_test('zero reply deadline permits an old thread over HTTP',
+      static fn (): bool => $unlimited_status === 200
+        && (int)$db->query("SELECT COUNT(*) FROM board_log WHERE parent={$expiry_parent} AND sub='Unlimited reply'")->fetchColumn() === 1);
+  } finally {
+    file_put_contents($webroot . '/config.local.php', $expiry_original_config);
+    $db->prepare('DELETE FROM board_log WHERE tid=? OR parent=?')->execute([$expiry_parent, $expiry_parent]);
+    foreach (glob($webroot . '/img/*') ?: [] as $path) if (!in_array($path, $expiry_public_before, true)) unlink($path);
+    foreach (['png', 'dat', 'pch', 'psd'] as $extension) {
+      $path = $webroot . '/tmp/' . $expiry_base . '.' . $extension;
+      if (is_file($path)) unlink($path);
+    }
+  }
   file_put_contents($webroot . '/tmp/' . $image_name, $png);
   $image_owner_code = (string)cookie_value($cookie_jar, 'usercode');
   file_put_contents($webroot . '/tmp/' . $image_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\t{$image_owner_code}\trep\t100\t160\t0\tneo");

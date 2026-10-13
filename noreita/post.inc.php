@@ -7,6 +7,7 @@ final class PostValidationException extends DomainException {}
 final class PostNotFoundException extends RuntimeException {}
 final class PostAuthorizationException extends RuntimeException {}
 final class DuplicatePostException extends RuntimeException {}
+final class PostReplyExpiredException extends RuntimeException {}
 
 /** コントローラーごとに規則を重複させず、日記モードの投稿可否を判断する。 */
 final class DiaryPostPolicy {
@@ -302,6 +303,11 @@ final class PostService implements AdminPostManagementService {
       $parent_post = $this->repository->findPublicPost($parent);
       if (empty($parent_post) || (int)($parent_post['thread'] ?? 0) !== 1) {
         throw new PostNotFoundException('Parent post was not found.');
+      }
+      $reply_days = Config::int('board.elapsed_reply_days');
+      if ($reply_days !== 0
+        && time() - (int)strtotime((string)($parent_post['created'] ?? '')) >= $reply_days * 86400) {
+        throw new PostReplyExpiredException('This thread is too old to reply.');
       }
       $tree = $now - $parent - (int)$parent_post['tid'];
       $comid = $tree + $now;

@@ -864,6 +864,10 @@ function regist(ApplicationContext $context): void {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     render_error($context, $en ? 'Parent post was not found.' : '返信先の記事が見つかりません。', 404);
     return;
+  } catch (PostReplyExpiredException $e) {
+    if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
+    render_error($context, $en ? 'This thread is too old to reply.' : 'このスレッドは返信期限を過ぎています。', 403);
+    return;
   } catch (ImageUploadException $e) {
     if (is_array($uploaded_image)) ImageService::deleteRelatedFiles(Config::string('paths.images'), $uploaded_image['picfile']);
     $upload_error = $en

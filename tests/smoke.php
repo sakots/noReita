@@ -1731,6 +1731,38 @@ smoke_test('reply saving rejects a parent hidden after preparation and permits r
     && (int)$repository->findPost($parent)['age'] === 1;
 });
 
+smoke_test('reply saving enforces creation-time deadlines and zero disables the limit', static function (): bool {
+  $configuration = Config::all();
+  try {
+    foreach ([[1, 86400, false], [1, 172800, false], [1, 82800, true], [0, 172800, true]] as [$days, $age, $allowed]) {
+      Config::initializeForTesting($configuration, ['board' => ['elapsed_reply_days' => $days]]);
+      $db = new PDO('sqlite::memory:');
+      (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+      $repository = new BoardRepository($db);
+      $parent = $repository->insertPost(['thread' => 1, 'age' => 0, 'tree' => 123, 'invz' => 0]);
+      $db->prepare('UPDATE board_log SET created=? WHERE tid=?')
+        ->execute([date('Y-m-d H:i:s', time() - $age), $parent]);
+      $before = $repository->findPost($parent);
+      $post = array_fill_keys(['name', 'sub', 'com', 'mail', 'url', 'picfile', 'pwdh', 'host'], '');
+      $post += ['resto' => (string)$parent, 'sodane' => 0, 'invz' => 0, 'admins' => 0];
+      $image = ['pchfile' => '', 'img_w' => 0, 'img_h' => 0, 'psec' => 0,
+        'utime' => '', 'tool' => '', 'nsfw' => false, 'ctype' => 'new', 'thumbnail' => ''];
+      try {
+        $reply = (new PostService($repository, sys_get_temp_dir()))->createPreparedPost($post, $image);
+        if (!$allowed || (int)$repository->findPost($reply)['parent'] !== $parent
+          || (int)$repository->findPost($parent)['age'] !== 1) return false;
+      } catch (PostReplyExpiredException $e) {
+        if ($allowed || $repository->findPost($parent) !== $before
+          || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== 1) return false;
+      }
+      if ($db->inTransaction()) return false;
+    }
+    return true;
+  } finally {
+    Config::initializeForTesting($configuration, []);
+  }
+});
+
 smoke_test('failed reply insertion restores parent ordering', static function (): bool {
   $db = new PDO('sqlite::memory:');
   (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
