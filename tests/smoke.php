@@ -2528,6 +2528,41 @@ smoke_test('animated WebP without a decodable ANMF frame is rejected', static fu
   }
 });
 
+smoke_test('animated WebP frame dimensions and offsets must fit the canvas before decoding', static function (): bool {
+  if (!function_exists('imagewebp')) return true;
+  $file = tempnam(sys_get_temp_dir(), 'noreita_webp_dimensions_');
+  if ($file === false) return false;
+  try {
+    $image = imagecreatetruecolor(4, 3);
+    imagewebp($image, $file, IMG_WEBP_LOSSLESS);
+    unset($image);
+    $chunks = substr((string)file_get_contents($file), 12);
+    $u24 = static fn (int $value): string => substr(pack('V', $value), 0, 3);
+    $chunk = static fn (string $type, string $data): string =>
+      $type . pack('V', strlen($data)) . $data . (strlen($data) % 2 ? "\0" : '');
+    $frame = static fn (int $width, int $height, int $x = 0, int $y = 0): string =>
+      $chunk('ANMF', $u24($x) . $u24($y) . $u24($width - 1) . $u24($height - 1)
+        . str_repeat("\0", 4) . $chunks);
+    foreach ([
+      [8, 6, $frame(4, 3, 1, 1), true],
+      [8, 6, $frame(1, 1), false],
+      [3, 6, $frame(4, 3), false],
+      [8, 2, $frame(4, 3), false],
+      [4, 3, $frame(4, 3, 1), false],
+      [8, 6, $frame(4, 3) . $frame(1, 1), false],
+    ] as [$width, $height, $frames, $expected]) {
+      $body = 'WEBP' . $chunk('VP8X', "\x02\0\0\0" . $u24($width - 1) . $u24($height - 1))
+        . $chunk('ANIM', str_repeat("\0", 6)) . $frames;
+      file_put_contents($file, 'RIFF' . pack('V', strlen($body)) . $body);
+      clearstatcache(true, $file);
+      if (ImageService::validateUpload($file, ['image/webp']) !== $expected) return false;
+    }
+    return true;
+  } finally {
+    unlink($file);
+  }
+});
+
 smoke_test('animated AVIF NSFW thumbnails use the largest declared frame dimensions', static function (): bool {
   $file = tempnam(sys_get_temp_dir(), 'noreita_animated_avif_');
   if ($file === false) return false;

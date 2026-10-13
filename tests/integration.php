@@ -3304,6 +3304,33 @@ PHP;
         && glob($webroot . '/img/*') === $before_files;
     });
   }
+  if (function_exists('imagewebp')) {
+    foreach (['width' => [4001, 1], 'height' => [1, 4001]] as $axis => [$frame_width, $frame_height]) {
+      $frame_source = $root . '/oversized-frame.webp';
+      $frame_image = imagecreatetruecolor($frame_width, $frame_height);
+      imagewebp($frame_image, $frame_source, IMG_WEBP_LOSSLESS);
+      unset($frame_image);
+      $frame_data = (string)file_get_contents($frame_source);
+      $chunks = substr($frame_data, 12);
+      $frame = str_repeat("\0", 16) . $chunks;
+      $body = 'WEBP' . 'VP8X' . pack('V', 10) . "\x02" . str_repeat("\0", 9)
+        . 'ANIM' . pack('V', 6) . str_repeat("\0", 6)
+        . 'ANMF' . pack('V', strlen($frame)) . $frame . (strlen($frame) % 2 ? "\0" : '');
+      $source = $root . '/mismatched-frame.webp';
+      file_put_contents($source, 'RIFF' . pack('V', strlen($body)) . $body);
+      $before_rows = (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn();
+      $before_files = glob($webroot . '/img/*');
+      [$status] = http_request($base_url . '?mode=regist', $cookie_jar, [
+        'send' => '1', 'name' => 'WebP test', 'sub' => 'WebP frame mismatch ' . $axis,
+        'com' => 'WebP内部フレームの寸法検証 ' . $axis, 'pwd' => 'webp-pass', 'invz' => '0', 'token' => $token,
+        'image_upload' => new CURLFile($source, 'image/webp', 'mismatch.webp'),
+      ]);
+      integration_test('animated WebP cannot conceal an oversized internal frame: ' . $axis,
+        static fn (): bool => $status === 400
+          && (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() === $before_rows
+          && glob($webroot . '/img/*') === $before_files);
+    }
+  }
   [$direct_upload_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'upload-test', 'mail' => '', 'url' => '',
     'sub' => 'Direct image upload', 'com' => "画像アップロード {$upload_marker}", 'pwd' => 'upload-delete-pass',

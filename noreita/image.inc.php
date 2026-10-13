@@ -52,6 +52,7 @@ final class ImageService {
   private static function isDecodableImage(string $file_path, string $mime_type): bool {
     $decoder = self::UPLOAD_IMAGE_TYPES[$mime_type]['decoder'] ?? null;
     if (!is_string($decoder) || !function_exists($decoder)) return false;
+    if ($mime_type === 'image/webp' && !self::webpFramesFitCanvas($file_path)) return false;
     try {
       $image = @call_user_func($decoder, $file_path);
       // GD 2.x cannot decode animated WebP as a complete image. Accept it only when
@@ -85,6 +86,9 @@ final class ImageService {
     $format = self::UPLOAD_IMAGE_TYPES[$mime_type] ?? null;
     if ($format === null || !function_exists($format['decoder']) || !function_exists($format['encoder'])) {
       throw new ImageUploadException('The detected image format is not supported by this server.', 415);
+    }
+    if ($mime_type === 'image/webp' && !self::webpFramesFitCanvas($source)) {
+      throw new ImageUploadException('The WebP frame dimensions are invalid.', 400);
     }
 
     $image = @call_user_func($format['decoder'], $source);
@@ -222,6 +226,34 @@ final class ImageService {
     }
   }
 
+  /** Check every animation frame before any GD decoder sees the container. */
+  private static function webpFramesFitCanvas(string $file_path): bool {
+    $data = @file_get_contents($file_path);
+    if (!is_string($data) || strlen($data) < 20 || substr($data, 0, 4) !== 'RIFF'
+      || substr($data, 8, 4) !== 'WEBP') return false;
+    $length = strlen($data);
+    if (unpack('V', substr($data, 4, 4))[1] !== $length - 8) return false;
+    $canvas = @getimagesizefromstring($data);
+    if ($canvas === false) return false;
+    $offset = 12;
+    while ($offset + 8 <= $length) {
+      $chunk = substr($data, $offset, 4);
+      $size = unpack('V', substr($data, $offset + 4, 4))[1];
+      $payload = $offset + 8;
+      if ($size > $length - $payload) return false;
+      if ($chunk === 'ANMF') {
+        if (self::animatedWebpFrameData($data, $payload, $size) === null) return false;
+        $x = unpack('V', substr($data, $payload, 3) . "\0")[1] * 2;
+        $y = unpack('V', substr($data, $payload + 3, 3) . "\0")[1] * 2;
+        $width = unpack('V', substr($data, $payload + 6, 3) . "\0")[1] + 1;
+        $height = unpack('V', substr($data, $payload + 9, 3) . "\0")[1] + 1;
+        if ($x + $width > $canvas[0] || $y + $height > $canvas[1]) return false;
+      }
+      $offset = $payload + $size + ($size % 2);
+    }
+    return $offset === $length;
+  }
+
   /**
    * Check the bounded RIFF chunk layout used by animated WebP files.
    *
@@ -264,7 +296,7 @@ final class ImageService {
    */
   private static function extractAnimatedWebpFirstFrame(string $file_path, string $destination): bool {
     $data = @file_get_contents($file_path);
-    if (!is_string($data) || !self::isAnimatedWebp($file_path)) return false;
+    if (!is_string($data) || !self::webpFramesFitCanvas($file_path) || !self::isAnimatedWebp($file_path)) return false;
     $offset = 12;
     $length = strlen($data);
     while ($offset + 8 <= $length) {
@@ -297,6 +329,8 @@ final class ImageService {
    */
   private static function animatedWebpFrameData(string $data, int $payload_offset, int $size): ?string {
     if ($size <= 16 || $payload_offset < 0 || $payload_offset + $size > strlen($data)) return null;
+    $width = unpack('V', substr($data, $payload_offset + 6, 3) . "\0")[1] + 1;
+    $height = unpack('V', substr($data, $payload_offset + 9, 3) . "\0")[1] + 1;
     $frame_chunks = substr($data, $payload_offset + 16, $size - 16);
     $offset = 0;
     $length = strlen($frame_chunks);
@@ -307,7 +341,14 @@ final class ImageService {
       $chunk_size = is_array($size_data) ? (int)($size_data['size'] ?? -1) : -1;
       $offset += 8;
       if ($chunk_size < 0 || $chunk_size > $length - $offset) return null;
-      if ($chunk === 'VP8 ' || $chunk === 'VP8L') $has_image_chunk = true;
+      if (!in_array($chunk, ['ALPH', 'VP8 ', 'VP8L'], true)) return null;
+      if ($chunk === 'VP8 ' || $chunk === 'VP8L') {
+        if ($has_image_chunk) return null;
+        $image_chunk = substr($frame_chunks, $offset - 8, 8 + $chunk_size + ($chunk_size % 2));
+        $dimensions = @getimagesizefromstring('RIFF' . pack('V', 4 + strlen($image_chunk)) . 'WEBP' . $image_chunk);
+        if ($dimensions === false || $dimensions[0] !== $width || $dimensions[1] !== $height) return null;
+        $has_image_chunk = true;
+      }
       $offset += $chunk_size + ($chunk_size % 2);
     }
     if ($offset !== $length || !$has_image_chunk) return null;
@@ -1414,6 +1455,9 @@ final class ImageService {
     $size = @getimagesize($source);
     if ($image_name === '' || $size === false) {
       throw new RuntimeException('Posted image was not found.');
+    }
+    if (($size['mime'] ?? '') === 'image/webp' && !self::webpFramesFitCanvas($source)) {
+      throw new RuntimeException('Invalid WebP frame dimensions.');
     }
 
     $new_thumbnail = '';
