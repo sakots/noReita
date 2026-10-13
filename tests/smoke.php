@@ -598,6 +598,42 @@ smoke_test('configuration overrides defaults and replaces list values', static f
     && $resolved['social']['servers'] === [['Local', 'https://social.example']];
 });
 
+smoke_test('configuration parser preserves PHP numeric literal values and types', static function (): bool {
+  $cases = [
+    ['0', 0], ['42', 42], ['0644', 0644], ['0o644', 0644], ['0O644', 0644],
+    ['0xFF', 255], ['0Xff', 255], ['0b1010', 10], ['0B1010', 10],
+    ['1_000', 1000], ['0_644', 0644], ['0o6_44', 0644],
+    ['0xF_F', 255], ['0b10_10', 10],
+    ['1_234.5_6e+2', 123456.0], ['.5', 0.5], ['1.', 1.0], ['1e-3', 0.001],
+    ['-0644', -0644], ['+0xFF', 255], ['-1_234.5_6e+2', -123456.0],
+    [(string)PHP_INT_MAX, PHP_INT_MAX], ['0x' . dechex(PHP_INT_MAX), PHP_INT_MAX],
+    ['18446744073709551616', 18446744073709551616.0],
+    ['0x1_0000_0000_0000_0000', 18446744073709551616.0],
+    ['02000000000000000000000', 18446744073709551616.0],
+    ['0b1' . str_repeat('0', 64), 18446744073709551616.0],
+  ];
+  foreach ($cases as [$literal, $expected]) {
+    $actual = (new ConfigArrayParser("return ['value' => {$literal}];"))->parse()['value'];
+    if ($actual !== $expected) {
+      throw new RuntimeException("{$literal}: expected " . var_export($expected, true) . ', got ' . var_export($actual, true));
+    }
+  }
+  $keys = (new ConfigArrayParser("return ['values' => [0x10 => 'hex', 0b10 => 'binary', 010 => 'octal']];"))->parse();
+  return $keys['values'] === [16 => 'hex', 2 => 'binary', 8 => 'octal'];
+});
+
+smoke_test('configuration parser rejects invalid numeric literals and executable expressions', static function (): bool {
+  foreach (['09', '0o8', '0b102', '0xG', '1__000', '1_', '1_.0', '1e_2', '1 + 2', 'phpinfo()'] as $literal) {
+    try {
+      (new ConfigArrayParser("return ['value' => {$literal}];"))->parse();
+      throw new RuntimeException("Invalid literal accepted: {$literal}");
+    } catch (InvalidArgumentException $e) {
+      // Expected: submitted configuration must not be executed or silently coerced.
+    }
+  }
+  return true;
+});
+
 smoke_test('administrator configuration editor writes validated local overrides only', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_config_editor_' . bin2hex(random_bytes(8));
   if (!mkdir($root, 0700)) return false;
@@ -611,6 +647,8 @@ smoke_test('administrator configuration editor writes validated local overrides 
 return [
   'admin' => ['password' => 'configured-admin'],
   'site' => ['base_url' => 'https://configured.example/', 'title' => '設定済み掲示板'],
+  'board' => ['max_threads' => 2_000, 'page_size' => 0x14, 'catalog_size' => 0b110],
+  'permissions' => ['public_file' => 0640, 'private_file' => 0o400],
 ];
 PHP;
     ConfigEditor::save($root, $source);
@@ -628,6 +666,8 @@ PHP;
     return str_starts_with($editable, "<?php\n\nreturn [") && $overrides === [
       'admin' => ['password' => 'configured-admin'],
       'site' => ['base_url' => 'https://configured.example/', 'title' => '設定済み掲示板'],
+      'board' => ['max_threads' => 2000, 'page_size' => 20, 'catalog_size' => 6],
+      'permissions' => ['public_file' => 416, 'private_file' => 256],
     ] && $resolved['site']['title'] === '設定済み掲示板' && $invalid_rejected;
   } finally {
     foreach (['config.local.php', 'config.php'] as $file) {

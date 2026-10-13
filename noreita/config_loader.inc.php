@@ -507,7 +507,11 @@ final class ConfigArrayParser {
 
   public function __construct(string $source) {
     $source = preg_replace('/\A\s*<\?php\b/', '', $source) ?? $source;
-    $tokens = token_get_all('<?php ' . $source);
+    try {
+      $tokens = token_get_all('<?php ' . $source, TOKEN_PARSE);
+    } catch (ParseError $e) {
+      throw new InvalidArgumentException('Invalid PHP array configuration syntax.', 0, $e);
+    }
     $this->tokens = array_values(array_filter($tokens, static function ($token): bool {
       return !is_array($token) || !in_array($token[0], [T_OPEN_TAG, T_CLOSE_TAG, T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true);
     }));
@@ -529,16 +533,15 @@ final class ConfigArrayParser {
   private function value() {
     $token = $this->current();
     if ($this->matches($token, '[')) return $this->arrayValue();
-    if ($this->matches($token, '-')) {
+    if ($this->matches($token, '-') || $this->matches($token, '+')) {
       $this->position++;
       $number = $this->value();
-      if (!is_int($number) && !is_float($number)) throw new InvalidArgumentException('Only numeric values may be negative.');
-      return -$number;
+      if (!is_int($number) && !is_float($number)) throw new InvalidArgumentException('Only numeric values may have a sign.');
+      return $token === '-' ? -$number : $number;
     }
     $this->position++;
     if (is_array($token) && $token[0] === T_CONSTANT_ENCAPSED_STRING) return $this->stringValue($token[1]);
-    if (is_array($token) && $token[0] === T_LNUMBER) return (int)$token[1];
-    if (is_array($token) && $token[0] === T_DNUMBER) return (float)$token[1];
+    if (is_array($token) && in_array($token[0], [T_LNUMBER, T_DNUMBER], true)) return $this->numberValue($token[1], $token[0]);
     if (is_array($token) && $token[0] === T_STRING) {
       return match (strtolower($token[1])) {
         'true' => true, 'false' => false, 'null' => null,
@@ -546,6 +549,16 @@ final class ConfigArrayParser {
       };
     }
     throw new InvalidArgumentException('Invalid configuration value.');
+  }
+
+  private function numberValue(string $literal, int $type): int|float {
+    $literal = str_replace('_', '', $literal);
+    $prefix = strtolower(substr($literal, 0, 2));
+    if ($prefix === '0x') return hexdec(substr($literal, 2));
+    if ($prefix === '0b') return bindec(substr($literal, 2));
+    if ($prefix === '0o') return octdec(substr($literal, 2));
+    if ($literal[0] === '0' && ctype_digit($literal)) return octdec($literal);
+    return $type === T_LNUMBER ? (int)$literal : (float)$literal;
   }
 
   /** @return array<mixed> */
