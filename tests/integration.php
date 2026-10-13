@@ -1524,6 +1524,46 @@ PHP;
       && str_contains($legacy_thread_body, $marker);
   });
 
+  $reply_url_original_config = (string)file_get_contents($webroot . '/config.local.php');
+  $db->exec('INSERT INTO board_log (' . implode(',', $reaction_columns) . ') SELECT '
+    . implode(',', $reaction_columns) . ' FROM board_log WHERE tid = ' . $shared_thread_id);
+  $reply_url_id = (int)$db->lastInsertId();
+  $reply_url_marker = '返信URL検証-' . bin2hex(random_bytes(6));
+  $db->prepare('UPDATE board_log SET thread=0, parent=?, comid=?, invz=0, com=? WHERE tid=?')
+    ->execute([$shared_thread_id, $reply_url_id, $reply_url_marker, $reply_url_id]);
+  try {
+    foreach (['eda', 'monoreita'] as $reply_url_theme) {
+      file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $reply_url_theme . "'],", $reply_url_original_config));
+      integration_test('thread reply profile URLs allow only valid HTTP and HTTPS links: ' . $reply_url_theme,
+        static function () use ($db, $base_url, $cookie_jar, $shared_thread_id, $reply_url_id, $reply_url_marker): bool {
+          foreach ([
+            ['javascript:alert(1)', false],
+            ['ftp://reply-profile.example.test/file', false],
+            ['https://', false],
+            ['http://reply-profile.example.test/member?a=1&b=2', true],
+            ['https://reply-profile.example.test/member?a=1&b=%22text%22', true],
+          ] as [$url, $allowed]) {
+            $db->prepare('UPDATE board_log SET a_url=? WHERE tid=?')->execute([$url, $reply_url_id]);
+            [$status, $body] = http_request($base_url . '?resno=' . $shared_thread_id, $cookie_jar);
+            if ($status !== 200 || !str_contains($body, $reply_url_marker)) return false;
+            preg_match_all('/\bhref="([^"]*)"/', $body, $matches);
+            $links = array_map(static fn (string $link): string => html_entity_decode($link, ENT_QUOTES | ENT_HTML5, 'UTF-8'), $matches[1]);
+            if (in_array($url, $links, true) !== $allowed) {
+              throw new RuntimeException('Unexpected reply link for ' . $url);
+            }
+            if ($db->query('SELECT a_url FROM board_log WHERE tid=' . $reply_url_id)->fetchColumn() !== $url) {
+              throw new RuntimeException('Displaying a reply changed its stored URL.');
+            }
+          }
+          return true;
+        });
+    }
+  } finally {
+    $db->prepare('DELETE FROM board_log WHERE tid=?')->execute([$reply_url_id]);
+    file_put_contents($webroot . '/config.local.php', $reply_url_original_config);
+  }
+
   $api_url = substr($base_url, 0, -strlen('index.php')) . 'api.php';
   [$api_threads_status, $api_threads_body, , $api_threads_headers] = http_request(
     $api_url . '?mode=threads&per_page=1', $cookie_jar

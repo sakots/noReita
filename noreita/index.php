@@ -1371,7 +1371,6 @@ function res(ApplicationContext $context): void {
         $bbsline['past'] = strtotime($bbsline['created']); // このスレは古いので用
         $res['created'] = date(Config::string('board.date_format'), strtotime($res['created']));
         $res['modified'] = date(Config::string('board.date_format'), strtotime($res['modified']));
-        $ko[] = $res;
         //投稿者名取得
         if (!in_array($res['a_name'], $r_res_name)) { //重複除外
           $r_res_name[] = $res['a_name']; //投稿者名を配列に入れる
@@ -1380,6 +1379,7 @@ function res(ApplicationContext $context): void {
         if (!filter_var($res['a_url'], FILTER_VALIDATE_URL) || !preg_match('|^https?://.*$|', $res['a_url'])) {
           $res['a_url'] = "";
         }
+        $ko[] = $res;
       }
       $bbsline['com'] = htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5);
 
