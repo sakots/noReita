@@ -1362,7 +1362,7 @@ final class ImageService {
 
   private static function readDeletionManifest(string $directory): ?array {
     $path = $directory . DIRECTORY_SEPARATOR . 'manifest.json';
-    $json = @file_get_contents($path, false, null, 0, 65536);
+    $json = @file_get_contents($path);
     $manifest = is_string($json) ? json_decode($json, true) : null;
     if (!is_array($manifest) || (int)($manifest['version'] ?? 0) !== 1
       || !is_array($manifest['posts'] ?? null) || !is_array($manifest['files'] ?? null)) {

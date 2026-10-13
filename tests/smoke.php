@@ -3390,6 +3390,64 @@ smoke_test('interrupted post deletions recover from manifests without touching a
   }
 });
 
+smoke_test('large deletion manifests restore or complete every related file', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_large_delete_' . bin2hex(random_bytes(8));
+  $images = $root . DIRECTORY_SEPARATOR . 'img';
+  $staging = $root . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'delete-staging';
+  if (!mkdir($images, 0700, true)) return false;
+  try {
+    $db = new PDO('sqlite::memory:');
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db->exec('CREATE TABLE board_log (tid INTEGER PRIMARY KEY, picfile TEXT NOT NULL)');
+    $insert = $db->prepare('INSERT INTO board_log VALUES (?, ?)');
+    $posts = [];
+    $image_names = [];
+    for ($id = 1; $id <= 1200; $id++) {
+      $filename = sprintf('%016d.png', $id);
+      $posts[] = ['tid' => $id, 'picfile' => $filename];
+      $image_names[] = $filename;
+    }
+    $last_post = $posts[count($posts) - 1];
+    $last_base = pathinfo($last_post['picfile'], PATHINFO_FILENAME);
+    $files = array_merge($image_names, [$last_base . '.pch', $last_base . '_thumb_safe_test.webp']);
+    $service = new PostService(new BoardRepository($db), $images, 100, 0600, $staging);
+
+    foreach ([true, false] as $restore) {
+      // Only the final manifest entry matches the DB, so recovery must read all posts.
+      if ($restore) $insert->execute([$last_post['tid'], $last_post['picfile']]);
+      else $db->exec('DELETE FROM board_log');
+      foreach ($files as $file) file_put_contents($images . DIRECTORY_SEPARATOR . $file, $file);
+      $stage = ImageService::stageRelatedFilesForDeletion($images, $staging, $image_names, $posts);
+      flock($stage['lock_handle'], LOCK_UN);
+      fclose($stage['lock_handle']);
+      if (filesize($stage['directory'] . DIRECTORY_SEPARATOR . 'manifest.json') <= 65536) return false;
+
+      $result = $service->recoverInterruptedDeletions();
+      if ($result !== [
+        'restored' => $restore ? 1 : 0, 'completed' => $restore ? 0 : 1,
+        'skipped' => 0, 'invalid' => 0, 'quarantined' => 0, 'purged' => 0,
+      ] || is_dir($stage['directory'])
+        || (int)$db->query('SELECT COUNT(*) FROM board_log')->fetchColumn() !== ($restore ? 1 : 0)) {
+        return false;
+      }
+      foreach ($files as $file) {
+        $path = $images . DIRECTORY_SEPARATOR . $file;
+        if ($restore ? !is_file($path) || file_get_contents($path) !== $file : is_file($path)) return false;
+      }
+    }
+    return true;
+  } finally {
+    $iterator = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+      RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $item) {
+      $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+    }
+    rmdir($root);
+  }
+});
+
 smoke_test('invalid deletion recovery data is quarantined and expires safely', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_delete_quarantine_' . bin2hex(random_bytes(8));
   $images = $root . DIRECTORY_SEPARATOR . 'img';
