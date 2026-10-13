@@ -829,7 +829,7 @@ function regist(ApplicationContext $context): void {
       } elseif ($picfile) {
         $ctype = PostInput::ctypeFromHttp();
         $image_result = ImageService::finalizeNewPost(
-          Config::string('paths.temporary'), Config::string('paths.images'), (string)$picfile, $ctype, (bool)Config::bool('features.display_paint_time'), Config::int('limits.paint_default_width'),
+          Config::string('paths.temporary'), Config::string('paths.images'), (string)$picfile, $usercode, $ctype, (bool)Config::bool('features.display_paint_time'), Config::int('limits.paint_default_width'),
           Config::bool('features.nsfw') && $nsfw_flag === '1', Config::int('permissions.public_file'),
           static function (array $image_data) use ($service, $prepared_post, $ctype): void {
             $image_data['ctype'] = $ctype;

@@ -1537,6 +1537,7 @@ final class ImageService {
     string $temp_dir,
     string $image_dir,
     string $image_name,
+    string $user_code,
     string $ctype,
     bool $show_paint_time,
     int $thumbnail_width,
@@ -1544,6 +1545,10 @@ final class ImageService {
     int $permission,
     ?callable $save_post = null
   ): array {
+    // Preview access for administrators does not authorize publication on behalf of the owner.
+    if (self::authorizedTemporaryImage($temp_dir, $image_name, $user_code, false) === null) {
+      throw new ImageUploadException('This temporary image is unavailable or belongs to another user.', 403);
+    }
     $published = [];
     $temporary = [];
     try {

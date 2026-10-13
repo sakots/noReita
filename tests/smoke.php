@@ -2493,7 +2493,7 @@ smoke_test('animated WebP is accepted without GD frame decoding and remains inta
     if ($webp === false || file_put_contents($temp . DIRECTORY_SEPARATOR . 'animated.webp', $webp) !== strlen($webp)) return false;
     $source_hash = hash_file('sha256', $temp . DIRECTORY_SEPARATOR . 'animated.webp');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'animated.dat', "ip\thost\tagent\t.webp\tcode\trep\t100\t160\t\tneo");
-    $result = ImageService::finalizeNewPost($temp, $images, 'animated.webp', 'new', true, 100, true, 0600);
+    $result = ImageService::finalizeNewPost($temp, $images, 'animated.webp', 'code', 'new', true, 100, true, 0600);
     $thumbnail = $images . DIRECTORY_SEPARATOR . (string)$result['thumbnail'];
     $thumbnail_image = is_file($thumbnail) ? @imagecreatefromstring((string)file_get_contents($thumbnail)) : false;
     $thumbnail_color = $thumbnail_image === false ? 0 : imagecolorat($thumbnail_image, 0, 0);
@@ -3498,7 +3498,23 @@ smoke_test('new post image and animation are finalized', static function (): boo
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.pch', 'NEO');
     file_put_contents($temp . DIRECTORY_SEPARATOR . 'post.psd', 'PSD');
 
-    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 100, true, 0600);
+    foreach ([['other-user', 'code'], ['', 'code'], ['code', '']] as [$request_code, $metadata_code]) {
+      file_put_contents($temp . '/post.dat', "ip\thost\tagent\t.png\t{$metadata_code}\trep\t100\t160\t\tneo");
+      $originals = [];
+      foreach (glob($temp . '/*') ?: [] as $path) $originals[$path] = hash_file('sha256', $path);
+      try {
+        ImageService::finalizeNewPost($temp, $images, 'post.png', $request_code, 'new', true, 100, true, 0600);
+        return false;
+      } catch (ImageUploadException $e) {
+        if ($e->getCode() !== 403 || (glob($images . '/*') ?: []) !== []) return false;
+      }
+      foreach ($originals as $path => $hash) {
+        if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
+      }
+    }
+    file_put_contents($temp . '/post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
+
+    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'code', 'new', true, 100, true, 0600);
     return $result['img_w'] === 4 && $result['img_h'] === 3
       && $result['psec'] === 60 && $result['tool'] === 'PaintBBS NEO'
       && $result['pchfile'] === 'post.pch'
@@ -3536,7 +3552,7 @@ smoke_test('failed drawing finalization preserves temporary files and supports r
 
     // A failure after image/thumbnail/animation publication must leave every source intact.
     try {
-      ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600,
+      ImageService::finalizeNewPost($temp, $images, 'post.png', 'code', 'new', true, 2, true, 0600,
         static function (array $result) use ($images): void {
           if (!is_file($images . '/' . $result['thumbnail']) || !is_file($images . '/post.psd')) {
             throw new RuntimeException('Files were not published before database save.');
@@ -3556,7 +3572,7 @@ smoke_test('failed drawing finalization preserves temporary files and supports r
     // A later working-file collision also rolls back, without deleting an existing file.
     file_put_contents($images . '/post.psd', 'existing PSD');
     try {
-      ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600);
+      ImageService::finalizeNewPost($temp, $images, 'post.png', 'code', 'new', true, 2, true, 0600);
       return false;
     } catch (RuntimeException $e) {
       if (file_get_contents($images . '/post.psd') !== 'existing PSD'
@@ -3567,7 +3583,7 @@ smoke_test('failed drawing finalization preserves temporary files and supports r
     }
     unlink($images . '/post.psd');
     $saved = 0;
-    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'new', true, 2, true, 0600,
+    $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'code', 'new', true, 2, true, 0600,
       static function (array $result) use (&$saved): void { ++$saved; }
     );
     return $saved === 1 && (glob($temp . '/*') ?: []) === []

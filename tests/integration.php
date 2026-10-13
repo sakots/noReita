@@ -1860,7 +1860,8 @@ PHP;
     }
   }
   file_put_contents($webroot . '/tmp/' . $image_name, $png);
-  file_put_contents($webroot . '/tmp/' . $image_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\tcode\trep\t100\t160\t0\tneo");
+  $image_owner_code = (string)cookie_value($cookie_jar, 'usercode');
+  file_put_contents($webroot . '/tmp/' . $image_base . '.dat', "127.0.0.1\tlocalhost\tagent\t.png\t{$image_owner_code}\trep\t100\t160\t0\tneo");
   file_put_contents($webroot . '/tmp/' . $image_base . '.pch', 'NEO animation');
   [$image_status] = http_request($base_url . '?mode=regist', $cookie_jar, [
     'mode' => 'regist', 'send' => '1', 'name' => 'Image test', 'mail' => '', 'url' => '',
@@ -2384,6 +2385,71 @@ PHP;
       && $temporary_direct_status === 403 && !str_contains($temporary_direct_body, 'PNG')
       && $temporary_work_status === 404 && !str_contains($temporary_work_body, 'private working data');
   });
+
+  // A valid CSRF token does not grant ownership of another user's pending drawing.
+  file_put_contents($webroot . '/tmp/' . $temporary_private_base . '.pch', 'private replay');
+  $temporary_originals = [];
+  foreach (['png', 'dat', 'pch', 'psd'] as $extension) {
+    $path = $webroot . '/tmp/' . $temporary_private_base . '.' . $extension;
+    $temporary_originals[$path] = hash_file('sha256', $path);
+  }
+  [$temporary_guest_form_status, $temporary_guest_form] = http_request(
+    $base_url . '?mode=admin_in', $temporary_guest_cookie_jar
+  );
+  $temporary_guest_token = preg_match('/name="token" value="([^"]+)"/', $temporary_guest_form, $token_match) === 1
+    ? $token_match[1] : '';
+  $temporary_publish_input = [
+    'mode' => 'regist', 'send' => '1', 'name' => 'Pending drawing owner',
+    'sub' => 'Pending drawing ownership', 'com' => '未投稿画像の所有権を確認します。',
+    'pwd' => 'temporary-owner-pass', 'invz' => '0', 'ctype' => 'new',
+    'picfile' => $temporary_private_name,
+  ];
+  foreach ([
+    'guest' => [$temporary_guest_cookie_jar, $temporary_guest_token],
+    'administrator' => [$cookie_jar, $token],
+  ] as $temporary_requester => [$requester_cookies, $requester_token]) {
+    [$temporary_publish_status] = http_request($base_url, $requester_cookies,
+      $temporary_publish_input + ['token' => $requester_token]);
+    $temporary_files_preserved = true;
+    foreach ($temporary_originals as $path => $hash) {
+      if (!is_file($path) || hash_file('sha256', $path) !== $hash) $temporary_files_preserved = false;
+    }
+    $temporary_public_files = glob($webroot . '/img/' . $temporary_private_base . '.*') ?: [];
+    $temporary_post_count = (int)$db->query(
+      "SELECT COUNT(*) FROM board_log WHERE sub = 'Pending drawing ownership'"
+    )->fetchColumn();
+    integration_test('pending drawing cannot be published by a non-owner: ' . $temporary_requester,
+      static fn (): bool => $temporary_guest_form_status === 200 && $requester_token !== ''
+        && $temporary_publish_status === 403 && $temporary_files_preserved
+        && $temporary_public_files === [] && $temporary_post_count === 0);
+  }
+  [$temporary_owner_form_status, $temporary_owner_form] = http_request(
+    $base_url . '?mode=admin_in', $temporary_owner_cookie_jar
+  );
+  $temporary_owner_token = preg_match('/name="token" value="([^"]+)"/', $temporary_owner_form, $token_match) === 1
+    ? $token_match[1] : '';
+  [$temporary_owner_publish_status] = http_request($base_url, $temporary_owner_cookie_jar,
+    $temporary_publish_input + ['token' => $temporary_owner_token]);
+  $temporary_published_post = $db->query(
+    "SELECT tid, picfile, pchfile, pwd FROM board_log WHERE sub = 'Pending drawing ownership'"
+  )->fetch(PDO::FETCH_ASSOC);
+  $temporary_owner_files_valid = true;
+  foreach ($temporary_originals as $path => $hash) {
+    $published_path = $webroot . '/img/' . basename($path);
+    if (is_file($path) || (pathinfo($path, PATHINFO_EXTENSION) !== 'dat'
+      && (!is_file($published_path) || hash_file('sha256', $published_path) !== $hash))) {
+      $temporary_owner_files_valid = false;
+    }
+  }
+  integration_test('pending drawing remains publishable by its owner after non-owner requests',
+    static fn (): bool => $temporary_owner_form_status === 200 && $temporary_owner_token !== ''
+      && $temporary_owner_publish_status === 200 && $temporary_owner_files_valid
+      && is_array($temporary_published_post)
+      && $temporary_published_post['picfile'] === $temporary_private_name
+      && $temporary_published_post['pchfile'] === $temporary_private_base . '.pch'
+      && password_verify('temporary-owner-pass', $temporary_published_post['pwd']));
+  $db->prepare('DELETE FROM board_log WHERE picfile = ?')->execute([$temporary_private_name]);
+  foreach (glob($webroot . '/img/' . $temporary_private_base . '*') ?: [] as $path) unlink($path);
 
   $image_post_id = (int)($image_row['tid'] ?? 0);
   [$image_admin_detail_status, $image_admin_detail_body] = http_request(
