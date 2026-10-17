@@ -1,5 +1,66 @@
 # 開発
 
+## OpenSpecによる変更管理
+
+OpenSpecは開発時の仕様・変更管理に使います。掲示板の設置先で実行する必要はありません。
+CLIをインストールした開発環境で、プロジェクトルートから操作してください。
+このリポジトリは初期化済みのため、通常は`openspec init`を再実行しません。
+
+### 資料の役割
+
+- `openspec/config.yaml`: 成果物の言語、変更の粒度、成果物ごとの作成ルール。
+- `openspec/specs/`: 実装済み機能の要件と受け入れシナリオ。変更をアーカイブするときに差分を反映します。
+- `openspec/changes/<変更名>/`: 作業中の提案、仕様差分、設計、実装タスク。
+- `openspec/changes/archive/`: 完了した変更の記録。
+- `docs/requirements.md`、`docs/architecture.md`など: 既存の要件、内部構成、運用手順。OpenSpec導入だけを理由に移動・削除しません。
+
+導入時点の`specs/`と`changes/`は空です。既存機能をすべて仕様化した状態ではありません。
+今後変更する機能から、既存資料・実装・テストと照合して仕様を記録します。
+仕様が未登録の機能は、既存要件も確認して新しい仕様にまとめます。
+登録済みの機能は既存の仕様を読み、変更対象の要件を差分として記述します。
+過去の更新履歴を、実施していない提案や完了タスクへ機械的に変換しません。
+
+### 作業の流れ
+
+最初に進行中の変更と登録済みの仕様を確認します。
+
+```bash
+openspec list --json
+openspec list --specs --json
+openspec doctor --json
+```
+
+対応するAIツールでは、次のコマンドまたは同名のOpenSpecスキルを使います。
+生成済みのスキル・コマンドは直接カスタマイズせず、プロジェクト固有のルールは`openspec/config.yaml`へ記述します。
+
+1. 要件が曖昧な場合は`/opsx:explore`で調査・整理します。この段階ではアプリを実装しません。
+2. `/opsx:propose <変更名>`で提案、仕様差分、必要な設計、タスクを作成します。変更名は`fix-reply-limit`のような英小文字のkebab-caseにし、一度に扱う修正・機能追加は一つにします。
+3. 資料と受け入れ条件を確認し、`openspec validate <変更名> --strict --no-interactive`で検証します。
+4. `/opsx:apply <変更名>`で実装します。不具合は再現と回帰テストを先に用意し、最小実装後に実際の変更経路を動かして確認します。要件・設計が変わった場合は`/opsx:update <変更名>`で計画資料も更新します。
+5. 本ページのテストと必要な診断を実行し、結果を確認してからタスクを完了にします。`README.md`と`changelog.md`の履歴も更新します。
+6. 完了後は`/opsx:archive <変更名>`で仕様差分を`specs/`へ反映し、変更をアーカイブします。仕様だけを先に同期する必要がある場合は`/opsx:sync <変更名>`を使います。
+
+CLIだけで変更の雛形を作る場合は、次の順で実行します。雛形の作成だけでは提案や実装は完了しません。
+
+```bash
+openspec new change fix-reply-limit
+openspec status --change fix-reply-limit --json
+openspec instructions proposal --change fix-reply-limit --json
+```
+
+以後は`status`の依存関係に従い、`instructions`の指示で成果物を作成します。
+成果物の本文は日本語とし、検証に使われる`## ADDED Requirements`、
+`### Requirement:`、`#### Scenario:`などの見出しや`SHALL`・`MUST`は変更しません。
+
+全体の仕様検証には次を使います。仕様や変更がまだない場合は検証対象がないため、これだけで設定の動作確認にはなりません。
+
+```bash
+openspec validate --all --strict --no-interactive
+```
+
+OpenSpecの検証は、PHPのテストやテーマ診断の代わりにはなりません。
+実運用の`config.local.php`・DB・投稿画像は検証に使わず、一時ディレクトリで実施します。
+
 ## ローカルでの文法テストなど
 
 Linux/WSL上では、プロジェクトのルートディレクトリで以下を実行してください。
