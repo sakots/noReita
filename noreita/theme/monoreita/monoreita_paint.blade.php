@@ -7,10 +7,6 @@
     @include('components.monoreita_headCss')
     <script src="theme/monoreita/js/neoLoader.js?{{$stime}}" charset="utf-8"></script>
     <!-- アプレットフィット -->
-    <script>
-      const originalWidth = {{$w}};
-      const originalHeight = {{$h}};
-    </script>
     <script src="theme/{{$theme_dir}}/js/appFit.js?{{$stime}}" charset="utf-8"></script>
     <!-- アプレットフィットここまで -->
     @include('components.monoreita_customCss')
@@ -59,6 +55,10 @@
       </script>
       <!-- 動的パレットスクリプトここまで -->
       <section id="appstage">
+        <div class="fit-toolbar" aria-hidden="true">
+          <button class="button" type="button" data-fit-exit>通常表示へ戻る</button>
+        </div>
+        <div class="fit-editor">
         <div class="app" id="apps">
           <div class="neo-applet-paintbbs" data-width="{{$w}}" data-height="{{$h}}"></div>
           <script>
@@ -107,6 +107,7 @@
             };
             loadPaintBbsNeo({!! $neo_dir_json !!}, {!! $neo_github_api_json !!}, window.configurePaintBbsNeo);
           </script>
+        </div>
         </div>
         <div class="palette" id="dyntools">
           @include('components.monoreita_dynamicPalette') <!-- 動的パレット -->
