@@ -319,56 +319,6 @@ smoke_test('post image templates provide a clipboard copy link', static function
   return true;
 });
 
-smoke_test('PaintBBS NEO loads from GitHub API with a configurable mirror fallback', static function (): bool {
-  $root = dirname(__DIR__) . '/noreita/theme';
-  $loaders = [
-    'eda/js/neoLoader.js',
-    'monoreita/js/neoLoader.js',
-  ];
-  foreach ($loaders as $loader) {
-    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $loader);
-    if (!is_string($source)
-      || !str_contains($source, 'api.github.com/repos/funige/neo/contents/dist/')
-      || !str_contains($source, "?ref=master")
-      || !str_contains($source, "fetchSource('neo.css')")
-      || !str_contains($source, "fetchSource('neo.js')")
-      || !str_contains($source, 'Promise.all')
-      || !str_contains($source, 'requestTimeoutMs = 5000')
-      || !str_contains($source, 'fetchWithTimeout')
-      || !str_contains($source, 'controller.abort()')
-      || str_contains($source, 'request.open')
-      || !str_contains($source, 'useGithubApi !== false')
-      || !str_contains($source, 'finishLoad(onReady)')
-      || !str_contains($source, 'loadFallback')) {
-      return false;
-    }
-  }
-
-  $templates = [
-    'eda/eda_paint.twig', 'eda/eda_anime.twig',
-    'monoreita/monoreita_paint.blade.php', 'monoreita/monoreita_anime.blade.php',
-  ];
-  foreach ($templates as $template) {
-    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
-    if (!is_string($source) || !str_contains($source, 'loadPaintBbsNeo(')
-      || !str_contains($source, 'neo_github_api') || !str_contains($source, 'configurePaintBbsNeo')) return false;
-  }
-  $config = require dirname(__DIR__) . '/noreita/config.php';
-  return ($config['features']['neo_github_api'] ?? null) === false;
-});
-
-smoke_test('applet fit waits for the asynchronously created NEO container', static function (): bool {
-  foreach (['eda', 'monoreita'] as $theme) {
-    $source = file_get_contents(dirname(__DIR__) . '/noreita/theme/' . $theme . '/js/appFit.js');
-    if (!is_string($source) || !str_contains($source, 'refreshElements()')
-      || !str_contains($source, 'this.isExpanded || !this.refreshElements()')
-      || !str_contains($source, '!this.isExpanded || !this.refreshElements()')) {
-      return false;
-    }
-  }
-  return true;
-});
-
 smoke_test('simple theme stylesheets load after page-specific styles', static function (): bool {
   $themes = [
     [

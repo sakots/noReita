@@ -59,16 +59,19 @@
     if (window.Neo.init() && typeof window.Neo.start === 'function') window.Neo.start();
   }
 
-  function appendScript(source, onload) {
+  function appendInlineScript(source) {
     const script = document.createElement('script');
     script.charset = 'utf-8';
-    if (onload) script.addEventListener('load', onload, { once: true });
-    if (source.startsWith('http://') || source.startsWith('https://')) {
-      script.src = source;
-      script.async = false;
-    } else {
-      script.text = source;
-    }
+    script.text = source;
+    document.head.appendChild(script);
+  }
+
+  function appendExternalScript(url, onload) {
+    const script = document.createElement('script');
+    script.charset = 'utf-8';
+    script.src = url;
+    script.async = false;
+    script.addEventListener('load', onload, { once: true });
     document.head.appendChild(script);
   }
 
@@ -79,7 +82,7 @@
 
   function loadFallback(baseUrl, onReady) {
     appendStylesheet(baseUrl + 'neo.css');
-    appendScript(baseUrl + 'neo.js', function () { finishLoad(onReady); });
+    appendExternalScript(baseUrl + 'neo.js', function () { finishLoad(onReady); });
   }
 
   window.loadPaintBbsNeo = function (fallbackBaseUrl, useGithubApi, onReady) {
@@ -88,7 +91,7 @@
         const css = sources[0];
         const javascript = sources[1];
         appendStyle(css);
-        appendScript(javascript);
+        appendInlineScript(javascript);
         finishLoad(onReady);
       }).catch(function () {
         // APIの障害、CORS制限、レート制限時は従来の読み込み先へ戻す。

@@ -4,11 +4,11 @@ return [
   'format' => 1,
   'id' => 'eda',
   'name' => 'eda',
-  'version' => 'lot.261013.0',
+  'version' => 'lot.261018.0',
   'engine' => 'twig',
   'requires' => [
     'php' => '8.1.0',
-    'noreita' => '4.13.1',
+    'noreita' => '4.14.0',
   ],
   'templates' => [
     'main' => 'eda_main', 'response' => 'eda_res', 'paint' => 'eda_paint',

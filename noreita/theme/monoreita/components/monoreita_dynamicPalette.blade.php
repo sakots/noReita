@@ -1,12 +1,9 @@
 <form name="Palette">
   @if ($tool == 'neo')
-    <fieldset id="fit_exp">
+    <fieldset class="fit-controls">
       <legend>FIT!</legend>
-      <input class="button" type="button" value="← FIT →" onclick="appfit(0)">
-    </fieldset>
-    <fieldset id="fit_comp" style="display: none;">
-      <legend>FIT!</legend>
-      <input class="button" type="button" value="→ FIT ←" onclick="appfit(1)">
+      <input class="button" type="button" value="← FIT →" data-fit-start aria-expanded="false" aria-controls="appstage">
+      <input class="button" type="button" value="通常表示に戻る" data-fit-exit>
     </fieldset>
     <fieldset>
       <legend>TOOL</legend>
