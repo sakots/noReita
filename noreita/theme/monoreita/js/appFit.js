@@ -65,9 +65,6 @@ class AppFitManager {
     this.stage.querySelectorAll("[data-fit-start]").forEach((control) => {
       control.setAttribute("aria-expanded", String(fit));
     });
-    this.stage.querySelectorAll(".fit-toolbar").forEach((toolbar) => {
-      toolbar.setAttribute("aria-hidden", String(!fit));
-    });
   }
 
   capturePage() {

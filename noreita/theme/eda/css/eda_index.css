@@ -271,7 +271,7 @@ button {
   vertical-align: middle;
 }
 
-#appstage > .fit-toolbar {
+#appstage [data-fit-exit] {
   display: none;
 }
 
@@ -285,22 +285,13 @@ button {
   height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 180px;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 4px;
   padding: 4px;
   background: Canvas;
   color: CanvasText;
   text-align: left;
   overflow: hidden;
-}
-#appstage.is-fit > .fit-toolbar {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  grid-column: 1/-1;
-  align-items: center;
-  min-width: 0;
-  overflow: auto;
 }
 #appstage.is-fit > .fit-editor {
   display: block;
@@ -329,6 +320,19 @@ button {
   overflow: auto;
   overscroll-behavior: contain;
 }
+#appstage.is-fit > #dyntools > form {
+  display: contents;
+}
+#appstage.is-fit .fit-controls {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: Canvas;
+  color: CanvasText;
+}
+#appstage.is-fit [data-fit-exit] {
+  display: inline-block;
+}
 #appstage.is-fit [data-fit-start] {
   display: none;
 }
@@ -336,7 +340,7 @@ button {
 @media screen and (max-width: 600px) {
   #appstage.is-fit {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
   }
 }
 .palette {

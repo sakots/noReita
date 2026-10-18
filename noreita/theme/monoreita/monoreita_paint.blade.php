@@ -55,9 +55,6 @@
       </script>
       <!-- 動的パレットスクリプトここまで -->
       <section id="appstage">
-        <div class="fit-toolbar" aria-hidden="true">
-          <button class="button" type="button" data-fit-exit>通常表示へ戻る</button>
-        </div>
         <div class="fit-editor">
         <div class="app" id="apps">
           <div class="neo-applet-paintbbs" data-width="{{$w}}" data-height="{{$h}}"></div>

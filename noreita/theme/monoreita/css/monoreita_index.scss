@@ -246,7 +246,7 @@ button {
 	}
 }
 
-#appstage > .fit-toolbar {
+#appstage [data-fit-exit] {
 	display: none;
 }
 
@@ -260,7 +260,7 @@ button {
 	height: 100dvh;
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) 180px;
-	grid-template-rows: auto minmax(0, 1fr);
+	grid-template-rows: minmax(0, 1fr);
 	gap: 4px;
 	padding: 4px;
 	background: Canvas;
@@ -268,15 +268,6 @@ button {
 	text-align: left;
 	overflow: hidden;
 
-	> .fit-toolbar {
-		position: relative;
-		z-index: 2;
-		display: flex;
-		grid-column: 1 / -1;
-		align-items: center;
-		min-width: 0;
-		overflow: auto;
-	}
 
 	> .fit-editor {
 		display: block;
@@ -308,6 +299,23 @@ button {
 		width: auto;
 		overflow: auto;
 		overscroll-behavior: contain;
+
+		// Keep sticky controls bounded by the full palette, not its legacy form.
+		> form {
+			display: contents;
+		}
+	}
+
+	.fit-controls {
+		position: sticky;
+		top: 0;
+		z-index: 2;
+		background: Canvas;
+		color: CanvasText;
+	}
+
+	[data-fit-exit] {
+		display: inline-block;
 	}
 
 	[data-fit-start] {
@@ -318,7 +326,7 @@ button {
 @media screen and (max-width: 600px) {
 	#appstage.is-fit {
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: auto minmax(0, 2fr) minmax(0, 1fr);
+		grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
 	}
 }
 
