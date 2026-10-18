@@ -215,7 +215,13 @@ class AppFitManager {
     const saved = this.release();
     try {
       const neo = this.readyNeo();
-      if (neo) this.resizeHost(neo);
+      if (neo) {
+        neo.painter.setZoom(1);
+        // Zoom changes the display buffer even when the host dimensions match.
+        neo.resizeCanvas();
+        this.lastWidth = this.host.clientWidth;
+        this.lastHeight = this.host.clientHeight;
+      }
     } finally {
       this.restorePage(saved);
     }
