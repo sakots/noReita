@@ -2,7 +2,7 @@
 
 ## プロジェクト概要
 
-noReita は PHP 8.1 以上で動作する、お絵かき掲示板です。SQLite、GD、Twig または
+noReita は PHP 8.2 以上で動作する、お絵かき掲示板です。SQLite、GD、Twig または
 BladeOne のテーマ、PaintBBS NEO・Klecks・Tegaki.js などの描画アプリを扱います。
 
 - アプリケーション本体: `noreita/`
@@ -13,7 +13,7 @@ BladeOne のテーマ、PaintBBS NEO・Klecks・Tegaki.js などの描画アプ�
 
 ## 実装方針
 
-- PHP 8.1 との互換性を維持する。新しい PHP 専用の構文や関数は導入しない。
+- PHP 8.2 との互換性を維持する。PHP 8.3以降専用の構文や関数は導入しない。
 - 新しい処理は、可能な限り `ApplicationContext`、サービス、コントローラーへ分離する。新規の `global`、`$GLOBALS`、静的なリクエスト状態は追加しない。
 - HTML はテーマテンプレートで生成し、表示用データは `ApplicationContext->data` 経由で渡す。
 - テーマを変更する場合は eda と monoreita の両方を同等に更新する。Twig は `.twig`、BladeOne は `.blade.php` を使う。
