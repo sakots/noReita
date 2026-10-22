@@ -7,7 +7,7 @@ return [
   'version' => 'lot.261018.0',
   'engine' => 'twig',
   'requires' => [
-    'php' => '8.1.0',
+    'php' => '8.2.0',
     'noreita' => '4.14.0',
   ],
   'templates' => [

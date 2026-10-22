@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1bfc9276039e4c6a3b310f5ed90df561",
+    "content-hash": "3110bcc3d6a4cfbf799152814878177c",
     "packages": [
         {
             "name": "eftec/bladeone",
@@ -392,7 +392,7 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": ">=8.1"
+        "php": ">=8.2"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"

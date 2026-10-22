@@ -54,9 +54,9 @@ function smoke_test(string $name, callable $test): void {
   }
 }
 
-smoke_test('minimum PHP version is 8.1', static function (): bool {
-  return NOREITA_MIN_PHP_VERSION === '8.1.0'
-    && NOREITA_MIN_PHP_VERSION_ID === 80100
+smoke_test('minimum PHP version is 8.2', static function (): bool {
+  return NOREITA_MIN_PHP_VERSION === '8.2.0'
+    && NOREITA_MIN_PHP_VERSION_ID === 80200
     && PHP_VERSION_ID >= NOREITA_MIN_PHP_VERSION_ID;
 });
 

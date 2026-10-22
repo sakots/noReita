@@ -1,6 +1,6 @@
 # noReita
 
-![php](https://img.shields.io/badge/php-%3E%3D8.1-green.svg)
+![php](https://img.shields.io/badge/php-%3E%3D8.2-green.svg)
 
 ![Last commit](https://img.shields.io/github/last-commit/sakots/noReita)
 ![version](https://img.shields.io/github/v/release/sakots/noReita)
@@ -207,6 +207,7 @@ bash pre.sh
 
 ### [2026/10/18] v4.14.0
 
+- PHP 8.1を動作対象から外し、最低動作要件をPHP 8.2以上へ変更
 - PaintBBS NEOを相対パスに配置すると起動しない問題を修正し、両テーマのローダーでスクリプトURLと取得済みコードの挿入を分離
 - 両テーマのPaintBBS NEOのFITを、外部パレットと解除ボタンを備えた専用表示へ変更。開始・画面サイズ変更では選択した倍率を保持し、背景操作を抑止して解除時にページ位置とフォーカスを復元。NEOのFloatは従来の確認を維持して優先
 
