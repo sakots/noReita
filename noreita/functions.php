@@ -111,8 +111,14 @@ function hashtag_link(string $hashtag): string {
   $self = Config::string('site.script_name');
   $pattern = "/(?:^|[^ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9&_\/]+)[#＃]([ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9_]*[ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z]+[ｦ-ﾟー゛゜々ヾヽぁ-ヶ一-龠ａ-ｚＡ-Ｚ０-９a-zA-Z0-9_]*)/u";
   $replace = " <a href=\"{$self}?mode=search&amp;tag=tag&amp;search=\\1\">#\\1</a>";
-  $hashtag = preg_replace($pattern, $replace, $hashtag);
-  return $hashtag;
+  // 生成済みリンク（カード内の要素を含む）・HTMLタグ・URLはそのまま残し、本文だけを置換する。
+  $parts = preg_split('~(<a\b[^>]*>.*?</a>|<[^>]*>|(?:https?|ftp)://[^\s<>]+)~is', $hashtag, -1, PREG_SPLIT_DELIM_CAPTURE);
+  foreach ($parts as $index => $part) {
+    if ($index % 2 === 0) {
+      $parts[$index] = preg_replace($pattern, $replace, $part);
+    }
+  }
+  return implode('', $parts);
 }
 
 /* '>'色設定 */
