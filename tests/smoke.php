@@ -2200,6 +2200,30 @@ smoke_test('old thread warnings are recalculated instead of accumulating', stati
   return true;
 });
 
+smoke_test('empty post passwords cannot authorize owners but administrators retain access', static function (): bool {
+  $db = new PDO('sqlite::memory:');
+  (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+  $repository = new BoardRepository($db);
+  $id = $repository->insertPost([
+    'thread' => 1, 'pwd' => password_hash('', PASSWORD_DEFAULT),
+  ]);
+  $service = new PostService($repository, sys_get_temp_dir());
+  try {
+    $service->authorize($id, '');
+    return false;
+  } catch (PostAuthorizationException $e) {
+  }
+  $admin = $service->authorize($id, '', true);
+  if ($admin['role'] !== 'admin' || (int)$admin['post']['tid'] !== $id) return false;
+
+  // "0" is a nonempty password, not a missing credential.
+  $zero_id = $repository->insertPost([
+    'thread' => 1, 'pwd' => password_hash('0', PASSWORD_DEFAULT),
+  ]);
+  $owner = $service->authorize($zero_id, '0');
+  return $owner['role'] === 'owner' && (int)$owner['post']['tid'] === $zero_id;
+});
+
 smoke_test('post service centralizes edit and delete authorization', static function (): bool {
   $image_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_post_service_' . bin2hex(random_bytes(8));
   if (!mkdir($image_dir, 0700)) return false;
