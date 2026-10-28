@@ -66,7 +66,7 @@ final class PostService implements AdminPostManagementService {
     if ($authorize_as_admin) {
       return ['post' => $post, 'role' => 'admin'];
     }
-    if (password_verify($password, (string)$post['pwd'])) {
+    if ($password !== '' && password_verify($password, (string)$post['pwd'])) {
       return ['post' => $post, 'role' => 'owner'];
     }
     throw new PostAuthorizationException('Invalid password.');
