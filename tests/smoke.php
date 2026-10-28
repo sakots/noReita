@@ -1881,6 +1881,41 @@ smoke_test('escaping and NG-word helpers', static function (): bool {
     && !is_ngword(['spam'], 'safe');
 });
 
+foreach ([
+  'query fragment' => 'https://example.org/page?#section',
+  'escaped query' => 'https://example.org/page?x=1&next=#section',
+  'image URL' => 'https://example.org/picture.png?next=#section',
+] as $case => $url) {
+  smoke_test('hashtags preserve URLs and existing links: ' . $case, static function () use ($url): bool {
+    $escaped = h($url);
+    $linked = auto_link($escaped);
+    return hashtag_link($escaped) === $escaped && hashtag_link($linked) === $linked;
+  });
+}
+
+smoke_test('hashtags outside links preserve link cards and HTML attributes', static function (): bool {
+  $card = '<a href="https://example.org/?q=#section"><strong>#title</strong>'
+    . '<span>説明 #description</span></a>';
+  $html = '<aside class="external-link-card">' . $card . '</aside>'
+    . '<span title="#attribute">#outside</span>';
+  $result = hashtag_link($html);
+  return str_contains($result, $card)
+    && str_contains($result, 'title="#attribute"')
+    && str_contains($result, '?mode=search&amp;tag=tag&amp;search=outside')
+    && substr_count($result, '<a ') === 2;
+});
+
+smoke_test('ordinary hashtags remain searchable next to protected links', static function (): bool {
+  $link = auto_link(h('https://example.org/page?#section'));
+  $result = hashtag_link("#猫\n＃全角タグ " . $link . ' #tag_2 #123');
+  foreach (['猫', '全角タグ', 'tag_2'] as $tag) {
+    if (!str_contains($result, '?mode=search&amp;tag=tag&amp;search=' . $tag)) return false;
+  }
+  return str_contains($result, $link)
+    && !str_contains($result, 'search=123')
+    && substr_count($result, '<a ') === 4;
+});
+
 smoke_test('post validation is independent from HTTP rendering', static function (): bool {
   $input = [
     'sub' => '題名', 'name' => '名前', 'mail' => '', 'url' => '', 'com' => '本文です',
