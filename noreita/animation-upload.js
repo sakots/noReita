@@ -467,8 +467,6 @@
         clearImageUploadPreview(form);
         const directCancel = form.querySelector('[data-image-upload-cancel]');
         if (directCancel) directCancel.disabled = true;
-        status.textContent = '動画を選択したため、画像の選択を解除しました。';
-        return;
       }
       preparedPicture = null;
       preparing = true;
