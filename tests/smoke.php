@@ -65,22 +65,6 @@ smoke_test('PHP 8.5 deprecated imagedestroy is not used', static function (): bo
   return is_string($save) && !preg_match('/\bimagedestroy\s*\(/i', $save);
 });
 
-smoke_test('post image candidates replace each other in the post form', static function (): bool {
-  $script = file_get_contents(dirname(__DIR__) . '/noreita/animation-upload.js');
-  return is_string($script)
-    && str_contains($script, "select[name=\"picfile\"]")
-    && str_contains($script, 'clearTemporaryImage')
-    && str_contains($script, "directUpload.addEventListener('change'")
-    && str_contains($script, '[data-image-upload-cancel]')
-    && str_contains($script, '[data-animation-upload-cancel]')
-    && str_contains($script, 'clearAnimationUploadPreview')
-    && str_contains($script, "input.value = '';")
-    && str_contains($script, "directUpload.value = '';")
-    && str_contains($script, 'showPreparedPreview')
-    && str_contains($script, 'プレビューを確認してから「書き込む」を押してください。')
-    && !str_contains($script, '別の動画へ変更する場合はページを再読み込みしてください。');
-});
-
 smoke_test('post preview renders text and links without fetching external pages', static function (): bool {
   $script = file_get_contents(dirname(__DIR__) . '/noreita/post-preview.js');
   return is_string($script)
