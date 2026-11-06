@@ -2790,13 +2790,14 @@ smoke_test('posted image filenames reject invalid continuation targets', static 
     && !ImageService::isSafePostedImageFilename('drawing.php');
 });
 
-smoke_test('temporary images are parsed, found, and cleaned up', static function (): bool {
+smoke_test('temporary images with long User-Agents are listed, authorized, found, and cleaned up', static function (): bool {
   $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_temp_' . bin2hex(random_bytes(8));
   if (!mkdir($directory, 0700)) return false;
   $now = 1700000000;
   try {
     file_put_contents($directory . DIRECTORY_SEPARATOR . '100.png', 'image');
-    file_put_contents($directory . DIRECTORY_SEPARATOR . '100.dat', "127.0.0.1\thost\tagent\t.png\tuser-a\treplace-a\t100\t160\t0\tneo");
+    $long_agent = str_repeat('A', 4096);
+    file_put_contents($directory . DIRECTORY_SEPARATOR . '100.dat', "127.0.0.1\thost\t{$long_agent}\t.png\tuser-a\treplace-a\t100\t160\t0\tneo");
     file_put_contents($directory . DIRECTORY_SEPARATOR . '200.png', 'image');
     file_put_contents($directory . DIRECTORY_SEPARATOR . '200.dat', "127.0.0.2\thost\tagent\t.png\tuser-b\treplace-b\t200\t230\t0\tklecks");
     file_put_contents($directory . DIRECTORY_SEPARATOR . 'orphan.dat', "127.0.0.3\thost\tagent\t.png\tuser-c\treplace-c\t0\t0\t0\tneo");
@@ -2805,6 +2806,8 @@ smoke_test('temporary images are parsed, found, and cleaned up', static function
     $found = ImageService::findTemporaryImageByReplacementCode($directory, 'replace-b');
     if (count($images) !== 2 || $images[0]['filename'] !== '100.png'
       || $images[0]['paint_seconds'] !== 60 || $images[0]['tool'] !== 'neo'
+      || $images[0]['user_agent'] !== $long_agent || $images[0]['user_code'] !== 'user-a'
+      || (ImageService::findTemporaryImageByReplacementCode($directory, 'replace-a')['filename'] ?? '') !== '100.png'
       || $found === null || $found['base_name'] !== '200'
       || ImageService::findTemporaryImageByReplacementCode($directory, 'missing') !== null) {
       return false;
@@ -3700,7 +3703,7 @@ smoke_test('NSFW thumbnail rollback preserves old and pre-existing thumbnails', 
   }
 });
 
-smoke_test('new post image and animation are finalized', static function (): bool {
+smoke_test('new post finalization retains drawing metadata after a long User-Agent', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_finalize_' . bin2hex(random_bytes(8));
   $temp = $root . DIRECTORY_SEPARATOR . 'tmp';
   $images = $root . DIRECTORY_SEPARATOR . 'img';
@@ -3729,7 +3732,8 @@ smoke_test('new post image and animation are finalized', static function (): boo
         if (!is_file($path) || hash_file('sha256', $path) !== $hash) return false;
       }
     }
-    file_put_contents($temp . '/post.dat', "ip\thost\tagent\t.png\tcode\trep\t100\t160\t\tneo");
+    $long_agent = str_repeat('A', 4096);
+    file_put_contents($temp . '/post.dat', "ip\thost\t{$long_agent}\t.png\tcode\trep\t100\t160\t\tneo");
 
     $result = ImageService::finalizeNewPost($temp, $images, 'post.png', 'code', 'new', true, 100, true, 0600);
     return $result['img_w'] === 4 && $result['img_h'] === 3
