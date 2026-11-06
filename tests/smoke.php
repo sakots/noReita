@@ -2250,6 +2250,45 @@ smoke_test('empty post passwords cannot authorize owners but administrators reta
   return $owner['role'] === 'owner' && (int)$owner['post']['tid'] === $zero_id;
 });
 
+smoke_test('owner edits distinguish administrator names without changing administrator status', static function (): bool {
+  $configuration = Config::all();
+  try {
+    Config::initializeForTesting($configuration, [
+      'admin' => ['name' => '運営', 'cap' => '（一般投稿）'],
+    ]);
+    $db = new PDO('sqlite::memory:');
+    (new DatabaseMigrator($db, ':memory:', sys_get_temp_dir()))->migrate();
+    $repository = new BoardRepository($db);
+    $service = new PostService($repository, sys_get_temp_dir());
+    foreach ([
+      'owner changes name' => ['投稿者', 0, '運営', false, '運営（一般投稿）'],
+      'unchanged spoofed name' => ['運営', 0, '運営', false, '運営（一般投稿）'],
+      'already distinguished name' => ['運営（一般投稿）', 0, '運営（一般投稿）', false, '運営（一般投稿）'],
+      'administrator post owner' => ['運営', 1, '運営', false, '運営'],
+      'administrator session' => ['投稿者', 0, '運営', true, '運営'],
+    ] as $case => [$stored_name, $admins, $submitted_name, $as_admin, $expected_name]) {
+      $id = $repository->insertPost([
+        'thread' => 1, 'a_name' => $stored_name, 'admins' => $admins,
+        'pwd' => password_hash('owner-pass', PASSWORD_DEFAULT),
+        'picfile' => '', 'nsfw' => 0, 'thumbnail' => '', 'invz' => 0,
+      ]);
+      $role = $service->edit($id, $as_admin ? '' : 'owner-pass', [
+        'name' => $submitted_name, 'mail' => '', 'sub' => '名前編集', 'com' => '本文',
+        'url' => '', 'host' => 'localhost',
+        'edit_image_state' => PostService::imageStateForEdit($repository->findPost($id)),
+      ], $as_admin);
+      $edited = $repository->findPost($id);
+      if ($edited['a_name'] !== $expected_name || (int)$edited['admins'] !== $admins
+        || $role !== ($as_admin ? 'admin' : 'owner')) {
+        throw new RuntimeException($case . ': name=' . $edited['a_name'] . ', admins=' . $edited['admins']);
+      }
+    }
+    return true;
+  } finally {
+    Config::initializeForTesting($configuration, []);
+  }
+});
+
 smoke_test('post service centralizes edit and delete authorization', static function (): bool {
   $image_dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_post_service_' . bin2hex(random_bytes(8));
   if (!mkdir($image_dir, 0700)) return false;

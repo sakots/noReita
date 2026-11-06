@@ -92,6 +92,10 @@ final class PostService implements AdminPostManagementService {
     $values['name'] = hash_equals((string)$post['a_name'], $submitted_name)
       ? $submitted_name
       : generate_trip($submitted_name);
+    $values['name'] = self::distinguishAdminName(
+      $values['name'], Config::string('admin.name'), Config::string('admin.cap'),
+      $authorization['role'] === 'admin' || (int)($post['admins'] ?? 0) === 1
+    );
     $submitted_mail = (string)($values['mail'] ?? '');
     $values['mail'] = hash_equals((string)$post['mail'], $submitted_mail)
       ? $submitted_mail
@@ -121,6 +125,10 @@ final class PostService implements AdminPostManagementService {
     }
     $this->repository->updateContent($post_id, $values, $post);
     return $authorization['role'];
+  }
+
+  private static function distinguishAdminName(string $name, string $admin_name, string $admin_cap, bool $is_admin): string {
+    return !$is_admin && $name === $admin_name ? $name . $admin_cap : $name;
   }
 
   public static function nameForEdit(string $stored_name, string $saved_name, bool $is_owner): string {
@@ -264,9 +272,7 @@ final class PostService implements AdminPostManagementService {
     $password = (string)($input['pwd'] ?? '');
     $admin_name = (string)$settings['admin_name'];
     $is_admin = !empty($settings['is_admin']);
-    if ($name === $admin_name && !$is_admin) {
-      $name .= (string)$settings['admin_cap'];
-    }
+    $name = self::distinguishAdminName($name, $admin_name, (string)$settings['admin_cap'], $is_admin);
     return array_merge($input, [
       'name' => $name, 'mail' => $mail, 'com' => $comment, 'sub' => $subject, 'host' => $host,
       'pwdh' => password_hash($password, PASSWORD_DEFAULT),
