@@ -245,7 +245,9 @@ final class BoardRepository {
   /** 親スレッドの公開状態も含めて、公開経路へ渡せる投稿だけを取得する。 @return array|false */
   public function findPublicPost(int $id) {
     $visibility = $this->publicVisibilityCondition();
-    $statement = $this->db->prepare("SELECT * FROM board_log WHERE tid = ? AND {$visibility}");
+    // createdはSQLiteのサーバーローカル時刻。PHPのタイムゾーンで再解釈しない。
+    $statement = $this->db->prepare("SELECT *, CAST(strftime('%s', created, 'utc') AS INTEGER) AS created_timestamp
+      FROM board_log WHERE tid = ? AND {$visibility}");
     $statement->execute([$id]);
     return $statement->fetch(PDO::FETCH_ASSOC);
   }
@@ -434,7 +436,8 @@ final class BoardRepository {
   }
 
   public function listThreads(int $offset, int $limit): array {
-    $statement = $this->db->prepare('SELECT * FROM board_log WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?');
+    $statement = $this->db->prepare("SELECT *, CAST(strftime('%s', created, 'utc') AS INTEGER) AS created_timestamp
+      FROM board_log WHERE invz=0 AND thread=1 ORDER BY tree DESC LIMIT ?, ?");
     $statement->bindValue(1, $offset, PDO::PARAM_INT);
     $statement->bindValue(2, $limit, PDO::PARAM_INT);
     $statement->execute();

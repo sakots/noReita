@@ -306,7 +306,7 @@ final class PostService implements AdminPostManagementService {
       }
       $reply_days = Config::int('board.elapsed_reply_days');
       if ($reply_days !== 0
-        && time() - (int)strtotime((string)($parent_post['created'] ?? '')) >= $reply_days * 86400) {
+        && $now - (int)$parent_post['created_timestamp'] >= $reply_days * 86400) {
         throw new PostReplyExpiredException('This thread is too old to reply.');
       }
       $tree = $now - $parent - (int)$parent_post['tid'];

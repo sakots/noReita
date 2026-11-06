@@ -1060,7 +1060,7 @@ function def(ApplicationContext $context): void {
       $bbsline['com'] = tobr($bbsline['com']);
       //引用の色
       $bbsline['com'] = quote($bbsline['com']);
-      $bbsline['past'] = strtotime($bbsline['created']);
+      $bbsline['past'] = (int)$bbsline['created_timestamp'];
       $bbsline['created'] = date(Config::string('board.date_format'), strtotime($bbsline['created']));
       $bbsline['modified'] = date(Config::string('board.date_format'), strtotime($bbsline['modified']));
 
@@ -1371,8 +1371,6 @@ function res(ApplicationContext $context): void {
         $res['com'] = tobr($res['com']);
         //引用の色
         $res['com'] = quote($res['com']);
-        //日付をUNIX時間に
-        $bbsline['past'] = strtotime($bbsline['created']); // このスレは古いので用
         $res['created'] = date(Config::string('board.date_format'), strtotime($res['created']));
         $res['modified'] = date(Config::string('board.date_format'), strtotime($res['modified']));
         //投稿者名取得
@@ -1408,7 +1406,7 @@ function res(ApplicationContext $context): void {
       //引用の色
       $bbsline['com'] = quote($bbsline['com']);
       //日付をUNIX時間に
-      $bbsline['past'] = strtotime($bbsline['created']); //古いので用
+      $bbsline['past'] = (int)$bbsline['created_timestamp'];
       $bbsline['created'] = date(Config::string('board.date_format'), strtotime($bbsline['created']));
       $bbsline['modified'] = date(Config::string('board.date_format'), strtotime($bbsline['modified']));
       if (!in_array($bbsline['a_name'], $r_res_name)) {
