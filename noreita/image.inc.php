@@ -530,7 +530,7 @@ final class ImageService {
     if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_-]{0,127}\z/D', $base_name) !== 1) {
       return null;
     }
-    $metadata = @file_get_contents($metadata_file, false, null, 0, 1024);
+    $metadata = @file_get_contents($metadata_file);
     if ($metadata === false) return null;
 
     $fields = explode("\t", rtrim($metadata) . "\t");
@@ -1635,14 +1635,13 @@ final class ImageService {
     if (!self::validateUpload($source, ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'])) {
       throw new RuntimeException('Invalid image file.');
     }
-    $metadata = @file_get_contents($metadata_file, false, null, 0, 1024);
-    if ($metadata === false) {
+    $metadata = self::parseTemporaryMetadata($metadata_file);
+    if ($metadata === null) {
       throw new RuntimeException('Image metadata was not found.');
     }
-    $fields = explode("\t", rtrim($metadata) . "\t");
-    $start_time = (int)($fields[6] ?? 0);
-    $posted_time = (int)($fields[7] ?? 0);
-    $tool = (string)($fields[9] ?? '');
+    $start_time = $metadata['start_time'];
+    $posted_time = $metadata['posted_time'];
+    $tool = $metadata['tool'];
 
     $destination = $image_dir . $image_name;
     self::copyNewPostFile($source, $destination, $permission, $published, $temporary);
