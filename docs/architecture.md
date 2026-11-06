@@ -20,6 +20,8 @@
 
 返信期限は親スレッドの作成日時を基準とし、`board.elapsed_reply_days`の日数に達した時点から返信を拒否します。0は制限なしです。`PostService`は保存トランザクション内で期限を確認し、期限切れは管理者を含めHTTP 403で拒否します。拒否時は親の並び順と投稿を変更せず、描画中の一時画像・動画・PSD・メタデータを残し、その要求で作成した公開ファイルだけを取り消します。
 
+返信期限の計算では、SQLiteがサーバーのローカル時刻で保存した`created`を、同じSQLiteの`strftime('%s', created, 'utc')`でUNIX時刻へ変換します。`BoardRepository::findPublicPost()`と`listThreads()`はこの値を`created_timestamp`として返し、保存時の期限判定と両テーマの返信フォーム・ボタン表示に共用します。PHPの`site.timezone`で保存日時を再解釈しないため、サーバーとPHPのタイムゾーンが異なっても期限はずれません。保存形式と既存データは変更せず、DB移行は不要です。
+
 `PostInput`は投稿種別など、複数のHTTP入力元に対応する値の取得と正規化を担当します。
 
 ## SNS共有

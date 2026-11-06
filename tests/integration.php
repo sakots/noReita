@@ -1995,19 +1995,51 @@ PHP;
   }
 
   $expiry_original_config = (string)file_get_contents($webroot . '/config.local.php');
-  $expiry_config = str_replace("'features' => [", "'board' => ['elapsed_reply_days' => 1],\n  'features' => [", $expiry_original_config);
+  $expiry_settings = require $webroot . '/config.local.php';
+  $expiry_settings['board']['elapsed_reply_days'] = 1;
+  $expiry_settings['site']['timezone'] = 'Asia/Tokyo';
+  $expiry_config = "<?php\nreturn " . var_export($expiry_settings, true) . ";\n";
   file_put_contents($webroot . '/config.local.php', $expiry_config);
   $db->exec('INSERT INTO board_log (' . implode(',', $reaction_columns) . ') SELECT '
     . implode(',', $reaction_columns) . ' FROM board_log WHERE tid=' . $shared_thread_id);
   $expiry_parent = (int)$db->lastInsertId();
-  $db->prepare('UPDATE board_log SET created=?, modified=datetime(\'now\', \'localtime\'), invz=0 WHERE tid=?')
-    ->execute([date('Y-m-d H:i:s', time() - 172800), $expiry_parent]);
+  $db->prepare("UPDATE board_log SET created=datetime('now', 'localtime', '-2 days'), modified=datetime('now', 'localtime'), invz=0 WHERE tid=?")
+    ->execute([$expiry_parent]);
   $expiry_base = 'expired-reply-' . bin2hex(random_bytes(6));
   $expiry_public_before = glob($webroot . '/img/*') ?: [];
   $expiry_guest_jar = $root . '/expiry-guest-cookies.txt';
   [, $expiry_guest_form] = http_request($base_url . '?mode=admin_in', $expiry_guest_jar);
   preg_match('/name="token" value="([^"]+)"/', $expiry_guest_form, $expiry_token_match);
   try {
+    foreach (['eda', 'monoreita'] as $deadline_theme) {
+      foreach ([['Asia/Tokyo', 16, true], ['Pacific/Honolulu', 25, false]] as [$timezone, $hours, $allowed]) {
+        $deadline_settings = $expiry_settings;
+        $deadline_settings['paths']['theme'] = $deadline_theme;
+        $deadline_settings['site']['timezone'] = $timezone;
+        file_put_contents($webroot . '/config.local.php', "<?php\nreturn " . var_export($deadline_settings, true) . ";\n");
+        $db->prepare("UPDATE board_log SET created=datetime(?, 'unixepoch', 'localtime') WHERE tid=?")
+          ->execute([time() - $hours * 3600, $expiry_parent]);
+        [$form_status, $deadline_form] = http_request($base_url . '?resno=' . $expiry_parent, $expiry_guest_jar);
+        $subject = 'Timezone deadline ' . $deadline_theme . ' ' . $hours;
+        [$reply_status] = http_request($base_url . '?mode=reply', $expiry_guest_jar, [
+          'send' => '1', 'resto' => (string)$expiry_parent, 'name' => 'Expiry test',
+          'sub' => $subject, 'com' => 'タイムゾーン差がある環境からの返信です。',
+          'pwd' => 'expiry-pass', 'invz' => '0', 'token' => $expiry_token_match[1] ?? '',
+        ]);
+        integration_test('reply form and saving agree across timezones: ' . $deadline_theme . '/' . $timezone,
+          static function () use ($form_status, $deadline_form, $reply_status, $allowed, $db, $expiry_parent, $subject): bool {
+            $has_form = str_contains($deadline_form, 'id="p_input_com"');
+            $query = $db->prepare('SELECT COUNT(*) FROM board_log WHERE parent=? AND sub=?');
+            $query->execute([$expiry_parent, $subject]);
+            return $form_status === 200 && $has_form === $allowed
+              && $reply_status === ($allowed ? 200 : 403)
+              && (int)$query->fetchColumn() === ($allowed ? 1 : 0);
+          });
+      }
+    }
+    file_put_contents($webroot . '/config.local.php', $expiry_config);
+    $db->prepare("UPDATE board_log SET created=datetime('now', 'localtime', '-2 days') WHERE tid=?")
+      ->execute([$expiry_parent]);
     foreach (['guest' => [$expiry_guest_jar, $expiry_token_match[1] ?? ''], 'admin' => [$cookie_jar, $token]] as $role => [$jar, $request_token]) {
       foreach (['text', 'upload', 'drawing'] as $kind) {
         $temporary_files = ['png' => $png, 'pch' => 'NEO replay', 'psd' => 'PSD working data',
