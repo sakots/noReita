@@ -1584,8 +1584,18 @@ PHP;
     . implode(',', $reaction_columns) . ' FROM board_log WHERE tid = ' . $shared_thread_id);
   $reply_url_id = (int)$db->lastInsertId();
   $reply_url_marker = '返信URL検証-' . bin2hex(random_bytes(6));
+  $subject_escape_probes = [
+    $shared_thread_id => '<親&"あいうえ',
+    $reply_url_id => '>返&"かきくけ',
+  ];
+  $subject_escape_originals = $db->query('SELECT tid, sub FROM board_log WHERE tid IN ('
+    . $shared_thread_id . ', ' . $reply_url_id . ')')->fetchAll(PDO::FETCH_KEY_PAIR);
+  $subject_escape_update = $db->prepare('UPDATE board_log SET sub=? WHERE tid=?');
   $db->prepare('UPDATE board_log SET thread=0, parent=?, comid=?, invz=0, com=? WHERE tid=?')
     ->execute([$shared_thread_id, $reply_url_id, $reply_url_marker, $reply_url_id]);
+  foreach ($subject_escape_probes as $id => $subject) {
+    $subject_escape_update->execute([$subject, $id]);
+  }
   try {
     foreach (['eda', 'monoreita'] as $reply_url_theme) {
       file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
@@ -1613,8 +1623,25 @@ PHP;
           }
           return true;
         });
+      [$subject_escape_status, $subject_escape_body] = http_request($base_url . '?mode=admin', $cookie_jar);
+      integration_test('administration list escapes truncated parent and reply subjects: ' . $reply_url_theme,
+        static function () use ($subject_escape_status, $subject_escape_body, $subject_escape_probes): bool {
+          if ($subject_escape_status !== 200) return false;
+          foreach ($subject_escape_probes as $subject) {
+            $truncated = mb_substr($subject, 0, 6);
+            $escaped = htmlspecialchars($truncated, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            if (preg_match('/<td>\s*' . preg_quote($escaped, '/') . '\s*<\/td>/', $subject_escape_body) !== 1
+              || str_contains($subject_escape_body, $truncated)) {
+              return false;
+            }
+          }
+          return true;
+        });
     }
   } finally {
+    foreach ($subject_escape_originals as $id => $subject) {
+      $subject_escape_update->execute([$subject, $id]);
+    }
     $db->prepare('DELETE FROM board_log WHERE tid=?')->execute([$reply_url_id]);
     file_put_contents($webroot . '/config.local.php', $reply_url_original_config);
   }
@@ -1663,19 +1690,6 @@ PHP;
       });
     }
   }
-
-  $subject_escape_probe = '<b>XSS</b>';
-  $subject_escape_stmt = $db->prepare('UPDATE board_log SET sub = :sub WHERE tid = :tid');
-  $subject_escape_stmt->execute([':sub' => $subject_escape_probe, ':tid' => (int)($row['tid'] ?? 0)]);
-  [$subject_escape_status, $subject_escape_body] = http_request($base_url . '?mode=admin', $cookie_jar);
-  $subject_escape_stmt->execute([':sub' => "Integration's subject", ':tid' => (int)($row['tid'] ?? 0)]);
-  integration_test('administration list escapes truncated post subjects', static function () use (
-    $subject_escape_status, $subject_escape_body
-  ): bool {
-    return $subject_escape_status === 200
-      && str_contains($subject_escape_body, '&lt;b&gt;XSS')
-      && !str_contains($subject_escape_body, '<b>XSS');
-  });
 
   $search_term = "user's {$marker}";
   [$search_status, $search_body] = http_request($base_url . '?mode=search&tag=tag&search=' . rawurlencode($search_term), $cookie_jar);
@@ -2853,6 +2867,7 @@ PHP;
       file_put_contents($webroot . '/config.local.php', str_replace("'paths' => ['theme' => 'starter'],",
         "'paths' => ['theme' => '" . $ogp_theme . "'],", $config_local));
       $ogp_alt_results = [];
+      $canonical_thread_url = 'http://localhost/index.php?resno=' . $image_post_id;
       foreach ([
         [$image_name, '0', 0, '', '0'],
         [$image_name, '0', 1, $nsfw_thumbnail, '0'],
@@ -2863,13 +2878,21 @@ PHP;
       ] as [$picfile, $description, $nsfw, $thumbnail, $expected_alt]) {
         $ogp_alt_update->execute([$picfile, $description, $nsfw, $thumbnail, $image_post_id]);
         [$status, $body] = http_request($base_url . '?resno=' . $image_post_id, $root . '/ogp-anonymous-cookies.txt');
-        $ogp_alt_results[] = $status === 200 && ($expected_alt === null
-          ? !str_contains($body, 'property="og:image:alt"') && !str_contains($body, 'property="og:image"')
-          : str_contains($body, 'property="og:image:alt" content="' . htmlspecialchars($expected_alt, ENT_QUOTES, 'UTF-8') . '"')
-            && str_contains($body, 'property="og:image" content="')
-            && str_contains($body, '/img/' . rawurlencode($nsfw ? $thumbnail : $picfile) . '"'));
+        $expected_image = $expected_alt === null ? null
+          : 'http://localhost/img/' . rawurlencode($nsfw ? $thumbnail : $picfile);
+        $ogp_alt_results[] = $status === 200
+          && str_contains($body, 'property="og:url" content="' . $canonical_thread_url . '"')
+          && ($expected_image === null
+            ? !str_contains($body, 'property="og:image:alt"') && !str_contains($body, 'property="og:image"')
+              && !str_contains($body, 'name="twitter:image"')
+              && str_contains($body, 'name="twitter:card" content="summary"')
+            : str_contains($body, 'property="og:image:alt" content="'
+                . htmlspecialchars($expected_alt, ENT_QUOTES, 'UTF-8') . '"')
+              && str_contains($body, 'property="og:image" content="' . $expected_image . '"')
+              && str_contains($body, 'name="twitter:image" content="' . $expected_image . '"')
+              && str_contains($body, 'name="twitter:card" content="summary_large_image"'));
       }
-      integration_test('OGP image descriptions preserve zero and escape text: ' . $ogp_theme,
+      integration_test('OGP metadata renders canonical URLs and escaped descriptions: ' . $ogp_theme,
         static fn (): bool => !in_array(false, $ogp_alt_results, true));
     }
   } finally {
