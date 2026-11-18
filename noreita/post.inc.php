@@ -16,18 +16,11 @@ final class DiaryPostPolicy {
   }
 }
 
-interface AdminPostManagementService {
-  /** @param array<int, int|string> $post_ids */
-  public function deleteManyAsAdmin(array $post_ids): int;
-  /** @param array<int, int|string> $post_ids */
-  public function setVisibilityManyAsAdmin(array $post_ids, bool $hidden): int;
-}
-
 /**
  * 認可、投稿行、関連画像ファイルをまとめて扱う。
- * コントローラーはHTTP入力を検証してから、状態変更をこのサービスへ委譲する。
+ * HTTP処理は入力を検証してから、状態変更をこのサービスへ委譲する。
  */
-final class PostService implements AdminPostManagementService {
+final class PostService {
   private BoardRepository $repository;
   private string $image_dir;
   private int $thumbnail_width;

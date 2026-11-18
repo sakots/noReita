@@ -2431,7 +2431,6 @@ function admin_manage(ApplicationContext $context, ?string $forced_operation = n
     render_error($context, $en ? 'Invalid administration operation.' : '管理操作が不正です。', 400);
   }
   try {
-    /** @var AdminPostManagementService $service */
     $service = new PostService(
       new BoardRepository(), Config::string('paths.images'), Config::int('limits.paint_default_width'), Config::int('permissions.public_file'),
       __DIR__ . '/backup/delete-staging'
