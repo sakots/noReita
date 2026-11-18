@@ -135,7 +135,7 @@ final class Config {
       }
       $path = $prefix === '' ? $key : $prefix . '.' . $key;
       if (is_array($defaults[$key]) && is_array($value)
-        && !self::isList($defaults[$key]) && !self::isList($value)) {
+        && !array_is_list($defaults[$key]) && !array_is_list($value)) {
         $defaults[$key] = self::merge($defaults[$key], $value, $path);
       } else {
         $defaults[$key] = $value;
@@ -158,7 +158,7 @@ final class Config {
       if (gettype($actual) !== gettype($expected)) {
         throw new ConfigException("Invalid type for configuration key: {$path}");
       }
-      if (is_array($expected) && !self::isList($expected)) {
+      if (is_array($expected) && !array_is_list($expected)) {
         self::validateTypes($expected, $actual, $path);
       }
     }
@@ -331,7 +331,7 @@ final class Config {
 
   /** @param array<int,mixed> $proxies */
   private static function validateTrustedProxies(array $proxies): void {
-    if (!self::isList($proxies)) {
+    if (!array_is_list($proxies)) {
       throw new ConfigException('security.trusted_proxies must be a list.');
     }
     if (count($proxies) > 256) {
@@ -360,7 +360,7 @@ final class Config {
 
   /** @param array<int,mixed> $ips */
   private static function validateDebugAllowedIps(array $ips): void {
-    if (!self::isList($ips)) {
+    if (!array_is_list($ips)) {
       throw new ConfigException('debug.allowed_ips must be a list.');
     }
     if (count($ips) > 64) {
@@ -388,14 +388,6 @@ final class Config {
     return $current;
   }
 
-  /** @param array<mixed> $value */
-  private static function isList(array $value): bool {
-    $index = 0;
-    foreach ($value as $key => $_) {
-      if ($key !== $index++) return false;
-    }
-    return true;
-  }
 }
 
 /** Admin-only editor for the trusted local configuration override. */
@@ -435,7 +427,7 @@ final class ConfigEditor {
     foreach ($defaults as $key => $default) {
       if ($key === '_version') continue;
       $value = $values[$key] ?? null;
-      if (is_array($default) && is_array($value) && !self::isList($default) && !self::isList($value)) {
+      if (is_array($default) && is_array($value) && !array_is_list($default) && !array_is_list($value)) {
         $nested = self::differences($default, $value);
         if ($nested !== []) $differences[$key] = $nested;
       } elseif ($value !== $default) {
@@ -445,22 +437,13 @@ final class ConfigEditor {
     return $differences;
   }
 
-  /** @param array<mixed> $value */
-  private static function isList(array $value): bool {
-    $index = 0;
-    foreach ($value as $key => $_) {
-      if ($key !== $index++) return false;
-    }
-    return true;
-  }
-
   /** @param mixed $value */
   private static function export($value, int $indent = 0): string {
     if (!is_array($value)) return var_export($value, true);
     if ($value === []) return '[]';
     $lines = ['['];
     $padding = str_repeat('  ', $indent + 1);
-    $list = self::isList($value);
+    $list = array_is_list($value);
     foreach ($value as $key => $item) {
       $prefix = $list ? '' : var_export($key, true) . ' => ';
       $lines[] = $padding . $prefix . self::export($item, $indent + 1) . ',';
