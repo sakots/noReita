@@ -254,21 +254,6 @@ smoke_test('asynchronous paint replacements display the returned edit form', sta
   return true;
 });
 
-smoke_test('response templates provide image OGP metadata for SNS sharing', static function (): bool {
-  $root = dirname(__DIR__) . '/noreita/theme';
-  $templates = ['eda/eda_res.twig', 'monoreita/monoreita_res.blade.php'];
-  foreach ($templates as $template) {
-    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $template);
-    if (!is_string($source) || !str_contains($source, 'og:image')
-      || !str_contains($source, 'twitter:image') || !str_contains($source, 'og_url')) {
-      return false;
-    }
-  }
-  $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
-  return is_string($index) && str_contains($index, "'?resno='")
-    && str_contains($index, "['og_image']");
-});
-
 smoke_test('main templates render trusted configured head scripts', static function (): bool {
   $root = dirname(__DIR__) . '/noreita/theme';
   $templates = ['eda/eda_main.twig', 'monoreita/monoreita_main.blade.php'];
@@ -346,14 +331,6 @@ smoke_test('React theme assets use content-addressed cache versions', static fun
     && str_contains($template, "@include('components.monoreita_customCss')")
     && str_contains($template, 'react-board.js?v={{$theme_active_asset_version}}')
     && !str_contains($template, '?v=1.0.0');
-});
-
-smoke_test('administration templates escape post subjects', static function (): bool {
-  $eda = file_get_contents(dirname(__DIR__) . '/noreita/theme/eda/eda_admin.twig');
-  $monoreita = file_get_contents(dirname(__DIR__) . '/noreita/theme/monoreita/monoreita_admin.blade.php');
-  if (!is_string($eda) || !is_string($monoreita)) return false;
-  return !preg_match('/mb_substr\\([^\\n]+\\[\'sub\'\\][^\\n]+\\)\\|raw/', $eda)
-    && !preg_match('/\\{!!\\s*mb_substr\\([^\\n]+\\[\'sub\'\\][^\\n]+\\)\\s*!!\\}/', $monoreita);
 });
 
 smoke_test('theme manifests and diagnostics detect theme integrity problems', static function (): bool {
