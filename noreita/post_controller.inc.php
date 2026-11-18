@@ -1,11 +1,6 @@
 <?php
 
 final class PostController {
-  public static function register(ApplicationContext $context): void { regist($context); }
-  public static function edit(ApplicationContext $context): void { editform($context); }
-  public static function saveEdit(ApplicationContext $context): void { editexec($context); }
-  public static function delete(ApplicationContext $context): void { delmode($context); }
-  public static function replaceImage(ApplicationContext $context): void { picreplace($context); }
 
   // 投稿の認可を描画開始時のコードと所有者に結び付け、他の一時画像への流用を防ぐ。
   public static function replacementAuthorization(ApplicationContext $context, int $no, string $code): array {

@@ -10,10 +10,8 @@ const REITA_VER = 'v4.14.3 lot.261106.0';
 require_once __DIR__ . '/app_bootstrap.inc.php';
 $en = app_bootstrap(__DIR__);
 require_once __DIR__ . '/application_context.inc.php';
-require_once __DIR__ . '/board_controller.inc.php';
 require_once __DIR__ . '/post_controller.inc.php';
 require_once __DIR__ . '/paint_controller.inc.php';
-require_once __DIR__ . '/admin_controller.inc.php';
 
 // functions.phpのバージョンを確認
 if(!defined('FUNCTIONS_VER') || FUNCTIONS_VER < 20260807) {
@@ -389,15 +387,15 @@ $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTT
 
 // モード
 
-// 正規化済みのmodeをコントローラーへ振り分ける。
+// 正規化済みのmodeを既存のHTTP処理関数へ振り分ける。
 // 状態を変更する各処理でCSRF・認可を確認するため、この分岐には共通の検査を置かない。
 switch ($mode) {
   case 'regist': // スレ立て
-    PostController::register($application_context); return;
+    regist($application_context); return;
   case 'reply':
-    PostController::register($application_context); return;
+    regist($application_context); return;
   case 'res':
-    BoardController::response($application_context);
+    res($application_context);
     return;
   case 'sodane': // そうだね
     return sodane($application_context);
@@ -405,75 +403,75 @@ switch ($mode) {
     if (!diary_post_allowed((string)filter_input(INPUT_POST, 'resto') !== '')) {
       render_error($application_context, $en ? 'Only an administrator can create this post.' : 'この投稿は管理者のみ作成できます。', 403);
     }
-    PaintController::paint($application_context, '', filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
+    paint_form($application_context, '', filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'piccom':
-    PaintController::editImage($application_context); return;
+    paint_com($application_context, ''); return;
   case 'pictmp':
     if (!diary_post_allowed(false)) {
       render_error($application_context, $en ? 'Only an administrator can create a new post.' : '新規投稿は管理者のみ作成できます。', 403);
     }
-    PaintController::temporary($application_context); return;
+    paint_com($application_context, 'tmp'); return;
   case 'anime':
-    PaintController::animation($application_context); return;
+    open_pch($application_context); return;
   case 'continue':
-    PaintController::continue($application_context); return;
+    in_continue($application_context); return;
   case 'contpaint':
     $type = filter_input(INPUT_POST, 'type');
     PaintController::continuePainting($application_context, (string)$type, filter_input_data('POST','modid',FILTER_VALIDATE_INT)); return;
   case 'picrep':
-    PostController::replaceImage($application_context); return;
+    picreplace($application_context); return;
   case 'picrep_form':
     PostController::replacementForm($application_context); return;
   case 'catalog': // カタログ表示
-    BoardController::catalog($application_context);
+    catalog($application_context);
     return;
   case 'search': // 検索
-    BoardController::search($application_context);
+    search($application_context);
     return;
   case 'edit':
-    PostController::edit($application_context); return;
+    editform($application_context); return;
   case 'editexec':
-    PostController::saveEdit($application_context); return;
+    editexec($application_context); return;
   case 'del':
-    PostController::delete($application_context); return;
+    delmode($application_context); return;
   case 'saveimage': // 画像保存
     return save_image();
   case 'animation_upload': // 動画ファイルをPNGと組にして一時保存
-    PaintController::uploadAnimation($application_context); return;
+    animation_upload($application_context); return;
   case 'trip_preview':
     trip_preview($application_context); return;
   case 'admin_in': // 管理モードin
     return admin_in($application_context);
   case 'admin_login':
-    AdminController::login($application_context); return;
+    admin_login($application_context); return;
   case 'admin_logout':
-    AdminController::logout($application_context); return;
+    admin_logout($application_context); return;
   case 'admin_delete':
     return admin_delete($application_context);
   case 'admin_manage':
-    AdminController::manage($application_context); return;
+    admin_manage($application_context); return;
   case 'admin_theme_settings':
-    AdminController::themeSettings($application_context); return;
+    admin_theme_settings($application_context); return;
   case 'admin_config':
-    AdminController::configuration($application_context); return;
+    admin_config($application_context); return;
   case 'admin_config_save':
-    AdminController::saveConfiguration($application_context); return;
+    admin_config_save($application_context); return;
   case 'admin_errorlog':
-    AdminController::errorLog($application_context); return;
+    admin_errorlog($application_context); return;
   case 'admin_auditlog':
-    AdminController::auditLog($application_context); return;
+    admin_auditlog($application_context); return;
   case 'admin_temporary_images':
-    AdminController::temporaryImages($application_context); return;
+    admin_temporary_images($application_context); return;
   case 'admin_temporary_images_manage':
-    AdminController::manageTemporaryImages($application_context); return;
+    admin_temporary_images_manage($application_context); return;
   case 'temporary_image':
-    PaintController::temporaryImage($application_context); return;
+    temporary_image($application_context); return;
   case 'admin_post':
-    AdminController::post($application_context); return;
+    admin_post($application_context); return;
   case 'admin_edit':
-    AdminController::edit($application_context); return;
+    admin_edit($application_context); return;
   case 'admin': // 管理モード
-    AdminController::dashboard($application_context); return;
+    admin($application_context); return;
   case 'set_share_server':
     return show_share_server_form($application_context);
   case 'post_share_server':
@@ -489,7 +487,7 @@ switch ($mode) {
   case 'misskey_success':
     return misskey_note::misskey_success($application_context);
   default: // 通常表示モード
-    BoardController::index($application_context);
+    def($application_context);
     return;
 }
 
