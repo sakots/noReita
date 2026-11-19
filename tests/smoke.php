@@ -1567,6 +1567,45 @@ smoke_test('application initialization prepares runtime state', static function 
   }
 });
 
+smoke_test('configured initialization prepares every runtime path', static function (): bool {
+  $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_configured_init_' . bin2hex(random_bytes(8));
+  if (!mkdir($root, 0700)) return false;
+  $database_file = $root . DIRECTORY_SEPARATOR . 'board.db';
+  $public_directories = [
+    $root . DIRECTORY_SEPARATOR . Config::string('paths.images'),
+    $root . DIRECTORY_SEPARATOR . Config::string('paths.temporary'),
+    $root . DIRECTORY_SEPARATOR . Config::string('paths.thumbnails'),
+  ];
+  $private_directories = array_map(
+    static fn(string $directory): string => $root . DIRECTORY_SEPARATOR . $directory,
+    ['session', 'cache', 'backup', 'errorlog', 'auditlog']
+  );
+  try {
+    $initializer = ApplicationInitializer::fromConfig($root, 'sqlite:' . $database_file, $database_file);
+    $initializer->prepareDirectories();
+    $initializer->migrateDatabase();
+    $initializer->secureDatabaseFile();
+    $mode_checks = !FilesystemPermissions::modeChecksAreReliable(PHP_OS_FAMILY)
+      || ((fileperms($database_file) & 0777) === 0600
+        && !array_filter($public_directories, static fn(string $directory): bool =>
+          (fileperms($directory) & 0777) !== Config::int('permissions.public_directory'))
+        && !array_filter($private_directories, static fn(string $directory): bool =>
+          (fileperms($directory) & 0777) !== Config::int('permissions.private_directory')));
+    return $mode_checks
+      && !array_filter([...$public_directories, ...$private_directories], static fn(string $directory): bool => !is_dir($directory))
+      && is_file($root . DIRECTORY_SEPARATOR . Config::string('paths.temporary') . '.htaccess');
+  } finally {
+    $iterator = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+      RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $item) {
+      $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+    }
+    rmdir($root);
+  }
+});
+
 smoke_test('Windows does not enforce unsupported POSIX permission modes', static function (): bool {
   return !FilesystemPermissions::modeChecksAreReliable('Windows')
     && !FilesystemPermissions::modeChecksAreReliable('WINDOWS')

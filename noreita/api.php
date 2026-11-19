@@ -22,22 +22,7 @@ function api_response(array $payload, int $status = 200): void {
 
 /** Prepare the same storage required by index.php without starting a user session. */
 function initialize_public_api(): void {
-  $initializer = new ApplicationInitializer(
-    DB_PDO, DB_FILE, __DIR__ . '/backup', __DIR__,
-    [
-      __DIR__ . '/' . Config::string('paths.images') => Config::int('permissions.public_directory'),
-      __DIR__ . '/' . Config::string('paths.temporary') => Config::int('permissions.public_directory'),
-      __DIR__ . '/' . Config::string('paths.thumbnails') => Config::int('permissions.public_directory'),
-      __DIR__ . '/thumbnail' => Config::int('permissions.public_directory'),
-      __DIR__ . '/session' => Config::int('permissions.private_directory'),
-      __DIR__ . '/cache' => Config::int('permissions.private_directory'),
-      __DIR__ . '/backup' => Config::int('permissions.private_directory'),
-      __DIR__ . '/errorlog' => Config::int('permissions.private_directory'),
-      __DIR__ . '/auditlog' => Config::int('permissions.private_directory'),
-    ],
-    0600,
-    __DIR__ . '/' . Config::string('paths.temporary'),
-  );
+  $initializer = ApplicationInitializer::fromConfig(__DIR__, DB_PDO, DB_FILE);
   $initializer->prepareDirectories();
   $initializer->migrateDatabase();
   $initializer->secureDatabaseFile();

@@ -54,12 +54,9 @@ edaとmonoreitaで同じJavaScript・Luminous資産は`assets/`に1つだけ配�
 
 ## アプリケーション初期化
 
-`initialization.inc.php`の`ApplicationInitializer`がセキュリティヘッダー、実行時ディレクトリの準備、DBマイグレーション、DBファイルの権限設定を担当します。起動時のファイル環境処理は`index.php`へ直接追加せず、このクラスへ追加してください。
+`initialization.inc.php`の`ApplicationInitializer`がセキュリティヘッダー、実行時ディレクトリの準備、DBマイグレーション、DBファイルの権限設定を担当します。`fromConfig()`が通常画面と公開APIに共通するディレクトリ・権限設定を構築するため、入口ごとに設定一覧を複製しません。起動時のファイル環境処理は`index.php`へ直接追加せず、このクラスへ追加してください。
 
-`bootstrap.php`はすべてのHTTP・CLIエントリーポイントに共通する起動処理です。
-`config.php`の既定値と任意の`config.local.php`を読み込み、`Config`で検証した後に
-エラー処理とタイムゾーンを設定します。設定参照には`Config::string()`、
-`Config::int()`、`Config::bool()`、`Config::array()`を使用します。
+`bootstrap.php`はすべてのHTTP・CLIエントリーポイントに共通する起動処理です。`config.php`の既定値と任意の`config.local.php`を読み込み、`Config`で検証した後にエラー処理とタイムゾーンを1回だけ設定します。設定参照には`Config::string()`、`Config::int()`、`Config::bool()`、`Config::array()`を使用します。
 
 ## データベース
 

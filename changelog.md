@@ -16,6 +16,7 @@
 - JavaScript・エラー処理・Misskey処理のソース文字列を固定するテストを、DOM更新・HTTP応答・既存の振る舞い検証へ置換
 - `ApplicationContext`の汎用リクエスト配列を廃止し、続き描き判定を検証済みの描画種別へ統合
 - 通常画面・保存API・Misskey連携・エラー画面で重複していた表示言語判定を`RequestInfo`へ統一
+- 通常画面と公開APIで重複していた実行時ディレクトリ・権限の初期化設定を`ApplicationInitializer`へ集約
 
 ### [2026/10/28] v4.14.2
 
