@@ -932,7 +932,6 @@ function def(ApplicationContext $context): void {
     $dat['max_page'] = $pagination['max_page'];
     $dat['nowpage'] = $pagination['page'];
     $dat['paging'] = $pagination['paging'];
-    $dat['pp'] = $pagination['pp'];
     $dat['back'] = $pagination['back'];
     $dat['next'] = $pagination['next'];
 
@@ -1079,7 +1078,6 @@ function catalog(ApplicationContext $context): void {
     $dat['max_page'] = $pagination['max_page'];
     $dat['nowpage'] = $pagination['page'];
     $dat['paging'] = $pagination['paging'];
-    $dat['pp'] = $pagination['pp'];
     $dat['back'] = $pagination['back'];
     $dat['next'] = $pagination['next'];
     $dat['catalog_paging_query'] = 'mode=catalog';
@@ -1119,20 +1117,18 @@ function catalog(ApplicationContext $context): void {
   }
 }
 
-/** @return array{page:int,max_page:int,start:int,paging:array<int,array{p:int}>,pp:array<int,array<int,array{p:int}>>,back:int,next:int} */
+/** @return array{page:int,max_page:int,start:int,paging:array<int,array{p:int}>,back:int,next:int} */
 function catalog_paging(int $total, int $per_page, int $requested_page): array {
   if ($per_page < 1) throw new InvalidArgumentException('Invalid catalog page size.');
   $max_page = max(1, (int)ceil($total / $per_page));
   $page = min(max($requested_page, 1), $max_page);
   $paging = [];
-  $pp = [];
   for ($p = 1; $p <= $max_page; $p++) {
     $paging[$p] = compact('p');
-    $pp[] = $paging;
   }
   return [
     'page' => $page, 'max_page' => $max_page, 'start' => $per_page * ($page - 1),
-    'paging' => $paging, 'pp' => $pp, 'back' => $page - 1, 'next' => $page + 1,
+    'paging' => $paging, 'back' => $page - 1, 'next' => $page + 1,
   ];
 }
 
@@ -1201,7 +1197,6 @@ function search(ApplicationContext $context): void {
     $dat['max_page'] = $pagination['max_page'];
     $dat['nowpage'] = $pagination['page'];
     $dat['paging'] = $pagination['paging'];
-    $dat['pp'] = $pagination['pp'];
     $dat['back'] = $pagination['back'];
     $dat['next'] = $pagination['next'];
     echo $template_engine->render(CATALOGFILE, $dat);
