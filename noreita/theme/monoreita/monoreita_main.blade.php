@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <title>{{$board_title}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/luminous-basic.min.css">
+  <link rel="stylesheet" href="assets/luminous/luminous-basic.min.css">
   @include('components.monoreita_headCss')
-  <link rel="stylesheet" href="theme/{{$theme_dir}}/luminous/noreita-luminous.css">
+  <link rel="stylesheet" href="assets/luminous/noreita-luminous.css">
   @include('components.monoreita_customCss')
   @foreach ($head_scripts as $head_script)
   {!! $head_script !!}
@@ -72,8 +72,8 @@
     @include('components.monoreita_footerCopy') <!-- コピーライト -->
   </footer>
   <!-- scripts -->
-  <script src="theme/{{$theme_dir}}/js/sodane.js"></script>
-  <script src="theme/{{$theme_dir}}/js/imageClipboard.js"></script>
+  <script src="assets/js/sodane.js"></script>
+  <script src="assets/js/imageClipboard.js"></script>
   <script src="trip-preview.js?v={{$trip_preview_version}}" data-endpoint="{{$self}}?mode=trip_preview"></script>
   @include('components.monoreita_togglePaletteVisibility')
   @include('components.monoreita_luminous')
