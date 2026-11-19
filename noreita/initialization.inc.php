@@ -45,6 +45,36 @@ HTACCESS;
     $this->temporary_directory = $temporary_directory;
   }
 
+  public static function fromConfig(
+    string $application_root,
+    string $database_dsn,
+    string $database_file
+  ): self {
+    $path = static fn(string $relative): string => $application_root . '/' . $relative;
+    $public_directory = Config::int('permissions.public_directory');
+    $private_directory = Config::int('permissions.private_directory');
+    $temporary_directory = $path(Config::string('paths.temporary'));
+    return new self(
+      $database_dsn,
+      $database_file,
+      $path('backup'),
+      $application_root,
+      [
+        $path(Config::string('paths.images')) => $public_directory,
+        $temporary_directory => $public_directory,
+        $path(Config::string('paths.thumbnails')) => $public_directory,
+        $path('thumbnail') => $public_directory,
+        $path('session') => $private_directory,
+        $path('cache') => $private_directory,
+        $path('backup') => $private_directory,
+        $path('errorlog') => $private_directory,
+        $path('auditlog') => $private_directory,
+      ],
+      0600,
+      $temporary_directory,
+    );
+  }
+
   /** @return array<int,string> */
   public static function securityHeaders(): array {
     return [

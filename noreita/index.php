@@ -125,10 +125,6 @@ try {
 if (!is_array($theme_runtime)) exit;
 $theme_directory = $theme_runtime['active_directory'];
 
-// タイムゾーン設定
-date_default_timezone_set(Config::string('site.timezone'));
-
-
 // 管理パスが初期値(replace-with-a-long-random-admin-password)の場合は動作させない
 if (Config::string("admin.password") === 'replace-with-a-long-random-admin-password') {
   die($en ? "The admin pass is still at its default value! This program can't run it until you fix it." : "管理パスが初期設定値のままです！危険なので動かせません。管理パスを変更してください。");
@@ -550,22 +546,7 @@ function trip_preview(ApplicationContext $context): void {
 function init(): void {
   // ApplicationContext is created after startup has prepared the request user code.
   $en = ApplicationBootstrap::english();
-  $initializer = new ApplicationInitializer(
-    DB_PDO, DB_FILE, __DIR__ . '/backup', __DIR__,
-    [
-      __DIR__ . '/' . Config::string('paths.images') => Config::int('permissions.public_directory'),
-      __DIR__ . '/' . Config::string('paths.temporary') => Config::int('permissions.public_directory'),
-      __DIR__ . '/' . Config::string('paths.thumbnails') => Config::int('permissions.public_directory'),
-      __DIR__ . '/thumbnail' => Config::int('permissions.public_directory'),
-      __DIR__ . '/session' => Config::int('permissions.private_directory'),
-      __DIR__ . '/cache' => Config::int('permissions.private_directory'),
-      __DIR__ . '/backup' => Config::int('permissions.private_directory'),
-      __DIR__ . '/errorlog' => Config::int('permissions.private_directory'),
-      __DIR__ . '/auditlog' => Config::int('permissions.private_directory'),
-    ],
-    0600,
-    __DIR__ . '/' . Config::string('paths.temporary'),
-  );
+  $initializer = ApplicationInitializer::fromConfig(__DIR__, DB_PDO, DB_FILE);
   $initializer->sendSecurityHeaders();
   try {
     $initializer->prepareDirectories();
