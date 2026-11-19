@@ -53,6 +53,9 @@ jobs:
       - name: Build React theme
         run: npm run react:build
 
+      - name: Test browser client behavior
+        run: npm run client:test
+
       - name: Check generated frontend assets are up to date
         shell: bash
         run: |
