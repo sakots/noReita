@@ -892,6 +892,20 @@ function regist(ApplicationContext $context): void {
   ok($context, $en ? 'Successfully posted. Switching screen.' : '書き込みに成功しました。画面を切り替えます。');
 }
 
+function format_public_comment(string $comment, string $collapsed_newlines = "\n\n"): string {
+  $comment = htmlspecialchars($comment, ENT_QUOTES | ENT_HTML5);
+  if (Config::bool('features.autolink')) $comment = auto_link($comment);
+  if (Config::bool('features.external_image_thumbnail')) {
+    $comment = external_image_service()->addThumbnailLinks($comment);
+  }
+  if (Config::bool('features.external_link_preview')) {
+    $comment = external_link_preview_service()->addCards($comment);
+  }
+  if (Config::bool('features.hashtag')) $comment = hashtag_link($comment);
+  $comment = preg_replace('/(\n|\r|\r\n|\n\r){3,}/us', $collapsed_newlines, $comment);
+  return quote(tobr($comment));
+}
+
 //通常表示モード
 function def(ApplicationContext $context): void {
   $dat =& $context->data;
@@ -996,25 +1010,7 @@ function def(ApplicationContext $context): void {
         if (!filter_var($res['a_url'], FILTER_VALIDATE_URL) || !preg_match('|^https?://.*$|', $res['a_url'])) {
           $res['a_url'] = "";
         }
-        $res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
-
-        //オートリンク
-        if (Config::bool('features.autolink')) $res['com'] = auto_link($res['com']);
-        //画像URLにサムネイルを追加
-        if (Config::bool('features.external_image_thumbnail')) {
-          $res['com'] = external_image_service()->addThumbnailLinks($res['com']);
-        }
-        if (Config::bool('features.external_link_preview')) {
-          $res['com'] = external_link_preview_service()->addCards($res['com']);
-        }
-        //ハッシュタグ
-        if (Config::bool('features.hashtag')) $res['com'] = hashtag_link($res['com']);
-        //空行を縮める
-        $res['com'] = preg_replace('/(\n|\r|\r\n|\n\r){3,}/us', "\n\n", $res['com']);
-        //<br>に
-        $res['com'] = tobr($res['com']);
-        //引用の色
-        $res['com'] = quote($res['com']);
+        $res['com'] = format_public_comment($res['com']);
         //日付をUNIX時間に変換して設定どおりにフォーマット
         $res['created'] = date(Config::string('board.date_format'), strtotime($res['created']));
         $res['modified'] = date(Config::string('board.date_format'), strtotime($res['modified']));
@@ -1025,25 +1021,7 @@ function def(ApplicationContext $context): void {
       if (!filter_var($bbsline['a_url'], FILTER_VALIDATE_URL) || !preg_match('|^https?://.*$|', $bbsline['a_url'])) {
         $bbsline['a_url'] = "";
       }
-      $bbsline['com'] = htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5);
-
-      //オートリンク
-      if (Config::bool('features.autolink')) $bbsline['com'] = auto_link($bbsline['com']);
-      //画像URLにサムネイルを追加
-      if (Config::bool('features.external_image_thumbnail')) {
-        $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
-      }
-      if (Config::bool('features.external_link_preview')) {
-        $bbsline['com'] = external_link_preview_service()->addCards($bbsline['com']);
-      }
-      //ハッシュタグ
-      if (Config::bool('features.hashtag')) $bbsline['com'] = hashtag_link($bbsline['com']);
-      //空行を縮める
-      $bbsline['com'] = preg_replace('/(\n|\r|\r\n){3,}/us', "\n\n", $bbsline['com']);
-      //<br>に
-      $bbsline['com'] = tobr($bbsline['com']);
-      //引用の色
-      $bbsline['com'] = quote($bbsline['com']);
+      $bbsline['com'] = format_public_comment($bbsline['com']);
       $bbsline['past'] = (int)$bbsline['created_timestamp'];
       $bbsline['created'] = date(Config::string('board.date_format'), strtotime($bbsline['created']));
       $bbsline['modified'] = date(Config::string('board.date_format'), strtotime($bbsline['modified']));
@@ -1330,27 +1308,7 @@ function res(ApplicationContext $context): void {
       foreach ($posts_i as $res) {
         $res['thumb'] = $res['thumbnail'] ?? '';
         $res['thumb_avif'] = '';
-        $res['com'] = htmlspecialchars($res['com'], ENT_QUOTES | ENT_HTML5);
-
-        if (Config::bool('features.autolink')) {
-          $res['com'] = auto_link($res['com']);
-        }
-        if (Config::bool('features.external_image_thumbnail')) {
-          $res['com'] = external_image_service()->addThumbnailLinks($res['com']);
-        }
-        if (Config::bool('features.external_link_preview')) {
-          $res['com'] = external_link_preview_service()->addCards($res['com']);
-        }
-        //ハッシュタグ
-        if (Config::bool('features.hashtag')) {
-          $res['com'] = hashtag_link($res['com']);
-        }
-        //空行を縮める
-        $res['com'] = preg_replace('/(\n|\r|\r\n){3,}/us', "\n\n", $res['com']);
-        //<br>に
-        $res['com'] = tobr($res['com']);
-        //引用の色
-        $res['com'] = quote($res['com']);
+        $res['com'] = format_public_comment($res['com']);
         $res['created'] = date(Config::string('board.date_format'), strtotime($res['created']));
         $res['modified'] = date(Config::string('board.date_format'), strtotime($res['modified']));
         //投稿者名取得
@@ -1363,28 +1321,8 @@ function res(ApplicationContext $context): void {
         }
         $ko[] = $res;
       }
-      $bbsline['com'] = htmlspecialchars($bbsline['com'], ENT_QUOTES | ENT_HTML5);
-
-      if (Config::bool('features.autolink')) {
-        $bbsline['com'] = auto_link($bbsline['com']);
-      }
-      //画像URLにサムネイルを追加
-      if (Config::bool('features.external_image_thumbnail')) {
-        $bbsline['com'] = external_image_service()->addThumbnailLinks($bbsline['com']);
-      }
-      if (Config::bool('features.external_link_preview')) {
-        $bbsline['com'] = external_link_preview_service()->addCards($bbsline['com']);
-      }
-      //ハッシュタグ
-      if (Config::bool('features.hashtag')) {
-        $bbsline['com'] = hashtag_link($bbsline['com']);
-      }
-      //空行を縮める
-      $bbsline['com'] = preg_replace('/(\n|\r|\r\n){3,}/us', "\n", $bbsline['com']);
-      //<br>に
-      $bbsline['com'] = tobr($bbsline['com']);
-      //引用の色
-      $bbsline['com'] = quote($bbsline['com']);
+      // 詳細の親記事だけ、連続する改行を1つに縮める。
+      $bbsline['com'] = format_public_comment($bbsline['com'], "\n");
       //日付をUNIX時間に
       $bbsline['past'] = (int)$bbsline['created_timestamp'];
       $bbsline['created'] = date(Config::string('board.date_format'), strtotime($bbsline['created']));
