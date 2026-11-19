@@ -217,6 +217,7 @@ bash pre.sh
 - 診断IP設定の配列リスト判定をPHP標準の`array_is_list()`へ統一
 - edaとmonoreitaで重複していたJavaScript・Luminous資産を共通ディレクトリへ集約
 - JavaScript・エラー処理・Misskey処理のソース文字列を固定するテストを、DOM更新・HTTP応答・既存の振る舞い検証へ置換
+- `ApplicationContext`の汎用リクエスト配列を廃止し、続き描き判定を検証済みの描画種別へ統合
 
 ### [2026/10/28] v4.14.2
 

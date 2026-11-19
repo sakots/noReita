@@ -364,8 +364,7 @@ setcookie("usercode", $usercode, time()+(86400*365),"","",$https_only,true); //1
 $_SESSION['usercode'] = $usercode;
 
 $application_context = new ApplicationContext(
-  $en, $template_engine, $dat, $usercode, $req_method, $theme_directory,
-  ['message' => '']
+  $en, $template_engine, $dat, $usercode, $req_method, $theme_directory
 );
 //var_dump($_GET);
 
@@ -380,7 +379,6 @@ $shared_resno = filter_input_data('GET', 'resno', FILTER_VALIDATE_INT);
 if ($mode === '' && $shared_resno !== false && $shared_resno !== null) {
   $mode = 'res';
 }
-$application_context->request['mode'] = $mode;
 
 // Ajaxリクエストかどうかをチェック
 $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
@@ -1456,13 +1454,11 @@ function res(ApplicationContext $context): void {
 }
 
 //お絵描き画面
-function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): void {
+function paint_form(ApplicationContext $context, string $continuation_type, ?int $reply_to): void {
   $template_engine = $context->templates;
   $dat =& $context->data;
   $en = $context->english;
-  $message = (string)($context->request['message'] ?? '');
   $usercode = $context->usercode;
-  $mode = (string)($context->request['mode'] ?? '');
   $ctype = null;
   $pch = '';
   $type = '';
@@ -1477,12 +1473,10 @@ function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): v
   }
   $dat['tool'] = $tool;
 
-  $dat['message'] = $message;
-
   $picw = filter_input(INPUT_POST, 'picw', FILTER_VALIDATE_INT);
   $pich = filter_input(INPUT_POST, 'pich', FILTER_VALIDATE_INT);
 
-  if ($mode === "contpaint" && (!$picw || !$pich)) {
+  if ($continuation_type !== '' && (!$picw || !$pich)) {
     $imgfile = filter_input(INPUT_POST, 'img'); // 先にimgfileを取得
     if ($imgfile && is_file(Config::string('paths.images') . $imgfile)) {
       list($picw, $pich) = getimagesize(Config::string('paths.images') . $imgfile); //キャンバスサイズ
@@ -1520,9 +1514,9 @@ function paint_form(ApplicationContext $context, string $rep, ?int $reply_to): v
   $dat['stime'] = time();
 
   //続きから
-  if ($rep !== "") {
+  if ($continuation_type !== '') {
     $ctype = filter_input(INPUT_POST, 'ctype');
-    $type = $rep;
+    $type = $continuation_type;
 
     // 動画ファイルの存在をチェックしてctypeを自動設定
     if ($ctype === null || $ctype === '') {
