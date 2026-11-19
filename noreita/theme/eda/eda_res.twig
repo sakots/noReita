@@ -5,9 +5,9 @@
   <meta charset="utf-8">
   <title>{{ board_title }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="theme/{{ theme_dir }}/luminous/luminous-basic.min.css">
+  <link rel="stylesheet" href="assets/luminous/luminous-basic.min.css">
   {% include 'components/eda_headCss.twig' %}
-  <link rel="stylesheet" href="theme/{{ theme_dir }}/luminous/noreita-luminous.css">
+  <link rel="stylesheet" href="assets/luminous/noreita-luminous.css">
   {% if og_url is not empty %}
     <meta name="twitter:card" content="{{ og_twitter_card }}">
     <meta property="og:title" content="{{ og_title }}">
@@ -136,7 +136,7 @@
       {% include 'components/eda_footerCopy.twig' %}
     </footer>
     <!-- scripts -->
-    <script src="theme/{{ theme_dir }}/js/sodane.js"></script>
+    <script src="assets/js/sodane.js"></script>
     <script src="trip-preview.js?v={{ trip_preview_version }}" data-endpoint="{{ self }}?mode=trip_preview"></script>
     <script src="post-preview.js?v={{ post_preview_version }}"></script>
     {% if use_image_upload %}

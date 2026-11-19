@@ -18,7 +18,7 @@ return [
     'misskey_note' => 'eda_misskey_note', 'other' => 'eda_other',
   ],
   'assets' => [
-    'css' => ['css/eda_index.min.css', 'css/eda_admin.css', 'luminous/luminous-basic.min.css'],
-    'javascript' => ['js/appFit.js', 'js/dynamicPalette.js', 'js/imageClipboard.js', 'js/sodane.js', 'js/themeColorManager.js', 'luminous/luminous.min.js'],
+    'css' => ['css/eda_index.min.css', 'css/eda_admin.css'],
+    'javascript' => ['js/themeColorManager.js'],
   ],
 ];

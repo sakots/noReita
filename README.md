@@ -215,6 +215,7 @@ bash pre.sh
 - 実装が1つだけで差し替え経路のない管理操作サービスの専用インターフェースを廃止し、`PostService`を直接利用するよう整理
 - PHP 8.2以上で利用できる文字列関数のテスト用polyfillと配列リスト判定の独自実装を削除し、標準関数へ統一
 - 診断IP設定の配列リスト判定をPHP標準の`array_is_list()`へ統一
+- edaとmonoreitaで重複していたJavaScript・Luminous資産を共通ディレクトリへ集約
 - JavaScript・エラー処理・Misskey処理のソース文字列を固定するテストを、DOM更新・HTTP応答・既存の振る舞い検証へ置換
 
 ### [2026/10/28] v4.14.2

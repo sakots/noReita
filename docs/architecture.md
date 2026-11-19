@@ -10,6 +10,8 @@
 
 `theme_manifest.inc.php`の`ThemeRuntime`は、`theme.php`だけを持つ簡易テーマの継承関係を検証し、親の`theme_conf.php`と`theme_manifest.php`からエンジン、論理テンプレート、標準アセットを解決します。簡易テーマの`theme.css`は親とページ固有のCSSより後に読み込みます。従来の完全テーマは二つの設定ファイルをそのまま使用します。`ThemeDiagnostics`は親の必須テンプレートとアセットに加え、子の差分テンプレート、コンポーネント参照、Twig構文、BladeOneコンパイル後のPHP構文を診断します。`plugins/check-theme.php`は読み取り専用のCLI自己診断です。
 
+edaとmonoreitaで同じJavaScript・Luminous資産は`assets/`に1つだけ配置し、両テーマから共通URLで参照します。テーママニフェストの`assets`には各テーマが所有する固有資産だけを記載し、共通資産はHTTP結合テストで公開可否を確認します。
+
 `PostValidator`は必須項目、文字数、NGワード、日本語フィルター、コメントURL、拒否ホストを画面描画から独立して検証します。
 
 通常一覧とスレッド詳細では、投稿者のURL欄は有効なHTTP・HTTPS URLだけをリンクとして表示します。親記事と返信の両方で、URLの検証を終えてから表示用データへ格納します。不正なURLや他のスキームは表示用の値だけを空にし、DBに保存された値は変更しません。

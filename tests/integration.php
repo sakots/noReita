@@ -334,6 +334,29 @@ PHP;
   };
   $check_public_pages('eda / empty board', $base_url, $cookie_jar);
 
+  $shared_assets = [
+    'assets/js/appFit.js',
+    'assets/js/dynamicPalette.js',
+    'assets/js/imageClipboard.js',
+    'assets/js/neoLoader.js',
+    'assets/js/sodane.js',
+    'assets/luminous/luminous-basic.min.css',
+    'assets/luminous/luminous.min.js',
+    'assets/luminous/luminous.min.js.map',
+    'assets/luminous/noreita-luminous.css',
+  ];
+  $shared_assets_served = true;
+  foreach ($shared_assets as $asset) {
+    [$asset_status, $asset_body] = http_request($origin_url . '/' . $asset, $cookie_jar);
+    $expected_asset = file_get_contents($webroot . '/' . $asset);
+    if ($asset_status !== 200 || !is_string($expected_asset) || $asset_body !== $expected_asset) {
+      $shared_assets_served = false;
+      break;
+    }
+  }
+  integration_test('shared theme assets are publicly served from one directory',
+    static fn (): bool => $shared_assets_served);
+
   // 機能を無効にした設置では、表示ボタンだけでなくMisskeyの各入口を直接指定しても使えない。
   [$misskey_disabled_before_status] = http_request($base_url . '?mode=before_misskey_note&no=1', $cookie_jar);
   [$misskey_disabled_session_status] = http_request($base_url . '?mode=create_misskey_note_sessiondata', $cookie_jar, [

@@ -18,7 +18,7 @@ return [
     'misskey_note' => 'monoreita_misskey_note', 'other' => 'monoreita_other',
   ],
   'assets' => [
-    'css' => ['css/monoreita_index.min.css', 'luminous/luminous-basic.min.css'],
-    'javascript' => ['js/appFit.js', 'js/dynamicPalette.js', 'js/imageClipboard.js', 'js/sodane.js', 'js/switchcss.js', 'luminous/luminous.min.js'],
+    'css' => ['css/monoreita_index.min.css'],
+    'javascript' => ['js/switchcss.js'],
   ],
 ];

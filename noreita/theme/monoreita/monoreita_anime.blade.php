@@ -16,7 +16,7 @@
       }
     }
 	</script>
-  <script src="theme/monoreita/js/neoLoader.js?{{$a_stime}}" charset="utf-8"></script>
+  <script src="assets/js/neoLoader.js?{{$a_stime}}" charset="utf-8"></script>
   @include('components.monoreita_customCss')
 </head>
 
