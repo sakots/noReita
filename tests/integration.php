@@ -64,7 +64,7 @@ function remove_tree(string $path): void {
   rmdir($path);
 }
 
-function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1', string $origin = 'http://localhost', bool $ajax = false): array {
+function http_request(string $url, string $cookie_jar, ?array $post = null, string $forwarded_for = '127.0.0.1', string $origin = 'http://localhost', bool $ajax = false, string $accept_language = ''): array {
   $curl = curl_init($url);
   $response_headers = [];
   curl_setopt_array($curl, [
@@ -77,6 +77,7 @@ function http_request(string $url, string $cookie_jar, ?array $post = null, stri
       'Host: localhost', 'Origin: ' . $origin,
       'X-Forwarded-For: ' . $forwarded_for,
       ...($ajax ? ['X-Requested-With: XMLHttpRequest'] : []),
+      ...($accept_language !== '' ? ['Accept-Language: ' . $accept_language] : []),
     ],
     CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$response_headers): int {
       $length = strlen($header);
@@ -509,6 +510,19 @@ PHP;
       && str_contains($error_log_contents, 'RuntimeException')
       && str_contains($error_log_contents, 'error-probe.php')
       && !str_contains($error_log_contents, 'error-probe-secret');
+  });
+
+  [$japanese_error_status, $japanese_error_body] = http_request(
+    $origin_url . '/error-probe.php', $cookie_jar, null, '127.0.0.1', 'http://localhost', false, 'ja-JP,en;q=0.9'
+  );
+  integration_test('error pages use the shared request language detection', static function () use (
+    $error_probe_body, $japanese_error_status, $japanese_error_body
+  ): bool {
+    return str_contains($error_probe_body, '<html lang="en"')
+      && str_contains($error_probe_body, 'Internal Server Error')
+      && $japanese_error_status === 500
+      && str_contains($japanese_error_body, '<html lang="ja"')
+      && str_contains($japanese_error_body, '内部エラー');
   });
 
   [$debug_error_status, $debug_error_body] = http_request(

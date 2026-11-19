@@ -1007,6 +1007,14 @@ smoke_test('request client IP only trusts forwarding headers from configured pro
     ], ['0.0.0.0/0']) === '';
 });
 
+smoke_test('request language uses the first accepted language consistently', static function (): bool {
+  return RequestInfo::prefersEnglish([]) === true
+    && RequestInfo::prefersEnglish(['HTTP_ACCEPT_LANGUAGE' => 'en-US,en;q=0.9']) === true
+    && RequestInfo::prefersEnglish(['HTTP_ACCEPT_LANGUAGE' => 'ja-JP,en;q=0.9']) === false
+    && RequestInfo::prefersEnglish(['HTTP_ACCEPT_LANGUAGE' => 'en-US,ja;q=0.9']) === true
+    && RequestInfo::prefersEnglish(['HTTP_ACCEPT_LANGUAGE' => ['ja']]) === true;
+});
+
 smoke_test('same-origin requests compare scheme, host, and port', static function (): bool {
   $server = $_SERVER;
   try {

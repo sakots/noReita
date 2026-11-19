@@ -8,6 +8,19 @@ const REQUEST_INFO_INC_VER = 20260816;
  */
 final class RequestInfo {
   /**
+   * Accept-Languageの先頭言語から英語表示かを判定する。
+   *
+   * @param array<string, mixed>|null $server テスト時に差し替えるサーバー変数
+   */
+  public static function prefersEnglish(?array $server = null): bool {
+    $server ??= $_SERVER;
+    $languages = $server['HTTP_ACCEPT_LANGUAGE'] ?? '';
+    if (!is_string($languages)) return true;
+    $language = explode(',', $languages, 2)[0];
+    return stripos($language, 'ja') !== 0;
+  }
+
+  /**
    * 接続元IPを取得する。転送ヘッダーは、直近の接続元が信頼済みプロキシの場合だけ使用する。
    *
    * @param array<string, mixed>|null $server テスト時に差し替えるサーバー変数
