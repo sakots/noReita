@@ -106,4 +106,7 @@ return [
     'trusted_proxies' => [],
   ],
 
+  // error_log と audit_log: retention_days は1～3650日、
+  // max_bytes は65536～104857600バイト、max_files_per_day は1～100です。
+
 ];

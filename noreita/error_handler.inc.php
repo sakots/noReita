@@ -279,12 +279,12 @@ final class ApplicationErrorHandler {
     int $audit_max_bytes = self::DEFAULT_MAX_BYTES,
     int $audit_max_files_per_day = self::DEFAULT_MAX_FILES_PER_DAY
   ): void {
-    self::$retention_days = max(1, min(3650, $retention_days));
-    self::$max_bytes = max(65536, min(104857600, $max_bytes));
-    self::$max_files_per_day = max(1, min(100, $max_files_per_day));
-    self::$audit_retention_days = max(1, min(3650, $audit_retention_days));
-    self::$audit_max_bytes = max(65536, min(104857600, $audit_max_bytes));
-    self::$audit_max_files_per_day = max(1, min(100, $audit_max_files_per_day));
+    self::$retention_days = $retention_days;
+    self::$max_bytes = $max_bytes;
+    self::$max_files_per_day = $max_files_per_day;
+    self::$audit_retention_days = $audit_retention_days;
+    self::$audit_max_bytes = $audit_max_bytes;
+    self::$audit_max_files_per_day = $audit_max_files_per_day;
     try {
       if (random_int(1, 100) === 1) {
         self::cleanupLogs();

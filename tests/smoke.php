@@ -659,6 +659,24 @@ smoke_test('configuration rejects unknown keys, invalid types, and unsafe ranges
     && $minimum['board']['max_threads'] === 1 && $maximum['board']['max_threads'] === 1000;
 });
 
+smoke_test('log settings reject values outside the effective retention and rotation limits', static function (): bool {
+  $defaults = Config::all();
+  foreach (['error_log', 'audit_log'] as $group) {
+    foreach (['retention_days' => [1, 3650], 'max_bytes' => [65536, 104857600], 'max_files_per_day' => [1, 100]] as $key => [$min, $max]) {
+      foreach ([$min - 1, $min, $max, $max + 1] as $value) {
+        $valid = $min <= $value && $value <= $max;
+        try {
+          $resolved = Config::resolve($defaults, [$group => [$key => $value]]);
+          if (!$valid || $resolved[$group][$key] !== $value) return false;
+        } catch (ConfigException $e) {
+          if ($valid || !str_contains($e->getMessage(), "{$group}.{$key}")) return false;
+        }
+      }
+    }
+  }
+  return true;
+});
+
 smoke_test('upload input limits may be smaller than resize dimensions', static function (): bool {
   $defaults = require dirname(__DIR__) . '/noreita/config.php';
   foreach ([false, true] as $enabled) {
