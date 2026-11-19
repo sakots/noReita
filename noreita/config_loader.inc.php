@@ -233,10 +233,12 @@ final class Config {
       'limits.paint_image_kb' => [1, 32768],
       'limits.paint_work_kb' => [1, 32768],
       'limits.paint_request_kb' => [1, 32768],
-      'error_log.max_bytes' => [1024, 1073741824],
-      'error_log.max_files_per_day' => [1, 1000],
-      'audit_log.max_bytes' => [1024, 1073741824],
-      'audit_log.max_files_per_day' => [1, 1000],
+      'error_log.retention_days' => [1, 3650],
+      'error_log.max_bytes' => [65536, 104857600],
+      'error_log.max_files_per_day' => [1, 100],
+      'audit_log.retention_days' => [1, 3650],
+      'audit_log.max_bytes' => [65536, 104857600],
+      'audit_log.max_files_per_day' => [1, 100],
       'spam.comment_score_threshold' => [0, 1000000],
     ];
     foreach ($ranges as $key => $range) {
@@ -250,7 +252,7 @@ final class Config {
       'board.cookie_days', 'limits.external_thumbnail_days', 'limits.upload_kb',
       'limits.image_width', 'limits.image_height', 'limits.upload_resize_width', 'limits.upload_resize_height', 'limits.name_length', 'limits.email_length',
       'limits.subject_length', 'limits.url_length', 'limits.comment_length', 'limits.temporary_days',
-      'limits.undo', 'limits.undo_group', 'error_log.retention_days', 'audit_log.retention_days',
+      'limits.undo', 'limits.undo_group',
       'maintenance.delete_quarantine_days',
     ] as $key) {
       if (self::valueAt($values, $key) < 0) {
