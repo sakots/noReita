@@ -103,8 +103,7 @@ final class ApplicationBootstrap {
 
   /** @param mixed $ips */
   private static function validDiagnosticIps($ips, int $maximum): bool {
-    if (!is_array($ips) || count($ips) > $maximum
-      || array_keys($ips) !== ($ips === [] ? [] : range(0, count($ips) - 1))) return false;
+    if (!is_array($ips) || count($ips) > $maximum || !array_is_list($ips)) return false;
     foreach ($ips as $ip) {
       if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) return false;
     }

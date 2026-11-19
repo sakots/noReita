@@ -509,19 +509,41 @@ PHP;
     $base_url, $cookie_jar, null, '198.51.100.99'
   );
   [$configuration_public_status, $configuration_public_body] = http_request($base_url, $cookie_jar);
+  $mapped_diagnostic_config = <<<'PHP'
+<?php
+return [
+  'enabled' => true,
+  'allowed_ips' => ['office' => '198.51.100.99'],
+  'trusted_proxies' => ['127.0.0.1'],
+];
+PHP;
+  if (file_put_contents($webroot . '/debug.local.php', $mapped_diagnostic_config) === false) {
+    throw new RuntimeException('Could not create mapped diagnostic configuration.');
+  }
+  [$configuration_mapped_status, $configuration_mapped_body] = http_request(
+    $base_url, $cookie_jar, null, '198.51.100.99'
+  );
+  if (file_put_contents($webroot . '/debug.local.php', $diagnostic_config) === false) {
+    throw new RuntimeException('Could not restore diagnostic configuration.');
+  }
   if (file_put_contents($webroot . '/config.local.php', $config_local) === false) {
     throw new RuntimeException('Could not restore integration configuration.');
   }
-  integration_test('broken configuration details are visible only to diagnostic IPs', static function () use (
-    $configuration_debug_status, $configuration_debug_body, $configuration_public_status, $configuration_public_body, $webroot
+  integration_test('broken configuration details require list-shaped diagnostic IPs', static function () use (
+    $configuration_debug_status, $configuration_debug_body, $configuration_public_status, $configuration_public_body,
+    $configuration_mapped_status, $configuration_mapped_body, $webroot
   ): bool {
     return $configuration_debug_status === 500 && $configuration_public_status === 500
+      && $configuration_mapped_status === 500
       && str_contains($configuration_debug_body, 'Configuration error')
       && str_contains($configuration_debug_body, 'Invalid type for configuration key: limits.upload_resize_width')
       && str_contains($configuration_debug_body, $webroot . '/config_loader.inc.php')
       && !str_contains($configuration_public_body, 'Configuration error')
       && !str_contains($configuration_public_body, 'limits.upload_resize_width')
-      && !str_contains($configuration_public_body, $webroot);
+      && !str_contains($configuration_public_body, $webroot)
+      && !str_contains($configuration_mapped_body, 'Configuration error')
+      && !str_contains($configuration_mapped_body, 'limits.upload_resize_width')
+      && !str_contains($configuration_mapped_body, $webroot);
   });
 
   [$plain_error_status, $plain_error_body] = http_request($origin_url . '/plain-error-probe.php', $cookie_jar);
