@@ -646,6 +646,18 @@ PHP;
 
   // pictmp initializes the CSRF token in the same session used for posting.
   [$status, $pictmp_body] = http_request($base_url . '?mode=pictmp', $cookie_jar);
+  [$new_paint_status, $new_paint_body] = http_request($base_url, $cookie_jar, [
+    'mode' => 'paint', 'picw' => '320', 'pich' => '330', 'tools' => 'neo',
+  ]);
+  integration_test('new drawing uses submitted dimensions without generic request state', static function () use (
+    $new_paint_status, $new_paint_body
+  ): bool {
+    return $new_paint_status === 200
+      && str_contains($new_paint_body, 'data-width="470"')
+      && str_contains($new_paint_body, 'data-height="560"')
+      && str_contains($new_paint_body, 'image_width:320')
+      && str_contains($new_paint_body, 'image_height:330');
+  });
   $session_id = cookie_value($cookie_jar, 'noreita_session');
   $token = $session_id === null ? '' : hash('sha256', $session_id);
   [$trip_get_status] = http_request($base_url . '?mode=trip_preview', $cookie_jar);

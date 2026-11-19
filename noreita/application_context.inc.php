@@ -8,13 +8,7 @@ final class ApplicationContext {
   /** @var array<string,mixed> */
   public array $data;
 
-  /** @var array<string,mixed> */
-  public array $request;
-
-  /**
-   * @param array<string,mixed> $data
-   * @param array<string,mixed> $request
-   */
+  /** @param array<string,mixed> $data */
   public function __construct(
     public readonly bool $english,
     public readonly TemplateEngine $templates,
@@ -22,9 +16,7 @@ final class ApplicationContext {
     public readonly string $usercode,
     public readonly string $requestMethod,
     public readonly string $themeDirectory,
-    array $request = [],
   ) {
     $this->data =& $data;
-    $this->request = $request;
   }
 }
