@@ -2873,7 +2873,6 @@ function admin(ApplicationContext $context): void {
     $oya = array();
     foreach ($repository->listAdminThreads($offset, $per_page, $filters) as $bbsline) {
       if (empty($bbsline)) break;
-      $bbsline['_admin_matched'] = AdminPostFilter::matches($bbsline, $filters);
       $bbsline['com'] = htmlentities($bbsline['com'], ENT_QUOTES | ENT_HTML5);
       $oya[] = $bbsline;
     }
@@ -2881,8 +2880,7 @@ function admin(ApplicationContext $context): void {
 
     $ko = array();
     $parent_ids = array_column($oya, 'tid');
-    foreach ($repository->listAdminReplies($parent_ids) as $res) {
-      $res['_admin_matched'] = AdminPostFilter::matches($res, $filters);
+    foreach ($repository->listAdminReplies($parent_ids, $filters) as $res) {
       $res['com'] = htmlentities($res['com'], ENT_QUOTES | ENT_HTML5);
       $ko[(int)$res['parent']][] = $res;
     }

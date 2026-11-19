@@ -121,28 +121,6 @@ final class AdminPostFilter {
     ];
   }
 
-  public static function matches(array $post, array $filters): bool {
-    if ($filters['id'] !== '' && (int)$post['tid'] !== (int)$filters['id']) return false;
-    if ($filters['q'] !== '' && !self::contains((string)$post['sub'], $filters['q'])
-      && !self::contains((string)$post['com'], $filters['q'])) return false;
-    if ($filters['name'] !== '' && !self::contains((string)$post['a_name'], $filters['name'])) return false;
-    if ($filters['host'] !== '' && !self::contains((string)$post['host'], $filters['host'])) return false;
-    $created = substr((string)$post['created'], 0, 10);
-    if ($filters['date_from'] !== '' && $created < $filters['date_from']) return false;
-    if ($filters['date_to'] !== '' && $created > $filters['date_to']) return false;
-    if ($filters['type'] === 'thread' && (int)$post['thread'] !== 1) return false;
-    if ($filters['type'] === 'reply' && (int)$post['thread'] !== 0) return false;
-    $has_image = (string)$post['picfile'] !== '';
-    if (($filters['image'] === 'with' && !$has_image)
-      || ($filters['image'] === 'without' && $has_image)) return false;
-    foreach (['nsfw' => 'nsfw', 'visibility' => 'invz', 'isAdministrator' => 'admins'] as $key => $column) {
-      if ($filters[$key] === 'all') continue;
-      $expected = $filters[$key] === 'yes' || $filters[$key] === 'hidden' ? 1 : 0;
-      if ((int)$post[$column] !== $expected) return false;
-    }
-    return true;
-  }
-
   public static function query(array $filters): string {
     $values = array_filter($filters, static fn(string $value): bool => $value !== '' && $value !== 'all');
     return http_build_query($values, '', '&', PHP_QUERY_RFC3986);
@@ -150,10 +128,6 @@ final class AdminPostFilter {
 
   private static function escapeLike(string $value): string {
     return strtr($value, ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']);
-  }
-
-  private static function contains(string $haystack, string $needle): bool {
-    return mb_stripos($haystack, $needle, 0, 'UTF-8') !== false;
   }
 }
 
@@ -556,28 +530,41 @@ final class BoardRepository {
   public function listAdminThreads(int $offset, int $limit, array $filters = []): array {
     $filters = $filters ?: AdminPostFilter::normalize([]);
     $condition = AdminPostFilter::threadCondition($filters);
+    $match = AdminPostFilter::rowCondition($filters, 't', 'matched_');
     $statement = $this->db->prepare(
-      "SELECT t.* FROM board_log t WHERE {$condition['sql']}
+      "SELECT t.*, CASE WHEN {$match['sql']} THEN 1 ELSE 0 END AS _admin_matched
+        FROM board_log t WHERE {$condition['sql']}
         ORDER BY t.age DESC, t.tree DESC, t.tid DESC LIMIT :limit OFFSET :offset"
     );
-    foreach ($condition['params'] as $key => $value) $statement->bindValue(':' . $key, $value);
+    foreach ($condition['params'] + $match['params'] as $key => $value) $statement->bindValue(':' . $key, $value);
     $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
     $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
     $statement->execute();
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
-  public function listAdminReplies(array $parent_ids): array {
+  public function listAdminReplies(array $parent_ids, array $filters = []): array {
     $ids = array_values(array_unique(array_filter(
       array_map('intval', $parent_ids),
       static fn(int $id): bool => $id > 0
     )));
     if ($ids === []) return [];
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $filters = $filters ?: AdminPostFilter::normalize([]);
+    $match = AdminPostFilter::rowCondition($filters, 'r', 'matched_');
+    $params = $match['params'];
+    $parents = [];
+    foreach ($ids as $index => $id) {
+      $key = "parent_{$index}";
+      $parents[] = ':' . $key;
+      $params[$key] = $id;
+    }
+    $placeholders = implode(',', $parents);
     $statement = $this->db->prepare(
-      "SELECT * FROM board_log WHERE thread=0 AND parent IN ({$placeholders}) ORDER BY parent ASC, tree ASC, tid ASC"
+      "SELECT r.*, CASE WHEN {$match['sql']} THEN 1 ELSE 0 END AS _admin_matched
+        FROM board_log r WHERE r.thread=0 AND r.parent IN ({$placeholders})
+        ORDER BY r.parent ASC, r.tree ASC, r.tid ASC"
     );
-    $statement->execute($ids);
+    $statement->execute($params);
     return $statement->fetchAll(PDO::FETCH_ASSOC);
   }
 
