@@ -20,6 +20,11 @@ final class BladeTemplateEngine implements TemplateEngine {
     TemplateEngineFactory::assertTemplateName($template);
     return $this->blade->run($template, $data);
   }
+
+  public function templateFile(string $template): string {
+    TemplateEngineFactory::assertTemplateName($template);
+    return $this->blade->getTemplateFile($template);
+  }
 }
 
 /** Twigテンプレートを自動エスケープ付きで描画・検証する実装。 */

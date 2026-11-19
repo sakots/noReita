@@ -335,6 +335,49 @@ PHP;
   };
   $check_public_pages('eda / empty board', $base_url, $cookie_jar);
 
+  integration_test('React top skips server previews but retains thread cleanup and API posts', static function () use (
+    $webroot, $base_url, $origin_url, $cookie_jar, $config_local
+  ): bool {
+    $config_path = $webroot . '/config.local.php';
+    $config = require $config_path;
+    $config['database']['name'] = 'react_top';
+    $config['board']['max_threads'] = 1;
+    $config['features']['external_image_thumbnail'] = true;
+    $config['paths']['theme'] = 'react';
+    $db_file = $webroot . '/react_top.db';
+    $db = new PDO('sqlite:' . $db_file);
+    (new DatabaseMigrator($db, $db_file, $webroot . '/backup'))->migrate();
+    $repository = new BoardRepository($db);
+    // A numeric loopback URL is rejected locally, so no DNS or network service is needed.
+    $image_url = 'https://127.0.0.1/react-unused-list.png';
+    $failure_file = $webroot . '/thumbnail/.external-image-failures/' . hash('sha256', $image_url) . '.failure.dat';
+    $post = ['thread' => 1, 'invz' => 0, 'a_url' => '', 'picfile' => '', 'pchfile' => '', 'com' => $image_url];
+    $old_id = $repository->insertPost(['age' => 1, 'tree' => 1, 'sub' => 'Expired thread'] + $post);
+    $new_id = $repository->insertPost(['age' => 2, 'tree' => 2, 'sub' => 'React list entry'] + $post);
+    $child = $webroot . '/theme/react-child';
+    mkdir($child);
+    file_put_contents($child . '/theme.php', "<?php return ['extends' => 'react'];");
+    try {
+      foreach (['react', 'react-child'] as $theme) {
+        $config['paths']['theme'] = $theme;
+        file_put_contents($config_path, "<?php return " . var_export($config, true) . ";\n");
+        [$status, $body] = http_request($base_url, $cookie_jar);
+        if ($status !== 200 || !str_contains($body, 'id="react-board"') || is_file($failure_file)) return false;
+      }
+      [$api_status, $api_body] = http_request($origin_url . '/api.php?mode=threads', $cookie_jar);
+      $items = json_decode($api_body, true)['items'] ?? [];
+      if ($api_status !== 200 || array_column($items, 'id') !== [$new_id]
+        || $items[0]['comment'] !== $image_url || $repository->findPost($old_id) !== false) return false;
+
+      file_put_contents($child . '/monoreita_main.blade.php', '<main>{{$oya[0]["sub"]}}</main>');
+      [$status, $body] = http_request($base_url, $cookie_jar);
+      return $status === 200 && str_contains($body, '<main>React list entry</main>') && is_file($failure_file);
+    } finally {
+      file_put_contents($config_path, $config_local);
+      if (is_file($failure_file)) unlink($failure_file);
+    }
+  });
+
   $shared_assets = [
     'assets/js/appFit.js',
     'assets/js/dynamicPalette.js',
