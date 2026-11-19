@@ -60,32 +60,6 @@ smoke_test('minimum PHP version is 8.2', static function (): bool {
     && PHP_VERSION_ID >= NOREITA_MIN_PHP_VERSION_ID;
 });
 
-smoke_test('PHP 8.5 deprecated imagedestroy is not used', static function (): bool {
-  $save = file_get_contents(dirname(__DIR__) . '/noreita/save.inc.php');
-  return is_string($save) && !preg_match('/\bimagedestroy\s*\(/i', $save);
-});
-
-smoke_test('post preview renders text and links without fetching external pages', static function (): bool {
-  $script = file_get_contents(dirname(__DIR__) . '/noreita/post-preview.js');
-  return is_string($script)
-    && str_contains($script, 'textarea[name="com"]')
-    && str_contains($script, '外部リンク')
-    && str_contains($script, "link.rel = 'noopener noreferrer'")
-    && str_contains($script, 'body.textContent = text')
-    && !str_contains($script, 'fetch(');
-});
-
-smoke_test('trip preview uses the server trip generator without sending secrets in URLs', static function (): bool {
-  $script = file_get_contents(dirname(__DIR__) . '/noreita/trip-preview.js');
-  $index = file_get_contents(dirname(__DIR__) . '/noreita/index.php');
-  return is_string($script) && is_string($index)
-    && str_contains($script, "method: 'POST'")
-    && str_contains($script, 'URLSearchParams({ value, token: token.value })')
-    && !str_contains($script, 'endpoint +')
-    && str_contains($index, "case 'trip_preview':")
-    && str_contains($index, 'generate_trip($value)');
-});
-
 smoke_test('BladeOne and Twig render through the template engine abstraction', static function (): bool {
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_templates_' . bin2hex(random_bytes(8));
   $views = $root . DIRECTORY_SEPARATOR . 'views';
@@ -995,19 +969,6 @@ smoke_test('drawing save requests enforce file and aggregate capacity limits', s
     && $rejected(static fn () => PaintSaveRequestGuard::assertImageDimensions(
       5000, 5000, 10000, 10000
     ), 413);
-});
-
-smoke_test('drawing and Misskey API errors use the centralized logging responder', static function (): bool {
-  $save = file_get_contents(dirname(__DIR__) . '/noreita/save.inc.php');
-  $misskey_note = file_get_contents(dirname(__DIR__) . '/noreita/misskey_note.inc.php');
-  $misskey_api = file_get_contents(dirname(__DIR__) . '/noreita/connect_misskey_api.php');
-  if (!is_string($save) || !is_string($misskey_note) || !is_string($misskey_api)) return false;
-  return str_contains($save, 'ApplicationErrorHandler::respondPlainError(')
-    && str_contains($misskey_api, 'ApplicationErrorHandler::respondPlainError(')
-    && !str_contains($misskey_api, "'Misskey upload source image was missing: ' . \$imagePath")
-    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $save)
-    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $misskey_note)
-    && !preg_match('/\bdie\s*\(\s*[\'\"]Error:/i', $misskey_api);
 });
 
 smoke_test('request client IP only trusts forwarding headers from configured proxies', static function (): bool {
@@ -2882,20 +2843,6 @@ smoke_test('external link previews parse cached OGP metadata without fetching in
     if (is_dir($directory . DIRECTORY_SEPARATOR . '.external-link-previews')) rmdir($directory . DIRECTORY_SEPARATOR . '.external-link-previews');
     if (is_dir($directory)) rmdir($directory);
   }
-});
-
-smoke_test('Misskey sending does not impose a fixed wait', static function (): bool {
-  $source = file_get_contents(dirname(__DIR__) . '/noreita/connect_misskey_api.php');
-  return is_string($source)
-    && !preg_match('/\b(?:sleep|usleep|time_nanosleep|time_sleep_until)\s*\(/', $source);
-});
-
-smoke_test('Misskey cached tokens are checked without creating a note', static function (): bool {
-  $source = file_get_contents(dirname(__DIR__) . '/noreita/misskey_note.inc.php');
-  return is_string($source)
-    && str_contains($source, 'permission=read:account,write:notes,write:drive')
-    && str_contains($source, 'MisskeyTokenVerifier::isValid(')
-    && !str_contains($source, '/api/notes/create');
 });
 
 foreach ([

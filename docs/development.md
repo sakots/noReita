@@ -69,6 +69,7 @@ Linux/WSL上では、プロジェクトのルートディレクトリで以下�
 ./scripts/lint-php.sh
 ./scripts/smoke-test.sh
 ./scripts/integration-test.sh
+npm run client:test
 ```
 
 別名のPHPコマンドでテストする場合は、`PHP_BIN`を指定します。例えばPHP 8.2のコマンドが`php82`の場合は次のように実行できます。
@@ -81,11 +82,12 @@ PHP_BIN=php82 ./scripts/integration-test.sh
 
 `./scripts/lint-php.sh`ではPHP構文チェック、
 `./scripts/smoke-test.sh`ではスモークテスト、
-`./scripts/integration-test.sh`ではHTTP結合テストが行なえます。
+`./scripts/integration-test.sh`ではHTTP結合テスト、
+`npm run client:test`では実際のブラウザー用JavaScriptを隔離したDOM上で実行するクライアント動作テストが行なえます。
 
 HTTP結合テストは一時ディレクトリ内の設定を切り替えて検証します。テスト用PHP開発サーバーでは`opcache.enable=0`を指定し、変更前の設定がキャッシュから読み込まれないようにします。CLI用の`opcache.enable_cli=0`だけでは、開発サーバーのOPcacheは無効になりません。実運用のOPcache設定は変更しません。
 
-回帰テストは、テンプレートやPHPソースに特定の文字列・式が含まれることではなく、HTTP応答や保存結果など利用者から観測できる振る舞いを検証します。テーマごとに出力が変わる画面は、edaとmonoreitaの両方を同じ入力と期待値で確認します。
+回帰テストは、テンプレートやPHP・JavaScriptソースに特定の文字列・式が含まれることではなく、HTTP応答、保存結果、DOM更新、送信リクエストなど利用者から観測できる振る舞いを検証します。テーマごとに出力が変わる画面は、edaとmonoreitaの両方を同じ入力と期待値で確認します。
 
 アプリケーション本体とテストコードは最低動作要件のPHP 8.2以上を前提とします。対応外バージョン向けのpolyfillや組み込み関数の再実装は追加せず、`str_contains()`や`array_is_list()`など利用可能な標準関数を直接使います。
 
