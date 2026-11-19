@@ -897,10 +897,6 @@ function def(ApplicationContext $context): void {
   $dat =& $context->data;
   $template_engine = $context->templates;
   $en = $context->english;
-  $dsp_res = Config::int('board.replies_shown');
-  $page_def = Config::int('board.page_size');
-
-  $start = 0;
 
   //ログ行数オーバー処理
   //スレ数カウント
@@ -915,6 +911,18 @@ function def(ApplicationContext $context): void {
   if ($th_cnt > Config::int('board.max_threads')) {
     logdel($context);
   }
+
+  // Reactの一覧は公開APIから取得する。子テーマがトップを上書きした場合は通常どおり準備する。
+  if ($template_engine instanceof BladeTemplateEngine) {
+    $react_top = realpath(__DIR__ . '/theme/react/monoreita_main.blade.php');
+    if ($react_top !== false && realpath($template_engine->templateFile(MAINFILE)) === $react_top) {
+      echo $template_engine->render(MAINFILE, $dat);
+      return;
+    }
+  }
+
+  $page_def = Config::int('board.page_size');
+  $start = 0;
 
   //古いスレのレスボタンを表示しない
   $elapsed_time = Config::int('board.elapsed_reply_days') * 86400; //デフォルトの1年だと31536000
