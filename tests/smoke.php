@@ -1571,16 +1571,20 @@ smoke_test('configured initialization prepares every runtime path', static funct
   $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'noreita_configured_init_' . bin2hex(random_bytes(8));
   if (!mkdir($root, 0700)) return false;
   $database_file = $root . DIRECTORY_SEPARATOR . 'board.db';
+  $configuration = Config::all();
+  $unused_thumbnail_path = $root . DIRECTORY_SEPARATOR . 'unused-thumbnails';
   $public_directories = [
     $root . DIRECTORY_SEPARATOR . Config::string('paths.images'),
     $root . DIRECTORY_SEPARATOR . Config::string('paths.temporary'),
-    $root . DIRECTORY_SEPARATOR . Config::string('paths.thumbnails'),
+    $root . DIRECTORY_SEPARATOR . 'thumbnail',
   ];
   $private_directories = array_map(
     static fn(string $directory): string => $root . DIRECTORY_SEPARATOR . $directory,
     ['session', 'cache', 'backup', 'errorlog', 'auditlog']
   );
   try {
+    Config::initializeForTesting($configuration, ['paths' => ['thumbnails' => 'unused-thumbnails/']]);
+    if (file_put_contents($unused_thumbnail_path, 'leave untouched') === false) return false;
     $initializer = ApplicationInitializer::fromConfig($root, 'sqlite:' . $database_file, $database_file);
     $initializer->prepareDirectories();
     $initializer->migrateDatabase();
@@ -1592,9 +1596,11 @@ smoke_test('configured initialization prepares every runtime path', static funct
         && !array_filter($private_directories, static fn(string $directory): bool =>
           (fileperms($directory) & 0777) !== Config::int('permissions.private_directory')));
     return $mode_checks
+      && file_get_contents($unused_thumbnail_path) === 'leave untouched'
       && !array_filter([...$public_directories, ...$private_directories], static fn(string $directory): bool => !is_dir($directory))
       && is_file($root . DIRECTORY_SEPARATOR . Config::string('paths.temporary') . '.htaccess');
   } finally {
+    Config::initializeForTesting($configuration);
     $iterator = new RecursiveIteratorIterator(
       new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
       RecursiveIteratorIterator::CHILD_FIRST

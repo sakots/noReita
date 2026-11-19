@@ -62,7 +62,6 @@ HTACCESS;
       [
         $path(Config::string('paths.images')) => $public_directory,
         $temporary_directory => $public_directory,
-        $path(Config::string('paths.thumbnails')) => $public_directory,
         $path('thumbnail') => $public_directory,
         $path('session') => $private_directory,
         $path('cache') => $private_directory,

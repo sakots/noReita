@@ -267,7 +267,7 @@ return [
     'axnos' => 'https://oekakibbs.moe/apps/axnos/',
     // 投稿画像を保存するディレクトリです。
     'images' => 'img/',
-    // 投稿画像のサムネイルを保存するディレクトリです。
+    // 旧設定との互換用。外部画像のサムネイルは常に thumbnail/ を使います。
     'thumbnails' => 'thumbnail/',
     // 投稿前のお絵かき画像など、一時ファイルを保存するディレクトリです。
     'temporary' => 'tmp/',
