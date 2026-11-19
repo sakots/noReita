@@ -1815,11 +1815,13 @@ smoke_test('administrator pagination keeps replies with their parent thread', st
   $page_ids = array_map(static fn(array $row): int => (int)$row['tid'], $page);
   $reply_filter = AdminPostFilter::normalize(['q' => 'レス1', 'type' => 'reply']);
   $filtered_page = $repository->listAdminThreads(0, 10, $reply_filter);
+  $filtered_replies = $repository->listAdminReplies(array_column($filtered_page, 'tid'), $reply_filter);
   $filter_valid = $repository->countAdminPosts($reply_filter) === 1
     && $repository->countAdminThreads($reply_filter) === 1
     && count($filtered_page) === 1 && (int)$filtered_page[0]['tid'] === $middle
-    && !AdminPostFilter::matches($filtered_page[0], $reply_filter)
-    && AdminPostFilter::matches($repository->findPost($reply_one), $reply_filter)
+    && !(bool)$filtered_page[0]['_admin_matched']
+    && array_map(static fn(array $row): int => (int)$row['tid'], $filtered_replies) === [$reply_one, $reply_two]
+    && array_map('boolval', array_column($filtered_replies, '_admin_matched')) === [true, false]
     && str_contains(AdminPostFilter::query($reply_filter), 'q=%E3%83%AC%E3%82%B91');
   try {
     AdminPostFilter::normalize(['date_from' => '2026-02-30']);

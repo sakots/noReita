@@ -3344,6 +3344,36 @@ PHP;
       && $admin_invalid_page_status === 400 && $admin_missing_page_status === 404;
   });
 
+  $admin_search_config_path = $webroot . '/config.local.php';
+  $admin_search_config = (string)file_get_contents($admin_search_config_path);
+  $admin_search_insert = $db->prepare("INSERT INTO board_log (thread, parent, sub, com) VALUES (?, ?, ?, '')");
+  $admin_search_insert->execute([1, null, 'É-admin-filter parent']);
+  $admin_search_parent = (int)$db->lastInsertId();
+  $admin_search_insert->execute([0, $admin_search_parent, 'é-admin-filter match']);
+  $admin_search_match = (int)$db->lastInsertId();
+  $admin_search_insert->execute([0, $admin_search_parent, 'É-admin-filter sibling']);
+  $admin_search_sibling = (int)$db->lastInsertId();
+  try {
+    foreach (['eda', 'monoreita'] as $theme) {
+      file_put_contents($admin_search_config_path, str_replace("'paths' => ['theme' => 'starter'],",
+        "'paths' => ['theme' => '" . $theme . "'],", $admin_search_config));
+      integration_test('admin search only selects posts included in the result count: ' . $theme, static function () use (
+        $base_url, $cookie_jar, $admin_search_parent, $admin_search_match, $admin_search_sibling
+      ): bool {
+        [$status, $body] = http_request($base_url . '?mode=admin&q=' . rawurlencode('é-admin-filter'), $cookie_jar);
+        preg_match_all('/name="delno\[\]" value="(\d+)"/', $body, $checkboxes);
+        return $status === 200 && preg_match('/検索結果\s+1件\s*\//u', $body) === 1
+          && str_contains($body, '?mode=admin_post&amp;id=' . $admin_search_parent . '"')
+          && str_contains($body, '?mode=admin_post&amp;id=' . $admin_search_sibling . '"')
+          && $checkboxes[1] === [(string)$admin_search_match];
+      });
+    }
+  } finally {
+    $db->prepare('DELETE FROM board_log WHERE tid IN (?, ?, ?)')
+      ->execute([$admin_search_parent, $admin_search_match, $admin_search_sibling]);
+    file_put_contents($admin_search_config_path, $admin_search_config);
+  }
+
   [$image_delete_status] = http_request($base_url, $cookie_jar, [
     'mode' => 'del', 'delno' => (string)$image_post_id, 'pwd' => 'image-pass',
   ]);
