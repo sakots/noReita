@@ -161,9 +161,7 @@ class image_save{
     redirect("./");
   }
 
-  $lang = ($http_langs = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')
-  ? explode( ',', $http_langs )[0] : '';
-  $this->en= (stripos($lang,'ja')!==0);
+  $this->en = ApplicationBootstrap::english();
 
   $request_tool = (string)filter_input_data('GET', 'tool');
   $this->error_type = $request_tool === 'neo' ? 'neo' : ($request_tool === 'chi' ? 'chi' : $request_tool);

@@ -27,9 +27,7 @@ final class ApplicationBootstrap {
   public static function boot(string $root): void {
     if (self::$booted) return;
 
-    $languages = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
-    $language = $languages !== '' ? explode(',', $languages)[0] : '';
-    self::$english = stripos($language, 'ja') !== 0;
+    self::$english = RequestInfo::prefersEnglish();
 
     $functions = $root . '/functions.php';
     $error_handler = $root . '/error_handler.inc.php';

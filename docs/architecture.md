@@ -44,7 +44,7 @@ edaとmonoreitaで同じJavaScript・Luminous資産は`assets/`に1つだけ配�
 
 `AdminLoginRateLimiter`は管理者ログインの失敗回数を接続元IP単位で制限します。生IPや管理パスは保存せず、管理パスを鍵にしたIPのHMACと、回数・時刻だけを`session/`内の`0600`ファイルへ保存します。既定では15分以内に5回失敗すると15分間HTTP 429で拒否し、ログイン成功時にそのIPの記録を削除します。期限切れの記録は、認証の成否にかかわらずログイン試行時に確率的かつ件数を制限して削除します。接続元IPは`RequestInfo`の信頼境界を共通利用します。
 
-`request_info.inc.php`の`RequestInfo`がクライアントIPなど、HTTPリクエスト由来の情報の取得と正規化を担当します。既定は`REMOTE_ADDR`だけを採用します。`security.trusted_proxies`に直近のプロキシが明示されている場合だけ`X-Forwarded-For`を右からたどり、信頼済みホップの手前にあるIPを採用します。`Client-IP`は常に無視します。
+`request_info.inc.php`の`RequestInfo`がクライアントIPや表示言語など、HTTPリクエスト由来の情報の取得と正規化を担当します。表示言語は`Accept-Language`の先頭言語が日本語なら日本語、それ以外または未指定なら英語と判定し、通常画面、保存API、Misskey連携、エラー画面で同じ判定を使用します。接続元IPは既定で`REMOTE_ADDR`だけを採用します。`security.trusted_proxies`に直近のプロキシが明示されている場合だけ`X-Forwarded-For`を右からたどり、信頼済みホップの手前にあるIPを採用します。`Client-IP`は常に無視します。
 
 ## エラー処理
 

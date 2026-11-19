@@ -1,6 +1,8 @@
 <?php
 // error_handler.inc.php for noReita (C) sakots 2026 MIT License
 
+require_once __DIR__ . '/request_info.inc.php';
+
 const ERROR_HANDLER_INC_VER = 20260820;
 
 /** エラー記録を日付ごとのJSON Linesファイルへ追記し、サイズと保存期間を管理する。 */
@@ -571,7 +573,7 @@ final class ApplicationErrorHandler {
       header('Content-Type: text/html; charset=UTF-8');
       header('Cache-Control: no-store, private');
     }
-    $english = stripos((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''), 'ja') !== 0;
+    $english = RequestInfo::prefersEnglish();
     $title = self::$debug ? 'Debug error' : ($english ? 'Internal Server Error' : '内部エラー');
     $body = self::$debug
       ? self::debugMessage($error_id, $message, $cause)

@@ -29,11 +29,6 @@ final class MisskeyApiContext {
     public readonly bool $english,
     public readonly string $baseUrl,
   ) {}
-
-  public static function englishFromRequest(): bool {
-    $language = explode(',', (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''))[0];
-    return stripos($language, 'ja') !== 0;
-  }
 }
 
 function misskey_api_error(
@@ -45,7 +40,7 @@ function misskey_api_error(
 	ApplicationErrorHandler::respondPlainError(
 		$status,
 		$public_message,
-		MisskeyApiContext::englishFromRequest(),
+		ApplicationBootstrap::english(),
 		'Error: ',
 		'Misskey API: ' . $diagnostic,
 		$cause
@@ -429,7 +424,7 @@ class connect_misskey_api{
 
 function connect_misskey_api_dispatch(): void {
 	RequestSecurity::startSession();
-	$context = new MisskeyApiContext(MisskeyApiContext::englishFromRequest(), '');
+	$context = new MisskeyApiContext(ApplicationBootstrap::english(), '');
 	$en = $context->english;
 	if (!Config::bool('features.misskey_note')) {
 		misskey_api_error(
