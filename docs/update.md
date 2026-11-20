@@ -40,9 +40,12 @@ bash scripts/upload-ssh.sh deploy_key /path/to/noReita/noreita \
 
 ```text
 deploy_key
-user@server1:/var/www/board/
-board2:/home/user/public_html/board/
+user@server1:2222:/var/www/boardpath1/
+user@server2:2200:/var/www/boardpath2/
 ```
+
+ポートは転送先ごとに1～65535の数字で指定します。ポートを省略した `HOST:/絶対パス/`
+も使えます。その場合は `~/.ssh/config` のポート設定（なければ22）が使われます。
 
 ```bash
 bash scripts/upload-ssh.sh --config ~/.ssh/noreita-upload.txt /path/to/noReita/noreita

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  printf 'Usage: bash %s [--apply] KEY_NAME SOURCE_DIR HOST:/DEST/ [HOST:/DEST/ ...]\n' "$0"
+  printf 'Usage: bash %s [--apply] KEY_NAME SOURCE_DIR HOST:[PORT:]/DEST/ [HOST:[PORT:]/DEST/ ...]\n' "$0"
   printf '       bash %s [--apply] --config FILE SOURCE_DIR\n' "$0"
   printf 'KEY_NAME is a private key in ~/.ssh/. Without --apply, preview changes only.\n'
 }
@@ -46,12 +46,27 @@ if [[ ! -d $source_dir || ! -f $source_dir/index.php || ! -f $source_dir/vendor/
   exit 2
 fi
 source_dir=$(cd -- "$source_dir" && pwd -P)
+targets=()
+ports=()
+destination_pattern='^(([a-zA-Z0-9_][a-zA-Z0-9_.-]*@)?[a-zA-Z0-9_][a-zA-Z0-9_.-]*):(([0-9]{1,5}):)?(/[^/[:cntrl:]][^[:cntrl:]]*)$'
 for destination in "$@"; do
-  if [[ ! $destination =~ ^([a-zA-Z0-9_][a-zA-Z0-9_.-]*@)?[a-zA-Z0-9_][a-zA-Z0-9_.-]*:/[^/[:cntrl:]][^[:cntrl:]]*$ \
-    || ${destination#*:}/ == */../* || ${destination#*:}/ == */./* ]]; then
-    printf 'Expected HOST:/absolute/path/ (not the remote root): %s\n' "$destination" >&2
+  if [[ ! $destination =~ $destination_pattern ]]; then
+    printf 'Expected HOST:[PORT:]/absolute/path/ (not the remote root): %s\n' "$destination" >&2
     exit 2
   fi
+  host=${BASH_REMATCH[1]}
+  port=${BASH_REMATCH[4]}
+  path=${BASH_REMATCH[5]}
+  if [[ $path/ == */../* || $path/ == */./* ]]; then
+    printf 'Destination path must not contain . or .. segments: %s\n' "$destination" >&2
+    exit 2
+  fi
+  if [[ -n $port ]] && (( 10#$port < 1 || 10#$port > 65535 )); then
+    printf 'SSH port must be between 1 and 65535: %s\n' "$destination" >&2
+    exit 2
+  fi
+  targets+=("$host:$path")
+  ports+=("$port")
 done
 
 ssh_command="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -i \"$key\""
@@ -61,11 +76,19 @@ for directory in img thumbnail tmp cache session backup errorlog auditlog; do
 done
 
 failed=0
-for destination in "$@"; do
-  printf '\n==> %s\n' "$destination"
+for index in "${!targets[@]}"; do
+  destination=${targets[index]}
+  transport=$ssh_command
+  if [[ -n ${ports[index]} ]]; then
+    transport+=" -p $((10#${ports[index]}))"
+    destination_label="${destination%%:*}:${ports[index]}:${destination#*:}"
+  else
+    destination_label=$destination
+  fi
+  printf '\n==> %s\n' "$destination_label"
   if ! rsync -rt -s --itemize-changes "${mode[@]}" "${filters[@]}" \
-    -e "$ssh_command" -- "$source_dir/" "$destination"; then
-    printf 'Upload failed: %s\n' "$destination" >&2
+    -e "$transport" -- "$source_dir/" "$destination"; then
+    printf 'Upload failed: %s\n' "$destination_label" >&2
     failed=1
   fi
 done
