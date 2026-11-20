@@ -174,6 +174,7 @@ $dat['axnos_dir'] = Config::string('paths.axnos');
 
 $dat['ver'] = REITA_VER;
 $dat['base'] = Config::string('site.base_url');
+$dat['shared_js_path'] = '/' . ltrim((string)parse_url($dat['base'], PHP_URL_PATH), '/') . 'assets/js/';
 $dat['board_title'] = Config::string('site.title');
 $dat['home'] = Config::string('site.home_url');
 $dat['self'] = Config::string('site.script_name');
