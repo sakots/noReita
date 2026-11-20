@@ -5,9 +5,9 @@
     <title>{{$board_title}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('components.monoreita_headCss')
-    <script src="assets/js/neoLoader.js?{{$stime}}" charset="utf-8"></script>
+    <script src="{{$shared_js_path}}neoLoader.js?{{$stime}}" charset="utf-8"></script>
     <!-- アプレットフィット -->
-    <script src="assets/js/appFit.js?{{$stime}}" charset="utf-8"></script>
+    <script src="{{$shared_js_path}}appFit.js?{{$stime}}" charset="utf-8"></script>
     <!-- アプレットフィットここまで -->
     @include('components.monoreita_customCss')
   </head>
@@ -37,7 +37,7 @@
           {!!$palettes!!}
         @endif
       </script>
-      <script src="assets/js/dynamicPalette.js?{{$stime}}" charset="utf-8"></script>
+      <script src="{{$shared_js_path}}dynamicPalette.js?{{$stime}}" charset="utf-8"></script>
       <script>
         // パレットデータをマネージャーに設定
         document.addEventListener('DOMContentLoaded', function() {
