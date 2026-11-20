@@ -3,17 +3,25 @@ set -euo pipefail
 
 usage() {
   printf 'Usage: bash %s [--apply] KEY_NAME SOURCE_DIR HOST:[PORT:]/DEST/ [HOST:[PORT:]/DEST/ ...]\n' "$0"
-  printf '       bash %s [--apply] --config FILE SOURCE_DIR\n' "$0"
+  printf '       bash %s [--apply] [--config FILE SOURCE_DIR]\n' "$0"
   printf 'KEY_NAME is a private key in ~/.ssh/. Without --apply, preview changes only.\n'
+  printf 'Defaults: ~/.ssh/noreita-upload.txt and noreita/ next to the scripts directory.\n'
 }
 
 if [[ ${1:-} == --help ]]; then usage; exit 0; fi
 mode=(--dry-run)
 if [[ ${1:-} == --apply ]]; then mode=(); shift; fi
-if [[ ${1:-} == --config ]]; then
-  if (( $# != 3 )); then usage >&2; exit 2; fi
-  config_file=$2
-  source_dir=$3
+if (( $# == 0 )) || [[ $1 == --config ]]; then
+  if (( $# == 0 )); then
+    config_file="$HOME/.ssh/noreita-upload.txt"
+    script_path=$0
+    if [[ $script_path != */* ]]; then script_path="./$script_path"; fi
+    source_dir="${script_path%/*}/../noreita"
+  else
+    if (( $# != 3 )); then usage >&2; exit 2; fi
+    config_file=$2
+    source_dir=$3
+  fi
   if [[ ! -f $config_file || ! -r $config_file ]]; then
     printf 'Cannot read configuration file: %s\n' "$config_file" >&2
     exit 2
@@ -42,7 +50,7 @@ if [[ ! $key_name =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$ || $key == *\"* || $key == *$
   exit 2
 fi
 if [[ ! -d $source_dir || ! -f $source_dir/index.php || ! -f $source_dir/vendor/autoload.php ]]; then
-  printf 'Specify the extracted noReita application directory (with index.php and vendor/).\n' >&2
+  printf 'Source must contain index.php and vendor/autoload.php: %s\n' "$source_dir" >&2
   exit 2
 fi
 source_dir=$(cd -- "$source_dir" && pwd -P)

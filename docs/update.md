@@ -19,7 +19,9 @@
 
 ## SSHで複数の設置先へアップロード
 
-配布アーカイブを展開した `noReita/noreita/` を転送元に指定します。
+引数を省略すると、リポジトリ内の `noreita/` を転送元に使います。事前に
+`composer install --working-dir=noreita --no-dev --prefer-dist` で `vendor/` を用意してください。
+配布アーカイブから転送する場合は、展開した `noReita/noreita/` を引数で指定できます。
 ローカルと転送先に `rsync` が必要です。転送先のディレクトリはあらかじめ作成し、
 SSHホスト鍵を確認して `known_hosts` に登録してください。
 
@@ -33,9 +35,9 @@ bash scripts/upload-ssh.sh deploy_key /path/to/noReita/noreita \
 `--apply` を追加します。転送先の余分なファイルは削除せず、ローカル設定、DB、既定の
 運用データ用ディレクトリは転送しません。配布用の `.htaccess` は転送します。
 
-鍵のファイル名と転送先を繰り返し指定する場合は、リポジトリ外のテキストファイル
-（例: `~/.ssh/noreita-upload.txt`）に保存できます。最初の有効行は鍵のファイル名、
-以降は1行に1つの転送先です。空行と `#` で始まる行は無視します。
+引数を省略する場合は `~/.ssh/noreita-upload.txt` に鍵のファイル名と転送先を保存します。
+最初の有効行は鍵のファイル名、以降は1行に1つの転送先です。
+空行と `#` で始まる行は無視します。
 秘密鍵の中身は書かないでください。
 
 ```text
@@ -48,10 +50,11 @@ user@server2:2200:/var/www/boardpath2/
 も使えます。その場合は `~/.ssh/config` のポート設定（なければ22）が使われます。
 
 ```bash
-bash scripts/upload-ssh.sh --config ~/.ssh/noreita-upload.txt /path/to/noReita/noreita
+bash scripts/upload-ssh.sh          # プレビュー
+bash scripts/upload-ssh.sh --apply  # 実際に転送
 ```
 
-設定ファイルを使う場合も、実行には `--config` の前に `--apply` を付けます。
+別の設定ファイルと転送元を使う場合は `--config FILE SOURCE_DIR` を指定します。
 
 ## v4.14.2への更新
 
