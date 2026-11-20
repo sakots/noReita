@@ -205,7 +205,7 @@ bash pre.sh
 
 [すべての履歴はこちら](changelog.md)
 
-### 未リリース
+### [2026/11/20] v4.14.6
 
 - eda・monoreitaの描画画面で、共有JavaScriptを掲示板の設置先から読み込むよう修正
 
