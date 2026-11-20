@@ -33,6 +33,23 @@ bash scripts/upload-ssh.sh deploy_key /path/to/noReita/noreita \
 `--apply` を追加します。転送先の余分なファイルは削除せず、ローカル設定、DB、既定の
 運用データ用ディレクトリは転送しません。配布用の `.htaccess` は転送します。
 
+鍵のファイル名と転送先を繰り返し指定する場合は、リポジトリ外のテキストファイル
+（例: `~/.ssh/noreita-upload.txt`）に保存できます。最初の有効行は鍵のファイル名、
+以降は1行に1つの転送先です。空行と `#` で始まる行は無視します。
+秘密鍵の中身は書かないでください。
+
+```text
+deploy_key
+user@server1:/var/www/board/
+board2:/home/user/public_html/board/
+```
+
+```bash
+bash scripts/upload-ssh.sh --config ~/.ssh/noreita-upload.txt /path/to/noReita/noreita
+```
+
+設定ファイルを使う場合も、実行には `--config` の前に `--apply` を付けます。
+
 ## v4.14.2への更新
 
 この版には、パスワード未設定の投稿を第三者が編集・削除できる問題の修正が含まれます。
