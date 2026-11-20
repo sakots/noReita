@@ -17,6 +17,22 @@
 プログラム本体を更新するときは`.htaccess`もアップロードしてください。FTPソフトで
 隠しファイルを転送しない設定になっている場合は個別に確認してください。
 
+## SSHで複数の設置先へアップロード
+
+配布アーカイブを展開した `noReita/noreita/` を転送元に指定します。
+ローカルと転送先に `rsync` が必要です。転送先のディレクトリはあらかじめ作成し、
+SSHホスト鍵を確認して `known_hosts` に登録してください。
+
+```bash
+bash scripts/upload-ssh.sh deploy_key /path/to/noReita/noreita \
+  user@server1:/var/www/board/ board2:/home/user/public_html/board/
+```
+
+鍵は `~/.ssh/deploy_key` を使用します。`board2` は `~/.ssh/config` の `Host` 名も指定できます。
+最初は変更内容を表示するだけです。確認後、実際に転送するには `upload-ssh.sh` の直後に
+`--apply` を追加します。転送先の余分なファイルは削除せず、ローカル設定、DB、既定の
+運用データ用ディレクトリは転送しません。配布用の `.htaccess` は転送します。
+
 ## v4.14.2への更新
 
 この版には、パスワード未設定の投稿を第三者が編集・削除できる問題の修正が含まれます。
