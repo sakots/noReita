@@ -5,7 +5,7 @@
     "require": {
         "php": ">=8.2",
         "eftec/bladeone": "^4.19.1",
-        "twig/twig": "^3.28"
+        "twig/twig": "^3.31.1"
     },
     "config": {
         "optimize-autoloader": true,
