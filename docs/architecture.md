@@ -6,7 +6,7 @@
 
 `ApplicationContext`には複数の処理で共用する型付き状態だけを保持し、特定の処理だけが使うモードやメッセージを汎用配列へ複製しません。描画画面の続き描き判定は、検証済みの描画種別を直接使用します。
 
-外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOneはv4.19.1に固定し、Twig 3も同梱します。
+外部PHPライブラリは`noreita/composer.json`と`composer.lock`で管理し、`vendor/autoload.php`から読み込みます。BladeOne 5とTwig 3を同梱します。
 
 `template_engine.inc.php`が画面描画の共通入口です。`TemplateEngine`を通して論理テンプレート名とデータ配列を渡します。v4.2簡易テーマでは子から親の順に複数のテンプレートディレクトリを探索し、未配置の画面とコンポーネントを親テーマへフォールバックします。BladeOneは`.blade.php`、Twigは同名の`.twig`を読み込みます。Twig選択時に`.twig`がない画面は`.blade.php`へフォールバックするため、テーマを稼働させたまま1画面ずつ移行できます。Twigの自動エスケープを有効にしているため、HTMLを出力する値はTwigテンプレート側で必要な箇所だけ`|raw`を明示してください。
 
