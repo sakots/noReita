@@ -4,7 +4,7 @@
     "license": "MIT",
     "require": {
         "php": ">=8.2",
-        "eftec/bladeone": "^4.19.1",
+        "eftec/bladeone": "^5.0",
         "twig/twig": "^3.31.1"
     },
     "config": {

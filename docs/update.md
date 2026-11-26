@@ -102,7 +102,7 @@ v3以降のデータベースにはスキーマバージョンが記録され、
 
 `scripts/lint-php.sh`、`scripts/smoke-test.sh`を実行してください
 
-最初にComposer依存ライブラリをインストールしてください。BladeOne v4.19.1は`composer.lock`で固定されています。
+最初に`composer.lock`に従ってComposer依存ライブラリをインストールしてください。
 
 ```bash
 composer install --working-dir=noreita --no-dev --prefer-dist
